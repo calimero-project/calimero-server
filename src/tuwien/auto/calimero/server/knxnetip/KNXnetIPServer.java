@@ -1710,7 +1710,7 @@ public class KNXnetIPServer
 			final NetworkInterface[] joinOn) throws IOException
 		{
 			final String p = System.getProperties().getProperty("java.net.preferIPv4Stack");
-			logger.trace("network stack uses IPv4 addresses = " + (p == null ? "[not found]" : p));
+			logger.trace("network stack uses IPv4 addresses: " + (p == null ? "unknown" : p));
 			final MulticastSocket s;
 			try {
 				s = new MulticastSocket(Discoverer.SEARCH_PORT);
