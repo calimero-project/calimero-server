@@ -742,9 +742,8 @@ public class KnxServerGateway implements Runnable
 				if (routing && routingLoopback) {
 					synchronized (loopbackFrames) {
 						loopbackFrames.add(f);
-						System.out.println("added " + f + " to loopback frame buffer");
-						System.out.println("frame: " + DataUnitBuilder.toHex(f.toByteArray(), " ")
-								+ " to loopback frame buffer");
+						System.out.println("add to loopback frame buffer: " + f + " [" +
+								DataUnitBuilder.toHex(f.toByteArray(), " ") + "]");
 					}
 				}
 			}
