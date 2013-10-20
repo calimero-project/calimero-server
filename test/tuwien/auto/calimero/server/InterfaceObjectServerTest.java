@@ -88,8 +88,8 @@ public class InterfaceObjectServerTest extends TestCase
 
 	/**
 	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#setResourceHandler (tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler)}
-	 * .
+	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#setResourceHandler
+	 * (tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler)}.
 	 */
 	public final void testSetResourceHandler()
 	{
@@ -126,7 +126,7 @@ public class InterfaceObjectServerTest extends TestCase
 
 	/**
 	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#loadDefinitions(java.lang.String)} .
+	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#loadDefinitions(java.lang.String)}.
 	 * 
 	 * @throws KNXException
 	 */
@@ -195,8 +195,8 @@ public class InterfaceObjectServerTest extends TestCase
 
 	/**
 	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#addServerListener(tuwien.auto.calimero.server.InterfaceObjectServerListener)}
-	 * .
+	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#addServerListener
+	 * (tuwien.auto.calimero.server.InterfaceObjectServerListener)}.
 	 */
 	public final void testAddServerListener()
 	{
@@ -205,8 +205,8 @@ public class InterfaceObjectServerTest extends TestCase
 
 	/**
 	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#removeServerListener(tuwien.auto.calimero.server.InterfaceObjectServerListener)}
-	 * .
+	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#removeServerListener
+	 * (tuwien.auto.calimero.server.InterfaceObjectServerListener)}.
 	 */
 	public final void testRemoveServerListener()
 	{
@@ -253,9 +253,8 @@ public class InterfaceObjectServerTest extends TestCase
 	}
 
 	/**
-	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#setProperty(int, int, int, java.lang.String)}
-	 * .
+	 * Test method for {@link tuwien.auto.calimero.server.InterfaceObjectServer
+	 * #setProperty(int, int, int, java.lang.String)}.
 	 */
 	public final void testSetPropertyIntIntIntString()
 	{
@@ -273,9 +272,8 @@ public class InterfaceObjectServerTest extends TestCase
 	}
 
 	/**
-	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#setDescription(tuwien.auto.calimero.mgmt.Description, boolean)}
-	 * .
+	 * Test method for {@link tuwien.auto.calimero.server.InterfaceObjectServer
+	 * #setDescription(tuwien.auto.calimero.mgmt.Description, boolean)}.
 	 */
 	public final void testSetDescription()
 	{
