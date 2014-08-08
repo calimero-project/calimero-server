@@ -39,6 +39,7 @@ import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.exception.KNXException;
+import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -606,6 +607,14 @@ public class KnxServerGateway implements Runnable
 		else
 			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16)
 					+ " - ignored");
+	}
+
+	private static CEMI createCon(final byte[] data, final CEMI original, final boolean error)
+		throws KNXFormatException
+	{
+		return new CEMILData(CEMILData.MC_LDATA_CON, ((CEMILData) original).getSource(),
+				((CEMILData) original).getDestination(), data,
+				((CEMILData) original).getPriority(), error);
 	}
 
 	private boolean discardLoopedBackFrame(final CEMI frame)
