@@ -563,13 +563,7 @@ public class KnxServerGateway implements Runnable
 					if (send == null)
 						logger.info("hop count 0, discarded frame to " + f.getDestination());
 					else {
-						// dispatch to all subnets, this is actually not correct
-						// we should only dispatch to the subnet of the matching service
-						// container
-						for (final Iterator i = connectors.iterator(); i.hasNext();) {
-							final SubnetConnector b = (SubnetConnector) i.next();
-							dispatchToSubnet(b, send);
-						}
+						dispatchToSubnet(send);
 					}
 				}
 				catch (final KNXException e) {
@@ -640,32 +634,49 @@ public class KnxServerGateway implements Runnable
 		return false;
 	}
 
-	private void dispatchToSubnet(final SubnetConnector subnetConnector, final CEMILData f)
+	private void dispatchToSubnet(final CEMILData f)
 	{
 		if (f.getDestination() instanceof IndividualAddress) {
 			final KNXNetworkLink lnk = findSubnetLink((IndividualAddress) f.getDestination());
-			if (lnk != null)
-				send(lnk, f);
+			if (lnk == null) {
+				logger.warn("no subnet configured for destination " + f.getDestination() + " ("
+						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination())
+						+ " received from " + f.getSource() + ")");
+				return;
+			}
+			send(lnk, f);
 		}
 		else {
 			// group destination address, check forwarding settings
 			final int raw = f.getDestination().getRawAddress();
+			// XXX cleanup  the two loops
 			if (raw <= 0x6fff) {
 				if (subGroupAddressConfig == 2)
 					return;
-				if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
-						&& !inGroupAddressTable((GroupAddress) f.getDestination(),
-								subnetConnector.getGroupAddressTableObjectInstance())) {
-					logger.warn("destination " + f.getDestination()
-							+ " not in group address table - skipped frame");
-					return;
+				
+				for (final Iterator i = connectors.iterator(); i.hasNext();) {
+					final SubnetConnector subnet = (SubnetConnector) i.next();
+					if (subnet.getServiceContainer().isActivated()) {
+						
+						if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
+								&& !inGroupAddressTable((GroupAddress) f.getDestination(),
+										subnet.getGroupAddressTableObjectInstance())) {
+							logger.warn("destination " + f.getDestination()
+									+ " not in group address table - skip frame");
+						}
+						else
+							send(subnet.getSubnetLink(), f);
+					}
 				}
 			}
-			for (final Iterator i = connectors.iterator(); i.hasNext();) {
-				final SubnetConnector b = (SubnetConnector) i.next();
-				if (b.getServiceContainer().isActivated())
-					send(b.getSubnetLink(), f);
+			else {
+				for (final Iterator i = connectors.iterator(); i.hasNext();) {
+					final SubnetConnector b = (SubnetConnector) i.next();
+					if (b.getServiceContainer().isActivated())
+						send(b.getSubnetLink(), f);
+				}
 			}
+
 		}
 		incMsgTransmitted(true);
 	}
