@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1611,7 +1611,7 @@ public class KNXnetIPServer
 				}
 			}
 			catch (final Exception e) {
-				logger.warn("initialization of service failed", e);
+				logger.error("initialization of service failed", e);
 			}
 			return null;
 		}
@@ -1672,6 +1672,9 @@ public class KNXnetIPServer
 			}
 		}
 
+		/**
+		 * @return the looper object, or <code>null</code> if looper creation failed
+		 */
 		synchronized ServiceLoop getLooper()
 		{
 			return looper;
@@ -1829,8 +1832,8 @@ public class KNXnetIPServer
 						final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device,
 								svcFamilies));
 						final DatagramPacket p = new DatagramPacket(buf, buf.length, addr);
-						logger.trace("sending search response containing " + sc.getName() + " to "
-								+ addr);
+						logger.trace("sending search response with container \'" + sc.getName()
+								+ "\' to " + addr);
 						sendOnInterfaces(p);
 					}
 				}
@@ -1847,15 +1850,18 @@ public class KNXnetIPServer
 				final NetworkInterface nif = (NetworkInterface) nifs.nextElement();
 				// we can't use isUp or supportsMulticast on the interface with Java v1.4
 				if (nif.getInetAddresses().hasMoreElements()) {
+					// some OS use a dedicated display name, others use the same as from getName
+					String name = nif.getName();
+					final String disp = nif.getDisplayName();
+					if (!name.equals(disp))
+						name = name + " (" + disp + ")";
 					try {
 						((MulticastSocket) s).setNetworkInterface(nif);
-						logger.trace("send discovery response on interface " + nif.getName()
-								+ " or " + nif.getDisplayName());
+						logger.trace("send search response on interface " + name);
 						s.send(p);
 					}
 					catch (final SocketException e) {
-						logger.info("failure sending on interface " + nif.getName() + " or "
-								+ nif.getDisplayName());
+						logger.info("failure sending on interface " + name);
 					}
 				}
 			}
