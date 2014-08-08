@@ -35,11 +35,11 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
-import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
+import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -556,9 +556,21 @@ public class KnxServerGateway implements Runnable
 				try {
 					// send confirmation on .req type
 					if (mc == CEMILData.MC_LDATA_REQ) {
-						((KNXnetIPConnection) fe.getSource()).send(
-								CEMIFactory.create(CEMILData.MC_LDATA_CON, f.getPayload(), f),
-								KNXnetIPConnection.WAIT_FOR_ACK);
+						// TODO check for reasons to send negative L-Data.con
+						final boolean error = false;
+						//if (f.getDestination().equals(a))
+						//	error = true;
+						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
+						// TODO wait for ACK is correct, but should be done asynchronously
+						// otherwise, it might block the processing of a next queued frame
+						//c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
+						try {
+							c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.NONBLOCKING);
+						}
+						catch (final KNXIllegalStateException e) {
+							// an ACK is still pending from a previous non-blocking send
+							e.printStackTrace();
+						}
 					}
 					final CEMILData send = adjustHopCount(f);
 					if (send == null)
