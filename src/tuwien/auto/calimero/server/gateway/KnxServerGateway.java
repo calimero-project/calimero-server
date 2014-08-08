@@ -165,8 +165,8 @@ public class KnxServerGateway implements Runnable
 		 */
 		public void onPropertyValueChanged(final PropertyEvent pe)
 		{
-			logger.trace("property id " + pe.getPropertyId() + " changed to ["
-					+ DataUnitBuilder.toHex(pe.getNewData(), " ") + "]");
+			//logger.trace("property id " + pe.getPropertyId() + " changed to ["
+			//		+ DataUnitBuilder.toHex(pe.getNewData(), " ") + "]");
 
 			if (pe.getNewData().length == 0)
 				return;
