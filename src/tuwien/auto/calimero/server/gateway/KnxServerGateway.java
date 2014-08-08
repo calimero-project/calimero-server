@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -573,7 +573,9 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				catch (final KNXException e) {
-					logger.error("error on L-data confirmation", e);
+					logger.error("sending L-data confirmation of "
+							+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
+					e.printStackTrace();
 				}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
