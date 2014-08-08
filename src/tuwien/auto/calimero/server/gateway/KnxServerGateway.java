@@ -79,7 +79,7 @@ import tuwien.auto.calimero.server.knxnetip.ShutdownEvent;
  * <p>
  * Starting a gateway by invoking {@link #run()} is a blocking operation. Therefore, this class
  * implements {@link Runnable} to allow execution in its own thread.
- * 
+ *
  * @author B. Malinowsky
  */
 public class KnxServerGateway implements Runnable
@@ -382,7 +382,7 @@ public class KnxServerGateway implements Runnable
 	 * Creates a new server gateway for the supplied KNXnet/IP server.
 	 * <p>
 	 * On running this gateway ({@link #run()}), it is ensured the KNXnet/IP server is launched.
-	 * 
+	 *
 	 * @param gatewayName descriptive name to use for this gateway
 	 * @param s KNXnet/IP server representing the server side
 	 * @param subnetConnectors list of {@link SubnetConnector} objects, which specify the
@@ -509,7 +509,7 @@ public class KnxServerGateway implements Runnable
 	/**
 	 * Returns the name of this server gateway.
 	 * <p>
-	 * 
+	 *
 	 * @return the gateway name as string
 	 */
 	public String getName()
@@ -662,11 +662,11 @@ public class KnxServerGateway implements Runnable
 			if (raw <= 0x6fff) {
 				if (subGroupAddressConfig == 2)
 					return;
-				
+
 				for (final Iterator i = connectors.iterator(); i.hasNext();) {
 					final SubnetConnector subnet = (SubnetConnector) i.next();
 					if (subnet.getServiceContainer().isActivated()) {
-						
+
 						if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
 								&& !inGroupAddressTable((GroupAddress) f.getDestination(),
 										subnet.getGroupAddressTableObjectInstance())) {
