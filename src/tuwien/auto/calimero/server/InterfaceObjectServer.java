@@ -521,6 +521,28 @@ public class InterfaceObjectServer implements PropertyAccess
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see tuwien.auto.calimero.mgmt.PropertyAccess#getDescriptionByIndex(int, int)
+	 */
+	public Description getDescriptionByIndex(final int objIndex, final int propIndex)
+		throws KNXPropertyException
+	{
+		try {
+			return client.getDescriptionByIndex(objIndex, propIndex);
+		}
+		catch (final KNXException e) {
+			// forward all KNXPropertyExceptions from our adapter
+			if (e instanceof KNXPropertyException)
+				throw (KNXPropertyException) e;
+			// KNXException is currently thrown by PropertyClient.getObjectType,
+			// quite unnecessary to use that base type exception (maybe rework).
+			// note that we loose the stack trace up to here
+			final KNXPropertyException pe = new KNXPropertyException(e.getMessage());
+			pe.setStackTrace(e.getStackTrace());
+			throw pe;
+		}
+	}
+
 	private void updateIoList()
 	{
 		final InterfaceObject io = (InterfaceObject) objects.get(0);
