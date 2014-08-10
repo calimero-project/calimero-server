@@ -670,36 +670,30 @@ public class KnxServerGateway implements Runnable
 		else {
 			// group destination address, check forwarding settings
 			final int raw = f.getDestination().getRawAddress();
-			// XXX cleanup  the two loops
-			if (raw <= 0x6fff) {
-				if (subGroupAddressConfig == 2)
-					return;
+			if (raw <= 0x6fff && subGroupAddressConfig == 2)
+				return;
 
-				for (final Iterator i = connectors.iterator(); i.hasNext();) {
-					final SubnetConnector subnet = (SubnetConnector) i.next();
-					if (subnet.getServiceContainer().isActivated()) {
-
-						if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
-								&& !inGroupAddressTable((GroupAddress) f.getDestination(),
-										subnet.getGroupAddressTableObjectInstance())) {
-							logger.warn("destination " + f.getDestination()
-									+ " not in group address table - skip frame");
-						}
-						else
-							send(subnet.getSubnetLink(), f);
-					}
-				}
+			for (final Iterator i = connectors.iterator(); i.hasNext();) {
+				final SubnetConnector subnet = (SubnetConnector) i.next();
+				if (subnet.getServiceContainer().isActivated())
+					dispatchToSubnet(subnet, f, raw);
 			}
-			else {
-				for (final Iterator i = connectors.iterator(); i.hasNext();) {
-					final SubnetConnector b = (SubnetConnector) i.next();
-					if (b.getServiceContainer().isActivated())
-						send(b.getSubnetLink(), f);
-				}
-			}
-
 		}
 		incMsgTransmitted(true);
+	}
+
+	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f,
+		final int rawAddress)
+	{
+		if (rawAddress <= 0x6fff) {
+			final GroupAddress d = (GroupAddress) f.getDestination();
+			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
+					&& !inGroupAddressTable(d, subnet.getGroupAddressTableObjectInstance())) {
+				logger.warn("destination " + d + " not in group address table - skip frame");
+				return;
+			}
+		}
+		send(subnet.getSubnetLink(), f);
 	}
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
