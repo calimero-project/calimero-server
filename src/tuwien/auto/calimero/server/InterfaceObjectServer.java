@@ -74,7 +74,7 @@ import tuwien.auto.calimero.xml.XMLWriter;
  * For definition resources, by default an xml resource handler implementing the
  * {@link tuwien.auto.calimero.mgmt.PropertyClient.ResourceHandler} interface is used. It supports
  * the same xml schema layout as the default resource handler in the {@link PropertyClient}.
- * 
+ *
  * @author B. Malinowsky
  */
 public class InterfaceObjectServer implements PropertyAccess
@@ -112,7 +112,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * - InterfaceObject.DEVICE_OBJECT<br>
 	 * - InterfaceObject.CEMI_SERVER_OBJECT<br>
 	 * See {@link #addInterfaceObject(int)} for details on creation.
-	 * 
+	 *
 	 * @param strictPropertyMode <code>true</code> if server shall enforce strict mode,
 	 *        <code>false</code> otherwise
 	 * @throws KNXFormatException
@@ -138,7 +138,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * this server.
 	 * <p>
 	 * By default, an xml property file handler is used.
-	 * 
+	 *
 	 * @param handler the new property resource handler, or <code>null</code> to use the default
 	 *        handler
 	 */
@@ -154,7 +154,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler)},
 	 * this method uses that resource handler. Otherwise, it uses the default property server
 	 * resource handler of this class.
-	 * 
+	 *
 	 * @param resource the identifier of a resource to load
 	 * @throws KNXException on errors in the property resource handler
 	 */
@@ -169,7 +169,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * {@link #setResourceHandler(InterfaceObjectServer.IosResourceHandler)}.
 	 * <p>
 	 * Any interface objects previously added to this IOS instance are not affected.
-	 * 
+	 *
 	 * @param resource resource storage location identifier passed to the used IOS resource handler
 	 * @throws KNXException on problems loading the interface objects, as thrown by the IOS resource
 	 *         handler
@@ -204,7 +204,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * resource using the resource handler set by
 	 * {@link #setResourceHandler(InterfaceObjectServer.IosResourceHandler)}.
 	 * <p>
-	 * 
+	 *
 	 * @param resource resource storage location identifier passed to the used IOS resource handler
 	 * @throws KNXException on problems saving the interface objects, as thrown by the IOS resource
 	 *         handler
@@ -227,7 +227,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * Modifications to the array do not alter the internal list of interface objects kept by the
 	 * server.<br>
 	 * If the server does not contain any interface objects, an array of length 0 is returned.
-	 * 
+	 *
 	 * @return array of interface objects
 	 */
 	public InterfaceObject[] getInterfaceObjects()
@@ -248,7 +248,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * - {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#OBJECT_TYPE} and property description,
 	 * representing the interface object type<br>
 	 * - PID.OBJECT_INDEX and property description, holding the index of the interface object<br>
-	 * 
+	 *
 	 * @param objectType Interface Object type, see {@link InterfaceObject} constants
 	 */
 	public void addInterfaceObject(final int objectType)
@@ -268,7 +268,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * Removes the specified interface object from the list of interface objects maintained by this
 	 * Interface Object Server.
 	 * <p>
-	 * 
+	 *
 	 * @param io the interface object to remove
 	 */
 	public void removeInterfaceObject(final InterfaceObject io)
@@ -283,7 +283,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * server.
 	 * <p>
 	 * If <code>l</code> was already added as listener, no action is performed.
-	 * 
+	 *
 	 * @param l the listener to add
 	 */
 	public void addServerListener(final InterfaceObjectServerListener l)
@@ -296,7 +296,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * this interface object server.
 	 * <p>
 	 * If <code>l</code> was not added in the first place, no action is performed.
-	 * 
+	 *
 	 * @param l the listener to remove
 	 */
 	public void removeServerListener(final InterfaceObjectServerListener l)
@@ -330,7 +330,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * See {@link #setProperty(int, int, int, int, byte[])}, but uses the object type and object
 	 * instance to refer to the interface object.
 	 * <p>
-	 * 
+	 *
 	 * @param objectType object type of the interface object containing the KNX property
 	 * @param objectInstance object instance of the interface object in the server, 1 refers to the
 	 *        first instance
@@ -350,7 +350,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * See {@link #getProperty(int, int, int, int)}, but uses the object type and object instance to
 	 * refer to the interface object.
 	 * <p>
-	 * 
+	 *
 	 * @param objectType object type of the interface object containing the KNX property
 	 * @param objectInstance object instance of the interface object in the server, 1 refers to the
 	 *        first instance
@@ -380,7 +380,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * Gets one or more elements of a property with the returned data set in a DPT translator of the
 	 * associated data type.
 	 * <p>
-	 * 
+	 *
 	 * @param objIndex interface object index in the device
 	 * @param pid property identifier
 	 * @param start index of the first array element to get
@@ -411,7 +411,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	 * failed.<br>
 	 * A caller can benefit from this behavior and leave the object type, property index, current
 	 * elements, and property data type (PDT) empty and let the server fill in those details.
-	 * 
+	 *
 	 * @param d the KNX property description to set
 	 * @param allowCorrections <code>true</code> to allow corrections by the interface object server
 	 *        to the description, <code>false</code> otherwise
@@ -891,7 +891,8 @@ public class InterfaceObjectServer implements PropertyAccess
 				d = findByPid(io.descriptions, pid);
 			else {
 				if (propIndex >= io.descriptions.size())
-					throw new KNXIllegalArgumentException("property index past last property");
+					throw new KNXIllegalArgumentException("property index " + propIndex
+							+ " past last property");
 				d = (Description) io.descriptions.get(propIndex);
 			}
 			if (d != null) {
@@ -968,7 +969,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * Reads interface object data from a resource identified by <code>resource</code> , and
 		 * creates {@link InterfaceObject}s.
 		 * <p>
-		 * 
+		 *
 		 * @param resource identifies the resource to read from
 		 * @return a collection of all loaded interface objects of type {@link InterfaceObject}
 		 * @throws KNXException on errors accessing the resource, parsing the data, or creating the
@@ -981,7 +982,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * <p>
 		 * All information maintained by an interface object are subject to serialization, this
 		 * includes all of its KNX property information.
-		 * 
+		 *
 		 * @param resource identifies the resource to save to
 		 * @param ifObjects a collection of interface objects, type {@link InterfaceObject}, to save
 		 * @throws KNXException on errors accessing the resource, or saving the data
@@ -996,7 +997,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * <p>
 		 * When the method returns, <code>descriptions</code> and <code>values</code> contain the
 		 * loaded {@link Description} and <code>byte[]</code> objects, respectively.
-		 * 
+		 *
 		 * @param resource identifies the resource to read from
 		 * @param descriptions a collection with the loaded description objects added to it
 		 * @param values a collection with the loaded property element values added to it, of type
@@ -1015,7 +1016,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * iterators {@link Collection#iterator()}: the n<sup>th</sup> description element returned
 		 * by the <code>descriptions</code> iterator corresponds to the n<sup>th</sup> value element
 		 * returned by the <code>values</code> iterator.
-		 * 
+		 *
 		 * @param resource identifies the resource to save to
 		 * @param descriptions a collection of property descriptions, of type {@link Description}
 		 * @param values a collection of property value data, of type <code>byte[]</code>; every
