@@ -516,8 +516,9 @@ public class InterfaceObjectServer implements PropertyAccess
 				throw (KNXPropertyException) e;
 			// KNXException is currently thrown by PropertyClient.getObjectType,
 			// quite unnecessary to use that base type exception (maybe rework).
-			// note that we loose the stack trace up to here
-			throw new KNXPropertyException(e.getMessage());
+			final KNXPropertyException pe = new KNXPropertyException(e.getMessage());
+			pe.setStackTrace(e.getStackTrace());
+			throw pe;
 		}
 	}
 
