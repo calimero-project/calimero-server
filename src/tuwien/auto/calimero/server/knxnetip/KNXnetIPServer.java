@@ -629,33 +629,37 @@ public class KNXnetIPServer
 				int i = 0;
 				for (int k = value.indexOf(','); i < value.length(); k = value.indexOf(',', i)) {
 					k = k == -1 ? value.length() : k;
-					final String name = value.substring(i, k).trim();
+					final String ifname = value.substring(i, k).trim();
 					i = k + 1;
-					try {
-						final NetworkInterface ni = NetworkInterface.getByName(name);
-						if (ni != null)
-							l.add(ni);
-						else
-							logger.error("option " + optionKey + ": no interface of name " + name,
-									null);
-					}
-					catch (final SocketException e) {
-						logger.error("option " + optionKey + " for interface " + name, e);
-					}
+					final NetworkInterface ni = getNetworkInterfaceByName(optionKey, ifname);
+					if (ni != null)
+						l.add(ni);
 				}
 				discoveryIfs = (NetworkInterface[]) l.toArray(new NetworkInterface[l.size()]);
 			}
 		}
 		else if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
-			try {
-				outgoingIf = value.equals("default") ? null : NetworkInterface.getByName(value);
-			}
-			catch (final SocketException e) {
-				logger.error("option " + optionKey + " for interface " + name, e);
-			}
+			outgoingIf = getNetworkInterfaceByName(optionKey, value);
 		}
 		else
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
+	}
+
+	private NetworkInterface getNetworkInterfaceByName(final String option, final String ifname)
+	{
+		if (ifname.equals("default"))
+			return null;
+		try {
+			final NetworkInterface nif = NetworkInterface.getByName(ifname);
+			if (nif != null)
+				return nif;
+			logger.error("option " + option + ": no network interface with name '" + ifname + "'",
+					null);
+		}
+		catch (final SocketException e) {
+			logger.error("option " + option + " for interface " + ifname, e);
+		}
+		return null;
 	}
 
 	/**
