@@ -96,42 +96,40 @@ import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCa
 /**
  * Provides server-side functionality of KNXnet/IP protocols.
  * <p>
- * This server implementation supports KNXnet/IP discovery and description, it accepts
- * KNXnet/IP tunneling connections on link layer and for bus monitoring, as well as
- * KNXnet/IP device management connections, and supports KNXnet/IP routing.
+ * This server implementation supports KNXnet/IP discovery and description, it accepts KNXnet/IP
+ * tunneling connections on link layer and for bus monitoring, as well as KNXnet/IP device
+ * management connections, and supports KNXnet/IP routing.
  * <p>
- * Services are configured for use by {@link ServiceContainer}s, which provide the server
- * endpoints and connectivity to KNX subnets.
+ * Services are configured for use by {@link ServiceContainer}s, which provide the server endpoints
+ * and connectivity to KNX subnets.
  * <p>
- * A running server instance needs specific device and configuration data to answer search
- * and description requests during discovery and description, to accept connection
- * requests, and so on. Therefore, during construction of a KNXnet/IP server, every
- * instance creates its own default interface object server (IOS). The IOS is initialized
- * with basic information by adding KNX properties, allowing the server to run properly. A
- * user can subsequently get the IOS by calling {@link #getInterfaceObjectServer()} to
- * query or modify the initial set of server properties, or replace the IOS with another
- * one by calling {@link #setInterfaceObjectServer(InterfaceObjectServer)}.<br>
- * See the server constructor for a list with the default settings of an IOS during
- * initialization.<br>
+ * A running server instance needs specific device and configuration data to answer search and
+ * description requests during discovery and description, to accept connection requests, and so on.
+ * Therefore, during construction of a KNXnet/IP server, every instance creates its own default
+ * interface object server (IOS). The IOS is initialized with basic information by adding KNX
+ * properties, allowing the server to run properly. A user can subsequently get the IOS by calling
+ * {@link #getInterfaceObjectServer()} to query or modify the initial set of server properties, or
+ * replace the IOS with another one by calling
+ * {@link #setInterfaceObjectServer(InterfaceObjectServer)}.<br>
+ * See the server constructor for a list with the default settings of an IOS during initialization.<br>
  * Different services are allowed to alter certain KNX properties in the set IOS.
  * <p>
- * Note, that if data required by the server is not available in the IOS (e.g., due to
- * deletion of KNX properties by a user) or is not valid, the server will at first try to
- * fall back on defaults to fill in the missing data ensuring a minimum service, but
- * finally might provide degraded service only. It will, however, not add or alter such
- * properties in the IOS.
+ * Note, that if data required by the server is not available in the IOS (e.g., due to deletion of
+ * KNX properties by a user) or is not valid, the server will at first try to fall back on defaults
+ * to fill in the missing data ensuring a minimum service, but finally might provide degraded
+ * service only. It will, however, not add or alter such properties in the IOS.
  * <p>
- * A server instance can be started ({@link #launch()} and shut down ( {@link #shutdown()}
- * ) repeatedly, without loosing server-global configuration settings.
+ * A server instance can be started ({@link #launch()} and shut down ( {@link #shutdown()} )
+ * repeatedly, without loosing server-global configuration settings.
  * <p>
  * The following properties are modified while the server is running:<br>
- * 
+ *
  * @author B. Malinowsky
  */
 public class KNXnetIPServer
 {
 	// dev v0.4
-	
+
 	// Notes:
 
 	// Core specification:
@@ -148,11 +146,10 @@ public class KNXnetIPServer
 	// NYI cEMI server in full transparent mode (server without an own Individual
 	// Address), shall send back negative confirmation (Confirm Flag set to 1 in
 	// L_Data.con, if corresponding L-data.req message has its source address set to 0.
-	
 
 	// NYI the following KNX properties are not used by now...
-	//private static final int PID_SERVICE_CONTROL = 8;
-	//private static final int PID_DEVICE_CONTROL = 14;
+	// private static final int PID_SERVICE_CONTROL = 8;
+	// private static final int PID_DEVICE_CONTROL = 14;
 
 	/*
 	  KNX property default values
@@ -160,7 +157,6 @@ public class KNXnetIPServer
 	  querying a property from the IOS fails to ensure minimum functionality.
 	*/
 
-	
 	// Values used for device DIB
 
 	// PID.FRIENDLY_NAME
@@ -187,7 +183,7 @@ public class KNXnetIPServer
 	}
 
 	private static final InetAddress systemSetupMulticast = defRoutingMulticast;
-	
+
 	// PID.MAC_ADDRESS
 	private static final byte[] defMacAddress;
 	static {
@@ -195,14 +191,13 @@ public class KNXnetIPServer
 		// getHardwareAddress is not supported on ME CDC
 		//try {
 		//	mac = NetworkInterface.getByInetAddress(InetAddress.getLocalHost())
-		//		.getHardwareAddress();
+		//			.getHardwareAddress();
 		//}
 		//catch (final SocketException e) {}
 		//catch (final UnknownHostException e) {}
 		defMacAddress = mac;
 	}
 
-	
 	// Values used for service families DIB
 
 	// PID.KNXNETIP_DEVICE_CAPABILITIES
@@ -216,9 +211,8 @@ public class KNXnetIPServer
 	private static final int defMfrId = 0;
 	// PID.MANUFACTURER_DATA
 	// one element is 4 bytes, value length has to be multiple of that
-	// defaults to 'bm2011  '
-	private static final byte[] defMfrData = new byte[] { 'b', 'm', '2',
-		'0', '1', '1', ' ', ' ' };
+	// defaults to 'bm2011 '
+	private static final byte[] defMfrData = new byte[] { 'b', 'm', '2', '0', '1', '1', ' ', ' ' };
 
 	// from init KNX properties
 
@@ -235,18 +229,15 @@ public class KNXnetIPServer
 
 	private boolean running;
 
-	
-	
 	// Discovery and description
-	
+
 	private boolean runDiscovery;
 	private LooperThread discovery;
 	private NetworkInterface outgoingIf;
 	private NetworkInterface[] discoveryIfs = null;
-	
-	
+
 	// KNX endpoint and connection stuff
-	
+
 	// true to enable multicast loopback, false to disable loopback
 	// used in KNXnet/IP Routing
 	private boolean multicastLoopback = true;
@@ -262,7 +253,7 @@ public class KNXnetIPServer
 	private final List routingEndpoints = new ArrayList();
 	// list of DataEndpointServiceHandler objects
 	private final List dataConnections = new ArrayList();
-	
+
 	private final List usedKnxAddresses = new ArrayList();
 	// If the server assigns its own KNX individual address to a connection, no
 	// management (using tunneling or from the KNX subnet) shall be allowed.
@@ -336,19 +327,18 @@ public class KNXnetIPServer
 	/**
 	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
 	 * <p>
-	 * The <code>localName</code> argument is user-chosen to locally identify the server
-	 * instance and also used for local naming purposes, e.g., the logger name.<br>
+	 * The <code>localName</code> argument is user-chosen to locally identify the server instance
+	 * and also used for local naming purposes, e.g., the logger name.<br>
 	 * The <code>friendlyName</code> argument is stored in the KNX property
-	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface
-	 * Object Server during initialization. It identifies the server instance to clients
-	 * of this server, and is used, e.g., in responses during server discovery.<br>
-	 * See also {@link #KNXnetIPServer()} for a list of KNX properties initialized by this
-	 * server.
-	 * 
+	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object
+	 * Server during initialization. It identifies the server instance to clients of this server,
+	 * and is used, e.g., in responses during server discovery.<br>
+	 * See also {@link #KNXnetIPServer()} for a list of KNX properties initialized by this server.
+	 *
 	 * @param localName name of this server as shown to the owner/user of this server
-	 * @param friendlyName a friendly, descriptive name for this server, consisting of
-	 *        ISO-8859-1 characters only, with string length < 30 characters,
-	 *        <code>friendlyName</code> might be null or of length 0 to use defaults
+	 * @param friendlyName a friendly, descriptive name for this server, consisting of ISO-8859-1
+	 *        characters only, with string length < 30 characters, <code>friendlyName</code> might
+	 *        be null or of length 0 to use defaults
 	 */
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
@@ -373,18 +363,18 @@ public class KNXnetIPServer
 	}
 
 	/**
-	 * Creates a new KNXnet/IP server instance, assigns a user-defined server name, adds
-	 * the supplied service containers, and sets the discovery service.
+	 * Creates a new KNXnet/IP server instance, assigns a user-defined server name, adds the
+	 * supplied service containers, and sets the discovery service.
 	 * <p>
 	 * The assigned server name is stored in the KNX property
-	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface
-	 * Object Server during initialization.<br>
+	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object
+	 * Server during initialization.<br>
 	 * See {@link #KNXnetIPServer()} for a list of initialized KNX properties.
-	 * 
+	 *
 	 * @param serverName both the local and friendly name of this server instance, see
 	 *        {@link #KNXnetIPServer(String, String)}
-	 * @param serviceContainers list holding {@link ServiceContainer} entries to be hosted
-	 *        by this server
+	 * @param serviceContainers list holding {@link ServiceContainer} entries to be hosted by this
+	 *        server
 	 * @see #KNXnetIPServer(String, String)
 	 */
 	public KNXnetIPServer(final String serverName, final List serviceContainers)
@@ -399,14 +389,14 @@ public class KNXnetIPServer
 	/**
 	 * Adds the service container to the list of service containers hosted by this server.
 	 * <p>
-	 * A service container <code>sc</code> is only added if the server does not already
-	 * contain a service container with <code>sc.getName()</code>.<br>
-	 * If the server is in launched mode, an added service container is published to
-	 * clients by starting a control endpoint for it.
-	 * 
+	 * A service container <code>sc</code> is only added if the server does not already contain a
+	 * service container with <code>sc.getName()</code>.<br>
+	 * If the server is in launched mode, an added service container is published to clients by
+	 * starting a control endpoint for it.
+	 *
 	 * @param sc the service container to add
-	 * @return <code>true</code> if the service container was added successfully,
-	 *         <code>false</code> otherwise
+	 * @return <code>true</code> if the service container was added successfully, <code>false</code>
+	 *         otherwise
 	 */
 	public final boolean addServiceContainer(final ServiceContainer sc)
 	{
@@ -439,13 +429,12 @@ public class KNXnetIPServer
 	}
 
 	/**
-	 * Removes the service container from the list of service containers hosted by this
-	 * server.
+	 * Removes the service container from the list of service containers hosted by this server.
 	 * <p>
 	 * If no such container is found, the method simply returns.<br>
-	 * If the server is in launched mode, the control endpoint associated with that
-	 * service container is removed and no further available to clients.
-	 * 
+	 * If the server is in launched mode, the control endpoint associated with that service
+	 * container is removed and no further available to clients.
+	 *
 	 * @param sc the service container to remove
 	 */
 	public final void removeServiceContainer(final ServiceContainer sc)
@@ -470,7 +459,7 @@ public class KNXnetIPServer
 	/**
 	 * Returns all service containers currently hosted by this server.
 	 * <p>
-	 * 
+	 *
 	 * @return a new ServiceContainer array holding the service containers with the array size equal
 	 *         to the number of service containers (i.e., can be an empty array)
 	 */
@@ -486,7 +475,7 @@ public class KNXnetIPServer
 	 * Sets a new Interface Object Server for this server, replacing any previously set Interface
 	 * Object Server instance.
 	 * <p>
-	 * 
+	 *
 	 * @param server the Interface Object Server
 	 */
 	public final void setInterfaceObjectServer(final InterfaceObjectServer server)
@@ -507,7 +496,7 @@ public class KNXnetIPServer
 	/**
 	 * Returns the Interface Object Server currently set (and used) by this server.
 	 * <p>
-	 * 
+	 *
 	 * @return the server IOS instance
 	 */
 	public final InterfaceObjectServer getInterfaceObjectServer()
@@ -523,7 +512,7 @@ public class KNXnetIPServer
 	 * server.
 	 * <p>
 	 * If <code>l</code> was already added as listener, no action is performed.
-	 * 
+	 *
 	 * @param l the listener to add
 	 */
 	public void addServerListener(final ServerListener l)
@@ -537,7 +526,7 @@ public class KNXnetIPServer
 	 * this KNXnet/IP server.
 	 * <p>
 	 * If <code>l</code> was not added in the first place, no action is performed.
-	 * 
+	 *
 	 * @param l the listener to remove
 	 */
 	public void removeServerListener(final ServerListener l)
@@ -583,7 +572,7 @@ public class KNXnetIPServer
 	 * Use this option key with {@link #setOption(String, String)}.
 	 */
 	public static final String OPTION_OUTGOING_INTERFACE = "discovery.outoingInterface";
-	
+
 	// ??? unused by now, make public if useful, also correctly synchronize setOption then
 	synchronized String getOption(final String optionKey)
 	{
@@ -615,7 +604,7 @@ public class KNXnetIPServer
 	/**
 	 * Sets or modifies KNXnet/IP server behavior.
 	 * <p>
-	 * 
+	 *
 	 * @param optionKey the server option key to identify the option to set or modify
 	 * @param value the corresponding option value, possibly replacing any previously set value
 	 */
@@ -672,11 +661,11 @@ public class KNXnetIPServer
 	/**
 	 * Launches this server to run its services.
 	 * <p>
-	 * Depending on server configuration and method parameters, the discovery service,
-	 * routing service, and the control endpoint services as determined by the added
-	 * service containers are started.<br>
+	 * Depending on server configuration and method parameters, the discovery service, routing
+	 * service, and the control endpoint services as determined by the added service containers are
+	 * started.<br>
 	 * If this server is already running, this method returns immediately.
-	 * 
+	 *
 	 * @throws KNXIllegalStateException on no service containers available in this server
 	 */
 	public synchronized void launch()
@@ -727,7 +716,7 @@ public class KNXnetIPServer
 	/**
 	 * Returns the server name initialized during server construction and used for logging.
 	 * <p>
-	 * 
+	 *
 	 * @return initially used server name as string
 	 */
 	public String getName()
@@ -741,7 +730,7 @@ public class KNXnetIPServer
 	 * This is the friendly server name value as returned by KNX property PID.FRIENDLY_NAME in the
 	 * Interface Object Server. If that property does not exist or has an empty name set, a server
 	 * default name is returned.
-	 * 
+	 *
 	 * @return server name as string
 	 */
 	public String getFriendlyName()
@@ -991,7 +980,7 @@ public class KNXnetIPServer
 			return def;
 		}
 	}
-	
+
 	private DeviceDIB createDeviceDIB(final ServiceContainer sc)
 	{
 		byte[] name;
@@ -1290,7 +1279,7 @@ public class KNXnetIPServer
 			return true;
 		}
 	}
-	
+
 	private void freeDeviceAddress(final IndividualAddress device)
 	{
 		synchronized (usedKnxAddresses) {
