@@ -796,8 +796,12 @@ public class KNXnetIPServer
 		ios.setProperty(devObject, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = split(Settings.getLibraryVersion(), ". -");
-		final int ver = Integer.parseInt(sver[0]) << 12 | Integer.parseInt(sver[1]) << 6
-				| Integer.parseInt(sver[2]);
+		int last = 0;
+		try {
+			last = sver.length > 2 ? Integer.parseInt(sver[2]) : 0;
+		}
+		catch (final NumberFormatException e) {}
+		final int ver = Integer.parseInt(sver[0]) << 12 | Integer.parseInt(sver[1]) << 6 | last;
 		ios.setProperty(devObject, objectInstance, PID.VERSION, 1, 1, new byte[] {
 			(byte) (ver >>> 8), (byte) (ver & 0xff) });
 
