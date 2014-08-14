@@ -704,11 +704,9 @@ public class InterfaceObjectServer implements PropertyAccess
 			Description d = null;
 			if (pid != 0)
 				d = findByPid(io.descriptions, pid);
-			else {
-				if (propIndex >= io.descriptions.size())
-					throw new KNXIllegalArgumentException("property index past last property");
+			else if (propIndex < io.descriptions.size())
 				d = (Description) io.descriptions.get(propIndex);
-			}
+
 			if (d != null) {
 				// actual property values might not exist yet
 				int elems = 0;
@@ -889,12 +887,9 @@ public class InterfaceObjectServer implements PropertyAccess
 			Description d = null;
 			if (pid != 0)
 				d = findByPid(io.descriptions, pid);
-			else {
-				if (propIndex >= io.descriptions.size())
-					throw new KNXIllegalArgumentException("property index " + propIndex
-							+ " past last property");
+			else if (propIndex < io.descriptions.size())
 				d = (Description) io.descriptions.get(propIndex);
-			}
+
 			if (d != null) {
 				// actual property values might not exist yet
 				int elems = 0;
