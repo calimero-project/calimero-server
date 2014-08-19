@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ import tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler;
  * uniquely identified by its object index ({@link #getIndex()}.<br>
  * KNX properties contained in an interface object are usually accessed and modified using KNX
  * property services.
- * 
+ *
  * @author B. Malinowsky
  */
 public class InterfaceObject
@@ -130,9 +130,9 @@ public class InterfaceObject
 	public static final int FILE_SERVER_OBJECT = 13;
 
 	// list holding Description objects or null entries
-	List descriptions = new ArrayList();
+	List<Description> descriptions = new ArrayList<>();
 	// map key is PropertyKey, map value is byte[]
-	Map values = new HashMap();
+	Map<PropertyKey, byte[]> values = new HashMap<>();
 
 	private final int type;
 	private volatile int idx;
@@ -140,7 +140,7 @@ public class InterfaceObject
 	/**
 	 * Creates a new interface object of the specified object type.
 	 * <p>
-	 * 
+	 *
 	 * @param objectType either one of the predefined interface object types listed by this class,
 	 *        or a user specific object type
 	 */
@@ -160,7 +160,7 @@ public class InterfaceObject
 	 * <p>
 	 * The type is either one of the predefined interface object types listed by this class, or a
 	 * user specific object type.
-	 * 
+	 *
 	 * @return interface object type as int
 	 */
 	public int getType()
@@ -171,7 +171,7 @@ public class InterfaceObject
 	/**
 	 * Returns a human readable representation of the interface object's type.
 	 * <p>
-	 * 
+	 *
 	 * @return interface object type as string
 	 */
 	public String getTypeName()
@@ -183,7 +183,7 @@ public class InterfaceObject
 	 * Returns the current position of this interface object within the array of interface objects
 	 * in the interface object server.
 	 * <p>
-	 * 
+	 *
 	 * @return zero based index as int
 	 */
 	public int getIndex()
@@ -205,14 +205,15 @@ public class InterfaceObject
 
 	/*public*/void load(final IosResourceHandler rh, final String resource) throws KNXException
 	{
-		final List loadDescriptions = new ArrayList();
-		final List loadValues = new ArrayList();
+		final List<Description> loadDescriptions = new ArrayList<>();
+		final List<byte[]> loadValues = new ArrayList<>();
 		rh.loadProperties(resource, loadDescriptions, loadValues);
 
-		for (final Iterator i = loadDescriptions.iterator(), k = loadValues.iterator(); i.hasNext()
+		final Iterator<byte[]> k = loadValues.iterator();
+		for (final Iterator<Description> i = loadDescriptions.iterator(); i.hasNext()
 				&& k.hasNext();) {
-			final Description d = (Description) i.next();
-			final byte[] v = (byte[]) k.next();
+			final Description d = i.next();
+			final byte[] v = k.next();
 
 			setDescription(d);
 			values.put(new PropertyKey(d.getObjectType(), d.getPID()), v);
@@ -222,18 +223,18 @@ public class InterfaceObject
 	/*public*/void save(final IosResourceHandler rh, final String resource) throws KNXException
 	{
 		// list to save with descriptions, containing no null entries
-		final List saveDesc = new ArrayList(descriptions);
+		final List<Description> saveDesc = new ArrayList<>(descriptions);
 		saveDesc.removeAll(Arrays.asList(new Object[] { null }));
 		// list to save with values
-		final List saveVal = new ArrayList();
+		final List<byte[]> saveVal = new ArrayList<>();
 		// values with no description
-		final Map remaining = new HashMap(values);
+		final Map<PropertyKey, byte[]> remaining = new HashMap<>(values);
 
 		final byte[] empty = new byte[0];
-		for (final Iterator i = saveDesc.iterator(); i.hasNext();) {
-			final Description d = (Description) i.next();
+		for (final Iterator<Description> i = saveDesc.iterator(); i.hasNext();) {
+			final Description d = i.next();
 			final PropertyKey key = new PropertyKey(d.getObjectType(), d.getPID());
-			final byte[] data = (byte[]) values.get(key);
+			final byte[] data = values.get(key);
 			// descriptions with no values get an empty array assigned
 			if (data == null)
 				saveVal.add(empty);
@@ -243,11 +244,11 @@ public class InterfaceObject
 			}
 		}
 		// add values where no description was set, creating a default description
-		for (final Iterator i = remaining.keySet().iterator(); i.hasNext();) {
-			final PropertyKey key = (PropertyKey) i.next();
+		for (final Iterator<PropertyKey> i = remaining.keySet().iterator(); i.hasNext();) {
+			final PropertyKey key = i.next();
 			saveDesc.add(new Description(idx, type, key.getPID(), saveVal.size(), 0, true, 0, 0, 0,
 					0));
-			saveVal.add(((byte[]) remaining.get(key)).clone());
+			saveVal.add(remaining.get(key).clone());
 		}
 		// save them
 		rh.saveProperties(resource, saveDesc, saveVal);
@@ -281,7 +282,7 @@ public class InterfaceObject
 	void truncateValueArray(final int pid, final int maxElements)
 	{
 		final PropertyKey key = new PropertyKey(getType(), pid);
-		final byte[] v = (byte[]) values.get(key);
+		final byte[] v = values.get(key);
 		if (v != null) {
 			if (maxElements == 0) {
 				values.put(key, null);

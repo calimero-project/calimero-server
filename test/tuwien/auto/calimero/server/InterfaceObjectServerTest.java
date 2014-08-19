@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,6 +44,7 @@ import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
+import tuwien.auto.calimero.mgmt.PropertyClient.Property;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler;
 
@@ -84,7 +85,7 @@ public class InterfaceObjectServerTest extends TestCase
 	/**
 	 * Test method for
 	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#InterfaceObjectServer(boolean)} .
-	 * 
+	 *
 	 * @throws KNXException
 	 */
 	public final void testInterfaceObjectServer() throws KNXException
@@ -113,28 +114,31 @@ public class InterfaceObjectServerTest extends TestCase
 		ios.setResourceHandler(null);
 		ios.setResourceHandler(new IosResourceHandler()
 		{
-			public void save(final String resource, final Collection definitions)
+			public void save(final String resource, final Collection<Property> definitions)
 				throws KNXException
 			{}
 
-			public Collection load(final String resource) throws KNXException
+			public Collection<Property> load(final String resource) throws KNXException
 			{
 				return null;
 			}
 
-			public void saveProperties(final String resource, final Collection descriptions,
-				final Collection values) throws KNXException
-			{}
-
-			public void saveInterfaceObjects(final String resource, final Collection ifObjects)
+			public void saveProperties(final String resource,
+				final Collection<Description> descriptions, final Collection<byte[]> values)
 				throws KNXException
 			{}
 
-			public void loadProperties(final String resource, final Collection descriptions,
-				final Collection values) throws KNXException
+			public void saveInterfaceObjects(final String resource,
+				final Collection<InterfaceObject> ifObjects) throws KNXException
 			{}
 
-			public Collection loadInterfaceObjects(final String resource) throws KNXException
+			public void loadProperties(final String resource,
+				final Collection<Description> descriptions, final Collection<byte[]> values)
+				throws KNXException
+			{}
+
+			public Collection<InterfaceObject> loadInterfaceObjects(final String resource)
+				throws KNXException
 			{
 				return null;
 			}
@@ -144,7 +148,7 @@ public class InterfaceObjectServerTest extends TestCase
 	/**
 	 * Test method for
 	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#loadDefinitions(java.lang.String)}.
-	 * 
+	 *
 	 * @throws KNXException
 	 */
 	public final void testLoadDefinitions() throws KNXException
@@ -156,7 +160,7 @@ public class InterfaceObjectServerTest extends TestCase
 	 * Test method for
 	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#loadInterfaceObjects(java.lang.String)}
 	 * .
-	 * 
+	 *
 	 * @throws KNXException
 	 */
 	public final void testLoadInterfaceObjects() throws KNXException
@@ -167,20 +171,19 @@ public class InterfaceObjectServerTest extends TestCase
 		for (int i = 0; i < objects.length; i++) {
 			final InterfaceObject interfaceObject = objects[i];
 			System.out.println("" + interfaceObject);
-			for (final Iterator k = interfaceObject.values.keySet().iterator(); k.hasNext();) {
-				final PropertyKey key = (PropertyKey) k.next();
-				System.out.println(DataUnitBuilder.toHex((byte[]) interfaceObject.values.get(key),
-						""));
+			for (final Iterator<PropertyKey> k = interfaceObject.values.keySet().iterator(); k
+					.hasNext();) {
+				final PropertyKey key = k.next();
+				System.out.println(DataUnitBuilder.toHex(interfaceObject.values.get(key), ""));
 			}
 		}
 		System.out.println(d.getPDT());
 	}
 
 	/**
-	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#saveInterfaceObjects(java.lang.String)}
-	 * .
-	 * 
+	 * Test method for {@link tuwien.auto.calimero.server.InterfaceObjectServer#saveInterfaceObjects
+	 * (java.lang.String)}.
+	 *
 	 * @throws KNXException
 	 */
 	public final void testSaveInterfaceObjects() throws KNXException
@@ -250,9 +253,8 @@ public class InterfaceObjectServerTest extends TestCase
 	}
 
 	/**
-	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#setProperty(int, int, int, int, int, byte[])}
-	 * .
+	 * Test method for {@link tuwien.auto.calimero.server.InterfaceObjectServer#setProperty(
+	 * int, int, int, int, int, byte[])}.
 	 */
 	public final void testSetPropertyIntIntIntIntIntByteArray()
 	{
@@ -280,8 +282,8 @@ public class InterfaceObjectServerTest extends TestCase
 
 	/**
 	 * Test method for
-	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#getPropertyTranslated(int, int, int, int)}
-	 * .
+	 * {@link tuwien.auto.calimero.server.InterfaceObjectServer#getPropertyTranslated(
+	 * int, int, int, int)}.
 	 */
 	public final void testGetPropertyTranslated()
 	{

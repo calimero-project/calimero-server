@@ -260,18 +260,18 @@ public class KNXnetIPServer
 	private boolean multicastLoopback = true;
 
 	// list of ServiceContainer objects
-	private final List svcContainers = new ArrayList();
+	private final List<ServiceContainer> svcContainers = new ArrayList<>();
 
-	private final Map svcContToIfObj = new HashMap();
+	private final Map<ServiceContainer, InterfaceObject> svcContToIfObj = new HashMap<>();
 
 	// list of LooperThread objects running a control endpoint
-	private final List controlEndpoints = new ArrayList();
+	private final List<LooperThread> controlEndpoints = new ArrayList<>();
 	// list of LooperThread objects running a routing endpoint
-	private final List routingEndpoints = new ArrayList();
+	private final List<LooperThread> routingEndpoints = new ArrayList<>();
 	// list of DataEndpointServiceHandler objects
-	private final List dataConnections = new ArrayList();
+	private final List<DataEndpointServiceHandler> dataConnections = new ArrayList<>();
 
-	private final List usedKnxAddresses = new ArrayList();
+	private final List<IndividualAddress> usedKnxAddresses = new ArrayList<>();
 	// If the server assigns its own KNX individual address to a connection, no
 	// management (using tunneling or from the KNX subnet) shall be allowed.
 	// This flag maintains the current state, access is synchronized on
@@ -395,11 +395,11 @@ public class KNXnetIPServer
 	 *        server
 	 * @see #KNXnetIPServer(String, String)
 	 */
-	public KNXnetIPServer(final String serverName, final List serviceContainers)
+	public KNXnetIPServer(final String serverName, final List<ServiceContainer> serviceContainers)
 	{
 		this(serverName, serverName);
-		for (final Iterator i = serviceContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = (ServiceContainer) i.next();
+		for (final Iterator<ServiceContainer> i = serviceContainers.iterator(); i.hasNext();) {
+			final ServiceContainer sc = i.next();
 			addServiceContainer(sc);
 		}
 	}
@@ -469,7 +469,7 @@ public class KNXnetIPServer
 			final boolean removed = svcContainers.remove(sc);
 			if (removed)
 				getInterfaceObjectServer().removeInterfaceObject(
-						(InterfaceObject) svcContToIfObj.get(sc));
+						svcContToIfObj.get(sc));
 		}
 		fireServiceContainerRemoved(sc);
 	}
@@ -484,8 +484,7 @@ public class KNXnetIPServer
 	public ServiceContainer[] getServiceContainers()
 	{
 		synchronized (svcContainers) {
-			return (ServiceContainer[]) svcContainers.toArray(new ServiceContainer[svcContainers
-					.size()]);
+			return svcContainers.toArray(new ServiceContainer[svcContainers.size()]);
 		}
 	}
 
@@ -643,7 +642,7 @@ public class KNXnetIPServer
 			if (value.equals("all"))
 				discoveryIfs = null;
 			else {
-				final List l = new ArrayList();
+				final List<NetworkInterface> l = new ArrayList<>();
 				int i = 0;
 				for (int k = value.indexOf(','); i < value.length(); k = value.indexOf(',', i)) {
 					k = k == -1 ? value.length() : k;
@@ -653,7 +652,7 @@ public class KNXnetIPServer
 					if (ni != null)
 						l.add(ni);
 				}
-				discoveryIfs = (NetworkInterface[]) l.toArray(new NetworkInterface[l.size()]);
+				discoveryIfs = l.toArray(new NetworkInterface[l.size()]);
 			}
 		}
 		else if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
@@ -698,8 +697,8 @@ public class KNXnetIPServer
 		logger.info("launch KNXnet/IP server " + getFriendlyName());
 		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
-		for (final Iterator i = svcContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = (ServiceContainer) i.next();
+		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
+			final ServiceContainer sc = i.next();
 			startControlEndpoint(sc);
 		}
 		running = true;
@@ -721,13 +720,13 @@ public class KNXnetIPServer
 
 		stopDiscoveryService();
 
-		for (final Iterator i = controlEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = (LooperThread) i.next();
+		for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
+			final LooperThread t = i.next();
 			t.quit();
 		}
 		controlEndpoints.clear();
-		for (final Iterator i = routingEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = (LooperThread) i.next();
+		for (final Iterator<LooperThread> i = routingEndpoints.iterator(); i.hasNext();) {
+			final LooperThread t = i.next();
 			t.quit();
 		}
 		routingEndpoints.clear();
@@ -1133,8 +1132,8 @@ public class KNXnetIPServer
 	private void stopControlEndpoint(final ServiceContainer sc)
 	{
 		LooperThread remove = null;
-		for (final Iterator i = controlEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = (LooperThread) i.next();
+		for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
+			final LooperThread t = i.next();
 			final ControlEndpointService ces = (ControlEndpointService) t.getLooper();
 			if (ces.svcCont == sc) {
 				t.quit();
@@ -1169,8 +1168,8 @@ public class KNXnetIPServer
 
 	private LooperThread findRoutingLooperThread(final ServiceContainer sc)
 	{
-		for (final Iterator i = routingEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = (LooperThread) i.next();
+		for (final Iterator<LooperThread> i = routingEndpoints.iterator(); i.hasNext();) {
+			final LooperThread t = i.next();
 			final RoutingService svc = (RoutingService) t.getLooper();
 			if (svc.getServiceContainer() == sc)
 				return t;
@@ -1180,8 +1179,8 @@ public class KNXnetIPServer
 
 	private ServiceContainer findContainer(final String svcContName)
 	{
-		for (final Iterator i = svcContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = (ServiceContainer) i.next();
+		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
+			final ServiceContainer sc = i.next();
 			if (sc.getName().compareTo(svcContName) == 0)
 				return sc;
 		}
@@ -1190,7 +1189,7 @@ public class KNXnetIPServer
 
 	private ServiceContainer findContainer(final InterfaceObject io)
 	{
-		for (final Iterator i = svcContToIfObj.keySet().iterator(); i.hasNext();) {
+		for (final Iterator<ServiceContainer> i = svcContToIfObj.keySet().iterator(); i.hasNext();) {
 			final Object svcCont = i.next();
 			if (svcContToIfObj.get(svcCont) == io)
 				return (ServiceContainer) svcCont;
@@ -1327,7 +1326,7 @@ public class KNXnetIPServer
 		// h.close() invokes the control endpoint callback, which removes the data
 		// connection from the list, hence we create our local copy to avoid
 		// concurrent modifications
-		final DataEndpointServiceHandler[] handlerList = (DataEndpointServiceHandler[]) dataConnections
+		final DataEndpointServiceHandler[] handlerList = dataConnections
 				.toArray(new DataEndpointServiceHandler[dataConnections.size()]);
 		for (int i = 0; i < handlerList.length; i++) {
 			final DataEndpointServiceHandler h = handlerList[i];
@@ -1775,19 +1774,20 @@ public class KNXnetIPServer
 			throws IOException
 		{
 			final SocketAddress group = new InetSocketAddress(systemSetupMulticast, 0);
-			final List nifs = joinOn != null ? Arrays.asList(joinOn) : Collections
-					.list(NetworkInterface.getNetworkInterfaces());
+			final List<NetworkInterface> nifs = joinOn != null ? Arrays.asList(joinOn)
+					: Collections.list(NetworkInterface.getNetworkInterfaces());
 			final StringBuffer found = new StringBuffer();
 
 			// we try to bind to all requested interfaces. Only if that completely fails, we throw
 			// the first caught exception
 			IOException thrown = null;
 			boolean joinedAny = false;
-			for (final Iterator i = nifs.iterator(); i.hasNext();) {
-				final NetworkInterface ni = (NetworkInterface) i.next();
+			for (final Iterator<NetworkInterface> i = nifs.iterator(); i.hasNext();) {
+				final NetworkInterface ni = i.next();
 				found.append(" ").append(ni.getName()).append(" [");
-				for (final Enumeration addrs = ni.getInetAddresses(); addrs.hasMoreElements();) {
-					final InetAddress addr = (InetAddress) addrs.nextElement();
+				for (final Enumeration<InetAddress> addrs = ni.getInetAddresses(); addrs
+						.hasMoreElements();) {
+					final InetAddress addr = addrs.nextElement();
 					if (addr instanceof Inet4Address) {
 						found.append(addr.getHostAddress());
 						try {
@@ -1833,8 +1833,8 @@ public class KNXnetIPServer
 				// for discovery, we do not remember previous NAT decisions
 				useNat = false;
 				final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
-				for (final Iterator i = controlEndpoints.iterator(); i.hasNext();) {
-					final LooperThread t = (LooperThread) i.next();
+				for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
+					final LooperThread t = i.next();
 					final ControlEndpointService ces = (ControlEndpointService) t.getLooper();
 					final ServiceContainer sc = ces.getServiceContainer();
 					if (sc.isActivated()) {
@@ -1859,9 +1859,9 @@ public class KNXnetIPServer
 
 		private void sendOnInterfaces(final DatagramPacket p) throws SocketException, IOException
 		{
-			final Enumeration nifs = NetworkInterface.getNetworkInterfaces();
+			final Enumeration<NetworkInterface> nifs = NetworkInterface.getNetworkInterfaces();
 			while (nifs.hasMoreElements()) {
-				final NetworkInterface nif = (NetworkInterface) nifs.nextElement();
+				final NetworkInterface nif = nifs.nextElement();
 				// we can't use isUp or supportsMulticast on the interface with Java v1.4
 				if (nif.getInetAddresses().hasMoreElements()) {
 					// some OS use a dedicated display name, others use the same as from getName
@@ -2259,8 +2259,8 @@ public class KNXnetIPServer
 					// supported, only one tunneling connection is allowed per subnetwork,
 					// i.e., if there are any active link-layer connections, we don't
 					// allow tunneling on busmonitor.
-					for (final Iterator i = dataConnections.iterator(); i.hasNext();) {
-						final DataEndpointServiceHandler h = (DataEndpointServiceHandler) i.next();
+					for (final Iterator<DataEndpointServiceHandler> i = dataConnections.iterator(); i.hasNext();) {
+						final DataEndpointServiceHandler h = i.next();
 						if (h.getCtrlSocketAddress().equals(s.getLocalSocketAddress())) {
 							logger.warn("active tunneling on link-layer connections, "
 									+ "tunneling on busmonitor currently not allowed");
@@ -2367,8 +2367,8 @@ public class KNXnetIPServer
 
 		private DataEndpointServiceHandler findConnection(final int channelId)
 		{
-			for (final Iterator i = dataConnections.iterator(); i.hasNext();) {
-				final DataEndpointServiceHandler c = (DataEndpointServiceHandler) i.next();
+			for (final Iterator<DataEndpointServiceHandler> i = dataConnections.iterator(); i.hasNext();) {
+				final DataEndpointServiceHandler c = i.next();
 				if (c.getChannelId() == channelId)
 					return c;
 			}

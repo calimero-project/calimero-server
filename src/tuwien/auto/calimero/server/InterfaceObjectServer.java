@@ -66,7 +66,6 @@ import tuwien.auto.calimero.mgmt.PropertyClient;
 import tuwien.auto.calimero.mgmt.PropertyClient.Property;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.mgmt.PropertyClient.ResourceHandler;
-import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.xml.Attribute;
 import tuwien.auto.calimero.xml.Element;
 import tuwien.auto.calimero.xml.EntityResolver;
@@ -97,16 +96,15 @@ import tuwien.auto.calimero.xml.XMLWriter;
  */
 public class InterfaceObjectServer implements PropertyAccess
 {
-	private final Logger logger = LogManager.getManager().getSlf4jLogger(
-			"Interface Object Server");
+	private final Logger logger = LogManager.getManager().getSlf4jLogger("Interface Object Server");
 
 	private IosResourceHandler rh;
 
 	// the list of interface objects is not expected to change frequently
-	private final List objects;
+	private final List<InterfaceObject> objects = new ArrayList<>();
 
-	private final PropertyClient client;
-	private final IosAdapter adapter;
+	private final IosAdapter adapter = new IosAdapter();
+	private final PropertyClient client = new PropertyClient(adapter);
 
 	private final boolean strictMode;
 
@@ -140,11 +138,6 @@ public class InterfaceObjectServer implements PropertyAccess
 	public InterfaceObjectServer(final boolean strictPropertyMode) throws KNXFormatException
 	{
 		strictMode = strictPropertyMode;
-
-		adapter = new IosAdapter();
-		client = new PropertyClient(adapter);
-
-		objects = new ArrayList();
 
 		// AN033 3.2.6: minimum required interface objects for a cEMI server
 		// are a device object and a cEMI server object
@@ -201,12 +194,12 @@ public class InterfaceObjectServer implements PropertyAccess
 				setResourceHandler(new XmlSerializer(logger));
 			h = rh;
 		}
-		final Collection c = h.loadInterfaceObjects(resource);
+		final Collection<InterfaceObject> c = h.loadInterfaceObjects(resource);
 		// we insert the objects in iteration order, but correcting the loaded interface
 		// object to match the insertion index. this is to avoid null entries in the
 		// objects list.
-		for (final Iterator i = c.iterator(); i.hasNext();) {
-			final InterfaceObject io = (InterfaceObject) i.next();
+		for (final Iterator<InterfaceObject> i = c.iterator(); i.hasNext();) {
+			final InterfaceObject io = i.next();
 			synchronized (objects) {
 				final int index = objects.size();
 				io.setIndex(index);
@@ -252,7 +245,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	public InterfaceObject[] getInterfaceObjects()
 	{
 		synchronized (objects) {
-			return (InterfaceObject[]) objects.toArray(new InterfaceObject[objects.size()]);
+			return objects.toArray(new InterfaceObject[objects.size()]);
 		}
 	}
 
@@ -564,7 +557,7 @@ public class InterfaceObjectServer implements PropertyAccess
 
 	private void updateIoList()
 	{
-		final InterfaceObject io = (InterfaceObject) objects.get(0);
+		final InterfaceObject io = objects.get(0);
 		if (io == null || io.getType() != InterfaceObject.DEVICE_OBJECT)
 			throw new KNXIllegalStateException("IOS is missing mandatory device object");
 		// the IO_LIST property values have to be in ascending order
@@ -572,8 +565,8 @@ public class InterfaceObjectServer implements PropertyAccess
 		final int items = objects.size();
 		final int[] types = new int[items];
 		int k = 0;
-		for (final Iterator i = objects.iterator(); i.hasNext();)
-			types[k++] = ((InterfaceObject) i.next()).getType();
+		for (final Iterator<InterfaceObject> i = objects.iterator(); i.hasNext();)
+			types[k++] = i.next().getType();
 
 		// now sort'em asc
 		Arrays.sort(types);
@@ -586,8 +579,8 @@ public class InterfaceObjectServer implements PropertyAccess
 			value[2 + 2 * i] = (byte) (type >> 8);
 			value[2 + 2 * i + 1] = (byte) type;
 		}
-		((InterfaceObject) objects.get(0)).values.put(new PropertyKey(
-				InterfaceObject.DEVICE_OBJECT, PID.IO_LIST), value);
+		objects.get(0).values.put(new PropertyKey(InterfaceObject.DEVICE_OBJECT, PID.IO_LIST),
+				value);
 	}
 
 	void initIoProperties(final InterfaceObject io, final boolean createDescription)
@@ -626,20 +619,20 @@ public class InterfaceObjectServer implements PropertyAccess
 
 	private Property getDefinition(final int objectType, final int pid)
 	{
-		final Map defs = client.getDefinitions();
+		final Map<PropertyKey, Property> defs = client.getDefinitions();
 		if (defs == null)
 			return null;
-		Property p = (Property) defs.get(new PropertyKey(objectType, pid));
+		Property p = defs.get(new PropertyKey(objectType, pid));
 		if (p == null && pid < 50)
-			p = (Property) defs.get(new PropertyKey(pid));
+			p = defs.get(new PropertyKey(pid));
 		return p;
 	}
 
 	private InterfaceObject getIfObject(final int objIndex)
 	{
 		synchronized (objects) {
-			for (final Iterator i = objects.iterator(); i.hasNext();) {
-				final InterfaceObject io = (InterfaceObject) i.next();
+			for (final Iterator<InterfaceObject> i = objects.iterator(); i.hasNext();) {
+				final InterfaceObject io = i.next();
 				if (io.getIndex() == objIndex)
 					return io;
 			}
@@ -653,8 +646,8 @@ public class InterfaceObjectServer implements PropertyAccess
 	{
 		synchronized (objects) {
 			int inst = 0;
-			for (final Iterator i = objects.iterator(); i.hasNext();) {
-				final InterfaceObject io = (InterfaceObject) i.next();
+			for (final Iterator<InterfaceObject> i = objects.iterator(); i.hasNext();) {
+				final InterfaceObject io = i.next();
 				if (io.getType() == objectType && ++inst == objectInstance)
 					return io;
 			}
@@ -724,7 +717,7 @@ public class InterfaceObjectServer implements PropertyAccess
 			if (pid != 0)
 				d = findByPid(io.descriptions, pid);
 			else if (propIndex < io.descriptions.size())
-				d = (Description) io.descriptions.get(propIndex);
+				d = io.descriptions.get(propIndex);
 
 			if (d != null) {
 				// actual property values might not exist yet
@@ -768,7 +761,7 @@ public class InterfaceObjectServer implements PropertyAccess
 			final int elements, final byte[] data) throws KNXPropertyException
 		{
 			final PropertyKey key = new PropertyKey(io.getType(), pid);
-			byte[] values = (byte[]) io.values.get(key);
+			byte[] values = io.values.get(key);
 
 			if (start == 0) {
 				// Document Application IF Layer (03/04/01) v1.1, 4.2.1:
@@ -865,7 +858,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		private byte[] getProperty(final InterfaceObject io, final int pid, final int start,
 			final int elements) throws KNXPropertyException
 		{
-			final byte[] values = (byte[]) io.values.get(new PropertyKey(io.getType(), pid));
+			final byte[] values = io.values.get(new PropertyKey(io.getType(), pid));
 
 			if (start == 0) {
 				if (elements > 1)
@@ -907,7 +900,7 @@ public class InterfaceObjectServer implements PropertyAccess
 			if (pid != 0)
 				d = findByPid(io.descriptions, pid);
 			else if (propIndex < io.descriptions.size())
-				d = (Description) io.descriptions.get(propIndex);
+				d = io.descriptions.get(propIndex);
 
 			if (d != null) {
 				// actual property values might not exist yet
@@ -951,12 +944,12 @@ public class InterfaceObjectServer implements PropertyAccess
 			return d;
 		}
 
-		private Description findByPid(final List descriptions, final int pid)
+		private Description findByPid(final List<Description> descriptions, final int pid)
 		{
 			// descriptions are stored at their property index in the list,
 			// so the list can contain null entries
-			for (final Iterator i = descriptions.iterator(); i.hasNext();) {
-				final Description d = (Description) i.next();
+			for (final Iterator<Description> i = descriptions.iterator(); i.hasNext();) {
+				final Description d = i.next();
 				if (d != null && d.getPID() == pid)
 					return d;
 			}
@@ -989,7 +982,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @throws KNXException on errors accessing the resource, parsing the data, or creating the
 		 *         interface objects
 		 */
-		Collection loadInterfaceObjects(final String resource) throws KNXException;
+		Collection<InterfaceObject> loadInterfaceObjects(final String resource) throws KNXException;
 
 		/**
 		 * Saves interface objects to a resource identified by <code>resource</code>.
@@ -1001,8 +994,8 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @param ifObjects a collection of interface objects, type {@link InterfaceObject}, to save
 		 * @throws KNXException on errors accessing the resource, or saving the data
 		 */
-		void saveInterfaceObjects(final String resource, final Collection ifObjects)
-			throws KNXException;
+		void saveInterfaceObjects(final String resource,
+			final Collection<InterfaceObject> ifObjects) throws KNXException;
 
 		/**
 		 * Reads KNX property data from a resource identified by <code>resource</code>, and loads
@@ -1019,8 +1012,8 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @throws KNXException on errors accessing the resource, parsing the data, or object
 		 *         creation
 		 */
-		void loadProperties(final String resource, final Collection descriptions,
-			final Collection values) throws KNXException;
+		void loadProperties(final String resource, final Collection<Description> descriptions,
+			final Collection<byte[]> values) throws KNXException;
 
 		/**
 		 * Saves KNX property information to a resource identified by <code>resource</code>.
@@ -1038,8 +1031,8 @@ public class InterfaceObjectServer implements PropertyAccess
 		 *        aligned by the {@link Iterator#next()} behavior of the supplied collections
 		 * @throws KNXException
 		 */
-		void saveProperties(final String resource, final Collection descriptions,
-			final Collection values) throws KNXException;
+		void saveProperties(final String resource, final Collection<Description> descriptions,
+			final Collection<byte[]> values) throws KNXException;
 	}
 
 	private static class XmlSerializer implements IosResourceHandler
@@ -1076,7 +1069,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @see tuwien.auto.calimero.mgmt.PropertyClient.ResourceHandler
 		 * #load(java.lang.String)
 		 */
-		public Collection load(final String resource) throws KNXException
+		public Collection<Property> load(final String resource) throws KNXException
 		{
 			return rh.load(resource);
 		}
@@ -1085,7 +1078,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @see tuwien.auto.calimero.mgmt.PropertyClient.ResourceHandler
 		 * #save(java.lang.String, java.util.Collection)
 		 */
-		public void save(final String resource, final Collection properties) throws KNXException
+		public void save(final String resource, final Collection<Property> properties) throws KNXException
 		{
 			rh.save(resource, properties);
 		}
@@ -1094,10 +1087,10 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @see tuwien.auto.calimero.server.InterfaceObjectServer.IOSResourceHandler
 		 * #loadInterfaceObjects(java.lang.String)
 		 */
-		public Collection loadInterfaceObjects(final String resource) throws KNXException
+		public Collection<InterfaceObject> loadInterfaceObjects(final String resource) throws KNXException
 		{
 			r = XMLFactory.getInstance().createXMLReader(resource);
-			final List list = new ArrayList();
+			final List<InterfaceObject> list = new ArrayList<>();
 			try {
 				if (r.read() != XMLReader.START_TAG || !r.getCurrent().getName().equals(TAG_IOS))
 					throw new KNXMLException("no interface objects");
@@ -1130,7 +1123,7 @@ public class InterfaceObjectServer implements PropertyAccess
 		 * @see tuwien.auto.calimero.server.InterfaceObjectServer.IOSResourceHandler
 		 * #saveInterfaceObjects(java.lang.String, java.util.Collection)
 		 */
-		public void saveInterfaceObjects(final String resource, final Collection objects)
+		public void saveInterfaceObjects(final String resource, final Collection<InterfaceObject> objects)
 			throws KNXException
 		{
 			w = XMLFactory.getInstance().createXMLWriter(resource);
@@ -1139,9 +1132,9 @@ public class InterfaceObjectServer implements PropertyAccess
 				w.writeComment("Calimero 2 " + Settings.getLibraryVersion()
 						+ " interface objects, saved on " + new Date().toString());
 				w.writeElement(TAG_IOS, null, null);
-				for (final Iterator i = objects.iterator(); i.hasNext();) {
-					final InterfaceObject io = (InterfaceObject) i.next();
-					final List att = new ArrayList();
+				for (final Iterator<InterfaceObject> i = objects.iterator(); i.hasNext();) {
+					final InterfaceObject io = i.next();
+					final List<Attribute> att = new ArrayList<>();
 					att.add(new Attribute(ATTR_OBJECTTYPE, Integer.toString(io.getType())));
 					att.add(new Attribute(ATTR_INDEX, Integer.toString(io.getIndex())));
 					w.writeElement(TAG_OBJECT, att, null);
@@ -1154,8 +1147,8 @@ public class InterfaceObjectServer implements PropertyAccess
 			}
 		}
 
-		public void loadProperties(final String resource, final Collection descriptions,
-			final Collection values) throws KNXException
+		public void loadProperties(final String resource, final Collection<Description> descriptions,
+			final Collection<byte[]> values) throws KNXException
 		{
 			try {
 				int type = 0;
@@ -1218,17 +1211,17 @@ public class InterfaceObjectServer implements PropertyAccess
 			}
 		}
 
-		public void saveProperties(final String resource, final Collection descriptions,
-			final Collection values) throws KNXException
+		public void saveProperties(final String resource, final Collection<Description> descriptions,
+			final Collection<byte[]> values) throws KNXException
 		{
 			if (values.size() < descriptions.size())
 				throw new KNXIllegalArgumentException("values size " + values.size()
 						+ " less than descriptions size " + descriptions.size());
-			final Iterator k = values.iterator();
-			for (final Iterator i = descriptions.iterator(); i.hasNext();) {
-				final Description d = (Description) i.next();
-				final byte[] data = (byte[]) k.next();
-				final List att = new ArrayList();
+			final Iterator<byte[]> k = values.iterator();
+			for (final Iterator<Description> i = descriptions.iterator(); i.hasNext();) {
+				final Description d = i.next();
+				final byte[] data = k.next();
+				final List<Attribute> att = new ArrayList<>();
 				att.add(new Attribute(ATTR_INDEX, Integer.toString(d.getPropIndex())));
 				att.add(new Attribute(ATTR_PID, Integer.toString(d.getPID())));
 				att.add(new Attribute(ATTR_PDT, d.getPDT() == -1 ? "<tbd>" : Integer.toString(d
@@ -1244,8 +1237,8 @@ public class InterfaceObjectServer implements PropertyAccess
 				w.endElement();
 			}
 			while (k.hasNext()) {
-				final byte[] data = (byte[]) k.next();
-				final List att = new ArrayList();
+				final byte[] data = k.next();
+				final List<Attribute> att = new ArrayList<>();
 				w.writeElement(TAG_PROPERTY, att, null);
 				w.writeElement(TAG_DATA, null, DataUnitBuilder.toHex(data, ""));
 				w.endElement();

@@ -235,8 +235,8 @@ public class KnxServerGateway implements Runnable
 				connector.setSubnetListener(new SubnetListener(connector.getName()));
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
-				for (final Iterator i = connectors.iterator(); i.hasNext();) {
-					final SubnetConnector b = (SubnetConnector) i.next();
+				for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
+					final SubnetConnector b = i.next();
 					if (b.getServiceContainer() == sc) {
 						b.getSubnetLink().removeLinkListener(b.getSubnetListener());
 						i.remove();
@@ -330,15 +330,16 @@ public class KnxServerGateway implements Runnable
 
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
-	private final List connectors = new ArrayList();
+	private final List<SubnetConnector> connectors = new ArrayList<>();
 	private final boolean enableDiscovery = true;
 
-	private final Map serverDataConnections = new HashMap();
-	private final List serverConnections = Collections.synchronizedList(new ArrayList());
+	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = new HashMap<>();
+	private final List<KNXnetIPConnection> serverConnections = Collections
+			.synchronizedList(new ArrayList<>());
 
 	private final int maxEventQueueSize = 200;
-	private final List ipEvents = new LinkedList();
-	private final List subnetEvents = new LinkedList();
+	private final List<FrameEvent> ipEvents = new LinkedList<>();
+	private final List<FrameEvent> subnetEvents = new LinkedList<>();
 
 	private boolean routing;
 	private boolean routingLoopback;
@@ -347,7 +348,7 @@ public class KnxServerGateway implements Runnable
 	// subsequently silently discarded when received again shortly after (and also removed
 	// from this buffer again).
 	// This list holds cEMI frames now, but can essentially might only keep data arrays.
-	private final List loopbackFrames = new LinkedList();
+	private final List<CEMILData> loopbackFrames = new LinkedList<>();
 
 	private volatile boolean trucking;
 	private volatile boolean inReset;
@@ -385,7 +386,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				while (trucking) {
 					while (!ipEvents.isEmpty())
-						onFrameReceived((FrameEvent) ipEvents.remove(0), true);
+						onFrameReceived(ipEvents.remove(0), true);
 					synchronized (this) {
 						wait();
 					}
@@ -412,8 +413,8 @@ public class KnxServerGateway implements Runnable
 		server = s;
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
-		for (final Iterator i = connectors.iterator(); i.hasNext();) {
-			final SubnetConnector b = (SubnetConnector) i.next();
+		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
+			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
 		}
 		logger = LogManager.getManager().getLogService(name);
@@ -480,7 +481,7 @@ public class KnxServerGateway implements Runnable
 				// other user tasks, be aware that subnet frame dispatching to IP
 				// front-end is done in this thread
 				while (!subnetEvents.isEmpty())
-					onFrameReceived((FrameEvent) subnetEvents.remove(0), false);
+					onFrameReceived(subnetEvents.remove(0), false);
 
 				// How does reset work:
 				// If we receive a reset.req message in the message handler, we set
@@ -608,8 +609,8 @@ public class KnxServerGateway implements Runnable
 				else {
 					// get connector of that subnet
 					SubnetConnector subnetConnector = null;
-					for (final Iterator i = connectors.iterator(); i.hasNext();) {
-						final SubnetConnector b = (SubnetConnector) i.next();
+					for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
+						final SubnetConnector b = i.next();
 						// ??? using the sending link does not always work,
 						// see listener indication for the reason of this workaround
 						if (b.getServiceContainer().getName().equals(fe.getSource())) {
@@ -651,8 +652,8 @@ public class KnxServerGateway implements Runnable
 		if (routing && routingLoopback) {
 			final byte[] a1 = frame.toByteArray();
 			synchronized (loopbackFrames) {
-				for (final Iterator i = loopbackFrames.iterator(); i.hasNext();) {
-					final byte[] a2 = ((CEMI) i.next()).toByteArray();
+				for (final Iterator<CEMILData> i = loopbackFrames.iterator(); i.hasNext();) {
+					final byte[] a2 = i.next().toByteArray();
 					if (a1.length == a2.length) {
 						for (int k = 0; k < a1.length; ++k)
 							if (a1[k] != a2[k])
@@ -690,8 +691,8 @@ public class KnxServerGateway implements Runnable
 			if (raw <= 0x6fff && subGroupAddressConfig == 2)
 				return;
 
-			for (final Iterator i = connectors.iterator(); i.hasNext();) {
-				final SubnetConnector subnet = (SubnetConnector) i.next();
+			for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
+				final SubnetConnector subnet = i.next();
 				if (subnet.getServiceContainer().isActivated())
 					dispatchToSubnet(subnet, f, raw);
 			}
@@ -729,8 +730,8 @@ public class KnxServerGateway implements Runnable
 
 	private KNXNetworkLink findSubnetLink(final IndividualAddress dst)
 	{
-		for (final Iterator i = connectors.iterator(); i.hasNext();) {
-			final SubnetConnector b = (SubnetConnector) i.next();
+		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
+			final SubnetConnector b = i.next();
 			final ServiceContainer c = b.getServiceContainer();
 			if (c.isActivated()) {
 				final IndividualAddress subnet = c.getSubnetAddress();
@@ -777,7 +778,7 @@ public class KnxServerGateway implements Runnable
 				}
 
 				// create temporary array to not block concurrent access during iteration
-				final KNXnetIPConnection[] sca = (KNXnetIPConnection[]) serverConnections
+				final KNXnetIPConnection[] sca = serverConnections
 						.toArray(new KNXnetIPConnection[serverConnections.size()]);
 				for (int i = 0; i < sca.length; i++) {
 					final KNXnetIPConnection c = sca[i];
@@ -804,7 +805,7 @@ public class KnxServerGateway implements Runnable
 
 	private KNXnetIPConnection findServerConnection(final IndividualAddress dst)
 	{
-		return (KNXnetIPConnection) serverDataConnections.get(dst);
+		return serverDataConnections.get(dst);
 	}
 
 	private void send(final KNXNetworkLink lnk, final CEMILData f)

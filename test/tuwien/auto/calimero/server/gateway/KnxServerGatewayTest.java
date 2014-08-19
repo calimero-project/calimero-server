@@ -56,7 +56,6 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.InterfaceObject;
@@ -172,8 +171,8 @@ public class KnxServerGatewayTest extends TestCase
 		assertEquals("gateway", gw.getName());
 	}
 
-	private final List addrList = new ArrayList();
-	private final Set addrSet = new HashSet();
+	private final List<GroupAddress> addrList = new ArrayList<>();
+	private final Set<GroupAddress> addrSet = new HashSet<>();
 	private InterfaceObjectServer ios;
 
 	/**
@@ -196,7 +195,7 @@ public class KnxServerGatewayTest extends TestCase
 		final byte[] table = new byte[size * 2];
 		int idx = 0;
 		for (int i = 0; i < size; i++) {
-			final GroupAddress ga = (GroupAddress) addrList.get(i);
+			final GroupAddress ga = addrList.get(i);
 			table[idx++] = (byte) (ga.getRawAddress() >> 8);
 			table[idx++] = (byte) ga.getRawAddress();
 		}
@@ -209,13 +208,13 @@ public class KnxServerGatewayTest extends TestCase
 		final int loops = 100000;
 		long start = System.currentTimeMillis();
 		for (int i = 0; i < loops; ++i)
-			inGroupAddressTable((GroupAddress) addrList.get(i % addrList.size()));
+			inGroupAddressTable(addrList.get(i % addrList.size()));
 		long end = System.currentTimeMillis();
 		System.out.println("group address table lookup: " + (end - start));
 
 		start = System.currentTimeMillis();
 		for (int i = 0; i < loops; ++i)
-			inGroupAddressSet((GroupAddress) addrList.get(i % addrList.size()));
+			inGroupAddressSet(addrList.get(i % addrList.size()));
 		end = System.currentTimeMillis();
 		System.out.println("group address set lookup: " + (end - start));
 	}
