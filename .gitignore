@@ -4,3 +4,13 @@
 *.jar
 *.war
 *.ear
+
+# Eclipse
+/.settings
+/.classpath
+
+/doc
+/target/
+
+# OS X
+.DS_Store
