@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,15 +44,16 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
  * A service container offers KNXnet/IP service types in a {@link KNXnetIPServer}.
  * <p>
  * The service container's control endpoint uniquely identifies the service container to clients on
- * the KNXnet/IP server side. A service container is usually connected to a KNX subnetwork. Hence, a
- * service container contained in a server provides the control endpoint through which the server
- * offers services to its clients.<br>
- * A KNXnet/IP server contains one or more service containers.
+ * the KNXnet/IP server side. Any service container is usually connected to one KNX subnetwork,
+ * i.e., area or line on the KNX network. Hence, a service container contained in a KNXnet/IP server
+ * provides the control endpoint through which the server offers services to its KNXnet/IP clients.<br>
+ * A KNXnet/IP server may contains one or more service containers.
  * <p>
  * Many of the configuration settings stored in a service container are used in the device
  * description of a KNXnet/IP server and used in the device description information block (
- * {@link DeviceDIB}) of that server instance.
- * 
+ * {@link DeviceDIB}) of that KNXnet/IP server instance. Essentially, that is the information
+ * provided as response to KNXnet/IP discovery and description requests.
+ *
  * @author B. Malinowsky
  */
 public interface ServiceContainer
