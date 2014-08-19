@@ -45,6 +45,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -56,9 +58,7 @@ import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
-import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
-import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAdapter;
@@ -66,6 +66,7 @@ import tuwien.auto.calimero.mgmt.PropertyClient;
 import tuwien.auto.calimero.mgmt.PropertyClient.Property;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.mgmt.PropertyClient.ResourceHandler;
+import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.xml.Attribute;
 import tuwien.auto.calimero.xml.Element;
 import tuwien.auto.calimero.xml.EntityResolver;
@@ -96,7 +97,8 @@ import tuwien.auto.calimero.xml.XMLWriter;
  */
 public class InterfaceObjectServer implements PropertyAccess
 {
-	private final LogService logger;
+	private final Logger logger = LogManager.getManager().getSlf4jLogger(
+			"Interface Object Server");
 
 	private IosResourceHandler rh;
 
@@ -108,7 +110,8 @@ public class InterfaceObjectServer implements PropertyAccess
 
 	private final boolean strictMode;
 
-	private final EventListeners listeners = new EventListeners();
+	private final EventListeners<InterfaceObjectServerListener> listeners =
+			new EventListeners<>(InterfaceObjectServerListener.class, logger);
 
 	/**
 	 * Creates a new interface object server.
@@ -138,7 +141,6 @@ public class InterfaceObjectServer implements PropertyAccess
 	{
 		strictMode = strictPropertyMode;
 
-		logger = LogManager.getManager().getLogService("Interface Object Server");
 		adapter = new IosAdapter();
 		client = new PropertyClient(adapter);
 
@@ -1063,9 +1065,9 @@ public class InterfaceObjectServer implements PropertyAccess
 		private XMLReader r;
 		private XMLWriter w;
 
-		private final LogService logger;
+		private final Logger logger;
 
-		XmlSerializer(final LogService l)
+		XmlSerializer(final Logger l)
 		{
 			logger = l;
 		}
@@ -1188,13 +1190,13 @@ public class InterfaceObjectServer implements PropertyAccess
 							if (valueExpected)
 								values.add(emptyValue);
 							valueExpected = true;
-							if (logger.isLoggable(LogLevel.TRACE))
+							if (logger.isTraceEnabled())
 								logger.trace(d.toString());
 						}
 						else if (e.getName().equals(TAG_DATA)) {
 							r.complete(e);
 							final String s = e.getCharacterData();
-							if (logger.isLoggable(LogLevel.TRACE))
+							if (logger.isTraceEnabled())
 								logger.trace(s);
 							final int odd = s.length() % 2;
 							final byte[] data = new byte[s.length() / 2 + odd];

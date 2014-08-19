@@ -61,6 +61,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import org.slf4j.Logger;
+
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
@@ -240,7 +242,7 @@ public class KNXnetIPServer
 	// server friendly name, matches PID.FRIENDLY_NAME property
 	private final String friendlyName;
 
-	private final LogService logger;
+	private final Logger logger;
 
 	private boolean running;
 
@@ -289,7 +291,7 @@ public class KNXnetIPServer
 	// will query for properties. Always defaults to 1.
 	private final int objectInstance = 1;
 
-	private final EventListeners listeners = new EventListeners();
+	private final EventListeners<ServerListener> listeners;
 
 	/**
 	 * Creates a new KNXnet/IP server instance.
@@ -336,7 +338,7 @@ public class KNXnetIPServer
 	 */
 	public KNXnetIPServer()
 	{
-		this("Calimero 2/NG", "");
+		this("Calimero 2", "");
 	}
 
 	/**
@@ -367,7 +369,8 @@ public class KNXnetIPServer
 			// ISO 8859-1 support is mandatory on every Java platform
 			throw new Error("missing ISO 8859-1 charset, " + e.getMessage());
 		}
-		logger = LogManager.getManager().getLogService(getName());
+		logger = LogManager.getManager().getSlf4jLogger(getName());
+		listeners = new EventListeners<>(ServerListener.class, logger);
 
 		try {
 			initBasicServerProperties();
@@ -668,8 +671,7 @@ public class KNXnetIPServer
 			final NetworkInterface nif = NetworkInterface.getByName(ifname);
 			if (nif != null)
 				return nif;
-			logger.error("option " + option + ": no network interface with name '" + ifname + "'",
-					null);
+			logger.error("option " + option + ": no network interface with name '" + ifname + "'");
 		}
 		catch (final SocketException e) {
 			logger.error("option " + option + " for interface " + ifname, e);
@@ -951,7 +953,7 @@ public class KNXnetIPServer
 		catch (final UnknownHostException e) {
 			// possible data corruption in IOS
 			final String s = "routing multicast property value is no IP address!";
-			logger.fatal(s, e);
+			logger.error(s, e);
 			throw new KNXPropertyException(s, CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 		}
 		ios.setProperty(knxObject, 1, PID.ROUTING_MULTICAST_ADDRESS, 1, 1, mcast.getAddress());
@@ -1460,7 +1462,7 @@ public class KNXnetIPServer
 				final String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
 				final StackTraceElement[] trace = e.getStackTrace();
 				final String frame = trace.length > 0 ? trace[0].toString() : "frame n/a";
-				logger.fatal("runtime exception in service loop " + addr + ": " + msg + " ["
+				logger.error("runtime exception in service loop " + addr + ": " + msg + " ["
 						+ frame + "]");
 				cleanup(LogLevel.ERROR, e);
 			}
@@ -1504,7 +1506,7 @@ public class KNXnetIPServer
 
 		void cleanup(final LogLevel level, final Throwable t)
 		{
-			logger.log(level, Thread.currentThread().getName() + " cleanup", t);
+			LogService.log(logger, level, Thread.currentThread().getName() + " cleanup", t);
 		}
 
 		DatagramSocket getSocket()
@@ -1708,7 +1710,7 @@ public class KNXnetIPServer
 
 		void cleanup(final LogLevel level, final Throwable t)
 		{
-			logger.log(level, super.getName() + " closed", t);
+			LogService.log(logger, level, super.getName() + " closed", t);
 		}
 	}
 

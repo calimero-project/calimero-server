@@ -620,7 +620,7 @@ public class KnxServerGateway implements Runnable
 					if (subnetConnector != null)
 						dispatchToServer(subnetConnector, send);
 					else
-						logger.fatal("dispatch to server: no subnet connector found!");
+						logger.error("dispatch to server: no subnet connector found!");
 				}
 			}
 			else {

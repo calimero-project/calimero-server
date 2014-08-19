@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2014 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -62,11 +62,12 @@ import tuwien.auto.calimero.knxnetip.servicetype.ServiceAck;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
 import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
+import tuwien.auto.calimero.log.LogService;
 
 /**
  * Server-side implementation of KNXnet/IP tunneling and device management protocol.
  * <p>
- * 
+ *
  * @author B. Malinowsky
  */
 final class DataEndpointServiceHandler extends ConnectionBase
@@ -119,7 +120,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		dataEndpt = remoteDataEndpt;
 
 		useNat = useNAT;
-		logger = LogManager.getManager().getLogService(getName());
+		logger = LogManager.getManager().getSlf4jLogger(getName());
 
 		setState(OK);
 	}
@@ -176,7 +177,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			shutdown = true;
 		}
 
-		logger.log(level, "close connection - " + reason, t);
+		LogService.log(logger, level, "close connection - " + reason, t);
 		callback.connectionClosed(this, device);
 		super.cleanup(initiator, reason, level, t);
 	}
@@ -246,7 +247,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
-				if (logger.isLoggable(LogLevel.TRACE))
+				if (logger.isTraceEnabled())
 					logger.trace("received service acknowledgment from " + ctrlEndpt
 							+ " (channel id " + channelId + ")");
 				if (internalState == ACK_ERROR)
