@@ -145,8 +145,6 @@ import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCa
  */
 public class KNXnetIPServer
 {
-	// dev v0.4
-
 	// Notes:
 
 	// Core specification:
@@ -228,7 +226,7 @@ public class KNXnetIPServer
 	private static final int defMfrId = 0;
 	// PID.MANUFACTURER_DATA
 	// one element is 4 bytes, value length has to be multiple of that
-	// defaults to 'bm2011 '
+	// defaults to 'bm2011  '
 	private static final byte[] defMfrData = new byte[] { 'b', 'm', '2', '0', '1', '1', ' ', ' ' };
 
 	// from init KNX properties
