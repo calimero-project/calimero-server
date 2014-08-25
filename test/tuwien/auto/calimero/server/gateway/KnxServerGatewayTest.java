@@ -119,7 +119,7 @@ public class KnxServerGatewayTest extends TestCase
 	 */
 	public final void testKnxServerGateway()
 	{
-		final KnxServerGateway gw2 = new KnxServerGateway("testGW", new KNXnetIPServer(),
+		/*final KnxServerGateway gw2 =*/ new KnxServerGateway("testGW", new KNXnetIPServer(),
 				new SubnetConnector[] {});
 	}
 
