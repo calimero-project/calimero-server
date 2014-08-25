@@ -45,6 +45,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.FrameEvent;
@@ -65,9 +67,7 @@ import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.NetworkLinkListener;
-import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
-import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.InterfaceObject;
@@ -326,7 +326,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private final String name;
-	private final LogService logger;
+	private final Logger logger;
 
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
@@ -417,7 +417,7 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
 		}
-		logger = LogManager.getManager().getLogService(name);
+		logger = LogManager.getManager().getSlf4jLogger(name);
 
 		// group address routing settings
 		try {
@@ -554,7 +554,7 @@ public class KnxServerGateway implements Runnable
 		final String s = fromServerSide ? "server-side " : "KNX subnet ";
 		final CEMI frame = fe.getFrame();
 
-		final boolean trace = logger.isLoggable(LogLevel.TRACE);
+		final boolean trace = logger.isTraceEnabled();
 		if (trace)
 			logger.trace(s + fe.getSource() + " " + frame.toString());
 
@@ -658,7 +658,7 @@ public class KnxServerGateway implements Runnable
 						for (int k = 0; k < a1.length; ++k)
 							if (a1[k] != a2[k])
 								return false;
-						if (logger.isLoggable(LogLevel.TRACE))
+						if (logger.isTraceEnabled())
 							logger.trace("discard routed cEMI frame received over "
 									+ "local multicast loopback");
 						i.remove();
@@ -736,7 +736,7 @@ public class KnxServerGateway implements Runnable
 			if (c.isActivated()) {
 				final IndividualAddress subnet = c.getSubnetAddress();
 				if (matchesSubnet(dst, subnet)) {
-					if (logger.isLoggable(LogLevel.TRACE))
+					if (logger.isTraceEnabled())
 						logger.trace("dispatch to KNX subnet " + subnet + " ("
 								+ b.getSubnetLink().getName() + " in service container "
 								+ b.getName() + ")");
@@ -757,7 +757,7 @@ public class KnxServerGateway implements Runnable
 				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f
 						.getDestination());
 				if (c != null) {
-					if (logger.isLoggable(LogLevel.TRACE))
+					if (logger.isTraceEnabled())
 						logger.trace("send from " + f.getSource() + " to " + f.getDestination());
 					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
 				}
