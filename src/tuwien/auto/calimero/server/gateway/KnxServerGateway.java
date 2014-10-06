@@ -67,7 +67,7 @@ import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.NetworkLinkListener;
-import tuwien.auto.calimero.log.LogManager;
+import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.InterfaceObject;
@@ -417,7 +417,7 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
 		}
-		logger = LogManager.getManager().getSlf4jLogger(name);
+		logger = LogService.getLogger(name);
 
 		// group address routing settings
 		try {

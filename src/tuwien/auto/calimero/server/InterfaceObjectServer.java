@@ -58,7 +58,7 @@ import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
-import tuwien.auto.calimero.log.LogManager;
+import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAdapter;
@@ -96,7 +96,7 @@ import tuwien.auto.calimero.xml.XMLWriter;
  */
 public class InterfaceObjectServer implements PropertyAccess
 {
-	private final Logger logger = LogManager.getManager().getSlf4jLogger("Interface Object Server");
+	private final Logger logger = LogService.getLogger("Interface Object Server");
 
 	private IosResourceHandler rh;
 

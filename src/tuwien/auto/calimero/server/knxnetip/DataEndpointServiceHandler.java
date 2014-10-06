@@ -60,9 +60,9 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceAck;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
-import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
+import tuwien.auto.calimero.log.LogService.LogLevel;
 
 /**
  * Server-side implementation of KNXnet/IP tunneling and device management protocol.
@@ -120,7 +120,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		dataEndpt = remoteDataEndpt;
 
 		useNat = useNAT;
-		logger = LogManager.getManager().getSlf4jLogger(getName());
+		logger = LogService.getLogger(getName());
 
 		setState(OK);
 	}

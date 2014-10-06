@@ -101,9 +101,8 @@ import tuwien.auto.calimero.knxnetip.util.ManufacturerDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRD;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRI;
-import tuwien.auto.calimero.log.LogLevel;
-import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
+import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.InterfaceObject;
 import tuwien.auto.calimero.server.InterfaceObjectServer;
@@ -369,7 +368,7 @@ public class KNXnetIPServer
 			// ISO 8859-1 support is mandatory on every Java platform
 			throw new Error("missing ISO 8859-1 charset, " + e.getMessage());
 		}
-		logger = LogManager.getManager().getSlf4jLogger(getName());
+		logger = LogService.getLogger(getName());
 		listeners = new EventListeners<>(ServerListener.class, logger);
 
 		try {
