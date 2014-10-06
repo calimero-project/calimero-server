@@ -104,7 +104,7 @@ public class InterfaceObjectServer implements PropertyAccess
 	private final List<InterfaceObject> objects = new ArrayList<>();
 
 	private final IosAdapter adapter = new IosAdapter();
-	private final PropertyClient client = new PropertyClient(adapter);
+	private final PropertyClient client;
 
 	private final boolean strictMode;
 
@@ -133,11 +133,19 @@ public class InterfaceObjectServer implements PropertyAccess
 	 *
 	 * @param strictPropertyMode <code>true</code> if server shall enforce strict mode,
 	 *        <code>false</code> otherwise
-	 * @throws KNXFormatException
 	 */
-	public InterfaceObjectServer(final boolean strictPropertyMode) throws KNXFormatException
+	public InterfaceObjectServer(final boolean strictPropertyMode)
 	{
 		strictMode = strictPropertyMode;
+		try {
+			client = new PropertyClient(adapter);
+		}
+		catch (final KNXFormatException e) {
+			// Don't propagate this checked exception type: it indicates that we requested an
+			// unsupported DPT. But the property client DPT is known and supported in the standard
+			// set of Calimero translators.
+			throw new KNXIllegalArgumentException("cannot create property client", e);
+		}
 
 		// AN033 3.2.6: minimum required interface objects for a cEMI server
 		// are a device object and a cEMI server object
