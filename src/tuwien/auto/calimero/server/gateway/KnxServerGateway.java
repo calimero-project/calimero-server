@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -479,8 +479,8 @@ public class KnxServerGateway implements Runnable
 				// although we possibly run in a dedicated thread so to not delay any
 				// other user tasks, be aware that subnet frame dispatching to IP
 				// front-end is done in this thread
-				while (!subnetEvents.isEmpty())
-					onFrameReceived((FrameEvent) subnetEvents.remove(0), false);
+				for (FrameEvent event = getSubnetEvent(); event != null; event = getSubnetEvent())
+					onFrameReceived(event, false);
 
 				// How does reset work:
 				// If we receive a reset.req message in the message handler, we set
@@ -532,6 +532,13 @@ public class KnxServerGateway implements Runnable
 	public String getName()
 	{
 		return name;
+	}
+
+	private synchronized FrameEvent getSubnetEvent()
+	{
+		if (subnetEvents.isEmpty())
+			return null;
+		return (FrameEvent) subnetEvents.remove(0);
 	}
 
 	private void launchServer()
