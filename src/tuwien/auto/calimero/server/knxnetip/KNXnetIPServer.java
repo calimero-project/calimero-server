@@ -1871,21 +1871,25 @@ public class KNXnetIPServer
 				final NetworkInterface nif = (NetworkInterface) nifs.nextElement();
 				// we can't use isUp or supportsMulticast on the interface with Java v1.4
 				if (nif.getInetAddresses().hasMoreElements()) {
-					// some OS use a dedicated display name, others use the same as from getName
-					String name = nif.getName();
-					final String disp = nif.getDisplayName();
-					if (!name.equals(disp))
-						name = name + " (" + disp + ")";
 					try {
 						((MulticastSocket) s).setNetworkInterface(nif);
-						logger.trace("send search response on interface " + name);
+						logger.trace("send search response on interface " + nameOf(nif));
 						s.send(p);
 					}
 					catch (final SocketException e) {
-						logger.info("failure sending on interface " + name);
+						logger.info("failure sending on interface " + nameOf(nif));
 					}
 				}
 			}
+		}
+
+		// some OS use a dedicated display name, others use the same as returned by getName, etc.
+		private String nameOf(final NetworkInterface nif) {
+			final String name = nif.getName();
+			final String friendly = nif.getDisplayName();
+			if (friendly != null & !name.equals(friendly))
+				return name + "(" + friendly + ")";
+			return name;
 		}
 
 		/* (non-Javadoc)
