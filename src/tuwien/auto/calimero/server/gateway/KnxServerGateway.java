@@ -585,14 +585,22 @@ public class KnxServerGateway implements Runnable
 						final boolean error = false;
 						//if (f.getDestination().equals(a))
 						//	error = true;
+						logger.trace("send positive cEMI L_Data.con");
 						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
 						// TODO wait for ACK is correct, but should be done asynchronously
 						// otherwise, it might block the processing of a next queued frame
 						//c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
 						try {
-							c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.NONBLOCKING);
+							final int sleep = 100; // ms
+							while (c.getState() != KNXnetIPConnection.OK) {
+								System.out.println(c.getName() + " not ready for .con (state "
+										+ c.getState() + "), sleep " + sleep + " ms");
+								Thread.sleep(sleep);
+							}
+							c.send(createCon(f.getPayload(), f, error),
+									KNXnetIPConnection.NONBLOCKING);
 						}
-						catch (final KNXIllegalStateException e) {
+						catch (final KNXIllegalStateException | InterruptedException e) {
 							// an ACK is still pending from a previous non-blocking send
 							e.printStackTrace();
 						}
