@@ -1714,10 +1714,12 @@ public class KNXnetIPServer
 
 	private final class DiscoveryService extends ServiceLoop
 	{
+		private final boolean hasOutgoingNetIf;
 		private DiscoveryService(final NetworkInterface outgoing, final NetworkInterface[] joinOn)
 			throws IOException
 		{
 			super(null, 512, 0);
+			hasOutgoingNetIf = outgoing != null;
 			s = createSocket(outgoing, joinOn);
 		}
 
@@ -1858,6 +1860,10 @@ public class KNXnetIPServer
 
 		private void sendOnInterfaces(final DatagramPacket p) throws SocketException, IOException
 		{
+			if (!p.getAddress().isMulticastAddress() || hasOutgoingNetIf) {
+				s.send(p);
+				return;
+			}
 			final Enumeration<NetworkInterface> nifs = NetworkInterface.getNetworkInterfaces();
 			while (nifs.hasMoreElements()) {
 				final NetworkInterface nif = nifs.nextElement();
