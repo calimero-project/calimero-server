@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -237,7 +237,7 @@ public class KNXnetIPServer
 		'e', 't', '/', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
 
 	// unmodifiable name assigned by user, used in getName() and logger
-	private final String name;
+	private final String serverName;
 	// server friendly name, matches PID.FRIENDLY_NAME property
 	private final String friendlyName;
 
@@ -358,7 +358,7 @@ public class KNXnetIPServer
 	 */
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
-		name = localName;
+		serverName = localName;
 		final byte[] nameData = friendlyName == null || friendlyName.length() == 0
 				? defFriendlyName : friendlyName.getBytes();
 		try {
@@ -692,7 +692,7 @@ public class KNXnetIPServer
 		if (running)
 			return;
 		if (svcContainers.isEmpty())
-			throw new KNXIllegalStateException(name + " has no service containers added");
+			throw new KNXIllegalStateException(serverName + " has no service containers added");
 		logger.info("launch KNXnet/IP server " + getFriendlyName());
 		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
@@ -740,7 +740,7 @@ public class KNXnetIPServer
 	 */
 	public String getName()
 	{
-		return name;
+		return serverName;
 	}
 
 	/**
@@ -1103,7 +1103,7 @@ public class KNXnetIPServer
 	{
 		if (runDiscovery) {
 			final Builder builder = new Builder(outgoing, netIfs);
-			final LooperThread t = new LooperThread(name + "/KNXnet/IP discovery endpoint",
+			final LooperThread t = new LooperThread(serverName + "/KNXnet/IP discovery endpoint",
 					retryAttempts, builder);
 			discovery = t;
 			discovery.start();
@@ -1120,8 +1120,8 @@ public class KNXnetIPServer
 
 	private void startControlEndpoint(final ServiceContainer sc)
 	{
-		final LooperThread t = new LooperThread(name + "/" + sc.getName() + " control endpoint", 9,
-				new Builder(true, sc, null));
+		final LooperThread t = new LooperThread(serverName + "/" + sc.getName()
+				+ " control endpoint", 9, new Builder(true, sc, null));
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingEndpoint)
@@ -1151,7 +1151,7 @@ public class KNXnetIPServer
 		final Builder builder = new Builder(sc, endpoint.getRoutingInterface(), mcast,
 				multicastLoopback);
 		final LooperThread t = new LooperThread(
-				name + "/routing service " + mcast.getHostAddress(), 9, builder);
+				serverName + "/routing service " + mcast.getHostAddress(), 9, builder);
 		routingEndpoints.add(t);
 		t.start();
 	}
@@ -1731,7 +1731,7 @@ public class KNXnetIPServer
 				s = new MulticastSocket(Discoverer.SEARCH_PORT);
 			}
 			catch (final IOException e) {
-				logger.error("failed to create discovery socket for " + name, e);
+				logger.error("failed to create discovery socket for " + serverName, e);
 				throw e;
 			}
 
@@ -2347,8 +2347,8 @@ public class KNXnetIPServer
 			activeMonitorConnection = busmonitor;
 			if (!useThisCtrlEp) {
 				((DataEndpointService) svcLoop).svcHandler = sh;
-				new LooperThread(name + "/" + svcCont.getName() + " data endpoint", 0, new Builder(
-						false, null, (DataEndpointService) svcLoop)).start();
+				new LooperThread(serverName + "/" + svcCont.getName() + " data endpoint", 0,
+						new Builder(false, null, (DataEndpointService) svcLoop)).start();
 			}
 			return ret;
 		}
