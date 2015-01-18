@@ -60,6 +60,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 
@@ -249,7 +250,7 @@ public class KNXnetIPServer
 
 	private boolean runDiscovery;
 	private LooperThread discovery;
-	private NetworkInterface outgoingIf;
+	private NetworkInterface[] outgoingIf;
 	private NetworkInterface[] discoveryIfs;
 
 	// KNX endpoint and connection stuff
@@ -601,19 +602,10 @@ public class KNXnetIPServer
 			return Boolean.toString(multicastLoopback);
 		}
 		if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
-			if (discoveryIfs == null)
-				return "all";
-			final StringBuffer sb = new StringBuffer();
-			for (int i = 0; i < discoveryIfs.length; i++) {
-				final NetworkInterface ni = discoveryIfs[i];
-				sb.append(ni.getName()).append(",");
-			}
-			return sb.toString();
+			return join(discoveryIfs, NetworkInterface::getName, ",");
 		}
 		if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
-			if (outgoingIf == null)
-				return "default";
-			return outgoingIf.getName();
+			return join(outgoingIf, NetworkInterface::getName, ",");
 		}
 		logger.warn("option \"" + optionKey + "\" not supported or unknown");
 		throw new KNXIllegalArgumentException("unknown KNXnet/IP server option " + optionKey);
@@ -640,32 +632,37 @@ public class KNXnetIPServer
 			multicastLoopback = Boolean.valueOf(value).booleanValue();
 		}
 		else if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
-			if (value.equals("all"))
-				discoveryIfs = null;
-			else {
-				final List<NetworkInterface> l = new ArrayList<>();
-				int i = 0;
-				for (int k = value.indexOf(','); i < value.length(); k = value.indexOf(',', i)) {
-					k = k == -1 ? value.length() : k;
-					final String ifname = value.substring(i, k).trim();
-					i = k + 1;
-					final NetworkInterface ni = getNetworkInterfaceByName(optionKey, ifname);
-					if (ni != null)
-						l.add(ni);
-				}
-				discoveryIfs = l.toArray(new NetworkInterface[l.size()]);
-			}
+			discoveryIfs = parseNetworkInterfaces(optionKey, value);
 		}
 		else if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
-			outgoingIf = getNetworkInterfaceByName(optionKey, value);
+			outgoingIf = parseNetworkInterfaces(optionKey, value);
 		}
 		else
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
 	}
 
+	private NetworkInterface[] parseNetworkInterfaces(final String optionKey, final String value)
+	{
+		if (value == null)
+			return null;
+		else if (value.equals("all"))
+			return new NetworkInterface[0];
+		final List<NetworkInterface> l = new ArrayList<>();
+		int i = 0;
+		for (int k = value.indexOf(','); i < value.length(); k = value.indexOf(',', i)) {
+			k = k == -1 ? value.length() : k;
+			final String ifname = value.substring(i, k).trim();
+			i = k + 1;
+			final NetworkInterface ni = getNetworkInterfaceByName(optionKey, ifname);
+			if (ni != null)
+				l.add(ni);
+		}
+		return l.toArray(new NetworkInterface[l.size()]);
+	}
+
 	private NetworkInterface getNetworkInterfaceByName(final String option, final String ifname)
 	{
-		if (ifname.equals("default"))
+		if (ifname == null || ifname.equals("any") || ifname.equals("default"))
 			return null;
 		try {
 			final NetworkInterface nif = NetworkInterface.getByName(ifname);
@@ -677,6 +674,15 @@ public class KNXnetIPServer
 			logger.error("option " + option + " for interface " + ifname, e);
 		}
 		return null;
+	}
+
+	private static <T> String join(final T[] array, final Function<T, ?>  f, final String sep)
+	{
+		if (array == null)
+			return "default";
+		final StringBuffer sb = new StringBuffer();
+		Arrays.stream(array).forEach(ni -> sb.append(f.apply(ni)).append(sep));
+		return sb.toString();
 	}
 
 	/**
@@ -1100,11 +1106,11 @@ public class KNXnetIPServer
 		return new ManufacturerDIB(mfrId, data);
 	}
 
-	private void startDiscoveryService(final NetworkInterface outgoing,
-		final NetworkInterface[] netIfs, final int retryAttempts)
+	private void startDiscoveryService(final NetworkInterface[] outgoing,
+		final NetworkInterface[] listen, final int retryAttempts)
 	{
 		if (runDiscovery) {
-			final Builder builder = new Builder(outgoing, netIfs);
+			final Builder builder = new Builder(outgoing, listen);
 			final LooperThread t = new LooperThread(serverName + "/KNXnet/IP discovery endpoint",
 					retryAttempts, builder);
 			discovery = t;
@@ -1564,7 +1570,7 @@ public class KNXnetIPServer
 		private final int service;
 
 		// routing arguments
-		private final NetworkInterface send;
+		private final NetworkInterface[] send;
 		private final NetworkInterface[] ni;
 		private final InetAddress mc;
 		// control arguments
@@ -1574,11 +1580,11 @@ public class KNXnetIPServer
 		private final DataEndpointService conn;
 
 		// discovery
-		Builder(final NetworkInterface outgoing, final NetworkInterface[] netIfs)
+		Builder(final NetworkInterface[] outgoing, final NetworkInterface[] listen)
 		{
 			service = 1;
 			send = outgoing;
-			ni = netIfs;
+			ni = listen;
 			mc = null;
 			sc = null;
 			conn = null;
@@ -1716,17 +1722,17 @@ public class KNXnetIPServer
 
 	private final class DiscoveryService extends ServiceLoop
 	{
-		private final boolean hasOutgoingNetIf;
-		private DiscoveryService(final NetworkInterface outgoing, final NetworkInterface[] joinOn)
+		private final NetworkInterface[] outgoing;
+
+		private DiscoveryService(final NetworkInterface[] outgoing, final NetworkInterface[] joinOn)
 			throws IOException
 		{
 			super(null, 512, 0);
-			hasOutgoingNetIf = outgoing != null;
-			s = createSocket(outgoing, joinOn);
+			this.outgoing = outgoing;
+			s = createSocket(joinOn);
 		}
 
-		private MulticastSocket createSocket(final NetworkInterface outgoing,
-			final NetworkInterface[] joinOn) throws IOException
+		private MulticastSocket createSocket(final NetworkInterface[] joinOn) throws IOException
 		{
 			final String p = System.getProperties().getProperty("java.net.preferIPv4Stack");
 			logger.trace("network stack uses IPv4 addresses: " + (p == null ? "unknown" : p));
@@ -1753,15 +1759,15 @@ public class KNXnetIPServer
 //			}
 //			catch (final SocketException ignore) {}
 
-			try {
-				if (outgoing != null)
-					s.setNetworkInterface(outgoing);
-			}
-			catch (final SocketException e) {
-				logger.error("setting outgoing network interface to " + outgoing.getName());
-				s.close();
-				throw e;
-			}
+//			try {
+//				if (outgoing != null)
+//					s.setNetworkInterface(outgoing);
+//			}
+//			catch (final SocketException e) {
+//				logger.error("setting outgoing network interface to " + outgoing.getName());
+//				s.close();
+//				throw e;
+//			}
 			try {
 				joinOnInterfaces(s, joinOn);
 			}
@@ -1777,19 +1783,37 @@ public class KNXnetIPServer
 			throws IOException
 		{
 			final SocketAddress group = new InetSocketAddress(systemSetupMulticast, 0);
-			final List<NetworkInterface> nifs = joinOn != null ? Arrays.asList(joinOn)
+			if (joinOn == null) {
+				logger.trace("address of netif = " + s.getInterface());
+				// We want to use the system-chosen network interface to send our join request.
+				// If joinGroup is called with the interface omitted, the interface as returned by
+				// getInterface() is used. If getInterface returns 0.0.0.0, join with interface
+				// set to null (on OSX, joinGroup(InetAddress) will fail)
+				if (s.getInterface().isAnyLocalAddress())
+					s.joinGroup(group, null);
+				else
+					s.joinGroup(systemSetupMulticast);
+				return;
+			}
+			final List<NetworkInterface> nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
 					: Collections.list(NetworkInterface.getNetworkInterfaces());
 			final StringBuffer found = new StringBuffer();
-
+			boolean joinedAny = false;
 			// we try to bind to all requested interfaces. Only if that completely fails, we throw
 			// the first caught exception
 			IOException thrown = null;
-			boolean joinedAny = false;
 			for (final Iterator<NetworkInterface> i = nifs.iterator(); i.hasNext();) {
 				final NetworkInterface ni = i.next();
+//				System.out.println("is up " + ni.isUp());
+//				System.out.println("mc support " + ni.supportsMulticast());
+				final Enumeration<InetAddress> addrs = ni.getInetAddresses();
+				if (!addrs.hasMoreElements()) {
+					logger.warn("KNXnet/IP discovery join fails with no IP address "
+							+ "bound to interface " + ni.getName());
+					continue;
+				}
 				found.append(" ").append(ni.getName()).append(" [");
-				for (final Enumeration<InetAddress> addrs = ni.getInetAddresses(); addrs
-						.hasMoreElements();) {
+				while (addrs.hasMoreElements()) {
 					final InetAddress addr = addrs.nextElement();
 					if (addr instanceof Inet4Address) {
 						found.append(addr.getHostAddress());
@@ -1862,15 +1886,14 @@ public class KNXnetIPServer
 
 		private void sendOnInterfaces(final DatagramPacket p) throws SocketException, IOException
 		{
-			if (!p.getAddress().isMulticastAddress() || hasOutgoingNetIf) {
+			if (!p.getAddress().isMulticastAddress() || outgoing == null) {
 				s.send(p);
 				return;
 			}
-			final Enumeration<NetworkInterface> nifs = NetworkInterface.getNetworkInterfaces();
-			while (nifs.hasMoreElements()) {
-				final NetworkInterface nif = nifs.nextElement();
-				// we can't use isUp or supportsMulticast on the interface with Java v1.4
-				if (nif.getInetAddresses().hasMoreElements()) {
+			final List<NetworkInterface> nifs = outgoing.length > 0 ? Arrays.asList(outgoing)
+					: Collections.list(NetworkInterface.getNetworkInterfaces());
+			for (final NetworkInterface nif : nifs) {
+				if (nif.getInetAddresses().hasMoreElements() && nif.isUp()) {
 					try {
 						((MulticastSocket) s).setNetworkInterface(nif);
 						logger.trace("send search response on interface " + nameOf(nif));
