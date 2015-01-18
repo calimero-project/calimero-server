@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -739,7 +739,7 @@ public class InterfaceObjectServer implements PropertyAccess
 						d.getReadLevel(), d.getWriteLevel()).toByteArray();
 			}
 			throw new KNXPropertyException("no description found for "
-					+ PropertyClient.getObjectTypeName(io.getType())
+					+ PropertyClient.getObjectTypeName(io.getType()) + " (" + io.getType() + ")"
 					+ (pid != 0 ? " PID " + pid : " property index " + propIndex));
 		}
 

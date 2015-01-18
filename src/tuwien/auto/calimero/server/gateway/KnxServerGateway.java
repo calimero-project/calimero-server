@@ -786,8 +786,7 @@ public class KnxServerGateway implements Runnable
 					if ((mainGroupAddressConfig == 0 || mainGroupAddressConfig == 3)
 							&& !inGroupAddressTable((GroupAddress) f.getDestination(),
 									subnetConnector.getGroupAddressTableObjectInstance())) {
-						logger.warn("destination " + f.getDestination()
-								+ " not in group address table - skipped frame");
+						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
 				}
