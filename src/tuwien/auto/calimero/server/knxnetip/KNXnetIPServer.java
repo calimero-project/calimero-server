@@ -250,7 +250,7 @@ public class KNXnetIPServer
 	private boolean runDiscovery;
 	private LooperThread discovery;
 	private NetworkInterface outgoingIf;
-	private NetworkInterface[] discoveryIfs = null;
+	private NetworkInterface[] discoveryIfs;
 
 	// KNX endpoint and connection stuff
 
@@ -572,7 +572,8 @@ public class KNXnetIPServer
 	public static final String OPTION_DISCOVERY_DESCRIPTION = "discoveryDescription";
 
 	/**
-	 * Option for KNXnet/IP server discovery endpoint: specify the network interfaces to listen on.<br>
+	 * Option for KNXnet/IP server discovery endpoint: specify the network interfaces to listen on.
+	 * <p>
 	 * The value format is (with &lt;if&gt; being an interface name as shown by the system):
 	 * <code>["all"|&lt;if&gt;{,&lt;if&gt;}]</code>. Supplying "all" will try to use all network
 	 * interfaces found on the host. This setting is queried on start of the discovery server.<br>
@@ -581,7 +582,8 @@ public class KNXnetIPServer
 	public static final String OPTION_DISCOVERY_INTERFACES = "discovery.interfaces";
 
 	/**
-	 * Option for KNXnet/IP server discovery endpoint: specify the network interfaces to listen on.<br>
+	 * Option for KNXnet/IP server discovery endpoint: specify the network interfaces to listen on.
+	 * <p>
 	 * The value format is (with &lt;if&gt; being an interface name as shown by the system):
 	 * <code>["all"|&lt;if&gt;{,&lt;if&gt;}]</code>. Supplying "all" will try to use all network
 	 * interfaces found on the host. This setting is queried on start of the discovery server.<br>

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -72,24 +72,24 @@ import tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler;
  */
 public class InterfaceObject
 {
-	/** Interface object type 'device object' ({@value DEVICE_OBJECT}) */
+	/** Interface object type 'device object' ({@value DEVICE_OBJECT}). */
 	public static final int DEVICE_OBJECT = 0;
 
-	/** Interface object type 'address table object' ({@value ADDRESSTABLE_OBJECT}) */
+	/** Interface object type 'address table object' ({@value ADDRESSTABLE_OBJECT}). */
 	public static final int ADDRESSTABLE_OBJECT = 1;
 
 	/**
-	 * Interface object type 'association table object' ({@value ASSOCIATIONTABLE_OBJECT})
+	 * Interface object type 'association table object' ({@value ASSOCIATIONTABLE_OBJECT}).
 	 */
 	public static final int ASSOCIATIONTABLE_OBJECT = 2;
 
 	/**
-	 * Interface object type 'application program object' ({@value APPLICATIONPROGRAM_OBJECT})
+	 * Interface object type 'application program object' ({@value APPLICATIONPROGRAM_OBJECT}).
 	 */
 	public static final int APPLICATIONPROGRAM_OBJECT = 3;
 
 	/**
-	 * Interface object type 'interface program object' ({@value INTERFACEPROGRAM_OBJECT})
+	 * Interface object type 'interface program object' ({@value INTERFACEPROGRAM_OBJECT}).
 	 */
 	public static final int INTERFACEPROGRAM_OBJECT = 4;
 
@@ -97,36 +97,36 @@ public class InterfaceObject
 	// public static final int EIB_OBJECT_ASSOCIATIONTABLE_OBJECT = 5;
 
 	/**
-	 * Interface object type 'router object' ({@value ROUTER_OBJECT})
+	 * Interface object type 'router object' ({@value ROUTER_OBJECT}).
 	 */
 	public static final int ROUTER_OBJECT = 6;
 
 	/**
 	 * Interface object type 'LTE address filter table object' ({@value
-	 * LTE_ADDRESS_FILTER_TABLE_OBJECT})
+	 * LTE_ADDRESS_FILTER_TABLE_OBJECT}).
 	 */
 	public static final int LTE_ADDRESS_FILTER_TABLE_OBJECT = 7;
 
-	/** Interface object type 'cEMI server object' ({@value CEMI_SERVER_OBJECT}) */
+	/** Interface object type 'cEMI server object' ({@value CEMI_SERVER_OBJECT}). */
 	public static final int CEMI_SERVER_OBJECT = 8;
 
 	/**
-	 * Interface object type 'group object table object' ({@value GROUP_OBJECT_TABLE_OBJECT})
+	 * Interface object type 'group object table object' ({@value GROUP_OBJECT_TABLE_OBJECT}).
 	 */
 	public static final int GROUP_OBJECT_TABLE_OBJECT = 9;
 
-	/** Interface object type 'polling master' ({@value POLLING_MASTER}) */
+	/** Interface object type 'polling master' ({@value POLLING_MASTER}). */
 	public static final int POLLING_MASTER = 10;
 
 	/**
-	 * Interface object type 'KNXnet/IP parameter object' ({@value KNXNETIP_PARAMETER_OBJECT})
+	 * Interface object type 'KNXnet/IP parameter object' ({@value KNXNETIP_PARAMETER_OBJECT}).
 	 */
 	public static final int KNXNETIP_PARAMETER_OBJECT = 11;
 
-	/** Interface object type 'application controller' ({@value APPLICATION_CONTROLLER}) */
+	/** Interface object type 'application controller' ({@value APPLICATION_CONTROLLER}). */
 	public static final int APPLICATION_CONTROLLER = 12;
 
-	/** Interface object type 'file server object' ({@value FILE_SERVER_OBJECT}) */
+	/** Interface object type 'file server object' ({@value FILE_SERVER_OBJECT}). */
 	public static final int FILE_SERVER_OBJECT = 13;
 
 	// list holding Description objects or null entries
