@@ -1263,7 +1263,7 @@ public class KNXnetIPServer
 			logger.warn(e.getMessage());
 		}
 		// there are no free addresses, or no additional address at all
-		logger.info("no additional individual addresses available");
+		logger.info("no additional individual addresses available that matches subnet");
 
 		if (!routingEndpoints.isEmpty()) {
 			logger.warn("KNXnet/IP routing active, can not assign server device address");
@@ -1801,8 +1801,8 @@ public class KNXnetIPServer
 						catch (final IOException e) {
 							if (thrown == null)
 								thrown = e;
-							logger.error("KNXnet/IP discovery could not join interface "
-									+ ni.getName(), e);
+							logger.error("KNXnet/IP discovery could not join on interface "
+								+ ni.getName(), e);
 						}
 						break;
 					}
