@@ -1911,7 +1911,7 @@ public class KNXnetIPServer
 			final String name = nif.getName();
 			final String friendly = nif.getDisplayName();
 			if (friendly != null & !name.equals(friendly))
-				return name + "(" + friendly + ")";
+				return name + " (" + friendly + ")";
 			return name;
 		}
 
