@@ -1245,7 +1245,8 @@ public class KNXnetIPServer
 				match = true;
 			}
 		}
-		logger.trace("match {} for KNX subnet {}: {}", addr, subnetMask, match ? "ok" : "no");
+		logger.trace("match " + addr + " for KNX subnet " + subnetMask + ": "
+				+ (match ? "ok" : "no"));
 		return match;
 	}
 
@@ -1293,7 +1294,7 @@ public class KNXnetIPServer
 			if (checkAndSetDeviceAddress(addr, true))
 				return addr;
 
-		logger.warn("server device address {} already assigned to data connection", addr);
+		logger.warn("server device address " + addr + " already assigned to data connection");
 		return null;
 	}
 
@@ -1810,8 +1811,6 @@ public class KNXnetIPServer
 			IOException thrown = null;
 			for (final Iterator i = nifs.iterator(); i.hasNext();) {
 				final NetworkInterface ni = (NetworkInterface) i.next();
-//				System.out.println("is up " + ni.isUp());
-//				System.out.println("mc support " + ni.supportsMulticast());
 				final Enumeration addrs = ni.getInetAddresses();
 				if (!addrs.hasMoreElements()) {
 					logger.warn("KNXnet/IP discovery join fails with no IP address "

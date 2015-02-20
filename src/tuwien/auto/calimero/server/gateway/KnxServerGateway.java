@@ -646,9 +646,9 @@ public class KnxServerGateway implements Runnable
 		if (original instanceof CEMILDataEx) {
 			final CEMILDataEx con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
 					original.getDestination(), data, original.getPriority(), error);
-			final List<AddInfo> l = ((CEMILDataEx) original).getAdditionalInfo();
-			for (final Iterator<AddInfo> i = l.iterator(); i.hasNext();) {
-				final CEMILDataEx.AddInfo info = i.next();
+			final List l = ((CEMILDataEx) original).getAdditionalInfo();
+			for (final Iterator i = l.iterator(); i.hasNext();) {
+				final CEMILDataEx.AddInfo info = (AddInfo) i.next();
 				con.addAdditionalInfo(info.getType(), info.getInfo());
 			}
 			return con;
@@ -961,15 +961,6 @@ public class KnxServerGateway implements Runnable
 			server.getInterfaceObjectServer().setProperty(
 					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
 					bytesFromWord(overflow));
-
-			// actual sending of routing lost message is done in KNXnetIPServer
-			/*
-			 * if (toKnxNetwork) { // query device state used in lost message notification
-			 * final byte[] state = server.getInterfaceObjectServer().getProperty(
-			 * InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-			 * PID.KNXNETIP_DEVICE_STATE, 1, 1); final RoutingLostMessage msg = new
-			 * RoutingLostMessage(overflow, state[0] & 0xff); }
-			 */
 		}
 		catch (final KNXPropertyException e) {
 			logger.error("on increasing queue overflow counter", e);
