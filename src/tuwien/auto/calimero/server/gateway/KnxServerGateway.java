@@ -588,7 +588,7 @@ public class KnxServerGateway implements Runnable
 						//c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
 						try {
 							final int sleep = 100; // ms
-							while (c.getState() != KNXnetIPConnection.OK) {
+							for (int i = 30; i --> 0 && c.getState() != KNXnetIPConnection.OK;) {
 								System.out.println(c.getName() + " not ready for .con (state "
 										+ c.getState() + "), sleep " + sleep + " ms");
 								Thread.sleep(sleep);
