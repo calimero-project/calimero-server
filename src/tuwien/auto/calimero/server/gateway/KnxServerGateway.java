@@ -971,15 +971,6 @@ public class KnxServerGateway implements Runnable
 			server.getInterfaceObjectServer().setProperty(
 					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
 					bytesFromWord(overflow));
-
-			// actual sending of routing lost message is done in KNXnetIPServer
-			/*
-			 * if (toKnxNetwork) { // query device state used in lost message notification
-			 * final byte[] state = server.getInterfaceObjectServer().getProperty(
-			 * InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-			 * PID.KNXNETIP_DEVICE_STATE, 1, 1); final RoutingLostMessage msg = new
-			 * RoutingLostMessage(overflow, state[0] & 0xff); }
-			 */
 		}
 		catch (final KNXPropertyException e) {
 			logger.error("on increasing queue overflow counter", e);

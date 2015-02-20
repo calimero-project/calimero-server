@@ -1807,8 +1807,6 @@ public class KNXnetIPServer
 			IOException thrown = null;
 			for (final Iterator<NetworkInterface> i = nifs.iterator(); i.hasNext();) {
 				final NetworkInterface ni = i.next();
-//				System.out.println("is up " + ni.isUp());
-//				System.out.println("mc support " + ni.supportsMulticast());
 				final Enumeration<InetAddress> addrs = ni.getInetAddresses();
 				if (!addrs.hasMoreElements()) {
 					logger.warn("KNXnet/IP discovery join fails with no IP address "
