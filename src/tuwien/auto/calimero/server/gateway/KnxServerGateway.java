@@ -54,6 +54,7 @@ import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
+import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
@@ -645,12 +646,21 @@ public class KnxServerGateway implements Runnable
 					+ " - ignored");
 	}
 
-	private static CEMI createCon(final byte[] data, final CEMI original, final boolean error)
+	private static CEMI createCon(final byte[] data, final CEMILData original, final boolean error)
 		throws KNXFormatException
 	{
-		return new CEMILData(CEMILData.MC_LDATA_CON, ((CEMILData) original).getSource(),
-				((CEMILData) original).getDestination(), data,
-				((CEMILData) original).getPriority(), error);
+		if (original instanceof CEMILDataEx) {
+			final CEMILDataEx con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
+					original.getDestination(), data, original.getPriority(), error);
+			final List<AddInfo> l = ((CEMILDataEx) original).getAdditionalInfo();
+			for (final Iterator<AddInfo> i = l.iterator(); i.hasNext();) {
+				final CEMILDataEx.AddInfo info = i.next();
+				con.addAdditionalInfo(info.getType(), info.getInfo());
+			}
+			return con;
+		}
+		return new CEMILData(CEMILData.MC_LDATA_CON, original.getSource(),
+				original.getDestination(), data, original.getPriority(), error);
 	}
 
 	private boolean discardLoopedBackFrame(final CEMI frame)
