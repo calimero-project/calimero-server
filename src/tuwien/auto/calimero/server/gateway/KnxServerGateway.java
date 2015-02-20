@@ -262,9 +262,9 @@ public class KnxServerGateway implements Runnable
 			if (inReset)
 				return;
 			final int i = se.getInitiator();
-			final String s = i == CloseEvent.USER_REQUEST ? " user"
-					: i == CloseEvent.CLIENT_REQUEST ? " client" : " server internal";
-			logger.info(server.getName() + s + " request for shutdown");
+			final String s = i == CloseEvent.USER_REQUEST ? "user"
+					: i == CloseEvent.CLIENT_REQUEST ? "client" : "server internal";
+			logger.info(server.getName() + ": " + s + " request for shutdown");
 			quit();
 		}
 	}
@@ -293,7 +293,6 @@ public class KnxServerGateway implements Runnable
 		 */
 		public void indication(final FrameEvent e)
 		{
-			logger.info("received " + scid + " subnet " + e.getFrame().toString());
 			synchronized (KnxServerGateway.this) {
 				if (subnetEvents.size() < maxEventQueueSize) {
 					// In the dispatching to server side, we rely on having the
