@@ -147,10 +147,7 @@ public class KnxServerGateway implements Runnable
 			serverConnections.remove(e.getSource());
 			if (e.getSource() instanceof KNXnetIPRouting)
 				routing = false;
-			if (addr != null)
-				synchronized (serverDataConnections) {
-					serverDataConnections.remove(addr);
-				}
+			serverDataConnections.remove(addr);
 		}
 	}
 
@@ -170,9 +167,7 @@ public class KnxServerGateway implements Runnable
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
 			if (assignedDeviceAddress != null)
-				synchronized (serverDataConnections) {
-					serverDataConnections.put(assignedDeviceAddress, conn);
-				}
+				serverDataConnections.put(assignedDeviceAddress, conn);
 			return true;
 		}
 
@@ -334,7 +329,8 @@ public class KnxServerGateway implements Runnable
 	private final List<SubnetConnector> connectors = new ArrayList<>();
 	private final boolean enableDiscovery = true;
 
-	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = new HashMap<>();
+	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = Collections
+			.synchronizedMap(new HashMap<>());
 	private final List<KNXnetIPConnection> serverConnections = Collections
 			.synchronizedList(new ArrayList<>());
 
