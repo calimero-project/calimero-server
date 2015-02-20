@@ -1880,6 +1880,9 @@ public class KNXnetIPServer
 				}
 				return true;
 			}
+			// we can safely ignore search responses and avoid a warning being logged
+			else if (svc == KNXnetIPHeader.SEARCH_RES)
+				return true;
 			// other requests are rejected with error
 			return false;
 		}
