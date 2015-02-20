@@ -949,14 +949,20 @@ public class KnxServerGateway implements Runnable
 	{
 		final int pid = toKnxNetwork ? PID.QUEUE_OVERFLOW_TO_KNX : PID.QUEUE_OVERFLOW_TO_IP;
 		try {
-			// 2 byte unsigned
-			final byte[] data = server.getInterfaceObjectServer().getProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1);
-			int overflow = (int) toUnsignedInt(data);
-			if (overflow == 0xffff) {
-				logger.warn("queue overflow counter reached maximum, not incremented");
-				return;
+			// property element might not exist yet (was never set before)
+			int overflow = 0;
+			try {
+				// 2 byte unsigned
+				final byte[] data = server.getInterfaceObjectServer().getProperty(
+						InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1);
+				overflow = (int) toUnsignedInt(data);
+				if (overflow == 0xffff) {
+					logger.warn("queue overflow counter reached maximum, not incremented");
+					return;
+				}
 			}
+			catch (final KNXPropertyException e) {}
+
 			++overflow;
 			server.getInterfaceObjectServer().setProperty(
 					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
