@@ -998,8 +998,8 @@ public class KNXnetIPServer
 				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1,
 						new IndividualAddress(0).toByteArray());
 		}
-		catch (final KNXPropertyException ignore) {
-			logger.warn("error matching server device address to routing capabilities ");
+		catch (final KNXPropertyException e) {
+			logger.warn("matching server device address to routing capabilities, " + e.getMessage());
 		}
 	}
 
@@ -1235,16 +1235,18 @@ public class KNXnetIPServer
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
 	{
+		boolean match = false;
 		if (subnetMask == null)
-			return true;
-		if (subnetMask.getArea() == addr.getArea()) {
+			match = true;
+		else if (subnetMask.getArea() == addr.getArea()) {
 			// if we represent an area coupler, line is 0
 			if (subnetMask.getLine() == 0 || subnetMask.getLine() == addr.getLine()) {
 				// address does match the mask
-				return true;
+				match = true;
 			}
 		}
-		return false;
+		logger.trace("match {} for KNX subnet {}: {}", addr, subnetMask, match ? "ok" : "no");
+		return match;
 	}
 
 	// null return means no address available
@@ -1271,7 +1273,7 @@ public class KNXnetIPServer
 			logger.warn(e.getMessage());
 		}
 		// there are no free addresses, or no additional address at all
-		logger.info("no additional individual addresses available that matches subnet");
+		logger.info("no additional individual addresses available that matches subnet " + forSubnet);
 
 		if (!routingEndpoints.isEmpty()) {
 			logger.warn("KNXnet/IP routing active, can not assign server device address");
@@ -1291,7 +1293,7 @@ public class KNXnetIPServer
 			if (checkAndSetDeviceAddress(addr, true))
 				return addr;
 
-		logger.warn("server device address already assigned to data connection");
+		logger.warn("server device address {} already assigned to data connection", addr);
 		return null;
 	}
 
@@ -1787,7 +1789,6 @@ public class KNXnetIPServer
 		{
 			final SocketAddress group = new InetSocketAddress(systemSetupMulticast, 0);
 			if (joinOn == null) {
-				logger.trace("address of netif = " + s.getInterface());
 				// We want to use the system-chosen network interface to send our join request.
 				// If joinGroup is called with the interface omitted, the interface as returned by
 				// getInterface() is used. If getInterface returns 0.0.0.0, join with interface
@@ -1796,6 +1797,8 @@ public class KNXnetIPServer
 					s.joinGroup(group, null);
 				else
 					s.joinGroup(systemSetupMulticast);
+				logger.info("KNXnet/IP discovery listens on interface with address "
+						+ s.getInterface());
 				return;
 			}
 			final List nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
