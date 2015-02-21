@@ -569,7 +569,7 @@ public class KnxServerGateway implements Runnable
 			final CEMILData f = (CEMILData) frame;
 
 			if (trace)
-				logger.trace("decoded service is "
+				logger.trace(f.getSource() + "->" + f.getDestination() + ": "
 						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 
 			// we get L-data.ind if client uses routing protocol
