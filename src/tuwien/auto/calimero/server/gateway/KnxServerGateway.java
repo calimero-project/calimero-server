@@ -605,25 +605,16 @@ public class KnxServerGateway implements Runnable
 				}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
-				if (send == null)
+				if (send == null) {
 					logger.info("hop count 0, discarded frame to " + f.getDestination());
-				else {
-					// get connector of that subnet
-					SubnetConnector subnetConnector = null;
-					for (final Iterator i = connectors.iterator(); i.hasNext();) {
-						final SubnetConnector b = (SubnetConnector) i.next();
-						// ??? using the sending link does not always work,
-						// see listener indication for the reason of this workaround
-						if (b.getServiceContainer().getName().equals(fe.getSource())) {
-							subnetConnector = b;
-							break;
-						}
-					}
-					if (subnetConnector != null)
-						dispatchToServer(subnetConnector, send);
-					else
-						logger.fatal("dispatch to server: no subnet connector found!");
+					return;
 				}
+				// get connector of that subnet
+				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
+				if (connector != null)
+					dispatchToServer(connector, send);
+
+				dispatchToSubnet(send);
 			}
 			else {
 				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x"
@@ -655,6 +646,19 @@ public class KnxServerGateway implements Runnable
 		}
 		return new CEMILData(CEMILData.MC_LDATA_CON, original.getSource(),
 				original.getDestination(), data, original.getPriority(), error);
+	}
+
+	// Using the sending link for identification does not always work,
+	// see listener indication for the reason of using the container name
+	private SubnetConnector getSubnetConnector(final String containerName)
+	{
+		for (final Iterator i = connectors.iterator(); i.hasNext();) {
+			final SubnetConnector b = (SubnetConnector) i.next();
+			if (b.getServiceContainer().getName().equals(containerName))
+				return b;
+		}
+		logger.error("dispatch to server: no subnet connector found!");
+		return null;
 	}
 
 	private boolean discardLoopedBackFrame(final CEMI frame)
