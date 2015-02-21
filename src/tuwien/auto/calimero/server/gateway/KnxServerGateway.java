@@ -299,7 +299,7 @@ public class KnxServerGateway implements Runnable
 					// subnet link in the frame event source stored so to know where the
 					// frame came from.
 					// But this will not work if the sending link differs from the one
-					// stored in this frame event, e.g., when when using a buffered link.
+					// stored in this frame event, e.g., when using a buffered link.
 					// Therefore, I store the svcContainer in here for re-association.
 					subnetEvents.add(new FrameEvent(scid, e.getFrame()));
 					KnxServerGateway.this.notify();
