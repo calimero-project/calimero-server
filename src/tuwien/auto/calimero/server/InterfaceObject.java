@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ import tuwien.auto.calimero.server.InterfaceObjectServer.IosResourceHandler;
  * uniquely identified by its object index ({@link #getIndex()}.<br>
  * KNX properties contained in an interface object are usually accessed and modified using KNX
  * property services.
- * 
+ *
  * @author B. Malinowsky
  */
 public class InterfaceObject
@@ -129,6 +129,9 @@ public class InterfaceObject
 	/** Interface object type 'file server object' ({@value FILE_SERVER_OBJECT}) */
 	public static final int FILE_SERVER_OBJECT = 13;
 
+	/** Interface object type 'RF medium object' ({@value RF_MEDIUM_OBJECT}). */
+	public static final int RF_MEDIUM_OBJECT = 19;
+
 	// list holding Description objects or null entries
 	List descriptions = new ArrayList();
 	// map key is PropertyKey, map value is byte[]
@@ -140,7 +143,7 @@ public class InterfaceObject
 	/**
 	 * Creates a new interface object of the specified object type.
 	 * <p>
-	 * 
+	 *
 	 * @param objectType either one of the predefined interface object types listed by this class,
 	 *        or a user specific object type
 	 */
@@ -160,7 +163,7 @@ public class InterfaceObject
 	 * <p>
 	 * The type is either one of the predefined interface object types listed by this class, or a
 	 * user specific object type.
-	 * 
+	 *
 	 * @return interface object type as int
 	 */
 	public int getType()
@@ -171,7 +174,7 @@ public class InterfaceObject
 	/**
 	 * Returns a human readable representation of the interface object's type.
 	 * <p>
-	 * 
+	 *
 	 * @return interface object type as string
 	 */
 	public String getTypeName()
@@ -183,7 +186,7 @@ public class InterfaceObject
 	 * Returns the current position of this interface object within the array of interface objects
 	 * in the interface object server.
 	 * <p>
-	 * 
+	 *
 	 * @return zero based index as int
 	 */
 	public int getIndex()
