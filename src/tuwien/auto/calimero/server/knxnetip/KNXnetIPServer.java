@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -165,6 +165,9 @@ public class KNXnetIPServer
 	// NYI the following KNX properties are not used by now...
 	// private static final int PID_SERVICE_CONTROL = 8;
 	// private static final int PID_DEVICE_CONTROL = 14;
+
+	// TODO limit routing indications to <= 50 messages per seconds as required by the KNX spec
+	// TODO send routing busy indication when frame queues get filled up
 
 	/*
 	  KNX property default values
