@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -66,7 +66,7 @@ import tuwien.auto.calimero.log.LogManager;
 /**
  * Server-side implementation of KNXnet/IP tunneling and device management protocol.
  * <p>
- * 
+ *
  * @author B. Malinowsky
  */
 final class DataEndpointServiceHandler extends ConnectionBase
@@ -198,7 +198,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 			final int seq = req.getSequenceNumber();
-			if (seq == getSeqRcv() || (tunnel && seq + 1 == getSeqRcv())) {
+			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR
 						: ErrorCodes.VERSION_NOT_SUPPORTED;
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq,
