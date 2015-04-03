@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.github.calimero</groupId>
 	<artifactId>calimero-server</artifactId>
-	<version>2.2.0-SNAPSHOT</version>
+	<version>2.1</version>
 	<name>Calimero KNXnet/IP Server</name>
 	<description>Calimero KNXnet/IP server, a free KNX network server</description>
 	<scm>
@@ -61,6 +61,8 @@
 				<configuration>
 					<overview>src/overview.html</overview>
 					<additionalparam>-Xdoclint:none</additionalparam>
+					<author>false</author>
+					<quiet>true</quiet>
 					<archive>
 						<manifestEntries>
 							<Built-By>calimero-project</Built-By>
@@ -90,7 +92,21 @@
 					<execution>
 						<id>attach-sources</id>
 						<goals>
-							<goal>jar</goal>
+							<goal>jar-no-fork</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>1.5</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
 						</goals>
 					</execution>
 				</executions>
@@ -101,7 +117,7 @@
 		<dependency>
 			<groupId>com.github.calimero</groupId>
 			<artifactId>calimero-core</artifactId>
-			<version>2.2-beta</version>
+			<version>2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
