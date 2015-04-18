@@ -247,8 +247,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
 				if (logger.isLoggable(LogLevel.TRACE))
-					logger.trace("received service acknowledgment from " + ctrlEndpt
-							+ " (channel id " + channelId + ")");
+					logger.trace("received service ack " + res.getSequenceNumber() + " from "
+							+ ctrlEndpt + " (channel " + channelId + ")");
 				if (internalState == ACK_ERROR)
 					logger.warn("received service acknowledgment status " + res.getStatusString());
 			}
