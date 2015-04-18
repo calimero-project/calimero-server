@@ -129,6 +129,9 @@ public class InterfaceObject
 	/** Interface object type 'file server object' ({@value FILE_SERVER_OBJECT}). */
 	public static final int FILE_SERVER_OBJECT = 13;
 
+	/** Interface object type 'RF medium object' ({@value RF_MEDIUM_OBJECT}). */
+	public static final int RF_MEDIUM_OBJECT = 19;
+
 	// list holding Description objects or null entries
 	List<Description> descriptions = new ArrayList<>();
 	// map key is PropertyKey, map value is byte[]

@@ -198,7 +198,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 			final int seq = req.getSequenceNumber();
-			if (seq == getSeqRcv() || (tunnel && seq + 1 == getSeqRcv())) {
+			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR
 						: ErrorCodes.VERSION_NOT_SUPPORTED;
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq,

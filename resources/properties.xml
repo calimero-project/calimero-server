@@ -54,7 +54,7 @@
             <usage>PortAddr, Direction bits for Port A</usage>
         </property>
         <property pid="18" pidName="PID_POLL_GROUP_SETTINGS" name="Pollgroup Settings" pdt="13" rw="R/W" writeEnabled="1">
-            <usage>Pollgroup settings, 2 octet Polling Group 1Byte Slot number</usage>
+            <usage>Pollgroup settings, 2 octet Polling Group 1 Byte Slot number</usage>
         </property>
         <property pid="19" pidName="PID_MANUFACTURER_DATA" name="Manufacturer Data" pdt="20" rw="R(/W)" writeEnabled="0/1">
             <usage>Manufacturer Data</usage>
@@ -161,7 +161,7 @@
             <usage>Frequency setting, Indication of whether a repeater is present, Indication of whether the device is a repeater or not</usage>
         </property>
         <property pid="74" pidName="PID_RF_REPEAT_COUNTER" name="RF Repeat Counter" pdt="2" rw="R/W" writeEnabled="W">
-            <usage>To be  completed.</usage>
+            <usage>To be completed.</usage>
         </property>
         <property pid="75" pidName="PID_RECEIVE_BLOCK_TABLE" name="BiBat Receive Block Table" pdt="2" rw="R/W" writeEnabled="&lt;tbd&gt;">
             <usage>Settings for a RF BiBat Slave in which synchronous blocks it shall receive.</usage>

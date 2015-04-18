@@ -168,6 +168,9 @@ public class KNXnetIPServer
 	// private static final int PID_SERVICE_CONTROL = 8;
 	// private static final int PID_DEVICE_CONTROL = 14;
 
+	// TODO limit routing indications to <= 50 messages per seconds as required by the KNX spec
+	// TODO send routing busy indication when frame queues get filled up
+
 	/*
 	  KNX property default values
 	  The following values are used to initialize the device objects and as fallback if
