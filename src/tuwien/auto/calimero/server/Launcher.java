@@ -46,6 +46,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -77,8 +78,11 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
+import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
+import tuwien.auto.calimero.log.LogStreamWriter;
+import tuwien.auto.calimero.log.LogWriter;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.gateway.KnxServerGateway;
@@ -157,6 +161,9 @@ public class Launcher implements Runnable
 		// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 		private final Map subnetDatapoints = new HashMap();
 
+		// Holds the network interface for KNX IP subnets, if specified
+		private final Map subnetNetIf = new HashMap();
+
 		// the following lists contain gateway information, in sequence of the svc containers
 
 		private final List subnetTypes = new ArrayList();
@@ -227,6 +234,7 @@ public class Launcher implements Runnable
 			int remotePort = 0;
 			String subnetType = "";
 			IndividualAddress subnet = null;
+			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
 			DatapointModel datapoints = null;
 			List filter = Collections.emptyList();
@@ -254,6 +262,8 @@ public class Launcher implements Runnable
 						final String p = e.getAttribute(XmlConfiguration.attrUdpPort);
 						if (subnetType.equals("ip") && p != null)
 							remotePort = Integer.parseInt(p);
+						if (subnetType.equals("knxip"))
+							subnetKnxipNetif = getNetIf(e);
 						r.complete(e);
 						addr = e.getCharacterData();
 					}
@@ -267,7 +277,7 @@ public class Launcher implements Runnable
 							routingMcast = InetAddress.getByName(e.getCharacterData());
 						}
 						catch (final UnknownHostException uhe) {
-							throw new KNXMLException(uhe.getMessage(), r);
+							throw new KNXMLException(uhe.getMessage(), "", r.getLineNumber());
 						}
 					}
 					else {
@@ -292,6 +302,7 @@ public class Launcher implements Runnable
 						subnetAddresses.add(addr);
 						subnetPorts.add(new Integer(remotePort));
 						svcContainers.add(sc);
+						subnetNetIf.put(sc, subnetKnxipNetif);
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						return;
@@ -373,6 +384,8 @@ public class Launcher implements Runnable
 	 */
 	public static void main(final String[] args)
 	{
+		final LogWriter w = LogStreamWriter.newUnformatted(LogLevel.ALL, System.out, true, false);
+		LogManager.getManager().addWriter("", w);
 		if (args.length == 0) {
 			logger.info("supply file name/URI for the KNX server configuration");
 			return;
@@ -421,7 +434,7 @@ public class Launcher implements Runnable
 
 			final String type = (String) xml.subnetTypes.get(i);
 			logger.info("    " + type + " subnet " + sc.getSubnetAddress() + ", medium "
-					+ KNXMediumSettings.getMediumString(sc.getKNXMedium()));
+					+ sc.getKNXMedium());
 			if (xml.groupAddressFilters.containsKey(sc))
 				logger.info("    GrpAddrFilter " + xml.groupAddressFilters.get(sc));
 			if (xml.subnetDatapoints.containsKey(sc))
@@ -462,6 +475,7 @@ public class Launcher implements Runnable
 		}
 		catch (final KNXException e) {
 			logger.error("initialization of KNX server, " + e.getMessage());
+			e.printStackTrace();
 		}
 		finally {
 			for (final Iterator i = linksToClose.iterator(); i.hasNext();)
@@ -526,9 +540,8 @@ public class Launcher implements Runnable
 					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
 							new InetSocketAddress(remoteHost, remotePort), false, settings);
 				else if ("knxip".equals(subnetType))
-					// TODO KNX IP: specify listening network interface
-					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.ROUTING, null,
-							new InetSocketAddress(remoteHost, 0), false, settings);
+					link = new KNXNetworkLinkIP((NetworkInterface) xml.subnetNetIf.get(sc),
+							new InetSocketAddress(remoteHost, 0).getAddress(), settings);
 				else
 					logger.error("unknown KNX subnet specifier " + subnetType);
 			}
@@ -754,13 +767,13 @@ public class Launcher implements Runnable
 
 			try {
 				// send a .con for a .req
-				NetworkLinkListener[] el = (NetworkLinkListener[]) confirmation.listeners();
+				EventListener[] el = confirmation.listeners();
 				if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
 					final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON,
 							msg.getPayload(), msg);
 					final FrameEvent e = new FrameEvent(this, f);
 					for (int i = 0; i < el.length; i++) {
-						final NetworkLinkListener l = el[i];
+						final NetworkLinkListener l = (NetworkLinkListener) el[i];
 						l.confirmation(e);
 					}
 				}
@@ -768,10 +781,10 @@ public class Launcher implements Runnable
 				final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
 						: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(),
 								msg);
-				el = (NetworkLinkListener[]) uplink.listeners.listeners();
+				el = uplink.listeners.listeners();
 				final FrameEvent e = new FrameEvent(this, f);
 				for (int i = 0; i < el.length; i++) {
-					final NetworkLinkListener l = el[i];
+					final NetworkLinkListener l = (NetworkLinkListener) el[i];
 					l.indication(e);
 				}
 			}
