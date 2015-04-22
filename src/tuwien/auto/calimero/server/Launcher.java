@@ -77,8 +77,11 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
+import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
+import tuwien.auto.calimero.log.LogStreamWriter;
+import tuwien.auto.calimero.log.LogWriter;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.gateway.KnxServerGateway;
@@ -380,6 +383,8 @@ public class Launcher implements Runnable
 	 */
 	public static void main(final String[] args)
 	{
+		final LogWriter w = LogStreamWriter.newUnformatted(LogLevel.ALL, System.out, true, false);
+		LogManager.getManager().addWriter("", w);
 		if (args.length == 0) {
 			logger.info("supply file name/URI for the KNX server configuration");
 			return;
