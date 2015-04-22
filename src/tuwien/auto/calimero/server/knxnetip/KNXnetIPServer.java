@@ -339,7 +339,7 @@ public class KNXnetIPServer
 	 */
 	public KNXnetIPServer()
 	{
-		this("Calimero 2/NG", "");
+		this("calimero-server", "");
 	}
 
 	/**
