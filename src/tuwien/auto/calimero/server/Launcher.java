@@ -157,6 +157,9 @@ public class Launcher implements Runnable
 		// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 		private final Map subnetDatapoints = new HashMap();
 
+		// Holds the network interface for KNX IP subnets, if specified
+		private final Map subnetNetIf = new HashMap();
+
 		// the following lists contain gateway information, in sequence of the svc containers
 
 		private final List subnetTypes = new ArrayList();
@@ -227,6 +230,7 @@ public class Launcher implements Runnable
 			int remotePort = 0;
 			String subnetType = "";
 			IndividualAddress subnet = null;
+			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
 			DatapointModel datapoints = null;
 			List filter = Collections.emptyList();
@@ -254,6 +258,8 @@ public class Launcher implements Runnable
 						final String p = e.getAttribute(XmlConfiguration.attrUdpPort);
 						if (subnetType.equals("ip") && p != null)
 							remotePort = Integer.parseInt(p);
+						if (subnetType.equals("knxip"))
+							subnetKnxipNetif = getNetIf(e);
 						r.complete(e);
 						addr = e.getCharacterData();
 					}
@@ -292,6 +298,7 @@ public class Launcher implements Runnable
 						subnetAddresses.add(addr);
 						subnetPorts.add(new Integer(remotePort));
 						svcContainers.add(sc);
+						subnetNetIf.put(sc, subnetKnxipNetif);
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						return;
@@ -526,9 +533,8 @@ public class Launcher implements Runnable
 					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
 							new InetSocketAddress(remoteHost, remotePort), false, settings);
 				else if ("knxip".equals(subnetType))
-					// TODO KNX IP: specify listening network interface
-					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.ROUTING, null,
-							new InetSocketAddress(remoteHost, 0), false, settings);
+					link = new KNXNetworkLinkIP((NetworkInterface) xml.subnetNetIf.get(sc),
+							new InetSocketAddress(remoteHost, 0).getAddress(), settings);
 				else
 					logger.error("unknown KNX subnet specifier " + subnetType);
 			}
