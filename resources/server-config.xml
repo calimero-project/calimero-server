@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Calimero 2 server settings -->
+<knxServer name="knx-server" friendlyName="My KNXnet/IP Server">
+	<propertyDefinitions ref="resources/properties.xml" />
+
+	<!-- KNXnet/IP search & discovery -->
+	<discovery listenNetIf="all" outgoingNetIf="all" />
+
+	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
+	<serviceContainer activate="true" routing="false" allowNetworkMonitoring="true" 
+		udpPort="3671" listenNetIf="en0" reuseCtrlEP="true">
+		<!-- 1.1.0 -->
+		<knxAddress type="individual">4352</knxAddress>
+
+		<!-- Specify the KNX subnet type, connecting the KNX network -->
+		<!-- <knxSubnet type="virtual">virtual-subnet</knxSubnet> -->
+		<!-- <knxSubnet type="ip" udpPort="3676">192.168.10.12</knxSubnet> -->
+		<knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet>
+
+		<!-- Datapoints are only required if a virtual KNX subnet is used -->
+		<datapoints ref="datapointMap.xml" />
+
+		<!-- KNX group address filter applied for this service container (optional) -->
+		<groupAddressFilter>
+			<knxAddress type="group">2561</knxAddress>
+			<knxAddress type="group">2562</knxAddress>
+			<knxAddress type="group">2563</knxAddress>
+			<knxAddress type="group">2564</knxAddress>
+			<knxAddress type="group">2565</knxAddress>
+		</groupAddressFilter>
+		<!-- Additional KNX individual addresses assigned to KNXnet/IP connections (optional) -->
+		<additionalAddresses>
+			<knxAddress type="individual">4406</knxAddress>
+			<knxAddress type="individual">4407</knxAddress>
+			<knxAddress type="individual">4408</knxAddress>
+			<knxAddress type="individual">4409</knxAddress>
+		</additionalAddresses>
+	</serviceContainer>
+	<!-- Next service container (optional) -->
+</knxServer>
