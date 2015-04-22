@@ -66,7 +66,6 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
-import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -75,8 +74,6 @@ import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.link.medium.PLSettings;
-import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
@@ -534,7 +531,8 @@ public class Launcher implements Runnable
 				final int remotePort = ((Integer) xml.subnetPorts.get(i)).intValue();
 				logger.info("connect to " + remoteHost + ":" + remotePort);
 
-				final KNXMediumSettings settings = create(sc.getKNXMedium(), sc.getSubnetAddress());
+				final KNXMediumSettings settings = KNXMediumSettings.create(sc.getKNXMedium(),
+						sc.getSubnetAddress());
 				// can cause a delay of connection timeout in the worst case
 				if ("ip".equals(subnetType))
 					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
@@ -556,24 +554,6 @@ public class Launcher implements Runnable
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, i + 1, (List) xml.groupAddressFilters.get(sc));
 		}
-	}
-
-	// XXX copied from KNXMediumSettings, because there its not yet public
-	private static KNXMediumSettings create(final int medium, final IndividualAddress device)
-	{
-		switch (medium) {
-		case KNXMediumSettings.MEDIUM_TP0:
-			return new TPSettings(device, false);
-		case KNXMediumSettings.MEDIUM_TP1:
-			return new TPSettings(device, true);
-		case KNXMediumSettings.MEDIUM_PL110:
-			return new PLSettings(device, null, false);
-		case KNXMediumSettings.MEDIUM_PL132:
-			return new PLSettings(device, null, true);
-		case KNXMediumSettings.MEDIUM_RF:
-			return new RFSettings(device);
-		}
-		throw new KNXIllegalArgumentException("unknown medium type " + medium);
 	}
 
 	private void waitForTermination()
