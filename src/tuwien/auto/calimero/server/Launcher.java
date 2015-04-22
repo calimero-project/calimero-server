@@ -46,6 +46,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -473,6 +474,7 @@ public class Launcher implements Runnable
 			logger.error("initialization of KNX server interrupted");
 		}
 		catch (final KNXException e) {
+			e.printStackTrace();
 			logger.error("initialization of KNX server, " + e.getMessage());
 		}
 		finally {
@@ -765,13 +767,13 @@ public class Launcher implements Runnable
 
 			try {
 				// send a .con for a .req
-				NetworkLinkListener[] el = (NetworkLinkListener[]) confirmation.listeners();
+				EventListener[] el = confirmation.listeners();
 				if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
 					final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON,
 							msg.getPayload(), msg);
 					final FrameEvent e = new FrameEvent(this, f);
 					for (int i = 0; i < el.length; i++) {
-						final NetworkLinkListener l = el[i];
+						final NetworkLinkListener l = (NetworkLinkListener) el[i];
 						l.confirmation(e);
 					}
 				}
@@ -779,10 +781,10 @@ public class Launcher implements Runnable
 				final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
 						: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(),
 								msg);
-				el = (NetworkLinkListener[]) uplink.listeners.listeners();
+				el = uplink.listeners.listeners();
 				final FrameEvent e = new FrameEvent(this, f);
 				for (int i = 0; i < el.length; i++) {
-					final NetworkLinkListener l = el[i];
+					final NetworkLinkListener l = (NetworkLinkListener) el[i];
 					l.indication(e);
 				}
 			}
