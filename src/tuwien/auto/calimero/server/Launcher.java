@@ -60,7 +60,6 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.buffer.Configuration;
@@ -78,8 +77,6 @@ import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.link.medium.PLSettings;
-import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
@@ -159,6 +156,9 @@ public class Launcher implements Runnable
 		// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 		private final Map<ServiceContainer, DatapointModel<Datapoint>> subnetDatapoints = new HashMap<>();
 
+		// Holds the network interface for KNX IP subnets, if specified
+		private final Map<ServiceContainer, NetworkInterface> subnetNetIf = new HashMap<>();
+
 		// the following lists contain gateway information, in sequence of the svc containers
 
 		private final List<String> subnetTypes = new ArrayList<>();
@@ -229,6 +229,7 @@ public class Launcher implements Runnable
 			int remotePort = 0;
 			String subnetType = "";
 			IndividualAddress subnet = null;
+			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
 			DatapointModel<Datapoint> datapoints = null;
 			List<GroupAddress> filter = Collections.emptyList();
@@ -256,6 +257,8 @@ public class Launcher implements Runnable
 						final String p = e.getAttribute(XmlConfiguration.attrUdpPort);
 						if (subnetType.equals("ip") && p != null)
 							remotePort = Integer.parseInt(p);
+						if (subnetType.equals("knxip"))
+							subnetKnxipNetif = getNetIf(e);
 						r.complete(e);
 						addr = e.getCharacterData();
 					}
@@ -294,6 +297,7 @@ public class Launcher implements Runnable
 						subnetAddresses.add(addr);
 						subnetPorts.add(new Integer(remotePort));
 						svcContainers.add(sc);
+						subnetNetIf.put(sc, subnetKnxipNetif);
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						return;
@@ -471,7 +475,6 @@ public class Launcher implements Runnable
 
 	/**
 	 * Quits a running server gateway launched by this launcher, and shuts down the KNX server.
-	 * <p>
 	 */
 	public void quit()
 	{
@@ -520,15 +523,15 @@ public class Launcher implements Runnable
 				final int remotePort = xml.subnetPorts.get(i).intValue();
 				logger.info("connect to " + remoteHost + ":" + remotePort);
 
-				final KNXMediumSettings settings = create(sc.getKNXMedium(), sc.getSubnetAddress());
+				final KNXMediumSettings settings = KNXMediumSettings.create(sc.getKNXMedium(),
+						sc.getSubnetAddress());
 				// can cause a delay of connection timeout in the worst case
 				if ("ip".equals(subnetType))
 					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
 							new InetSocketAddress(remoteHost, remotePort), false, settings);
 				else if ("knxip".equals(subnetType))
-					// TODO KNX IP: specify listening network interface
-					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.ROUTING, null,
-							new InetSocketAddress(remoteHost, 0), false, settings);
+					link = new KNXNetworkLinkIP(xml.subnetNetIf.get(sc), new InetSocketAddress(
+							remoteHost, 0).getAddress(), settings);
 				else
 					logger.error("unknown KNX subnet specifier " + subnetType);
 			}
@@ -543,24 +546,6 @@ public class Launcher implements Runnable
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, i + 1, xml.groupAddressFilters.get(sc));
 		}
-	}
-
-	// XXX copied from KNXMediumSettings, because there its not yet public
-	private static KNXMediumSettings create(final int medium, final IndividualAddress device)
-	{
-		switch (medium) {
-		case KNXMediumSettings.MEDIUM_TP0:
-			return new TPSettings(device, false);
-		case KNXMediumSettings.MEDIUM_TP1:
-			return new TPSettings(device, true);
-		case KNXMediumSettings.MEDIUM_PL110:
-			return new PLSettings(device, null, false);
-		case KNXMediumSettings.MEDIUM_PL132:
-			return new PLSettings(device, null, true);
-		case KNXMediumSettings.MEDIUM_RF:
-			return new RFSettings(device);
-		}
-		throw new KNXIllegalArgumentException("unknown medium type " + medium);
 	}
 
 	private void waitForTermination()
@@ -723,11 +708,7 @@ public class Launcher implements Runnable
 			return settings;
 		}
 
-		/**
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink #send(tuwien.auto.calimero.cemi.CEMILData,
-		 *      boolean)
-		 * @param waitForCon
-		 */
+		@Override
 		public void send(final CEMILData msg, final boolean waitForCon)
 		{
 			for (final Iterator<VirtualLink> i = deviceLinks.iterator(); i.hasNext();) {
