@@ -1025,7 +1025,7 @@ public class InterfaceObjectServer implements PropertyAccess
 
 		/**
 		 * Saves KNX property information to a resource identified by <code>resource</code>.
-		 * <p>>
+		 * <p>
 		 * The two collections <code>descriptions</code> and <code>values</code> holding the KNX
 		 * property descriptions and property element data are associated by the collection's
 		 * iterators {@link Collection#iterator()}: the n<sup>th</sup> description element returned

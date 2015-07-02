@@ -305,7 +305,7 @@ public class KNXnetIPServer
 	 * implementations, as might their default property values. Added KNX properties with their
 	 * initialized value in this implementation:
 	 * <ul>
-	 * <li>Device Object:</li>
+	 * <li>Device Object:
 	 * <ul>
 	 * <li>PID.MAX_APDULENGTH: 15</li>
 	 * <li>PID.DESCRIPTION: 'J', '2', 'M', 'E', ' ', 'K', 'N', 'X', 'n', 'e', 't', '/', 'I', 'P',
@@ -315,7 +315,8 @@ public class KNXnetIPServer
 	 * <li>PID.SUBNET_ADDR: subnet address of PID.KNX_INDIVIDUAL_ADDRESS value</li>
 	 * <li>PID.DEVICE_ADDR: device address of PID.KNX_INDIVIDUAL_ADDRESS value</li>
 	 * </ul>
-	 * <li>KNXnet/IP Parameter Object:</li>
+	 * </li>
+	 * <li>KNXnet/IP Parameter Object:
 	 * <ul>
 	 * <li>PID.FRIENDLY_NAME: {@link #getFriendlyName()}</li>
 	 * <li>PID.PROGMODE: 0</li>
@@ -337,6 +338,7 @@ public class KNXnetIPServer
 	 * <li>PID.MSG_TRANSMIT_TO_IP: 0</li>
 	 * <li>PID.MSG_TRANSMIT_TO_KNX: 0</li>
 	 * </ul>
+	 * </li>
 	 * </ul>
 	 */
 	public KNXnetIPServer()
@@ -357,7 +359,7 @@ public class KNXnetIPServer
 	 *
 	 * @param localName name of this server as shown to the owner/user of this server
 	 * @param friendlyName a friendly, descriptive name for this server, consisting of ISO-8859-1
-	 *        characters only, with string length < 30 characters, <code>friendlyName</code> might
+	 *        characters only, with string length &lt; 30 characters, <code>friendlyName</code> might
 	 *        be null or of length 0 to use defaults
 	 */
 	public KNXnetIPServer(final String localName, final String friendlyName)
