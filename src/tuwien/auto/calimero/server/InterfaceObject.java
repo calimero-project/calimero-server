@@ -43,7 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import tuwien.auto.calimero.exception.KNXException;
+import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyClient;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;

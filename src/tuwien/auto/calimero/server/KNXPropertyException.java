@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,12 +36,12 @@
 
 package tuwien.auto.calimero.server;
 
-import tuwien.auto.calimero.exception.KNXException;
+import tuwien.auto.calimero.KNXException;
 
 /**
  * Thrown on problems during access of a KNX property.
  * <p>
- * 
+ *
  * @author B. Malinowsky
  */
 public class KNXPropertyException extends KNXException
@@ -64,7 +64,7 @@ public class KNXPropertyException extends KNXException
 	 * Constructs a new <code>KNXPropertyException</code> with the specified detail message.
 	 * <p>
 	 * The status code is assigned 0.
-	 * 
+	 *
 	 * @param s the detail message
 	 */
 	public KNXPropertyException(final String s)
@@ -79,7 +79,7 @@ public class KNXPropertyException extends KNXException
 	 * <p>
 	 * Within the library, for the status code one of the codes listed in CEMIDevMgmt.ErrorCodes is
 	 * used.
-	 * 
+	 *
 	 * @param s the detail message
 	 * @param statusCode the status code for the problem
 	 */
@@ -94,7 +94,7 @@ public class KNXPropertyException extends KNXException
 	 * <p>
 	 * If this exception originates from within the library, the status code is one of the codes
 	 * listed in CEMIDevMgmt.ErrorCodes.
-	 * 
+	 *
 	 * @return status code as int
 	 */
 	public final int getStatusCode()

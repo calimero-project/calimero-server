@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@ import java.net.InetAddress;
 import java.util.Arrays;
 
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -49,7 +49,7 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
  * The default implementation of the {@link ServiceContainer}.
  * <p>
  * It allows for UDP communication only.
- * 
+ *
  * @author B. Malinowsky
  */
 public class DefaultServiceContainer implements ServiceContainer
@@ -66,7 +66,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * Creates a new service container with the supplied parameters.
 	 * <p>
 	 * The control endpoint of this service container must contain UDP host protocol information.
-	 * 
+	 *
 	 * @param name service container name; the name shall allow an identification within a set of
 	 *        service containers, and provide a descriptive name of the container. Therefore, a
 	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
@@ -112,7 +112,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * <p>
 	 * The control endpoint of this service container must contain UDP host protocol information.<br>
 	 * Reuse of control endpoint is not allowed, bus monitor connections are allowed.
-	 * 
+	 *
 	 * @param name service container name; the name shall allow an identification within a set of
 	 *        service containers, and provide a descriptive name of the container. Therefore, a
 	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}

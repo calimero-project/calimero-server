@@ -44,14 +44,14 @@ import java.net.SocketAddress;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
-import tuwien.auto.calimero.exception.KNXFormatException;
-import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
-import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;

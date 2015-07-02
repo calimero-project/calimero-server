@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 
@@ -51,7 +51,7 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
  * KNXnet/IP routing. When this service container is handed to a KNXnet/IP server, the server will
  * access the configured KNXnet/IP routing configuration, and initialize its service container to
  * providing routing services to the clients.
- * 
+ *
  * @author B. Malinowsky
  */
 public class RoutingServiceContainer extends DefaultServiceContainer implements RoutingEndpoint
@@ -62,7 +62,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
 	 * <p>
-	 * 
+	 *
 	 * @param name see {@link DefaultServiceContainer}
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
 	 * @param knxMedium see {@link DefaultServiceContainer}
