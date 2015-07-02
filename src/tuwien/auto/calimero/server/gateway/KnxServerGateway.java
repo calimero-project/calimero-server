@@ -143,7 +143,7 @@ public class KnxServerGateway implements Runnable
 
 		public void connectionClosed(final CloseEvent e)
 		{
-			logger.info("remove " + name + " (" + e.getReason() + ")");
+			logger.debug("remove {} ({})", name, e.getReason());
 			serverConnections.remove(e.getSource());
 			if (e.getSource() instanceof KNXnetIPRouting)
 				routing = false;
@@ -731,7 +731,8 @@ public class KnxServerGateway implements Runnable
 			final GroupAddress d = (GroupAddress) f.getDestination();
 			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
 					&& !inGroupAddressTable(d, subnet.getGroupAddressTableObjectInstance())) {
-				logger.warn("destination " + d + " not in group address table - skip frame");
+				logger.warn("destination {} not in {} group address table - discard {}", d,
+						subnet.getName(), f);
 				return;
 			}
 		}

@@ -176,7 +176,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			shutdown = true;
 		}
 
-		LogService.log(logger, level, "close connection - " + reason, t);
+		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason,
+				t);
 		callback.connectionClosed(this, device);
 		super.cleanup(initiator, reason, level, t);
 	}

@@ -2129,8 +2129,8 @@ public class KNXnetIPServer
 				byte[] buf = null;
 
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.info(svcCont.getName()
-							+ ": setup data endpoint for connection request from " + dataEndpt);
+					logger.info("{}: setup data endpoint (channel {}) for connection request "
+							+ "from {}", svcCont.getName(), channelId, dataEndpt);
 					final InetSocketAddress ctrlEndpt = createResponseAddress(
 							req.getControlEndpoint(), src, port, 1);
 					final Object[] init = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
@@ -2169,7 +2169,7 @@ public class KNXnetIPServer
 				// issue a warning
 				final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
 				if (!ctrlEndpt.getAddress().equals(src) || ctrlEndpt.getPort() != port) {
-					logger.warn("disconnect request: sender control endpoint changed " + "from "
+					logger.warn("disconnect request: sender control endpoint changed from "
 							+ ctrlEndpt + " to " + src + ", not recommended");
 				}
 				final byte[] buf = PacketHelper.toPacket(new DisconnectResponse(channelId,
@@ -2260,7 +2260,7 @@ public class KNXnetIPServer
 				if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 					s.setReuseAddress(true);
 				s.bind(new InetSocketAddress(ep.getAddress(), ep.getPort()));
-				logger.trace("created socket on " + s.getLocalSocketAddress());
+				logger.debug("created socket on " + s.getLocalSocketAddress());
 			}
 			catch (final SocketException e) {
 				logger.error("socket creation failed for "
@@ -2431,7 +2431,7 @@ public class KNXnetIPServer
 			super(new DatagramSocket(0, localCtrlEndpt.getLocalAddress()), 512,
 					MAX_RECEIVE_INTERVAL * 1000);
 			this.callback = callback;
-			logger.info("created socket on " + s.getLocalSocketAddress());
+			logger.debug("created socket on " + s.getLocalSocketAddress());
 		}
 
 		public void connectionClosed(final DataEndpointServiceHandler h,
