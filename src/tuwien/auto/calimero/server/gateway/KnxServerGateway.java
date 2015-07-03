@@ -543,7 +543,7 @@ public class KnxServerGateway implements Runnable
 
 		final boolean trace = logger.isLoggable(LogLevel.TRACE);
 		if (trace)
-			logger.trace(s + fe.getSource() + " " + frame.toString());
+			logger.trace(s + fe.getSource() + ": " + frame.toString());
 
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
@@ -562,6 +562,7 @@ public class KnxServerGateway implements Runnable
 						final boolean error = false;
 						//if (f.getDestination().equals(a))
 						//	error = true;
+						logger.trace("send positive cEMI L_Data.con");
 						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
 						// TODO wait for ACK is correct, but should be done asynchronously
 						// otherwise, it might block the processing of a next queued frame
@@ -578,7 +579,7 @@ public class KnxServerGateway implements Runnable
 					if (send == null)
 						logger.info("hop count 0, discarded frame to " + f.getDestination());
 					else {
-						dispatchToSubnet(send);
+						dispatchToSubnets(send);
 					}
 				}
 				catch (final KNXException e) {
@@ -589,7 +590,7 @@ public class KnxServerGateway implements Runnable
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
 				if (send == null) {
-					logger.info("hop count 0, discarded frame to " + f.getDestination());
+					logger.warn("hop count 0, discarded frame to " + f.getDestination());
 					return;
 				}
 				// get connector of that subnet
@@ -597,7 +598,7 @@ public class KnxServerGateway implements Runnable
 				if (connector != null)
 					dispatchToServer(connector, send);
 
-				dispatchToSubnet(send);
+				dispatchToOtherSubnets(send, connector);
 			}
 			else {
 				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x"
@@ -644,7 +645,7 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
-	private void dispatchToSubnet(final CEMILData f)
+	private void dispatchToOtherSubnets(final CEMILData f, final SubnetConnector exclude)
 	{
 		if (f.getDestination() instanceof IndividualAddress) {
 			final KNXNetworkLink lnk = findSubnetLink((IndividualAddress) f.getDestination());
@@ -664,11 +665,18 @@ public class KnxServerGateway implements Runnable
 
 			for (final Iterator i = connectors.iterator(); i.hasNext();) {
 				final SubnetConnector subnet = (SubnetConnector) i.next();
-				if (subnet.getServiceContainer().isActivated())
+				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
 					dispatchToSubnet(subnet, f, raw);
+				else
+					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			}
 		}
 		incMsgTransmitted(true);
+	}
+
+	private void dispatchToSubnets(final CEMILData f)
+	{
+		dispatchToOtherSubnets(f, null);
 	}
 
 	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f,
@@ -678,7 +686,7 @@ public class KnxServerGateway implements Runnable
 			final GroupAddress d = (GroupAddress) f.getDestination();
 			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
 					&& !inGroupAddressTable(d, subnet.getGroupAddressTableObjectInstance())) {
-				logger.warn("destination " + d + " not in group address table - skip frame");
+				logger.warn("destination " + d + " not in group address table - discard " + f);
 				return;
 			}
 		}
