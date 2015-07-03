@@ -58,6 +58,7 @@ import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
+import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
@@ -66,6 +67,7 @@ import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
+import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
@@ -791,14 +793,32 @@ public class KnxServerGateway implements Runnable
 	private void send(final KNXNetworkLink lnk, final CEMILData f)
 	{
 		try {
-			lnk.send(f, true);
+			final CEMILData ldata;
+			final int mc = f.getMessageCode();
+
+			// we have to adjust a possible routing .ind from server-side to .req,
+			// or vice versa a .req to .ind if we use KNXnet/IP routing on the KNX subnet
+			// ??? HACK: do we use routing on the KNX subnet
+			final boolean routing = lnk instanceof KNXNetworkLinkIP
+					&& lnk.toString().contains("routing");
+
+			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
+			if (mc == CEMILData.MC_LDATA_IND && !routing)
+				ldata = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f);
+			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
+			else if (mc == CEMILData.MC_LDATA_REQ && routing)
+				ldata = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f);
+			else
+				ldata = f;
+
+			lnk.send(ldata, true);
 			setNetworkState(true, false);
 		}
 		catch (final KNXTimeoutException e) {
-			e.printStackTrace();
 			setNetworkState(true, true);
+			e.printStackTrace();
 		}
-		catch (final KNXLinkClosedException e) {
+		catch (final KNXFormatException | KNXLinkClosedException e) {
 			e.printStackTrace();
 		}
 	}
