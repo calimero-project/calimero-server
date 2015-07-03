@@ -2000,6 +2000,12 @@ public class KNXnetIPServer
 					throw new KNXConnectionClosedException("connection closed");
 				}
 			}
+
+			@Override
+			public String toString()
+			{
+				return getName();
+			}
 		}
 
 		private final RoutingServiceHandler r;
