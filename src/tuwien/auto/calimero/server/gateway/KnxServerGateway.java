@@ -60,7 +60,6 @@ import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
-import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
@@ -145,8 +144,6 @@ public class KnxServerGateway implements Runnable
 		{
 			logger.info("remove " + name + " (" + e.getReason() + ")");
 			serverConnections.remove(e.getSource());
-			if (e.getSource() instanceof KNXnetIPRouting)
-				routing = false;
 			serverDataConnections.remove(addr);
 		}
 	}
@@ -215,8 +212,6 @@ public class KnxServerGateway implements Runnable
 				logger.info(sc.getName() + " started " + conn.getName());
 				conn.addConnectionListener(new ConnectionListener(conn.getName(), null));
 				serverConnections.add(conn);
-				routing = true;
-				routingLoopback = ((KNXnetIPRouting) conn).usesMulticastLoopback();
 			}
 			else if (event == ServiceContainerEvent.ADDED_TO_SERVER) {
 				logger.error("adding service container at runtime not yet implemented");
@@ -334,15 +329,6 @@ public class KnxServerGateway implements Runnable
 	private final int maxEventQueueSize = 200;
 	private final List ipEvents = new LinkedList();
 	private final List subnetEvents = new LinkedList();
-
-	private boolean routing;
-	private boolean routingLoopback;
-	// This list is used for multicast packets in KNXnet/IP routing that are looped back
-	// using the local loopback socket. Packets sent by us are buffered here, and
-	// subsequently silently discarded when received again shortly after (and also removed
-	// from this buffer again).
-	// This list holds cEMI frames now, but can essentially might only keep data arrays.
-	private final List loopbackFrames = new LinkedList();
 
 	private volatile boolean trucking;
 	private volatile boolean inReset;
@@ -559,9 +545,6 @@ public class KnxServerGateway implements Runnable
 		if (trace)
 			logger.trace(s + fe.getSource() + " " + frame.toString());
 
-		if (fromServerSide && discardLoopedBackFrame(frame))
-			return;
-
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
 			final CEMILData f = (CEMILData) frame;
@@ -659,32 +642,6 @@ public class KnxServerGateway implements Runnable
 		}
 		logger.error("dispatch to server: no subnet connector found!");
 		return null;
-	}
-
-	private boolean discardLoopedBackFrame(final CEMI frame)
-	{
-		if (routing && routingLoopback) {
-			final byte[] a1 = frame.toByteArray();
-			synchronized (loopbackFrames) {
-				for (final Iterator i = loopbackFrames.iterator(); i.hasNext();) {
-					final byte[] a2 = ((CEMI) i.next()).toByteArray();
-					if (a1.length == a2.length) {
-						for (int k = 0; k < a1.length; ++k)
-							if (a1[k] != a2[k])
-								return false;
-						if (logger.isLoggable(LogLevel.TRACE))
-							logger.trace("discard routed cEMI frame received over "
-									+ "local multicast loopback");
-						i.remove();
-						return true;
-					}
-					// limit max. loopback queue size
-					else if (loopbackFrames.size() > maxEventQueueSize)
-						i.remove();
-				}
-			}
-		}
-		return false;
 	}
 
 	private void dispatchToSubnet(final CEMILData f)
@@ -796,14 +753,6 @@ public class KnxServerGateway implements Runnable
 				for (int i = 0; i < sca.length; i++) {
 					final KNXnetIPConnection c = sca[i];
 					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
-				}
-
-				if (routing && routingLoopback) {
-					synchronized (loopbackFrames) {
-						loopbackFrames.add(f);
-						System.out.println("add to loopback frame buffer: " + f + " [" +
-								DataUnitBuilder.toHex(f.toByteArray(), " ") + "]");
-					}
 				}
 			}
 			incMsgTransmitted(false);
