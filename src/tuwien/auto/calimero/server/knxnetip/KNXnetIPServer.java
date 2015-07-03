@@ -1888,6 +1888,10 @@ public class KNXnetIPServer
 			// we can safely ignore search responses and avoid a warning being logged
 			else if (svc == KNXnetIPHeader.SEARCH_RES)
 				return true;
+			// also ignore routing messages
+			else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG
+					|| svc == KNXnetIPHeader.ROUTING_BUSY)
+				return true;
 			// other requests are rejected with error
 			return false;
 		}
