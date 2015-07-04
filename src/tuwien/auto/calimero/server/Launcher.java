@@ -66,6 +66,7 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
+import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -142,10 +143,12 @@ public class Launcher implements Runnable
 		/** */
 		public static final String attrUdpPort = "udpPort";
 		/** */
+		public static final String attrClass = "class";
+		/** */
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
 		public static final String attrMonitor = "allowNetworkMonitoring";
-		/** KNX subnet type: ["ip", "knxip", "virtual"] */
+		/** KNX subnet type: ["ip", "knxip", "usb", "virtual", "user-supplied"] */
 		public static final String attrType = "type";
 		/** */
 		public static final String attrRef = "ref";
@@ -160,6 +163,10 @@ public class Launcher implements Runnable
 
 		// Holds the network interface for KNX IP subnets, if specified
 		private final Map subnetNetIf = new HashMap();
+
+		// Holds the class name of user-supplied subnet links, if specified
+		private final Map subnetLinkClasses = new HashMap();
+
 
 		// the following lists contain gateway information, in sequence of the svc containers
 
@@ -233,6 +240,7 @@ public class Launcher implements Runnable
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
+			String subnetLinkClass = null;
 			DatapointModel datapoints = null;
 			List filter = Collections.emptyList();
 			List indAddressPool = Collections.emptyList();
@@ -259,8 +267,10 @@ public class Launcher implements Runnable
 						final String p = e.getAttribute(XmlConfiguration.attrUdpPort);
 						if (subnetType.equals("ip") && p != null)
 							remotePort = Integer.parseInt(p);
-						if (subnetType.equals("knxip"))
+						else if (subnetType.equals("knxip"))
 							subnetKnxipNetif = getNetIf(e);
+						else if (subnetType.equals("user-supplied"))
+							subnetLinkClass = e.getAttribute(XmlConfiguration.attrClass);
 						r.complete(e);
 						addr = e.getCharacterData();
 					}
@@ -300,6 +310,7 @@ public class Launcher implements Runnable
 						subnetPorts.add(new Integer(remotePort));
 						svcContainers.add(sc);
 						subnetNetIf.put(sc, subnetKnxipNetif);
+						subnetLinkClasses.put(sc, subnetLinkClass);
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						return;
@@ -471,7 +482,6 @@ public class Launcher implements Runnable
 			logger.error("initialization of KNX server interrupted");
 		}
 		catch (final KNXException e) {
-			e.printStackTrace();
 			logger.error("initialization of KNX server, " + e.getMessage());
 		}
 		finally {
@@ -482,7 +492,6 @@ public class Launcher implements Runnable
 
 	/**
 	 * Quits a running server gateway launched by this launcher, and shuts down the KNX server.
-	 * <p>
 	 */
 	public void quit()
 	{
@@ -509,7 +518,7 @@ public class Launcher implements Runnable
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = (ServiceContainer) xml.svcContainers.get(i);
 
-			KNXNetworkLink link = null;
+			final KNXNetworkLink link;
 			final String subnetType = (String) xml.subnetTypes.get(i);
 			if ("virtual".equals(subnetType)) {
 				// use network buffer to emulate KNX subnet
@@ -527,21 +536,26 @@ public class Launcher implements Runnable
 				link = config.getBufferedLink();
 			}
 			else {
-				final String remoteHost = (String) xml.subnetAddresses.get(i);
+				final String subnetArgs = (String) xml.subnetAddresses.get(i);
 				final int remotePort = ((Integer) xml.subnetPorts.get(i)).intValue();
-				logger.info("connect to " + remoteHost + ":" + remotePort);
+				logger.info("connect to " + subnetArgs + ":" + remotePort);
 
 				final KNXMediumSettings settings = KNXMediumSettings.create(sc.getKNXMedium(),
 						sc.getSubnetAddress());
 				// can cause a delay of connection timeout in the worst case
 				if ("ip".equals(subnetType))
 					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
-							new InetSocketAddress(remoteHost, remotePort), false, settings);
+							new InetSocketAddress(subnetArgs, remotePort), false, settings);
 				else if ("knxip".equals(subnetType))
 					link = new KNXNetworkLinkIP((NetworkInterface) xml.subnetNetIf.get(sc),
-							new InetSocketAddress(remoteHost, 0).getAddress(), settings);
-				else
+							new InetSocketAddress(subnetArgs, 0).getAddress(), settings);
+				else if ("user-supplied".equals(subnetType))
+					link = newLinkUsing((String) xml.subnetLinkClasses.get(sc),
+							subnetArgs.split(",|\\|"));
+				else {
 					logger.error("unknown KNX subnet specifier " + subnetType);
+					continue;
+				}
 			}
 
 			server.addServiceContainer(sc);
@@ -553,6 +567,26 @@ public class Launcher implements Runnable
 				setAdditionalIndividualAddresses(ios, i + 1, (List) xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, i + 1, (List) xml.groupAddressFilters.get(sc));
+		}
+	}
+
+	private KNXNetworkLink newLinkUsing(final String className, final String[] initArgs)
+	{
+		try {
+			final Class c = Class.forName(className).asSubclass(
+					KNXNetworkLink.class);
+			final Class[] paramTypes = new Class[] { Object[].class };
+			final Object[] args = new Object[] { initArgs };
+			return (KNXNetworkLink) c.getConstructor(paramTypes).newInstance(args);
+		}
+		catch (final ReflectiveOperationException e) {
+			// ClassNotFoundException, InstantiationException, IllegalAccessException,
+			// InvocationTargetException,
+			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
+		}
+		catch (final RuntimeException e) {
+			// ClassCastException, IllegalArgumentException, SecurityException
+			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
 		}
 	}
 

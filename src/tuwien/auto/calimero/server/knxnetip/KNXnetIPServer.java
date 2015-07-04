@@ -2001,7 +2001,6 @@ public class KNXnetIPServer
 				}
 			}
 
-			@Override
 			public String toString()
 			{
 				return getName();
