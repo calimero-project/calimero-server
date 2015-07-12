@@ -63,6 +63,7 @@ import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
+import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
@@ -787,7 +788,13 @@ public class KnxServerGateway implements Runnable
 
 	private KNXnetIPConnection findServerConnection(final IndividualAddress dst)
 	{
-		return serverDataConnections.get(dst);
+		final KNXnetIPConnection c = serverDataConnections.get(dst);
+		if (c != null)
+			return c;
+		for (final KNXnetIPConnection e : serverConnections)
+			if (e instanceof KNXnetIPRouting)
+				return e;
+		return null;
 	}
 
 	private void send(final KNXNetworkLink lnk, final CEMILData f)
