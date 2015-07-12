@@ -35,6 +35,7 @@
 				<includes>
 					<include>properties.xml</include>
 					<include>server-config.xml</include>
+					<include>javax.usb.properties</include>
 				</includes>
 			</resource>
 		</resources>
