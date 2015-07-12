@@ -658,6 +658,9 @@ public class KnxServerGateway implements Runnable
 						+ " received from " + f.getSource() + ")");
 				return;
 			}
+			if (exclude != null && lnk.equals(exclude.getSubnetLink()))
+				logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
+			else
 			send(lnk, f);
 		}
 		else {
@@ -740,9 +743,13 @@ public class KnxServerGateway implements Runnable
 						.getDestination());
 				if (c != null) {
 					if (logger.isLoggable(LogLevel.TRACE))
-						logger.trace("send from " + f.getSource() + " to " + f.getDestination());
+						logger.trace("dispatch " + f.getSource() + "->" + f.getDestination()
+								+ " using " + c);
 					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
 				}
+				else
+					logger.warn(
+							"no active KNXnet/IP connection for destination " + f.getDestination());
 			}
 			else {
 				final int raw = f.getDestination().getRawAddress();
