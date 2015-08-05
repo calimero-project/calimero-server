@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ import tuwien.auto.calimero.server.InterfaceObjectServerListener;
 /**
  * A listener for use with a {@link KNXnetIPServer}.
  * <p>
- * 
+ *
  * @author B. Malinowsky
  */
 public interface ServerListener extends InterfaceObjectServerListener
@@ -63,19 +63,21 @@ public interface ServerListener extends InterfaceObjectServerListener
 	 * During invocation of this method, do not use <code>connection</code> for sending frames. The
 	 * connection is not fully activated yet, and is allowed to be in any intermediate state;
 	 * behavior at this stage is implementation defined and subject to change.
-	 * 
+	 *
+	 * @param svcContainer the service container with the connect request
 	 * @param connection the new connection to be accepted or rejected, the callee can store a
 	 *        reference to it for later use
 	 * @param assignedDeviceAddress the KNX device address assigned to this connection
+	 * @param networkMonitor the new connection requests KNX subnet monitoring (busmonitor)
 	 * @return <code>true</code> to accept the connect, <code>false</code> to reject
 	 */
-	boolean acceptDataConnection(KNXnetIPConnection connection,
-		IndividualAddress assignedDeviceAddress);
+	boolean acceptDataConnection(ServiceContainer svcContainer, KNXnetIPConnection connection,
+		IndividualAddress assignedDeviceAddress, boolean networkMonitor);
 
 	/**
 	 * Notifies about a change related to a service container.
 	 * <p>
-	 * 
+	 *
 	 * @param sce contains details about the service container event
 	 */
 	void onServiceContainerChange(ServiceContainerEvent sce);
@@ -85,7 +87,7 @@ public interface ServerListener extends InterfaceObjectServerListener
 	 * <p>
 	 * Based on this notification, the notifying server should be restarted by calling
 	 * {@link KNXnetIPServer#shutdown()} and {@link KNXnetIPServer#launch()}.
-	 * 
+	 *
 	 * @param se contains details about the shutdown/launch request
 	 */
 	void onResetRequest(ShutdownEvent se);
@@ -93,7 +95,7 @@ public interface ServerListener extends InterfaceObjectServerListener
 	/**
 	 * Notifies that the server will shutdown.
 	 * <p>
-	 * 
+	 *
 	 * @param se contains details about the shutdown event
 	 */
 	void onShutdown(ShutdownEvent se);

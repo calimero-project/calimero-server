@@ -159,13 +159,9 @@ public class KnxServerGateway implements Runnable
 		KNXnetIPServerListener()
 		{}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
-		 * #acceptDataConnection(tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection)
-		 */
-		public boolean acceptDataConnection(final KNXnetIPConnection conn,
-			final IndividualAddress assignedDeviceAddress)
+		public boolean acceptDataConnection(final ServiceContainer svcContainer,
+			final KNXnetIPConnection conn, final IndividualAddress assignedDeviceAddress,
+			final boolean networkMonitor)
 		{
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
