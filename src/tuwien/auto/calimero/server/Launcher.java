@@ -198,6 +198,7 @@ public class Launcher implements Runnable
 						r.complete(e);
 						put(m, r, XmlConfiguration.attrListenNetIf);
 						put(m, r, XmlConfiguration.attrOutgoingNetIf);
+						put(m, r, XmlConfiguration.attrActivate);
 					}
 					else if (name.equals(XmlConfiguration.propDefs)) {
 						final String res = e.getAttribute(XmlConfiguration.attrRef);
@@ -440,6 +441,8 @@ public class Launcher implements Runnable
 		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, netIfListen);
 		final String netIfOutgoing = config.get(XmlConfiguration.attrOutgoingNetIf);
 		server.setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, netIfOutgoing);
+		final String runDiscovery = config.getOrDefault(XmlConfiguration.attrActivate, "true");
+		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, runDiscovery);
 
 		// output the configuration we loaded
 		logger.info("Discovery service network interfaces:");
