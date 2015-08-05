@@ -1123,7 +1123,7 @@ public class InterfaceObjectServer implements PropertyAccess
 				return list;
 			}
 			catch (final NumberFormatException e) {
-				throw new KNXFormatException("loading interface objects, " + e.getMessage());
+				throw new KNXFormatException("loading interface objects", e.getMessage());
 			}
 			finally {
 				r.close();
@@ -1218,7 +1218,7 @@ public class InterfaceObjectServer implements PropertyAccess
 				}
 			}
 			catch (final NumberFormatException e) {
-				throw new KNXFormatException("loading properties, " + e.getMessage());
+				throw new KNXFormatException("loading properties", e.getMessage());
 			}
 		}
 

@@ -290,8 +290,8 @@ public class KnxServerGateway implements Runnable
 			if (inReset)
 				return;
 			final int i = se.getInitiator();
-			final String s = i == CloseEvent.USER_REQUEST ? "user"
-					: i == CloseEvent.CLIENT_REQUEST ? "client" : "server internal";
+			final String s = i == CloseEvent.USER_REQUEST ? "user" : i == CloseEvent.CLIENT_REQUEST
+					? "client" : "server internal";
 			logger.info(server.getName() + ": " + s + " request for shutdown");
 			quit();
 		}
@@ -406,8 +406,7 @@ public class KnxServerGateway implements Runnable
 	// forwarding settings to sub line for addresses <= 0x6fff
 	private int subGroupAddressConfig = 3;
 
-	private final Thread dispatcher = new Thread()
-	{
+	private final Thread dispatcher = new Thread() {
 		{
 			setName("Gateway IP to subnet dispatcher");
 		}

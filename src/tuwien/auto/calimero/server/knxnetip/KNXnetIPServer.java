@@ -1112,13 +1112,15 @@ public class KNXnetIPServer
 	private void startDiscoveryService(final NetworkInterface[] outgoing,
 		final NetworkInterface[] listen, final int retryAttempts)
 	{
-		if (runDiscovery) {
-			final Builder builder = new Builder(outgoing, listen);
-			final LooperThread t = new LooperThread(serverName + "/KNXnet/IP discovery endpoint",
-					retryAttempts, builder);
-			discovery = t;
-			discovery.start();
+		synchronized (this) {
+			if (!runDiscovery)
+				return;
 		}
+		final Builder builder = new Builder(outgoing, listen);
+		final LooperThread t = new LooperThread(serverName + "/KNXnet/IP discovery endpoint",
+				retryAttempts, builder);
+		discovery = t;
+		discovery.start();
 	}
 
 	private void stopDiscoveryService()
