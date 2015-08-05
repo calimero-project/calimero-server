@@ -2391,7 +2391,7 @@ public class KNXnetIPServer
 					svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
 					busmonitor, useNat);
 
-			final boolean accept = acceptConnection(sh, device);
+			final boolean accept = acceptConnection(svcCont, sh, device, busmonitor);
 			if (!accept) {
 				sh.close();
 				return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
@@ -2406,12 +2406,13 @@ public class KNXnetIPServer
 			return ret;
 		}
 
-		private boolean acceptConnection(final KNXnetIPConnection conn, final IndividualAddress addr)
+		private boolean acceptConnection(final ServiceContainer sc, final KNXnetIPConnection conn,
+			final IndividualAddress addr, final boolean busmonitor)
 		{
 			final EventListener[] el = listeners.listeners();
 			for (int i = 0; i < el.length; i++) {
 				final ServerListener l = (ServerListener) el[i];
-				if (!l.acceptDataConnection(conn, addr))
+				if (!l.acceptDataConnection(sc, conn, addr, busmonitor))
 					return false;
 			}
 			return true;
