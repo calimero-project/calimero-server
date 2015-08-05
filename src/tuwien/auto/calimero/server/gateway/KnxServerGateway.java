@@ -323,7 +323,6 @@ public class KnxServerGateway implements Runnable
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
 	private final List<SubnetConnector> connectors = new ArrayList<>();
-	private final boolean enableDiscovery = true;
 
 	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = Collections
 			.synchronizedMap(new HashMap<>());
@@ -529,8 +528,6 @@ public class KnxServerGateway implements Runnable
 	private void launchServer()
 	{
 		try {
-			server.setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION,
-					Boolean.valueOf(enableDiscovery).toString());
 			server.launch();
 		}
 		catch (final RuntimeException e) {
