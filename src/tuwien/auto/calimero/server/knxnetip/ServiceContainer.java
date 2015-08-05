@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2014 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 
 /**
  * A service container offers KNXnet/IP service types in a {@link KNXnetIPServer}.
@@ -65,7 +66,7 @@ public interface ServiceContainer
 	 * provide a descriptive name for the container. The name might be checked for uniqueness when
 	 * used in service container collections by other classes. Therefore, a unique, but yet
 	 * descriptive name should be chosen and returned here.
-	 * 
+	 *
 	 * @return the service container name as non-empty, non-null string
 	 */
 	String getName();
@@ -73,7 +74,7 @@ public interface ServiceContainer
 	/**
 	 * Returns the control endpoint which uniquely identifies the service container to a client.
 	 * <p>
-	 * 
+	 *
 	 * @return the host protocol address information containing the control endpoint
 	 * @see HPAI
 	 */
@@ -82,7 +83,7 @@ public interface ServiceContainer
 	/**
 	 * Returns the KNX medium of the connected KNX subnet.
 	 * <p>
-	 * 
+	 *
 	 * @return KNX medium
 	 */
 	int getKNXMedium();
@@ -90,17 +91,22 @@ public interface ServiceContainer
 	/**
 	 * Returns the KNX subnet address of the KNX subnet this service container is connected to.
 	 * <p>
-	 * 
+	 *
 	 * @return KNX subnet individual address
 	 */
 	IndividualAddress getSubnetAddress();
+
+	/**
+	 * @return the KNX medium settings of the connected KNX subnet
+	 */
+	KNXMediumSettings getMediumSettings();
 
 	/**
 	 * Activates or deactivates the service container.
 	 * <p>
 	 * A deactivated service container is not listed in search responses during discovery by the
 	 * server.
-	 * 
+	 *
 	 * @param activate <code>true</code> to activate, <code>false</code> to deactivate
 	 */
 	void setActivationState(boolean activate);
@@ -108,7 +114,7 @@ public interface ServiceContainer
 	/**
 	 * Returns the activation state of the service container.
 	 * <p>
-	 * 
+	 *
 	 * @return <code>true</code> if activated, <code>false</code> otherwise
 	 */
 	boolean isActivated();
@@ -124,7 +130,7 @@ public interface ServiceContainer
 	 * endpoint reuse at a time. If another connection request occurs during an active connection,
 	 * the server might decide to create new data endpoints anyway or reject subsequent connection
 	 * requests, depending on implementation.
-	 * 
+	 *
 	 * @return <code>true</code> if the control endpoint should be reused, <code>false</code>
 	 *         otherwise
 	 */
@@ -134,7 +140,7 @@ public interface ServiceContainer
 	 * Returns whether network monitoring, i.e., bus monitor connections, to this service container
 	 * is allowed or not.
 	 * <p>
-	 * 
+	 *
 	 * @return <code>true</code> if network monitoring is allowed, <code>false</code> otherwise
 	 */
 	boolean isNetworkMonitoringAllowed();
