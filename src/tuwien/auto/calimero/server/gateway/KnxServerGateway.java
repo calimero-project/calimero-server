@@ -51,6 +51,7 @@ import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.cemi.CEMI;
+import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
@@ -60,8 +61,10 @@ import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
+import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
+import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
@@ -613,6 +616,33 @@ public class KnxServerGateway implements Runnable
 		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ
 				|| mc == CEMIDevMgmt.MC_RESET_REQ)
 			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame);
+		else if (frame instanceof CEMIBusMon) {
+			if (fromServerSide) {
+				logger.error("received cEMI busmonitor frame by server-side client (unspecified)");
+				return;
+			}
+			final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
+			if (connector == null)
+				return;
+			// create temporary array to not block concurrent access during iteration
+			final KNXnetIPConnection[] sca = (KNXnetIPConnection[]) serverConnections
+					.toArray(new KNXnetIPConnection[serverConnections.size()]);
+			for (int i = 0; i < sca.length; i++) {
+				final KNXnetIPConnection c = sca[i];
+				try {
+					// only tunnel connection does serve busmonitor mode
+					if (c instanceof KNXnetIPTunnel) {
+						c.send(frame, KNXnetIPConnection.WAIT_FOR_ACK);
+						setNetworkState(false, false);
+						incMsgTransmitted(false);
+					}
+				}
+				catch (final KNXConnectionClosedException e) {}
+				catch (final KNXTimeoutException e) {
+					setNetworkState(false, true);
+				}
+			}
+		}
 		else
 			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16)
 					+ " - ignored");
