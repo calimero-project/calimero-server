@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,41 +36,103 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+
+import tuwien.auto.calimero.exception.KNXException;
+import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
+import tuwien.auto.calimero.link.KNXNetworkLinkFT12;
+import tuwien.auto.calimero.link.KNXNetworkLinkIP;
+import tuwien.auto.calimero.link.KNXNetworkMonitor;
+import tuwien.auto.calimero.link.KNXNetworkMonitorFT12;
+import tuwien.auto.calimero.link.KNXNetworkMonitorIP;
+import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.server.InterfaceObjectServer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
 /**
- * Contains information necessary to connect a server-side service container to a KNX subnet.
- * <p>
- * A gateway is using subnet connectors to lookup associations of service containers and KNX
- * subnets. It provides information for, e.g., message filtering based on group address tables.
- * 
+ * Contains information necessary to connect a server-side service container to a KNX subnet. A
+ * gateway uses subnet connectors to lookup associations of service containers and KNX subnets. It
+ * provides information for, e.g., message filtering based on group address tables.
+ *
  * @author B. Malinowsky
  */
 public class SubnetConnector
 {
 	private final ServiceContainer sc;
-	private final KNXNetworkLink subnet;
-	private NetworkLinkListener nll;
+	private final String subnetType;
+	private final String linkArgs;
+	private final NetworkInterface netif;
+	private final String className;
 	private final int gatoi;
 
+	private Object subnetLink;
+	private LinkListener listener;
+
 	/**
-	 * Creates a new subnet connector.
-	 * <p>
-	 * 
+	 * Creates a new subnet connector using a KNXnet/IP routing (KNX IP) subnet link.
+	 *
 	 * @param container service container
-	 * @param subnetLink subnetLink sets the network link representing the connection to the KNX
-	 *        subnet
+	 * @param routingNetif the network interface used for routing messages
+	 * @param subnetArgs the arguments to create the KNX IP link
+	 * @param groupAddrTableInstance instance of the server group address table in the
+	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @return the new subnet connector
+	 */
+	public static final SubnetConnector newWithRoutingLink(final ServiceContainer container,
+		final NetworkInterface routingNetif, final String subnetArgs,
+		final int groupAddrTableInstance)
+	{
+		return new SubnetConnector(container, "knxip", routingNetif, null, subnetArgs,
+				groupAddrTableInstance);
+	}
+
+	/**
+	 * Creates a new subnet connector using a user-supplied subnet link.
+	 *
+	 * @param container service container
+	 * @param className the class name of to the user subnet link
+	 * @param subnetArgs the arguments to create the subnet link
+	 * @param groupAddrTableInstance instance of the server group address table in the
+	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @return the new subnet connector
+	 */
+	public static final SubnetConnector newWithUserLink(final ServiceContainer container,
+		final String className, final String subnetArgs, final int groupAddrTableInstance)
+	{
+		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs,
+				groupAddrTableInstance);
+	}
+
+	/**
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet
+	 * interface.
+	 *
+	 * @param container service container
+	 * @param interfaceType the interface type, use on of "ip", "usb", or "ft12".
+	 * @param subnetArgs the arguments to create the subnet link
 	 * @param groupAddrTableInstance instance of the server group address table in the
 	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
 	 */
-	public SubnetConnector(final ServiceContainer container, final KNXNetworkLink subnetLink,
+	public static final SubnetConnector newWithInterfaceType(final ServiceContainer container,
+		final String interfaceType, final String subnetArgs, final int groupAddrTableInstance)
+	{
+		return new SubnetConnector(container, interfaceType, null, null, subnetArgs,
+				groupAddrTableInstance);
+	}
+
+	private SubnetConnector(final ServiceContainer container, final String interfaceType,
+		final NetworkInterface routingNetif, final String className, final String subnetArgs,
 		final int groupAddrTableInstance)
 	{
 		sc = container;
-		subnet = subnetLink;
+		subnetType = interfaceType;
+		netif = routingNetif;
+		this.className = className;
+		this.linkArgs = subnetArgs;
 		gatoi = groupAddrTableInstance;
 	}
 
@@ -78,7 +140,7 @@ public class SubnetConnector
 	 * Returns this subnet connector name.
 	 * <p>
 	 * The name equals the service container name.
-	 * 
+	 *
 	 * @return the subnet connector name
 	 */
 	public final String getName()
@@ -87,9 +149,8 @@ public class SubnetConnector
 	}
 
 	/**
-	 * Returns the service container this connector is used for.
-	 * <p>
-	 * 
+	 * Returns the service container this connector is used with.
+	 *
 	 * @return the service container
 	 */
 	public final ServiceContainer getServiceContainer()
@@ -98,31 +159,117 @@ public class SubnetConnector
 	}
 
 	/**
-	 * Returns the KNX network link of the KNX subnet the service container is connected to.
-	 * <p>
-	 * 
-	 * @return a KNX network link representing the KNX subnet connection
+	 * Returns the KNX network or monitor link of the KNX subnet the service container is connected
+	 * to, if any.
+	 *
+	 * @return a KNX network or monitor link representing the KNX subnet connection, or
+	 *         <code>null</code>
 	 */
-	public final KNXNetworkLink getSubnetLink()
+	public synchronized final Object getSubnetLink()
 	{
-		return subnet;
+		return subnetLink;
 	}
 
-	// used by gateway: sets the subnet listener and stores the listener reference
-	final void setSubnetListener(final NetworkLinkListener subnetListener)
+	public KNXNetworkLink openNetworkLink() throws KNXException, InterruptedException
 	{
-		nll = subnetListener;
-		getSubnetLink().addLinkListener(nll);
+		final KNXMediumSettings settings = sc.getMediumSettings();
+		final KNXNetworkLink link;
+		// can cause a delay of connection timeout in the worst case
+		if ("ip".equals(subnetType)) {
+			final String[] args = linkArgs.split(":");
+			final String ip = args[0];
+			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
+			link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
+					new InetSocketAddress(ip, port), false, settings);
+		}
+		else if ("knxip".equals(subnetType))
+			link = new KNXNetworkLinkIP(netif, new InetSocketAddress(linkArgs, 0).getAddress(),
+					settings);
+		else if ("usb".equals(subnetType))
+			throw new KNXException("no USB support");
+		else if ("ft12".equals(subnetType))
+			link = new KNXNetworkLinkFT12(linkArgs, settings);
+		else if ("user-supplied".equals(subnetType))
+			link = (KNXNetworkLink) newLinkUsing(className, linkArgs.split(",|\\|"));
+		else
+			throw new KNXException("unknown KNX subnet specifier " + subnetType);
+
+		setSubnetLink(link);
+		return link;
 	}
 
-	// used by gateway to store its subnet listener
-	NetworkLinkListener getSubnetListener()
+	public KNXNetworkMonitor openMonitorLink() throws KNXException, InterruptedException
 	{
-		return nll;
+		final KNXMediumSettings settings = sc.getMediumSettings();
+		KNXNetworkMonitor link;
+		// can cause a delay of connection timeout in the worst case
+		if ("ip".equals(subnetType)) {
+			final String[] args = linkArgs.split(":");
+			final String ip = args[0];
+			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
+			link = new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false, settings);
+		}
+		else if ("usb".equals(subnetType))
+			throw new KNXException("no USB support");
+		else if ("ft12".equals(subnetType))
+			link = new KNXNetworkMonitorFT12(linkArgs, settings);
+		else if ("user-supplied".equals(subnetType))
+			link = (KNXNetworkMonitor) newLinkUsing(className, linkArgs.split(",|\\|"));
+		else
+			throw new KNXException("unknown KNX subnet specifier " + subnetType);
+
+		setSubnetLink(link);
+		return link;
+	}
+
+	final String getInterfaceType()
+	{
+		return subnetType;
+	}
+
+	final String getLinkArguments()
+	{
+		return linkArgs;
+	}
+
+	final void setSubnetListener(final LinkListener subnetListener)
+	{
+		listener = subnetListener;
+		final Object link = getSubnetLink();
+		if (link instanceof KNXNetworkLink)
+			((KNXNetworkLink) link).addLinkListener((NetworkLinkListener) listener);
+		if (link instanceof KNXNetworkMonitor)
+			((KNXNetworkMonitor) link).addMonitorListener(listener);
 	}
 
 	int getGroupAddressTableObjectInstance()
 	{
 		return gatoi;
+	}
+
+	private Object newLinkUsing(final String className, final String[] initArgs)
+	{
+		try {
+			final Class c = Class.forName(className);
+			final Class[] paramTypes = new Class[] { Object[].class };
+			final Object[] args = new Object[] { initArgs };
+			return c.getConstructor(paramTypes).newInstance(args);
+		}
+		catch (final ReflectiveOperationException e) {
+			// ClassNotFoundException, InstantiationException, IllegalAccessException,
+			// InvocationTargetException,
+			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
+		}
+		catch (final RuntimeException e) {
+			// ClassCastException, IllegalArgumentException, SecurityException
+			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
+		}
+	}
+
+	private synchronized void setSubnetLink(final Object link)
+	{
+		subnetLink = link;
+		if (listener != null)
+			setSubnetListener(listener);
 	}
 }

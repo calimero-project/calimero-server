@@ -40,7 +40,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -66,15 +65,15 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
-import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
-import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.PLSettings;
+import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
@@ -148,8 +147,12 @@ public class Launcher implements Runnable
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
 		public static final String attrMonitor = "allowNetworkMonitoring";
-		/** KNX subnet type: ["ip", "knxip", "usb", "virtual", "user-supplied"] */
+		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "virtual", "user-supplied"] */
 		public static final String attrType = "type";
+		/** KNX subnet communication medium: { "tp1", "pl110", "pl132", "knxip", "rf" } */
+		public static final String attrMedium = "medium";
+		/** KNX subnet domain address for power-line and RF, as hexadecimal value string */
+		public static final String attrDoA = "domainAddress";
 		/** */
 		public static final String attrRef = "ref";
 
@@ -167,12 +170,10 @@ public class Launcher implements Runnable
 		// Holds the class name of user-supplied subnet links, if specified
 		private final Map subnetLinkClasses = new HashMap();
 
-
 		// the following lists contain gateway information, in sequence of the svc containers
 
 		private final List subnetTypes = new ArrayList();
 		private final List subnetAddresses = new ArrayList();
-		private final List subnetPorts = new ArrayList();
 
 		// list of group addresses used in the group address filter of the KNXnet/IP server
 		private final Map groupAddressFilters = new HashMap();
@@ -235,8 +236,9 @@ public class Launcher implements Runnable
 			final NetworkInterface routingNetIf = routing ? getNetIf(e) : null;
 
 			String addr = "";
-			int remotePort = 0;
 			String subnetType = "";
+			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
+			byte[] subnetDoA = null;
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
@@ -264,10 +266,21 @@ public class Launcher implements Runnable
 					}
 					else if (name.equals(XmlConfiguration.subnet)) {
 						subnetType = e.getAttribute(XmlConfiguration.attrType);
-						final String p = e.getAttribute(XmlConfiguration.attrUdpPort);
-						if (subnetType.equals("ip") && p != null)
-							remotePort = Integer.parseInt(p);
-						else if (subnetType.equals("knxip"))
+						String medium = e.getAttribute(XmlConfiguration.attrMedium);
+						if (medium == null)
+							medium = "tp1";
+						subnetMedium = KNXMediumSettings.getMedium(medium);
+
+						final String doa = e.getAttribute(XmlConfiguration.attrDoA);
+						if (doa != null) {
+							long l = Long.parseLong(doa, 16);
+							final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
+							subnetDoA = new byte[bytes];
+							for (int i = subnetDoA.length; i-- > 0; l >>>= 8)
+								subnetDoA[i] = (byte) l;
+						}
+
+						if (subnetType.equals("knxip"))
 							subnetKnxipNetif = getNetIf(e);
 						else if (subnetType.equals("user-supplied"))
 							subnetLinkClass = e.getAttribute(XmlConfiguration.attrClass);
@@ -294,20 +307,23 @@ public class Launcher implements Runnable
 				else if (r.getPosition() == XMLReader.END_TAG) {
 					if (name.equals(XmlConfiguration.svcCont)) {
 						final DefaultServiceContainer sc;
-						// TODO set expected KNX medium from config
+						final KNXMediumSettings s = KNXMediumSettings.create(subnetMedium, subnet);
+						if (s.getMedium() == KNXMediumSettings.MEDIUM_PL110)
+							((PLSettings) s).setDomainAddress(subnetDoA);
+						else if (s.getMedium() == KNXMediumSettings.MEDIUM_RF)
+							((RFSettings) s).setDomainAddress(subnetDoA);
+
 						if (routing)
 							sc = new RoutingServiceContainer(addr, new HPAI((InetAddress) null,
-									port), KNXMediumSettings.MEDIUM_TP1, subnet, reuse, monitor,
-									routingMcast, routingNetIf);
+									port), s, reuse, monitor, routingMcast, routingNetIf);
 						else
 							sc = new DefaultServiceContainer(addr, new HPAI((InetAddress) null,
-									port), KNXMediumSettings.MEDIUM_TP1, subnet, reuse, monitor);
+									port), s, reuse, monitor);
 						sc.setActivationState(activate);
 						subnetTypes.add(subnetType);
 						if ("virtual".equals(subnetType) && datapoints != null)
 							subnetDatapoints.put(sc, datapoints);
 						subnetAddresses.add(addr);
-						subnetPorts.add(new Integer(remotePort));
 						svcContainers.add(sc);
 						subnetNetIf.put(sc, subnetKnxipNetif);
 						subnetLinkClasses.put(sc, subnetLinkClass);
@@ -441,8 +457,7 @@ public class Launcher implements Runnable
 					+ (sc instanceof RoutingServiceContainer));
 
 			final String type = (String) xml.subnetTypes.get(i);
-			logger.info("    " + type + " subnet " + sc.getSubnetAddress() + ", medium "
-					+ KNXMediumSettings.getMediumString(sc.getKNXMedium()));
+			logger.info("    " + type + " connection, " + sc.getMediumSettings());
 			if (xml.groupAddressFilters.containsKey(sc))
 				logger.info("    GrpAddrFilter " + xml.groupAddressFilters.get(sc));
 			if (xml.subnetDatapoints.containsKey(sc))
@@ -534,32 +549,29 @@ public class Launcher implements Runnable
 				config.setFilter(f, f);
 				config.activate(true);
 				link = config.getBufferedLink();
+
+				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc,
+						subnetType, null, 1);
+				connectors.add(connector);
 			}
 			else {
 				final String subnetArgs = (String) xml.subnetAddresses.get(i);
-				final int remotePort = ((Integer) xml.subnetPorts.get(i)).intValue();
-				logger.info("connect to " + subnetArgs + ":" + remotePort);
-
-				final KNXMediumSettings settings = KNXMediumSettings.create(sc.getKNXMedium(),
-						sc.getSubnetAddress());
-				// can cause a delay of connection timeout in the worst case
-				if ("ip".equals(subnetType))
-					link = new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
-							new InetSocketAddress(subnetArgs, remotePort), false, settings);
-				else if ("knxip".equals(subnetType))
-					link = new KNXNetworkLinkIP((NetworkInterface) xml.subnetNetIf.get(sc),
-							new InetSocketAddress(subnetArgs, 0).getAddress(), settings);
+				SubnetConnector connector;
+				if ("knxip".equals(subnetType))
+					connector = SubnetConnector.newWithRoutingLink(sc,
+							(NetworkInterface) xml.subnetNetIf.get(sc), subnetArgs, 1);
 				else if ("user-supplied".equals(subnetType))
-					link = newLinkUsing((String) xml.subnetLinkClasses.get(sc),
-							subnetArgs.split(",|\\|"));
-				else {
-					logger.error("unknown KNX subnet specifier " + subnetType);
-					continue;
-				}
+					connector = SubnetConnector.newWithUserLink(sc,
+							(String) xml.subnetLinkClasses.get(sc), subnetArgs, 1);
+				else
+					connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
+
+				logger.info("connect to " + subnetArgs);
+				link = connector.openNetworkLink();
+				connectors.add(connector);
 			}
 
 			server.addServiceContainer(sc);
-			connectors.add(new SubnetConnector(sc, link, 1));
 			linksToClose.add(link);
 
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
@@ -567,26 +579,6 @@ public class Launcher implements Runnable
 				setAdditionalIndividualAddresses(ios, i + 1, (List) xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, i + 1, (List) xml.groupAddressFilters.get(sc));
-		}
-	}
-
-	private KNXNetworkLink newLinkUsing(final String className, final String[] initArgs)
-	{
-		try {
-			final Class c = Class.forName(className).asSubclass(
-					KNXNetworkLink.class);
-			final Class[] paramTypes = new Class[] { Object[].class };
-			final Object[] args = new Object[] { initArgs };
-			return (KNXNetworkLink) c.getConstructor(paramTypes).newInstance(args);
-		}
-		catch (final ReflectiveOperationException e) {
-			// ClassNotFoundException, InstantiationException, IllegalAccessException,
-			// InvocationTargetException,
-			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
-		}
-		catch (final RuntimeException e) {
-			// ClassCastException, IllegalArgumentException, SecurityException
-			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
 		}
 	}
 
