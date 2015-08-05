@@ -72,7 +72,9 @@ import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
+import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
@@ -156,13 +158,37 @@ public class KnxServerGateway implements Runnable
 
 	private final class KNXnetIPServerListener implements ServerListener
 	{
-		KNXnetIPServerListener()
-		{}
-
 		public boolean acceptDataConnection(final ServiceContainer svcContainer,
 			final KNXnetIPConnection conn, final IndividualAddress assignedDeviceAddress,
 			final boolean networkMonitor)
 		{
+			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
+			if (connector == null)
+				return false;
+			final AutoCloseable subnetLink = connector.getSubnetLink();
+			final String subnetType = connector.getInterfaceType();
+			final String subnetArgs = connector.getLinkArguments();
+			final ServiceContainer serviceContainer = connector.getServiceContainer();
+			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
+
+			try {
+				if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
+					closeLink(subnetLink);
+					connector.openNetworkLink();
+				}
+				else if (networkMonitor && !(subnetLink instanceof KNXNetworkMonitor)) {
+					closeLink(subnetLink);
+					connector.openMonitorLink();
+				}
+			}
+			catch (KNXException | InterruptedException e) {
+				logger.error("open network link using {} interface {} for {}", subnetType,
+						subnetArgs, settings, e);
+				if (e instanceof InterruptedException)
+					Thread.currentThread().interrupt();
+				return false;
+			}
+
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
 			if (assignedDeviceAddress != null)
@@ -223,7 +249,8 @@ public class KnxServerGateway implements Runnable
 				// the following is not working!
 				// XXX subnet link and group address table is missing!
 				// what is the best way to get them here?
-				final SubnetConnector connector = new SubnetConnector(sc, null, 1);
+				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null,
+						null, 1);
 				connectors.add(connector);
 				connector.setSubnetListener(new SubnetListener(connector.getName()));
 			}
@@ -231,8 +258,8 @@ public class KnxServerGateway implements Runnable
 				for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 					final SubnetConnector b = i.next();
 					if (b.getServiceContainer() == sc) {
-						b.getSubnetLink().removeLinkListener(b.getSubnetListener());
 						i.remove();
+						closeLink(b.getSubnetLink());
 						break;
 					}
 				}
@@ -263,6 +290,21 @@ public class KnxServerGateway implements Runnable
 					: i == CloseEvent.CLIENT_REQUEST ? "client" : "server internal";
 			logger.info(server.getName() + ": " + s + " request for shutdown");
 			quit();
+		}
+
+		private void closeLink(final AutoCloseable link)
+		{
+			try {
+				if (link == null)
+					return;
+				link.close();
+				// give slow interfaces some time to settle down
+				Thread.sleep(700);
+			}
+			catch (final InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			catch (final Exception bogus) {}
 		}
 	}
 
@@ -728,7 +770,7 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 		}
-		send(subnet.getSubnetLink(), f);
+		send((KNXNetworkLink) subnet.getSubnetLink(), f);
 	}
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
@@ -755,11 +797,11 @@ public class KnxServerGateway implements Runnable
 				if (matchesSubnet(dst, subnet)) {
 					if (logger.isTraceEnabled())
 						logger.trace("dispatch to KNX subnet " + subnet + " ("
-								+ b.getSubnetLink().getName() + " in service container "
-								+ b.getName() + ")");
+								+ ((KNXNetworkLink) b.getSubnetLink()).getName()
+								+ " in service container " + b.getName() + ")");
 					// assuming a proper address assignment of area/line coupler
 					// addresses, this has to be the correct knx subnet link
-					return b.getSubnetLink();
+					return (KNXNetworkLink) b.getSubnetLink();
 				}
 				logger.trace("subnet=" + subnet + " dst=" + dst);
 			}

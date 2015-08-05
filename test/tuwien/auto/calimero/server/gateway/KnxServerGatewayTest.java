@@ -95,10 +95,10 @@ public class KnxServerGatewayTest extends TestCase
 		final ServiceContainer sc = new DefaultServiceContainer("test container", new HPAI(
 				(InetAddress) null, 5647), DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1));
 		server.addServiceContainer(sc);
-		final KNXNetworkLink link = new DummyLink();
-		final SubnetConnector b = new SubnetConnector(sc, link, 1);
-
-		subnetConnectors = new SubnetConnector[] { b };
+		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc,
+				DummyLink.class.getName(), "", 1);
+		connector.openNetworkLink();
+		subnetConnectors = new SubnetConnector[] { connector };
 		gw = new KnxServerGateway("gateway", server, subnetConnectors);
 	}
 
@@ -250,13 +250,12 @@ public class KnxServerGatewayTest extends TestCase
 	}
 
 	// dummy link for setting up gateway
-	private class DummyLink implements KNXNetworkLink
+	public static class DummyLink implements KNXNetworkLink
 	{
 		private final EventListeners<NetworkLinkListener> listeners =
 				new EventListeners<>(NetworkLinkListener.class, null);
 
-		public DummyLink()
-		{}
+		public DummyLink(final Object[] s) {}
 
 		/*
 		 * (non-Javadoc)
