@@ -43,6 +43,7 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 
 /**
  * A service container supporting configuration for a routing endpoint.
@@ -58,6 +59,37 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 {
 	private final InetAddress mcast;
 	private final NetworkInterface netIf;
+
+
+	/**
+	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
+	 * <p>
+	 *
+	 * @param name see {@link DefaultServiceContainer}
+	 * @param controlEndpoint see {@link DefaultServiceContainer}
+	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
+	 * @param reuseCtrlEndpt see {@link DefaultServiceContainer}
+	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
+	 * @param routingMulticast the routing multicast address this service container should use for
+	 *        KNXnet/IP routing; if you are unsure about a supported multicast address, use
+	 *        {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 * @param routingInterface the network interface this service container should use for KNXnet/IP
+	 *        routing, might be <code>null</code> to use the system default. Note that choosing a
+	 *        particular interface can be tied to the selected routing multicast address parameter
+	 *        <code>routingMulticast</code>.
+	 */
+	public RoutingServiceContainer(final String name, final HPAI controlEndpoint,
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt,
+		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
+		final NetworkInterface routingInterface)
+	{
+		super(name, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring);
+		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
+			throw new KNXIllegalArgumentException(routingMulticast
+					+ " is not a valid KNX routing multicast address");
+		mcast = routingMulticast;
+		netIf = routingInterface;
+	}
 
 	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.

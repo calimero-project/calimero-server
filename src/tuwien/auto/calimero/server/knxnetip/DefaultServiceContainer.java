@@ -57,10 +57,50 @@ public class DefaultServiceContainer implements ServiceContainer
 	private volatile boolean activated = true;
 	private final String id;
 	private final HPAI ctrlEndpt;
-	private final int medium;
-	private final IndividualAddress subnetAddr;
+	private final KNXMediumSettings settings;
 	private final boolean reuseEndpt;
 	private final boolean networkMonitor;
+
+
+	/**
+	 * Creates a new service container with the supplied parameters. The control endpoint of this
+	 * service container must contain UDP host protocol information.
+	 *
+	 * @param name service container name; the name shall allow an identification within a set of
+	 *        service containers, and provide a descriptive name of the container. Therefore, a
+	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
+	 * @param controlEndpoint control endpoint address information which uniquely identifies this
+	 *        service container to KNXnet/IP clients, UDP host protocol only, the HPAI has to
+	 *        contain an IP address not 0; if parameter is <code>null</code>, a control endpoint is
+	 *        created using the local host address and ephemeral port assignment
+	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
+	 * @param reuseCtrlEndpt <code>true</code> to reuse control endpoint, <code>false</code>
+	 *        otherwise, see {@link #reuseControlEndpoint()}
+	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
+	 *        this service container, <code>false</code> otherwise
+	 */
+	public DefaultServiceContainer(final String name, final HPAI controlEndpoint,
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt,
+		final boolean allowNetworkMonitoring)
+	{
+		if (name == null)
+			throw new NullPointerException("container identifier must not be null");
+		id = name;
+		if (controlEndpoint == null)
+			// create with local host address and ephemeral port
+			ctrlEndpt = new HPAI((InetAddress) null, 0);
+		else {
+			if (controlEndpoint.getHostProtocol() != HPAI.IPV4_UDP)
+				throw new KNXIllegalArgumentException("only support for UDP communication");
+			ctrlEndpt = controlEndpoint;
+		}
+		// IP is mandatory, port might be 0 indicating the use of an ephemeral port
+		if (Arrays.equals(new byte[4], ctrlEndpt.getRawAddress()))
+			throw new KNXIllegalArgumentException("no local host address specified");
+		settings = subnet;
+		reuseEndpt = reuseCtrlEndpt;
+		networkMonitor = allowNetworkMonitoring;
+	}
 
 	/**
 	 * Creates a new service container with the supplied parameters.
@@ -87,24 +127,8 @@ public class DefaultServiceContainer implements ServiceContainer
 		final int knxMedium, final IndividualAddress knxSubnet, final boolean reuseCtrlEndpt,
 		final boolean allowNetworkMonitoring)
 	{
-		if (name == null)
-			throw new NullPointerException("container identifier must not be null");
-		id = name;
-		if (controlEndpoint == null)
-			// create with local host address and ephemeral port
-			ctrlEndpt = new HPAI((InetAddress) null, 0);
-		else {
-			if (controlEndpoint.getHostProtocol() != HPAI.IPV4_UDP)
-				throw new KNXIllegalArgumentException("only support for UDP communication");
-			ctrlEndpt = controlEndpoint;
-		}
-		// IP is mandatory, port might be 0 indicating the use of an ephemeral port
-		if (Arrays.equals(new byte[4], ctrlEndpt.getRawAddress()))
-			throw new KNXIllegalArgumentException("no local host address specified");
-		medium = knxMedium;
-		subnetAddr = knxSubnet;
-		reuseEndpt = reuseCtrlEndpt;
-		networkMonitor = allowNetworkMonitoring;
+		this(name, controlEndpoint, KNXMediumSettings.create(knxMedium, knxSubnet), reuseCtrlEndpt,
+				allowNetworkMonitoring);
 	}
 
 	/**
@@ -152,7 +176,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 */
 	public int getKNXMedium()
 	{
-		return medium;
+		return settings.getMedium();
 	}
 
 	/* (non-Javadoc)
@@ -160,7 +184,13 @@ public class DefaultServiceContainer implements ServiceContainer
 	 */
 	public IndividualAddress getSubnetAddress()
 	{
-		return subnetAddr;
+		return settings.getDeviceAddress();
+	}
+
+	@Override
+	public final KNXMediumSettings getMediumSettings()
+	{
+		return settings;
 	}
 
 	/* (non-Javadoc)
