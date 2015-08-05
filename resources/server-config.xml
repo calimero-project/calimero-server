@@ -4,21 +4,24 @@
 	<propertyDefinitions ref="resources/properties.xml" />
 
 	<!-- KNXnet/IP search & discovery -->
-	<discovery listenNetIf="all" outgoingNetIf="all" />
+	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
 
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
-	<serviceContainer activate="true" routing="false" allowNetworkMonitoring="true" 
-		udpPort="3671" listenNetIf="en0" reuseCtrlEP="true">
-		<!-- 1.1.0 -->
-		<knxAddress type="individual">4352</knxAddress>
+	<serviceContainer activate="true" routing="true" allowNetworkMonitoring="true" 
+		udpPort="3671" listenNetIf="eth0" reuseCtrlEP="true">
+		<knxAddress type="individual">7.1.1</knxAddress>
 
 		<!-- Specify the KNX subnet type, connecting the KNX network -->
+		<!-- KNX communication medium: one of { "tp1" (default), "pl110", "pl132", "knxip", "rf" }  -->
 		<!-- <knxSubnet type="virtual">virtual-subnet</knxSubnet> -->
-		<!-- <knxSubnet type="ip" udpPort="3676">192.168.10.12</knxSubnet> -->
-		<knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet>
+		<!-- <knxSubnet type="ip">192.168.10.12:3676</knxSubnet> -->
+		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
+		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->		
+		<knxSubnet type="usb" medium="pl110" domainAddress="6f">siemens</knxSubnet>
+		<!-- <knxSubnet type="user-supplied" class="my.knx.NetworkLink">o1,i2|i4</knxSubnet> -->
 
 		<!-- Datapoints are only required if a virtual KNX subnet is used -->
-		<datapoints ref="datapointMap.xml" />
+		<!-- <datapoints ref="datapointMap.xml" /> -->
 
 		<!-- KNX group address filter applied for this service container (optional) -->
 		<groupAddressFilter>
