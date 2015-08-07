@@ -1461,6 +1461,12 @@ public class KNXnetIPServer
 			super(socket, true, receiveBufferSize, socketTimeout, 0);
 		}
 
+		ServiceLoop(final DatagramSocket socket, final boolean closeSocket,
+			final int receiveBufferSize, final int socketTimeout)
+		{
+			super(socket, closeSocket, receiveBufferSize, socketTimeout, 0);
+		}
+
 		public void run()
 		{
 			try {
@@ -2015,7 +2021,7 @@ public class KNXnetIPServer
 		private RoutingService(final ServiceContainer sc, final NetworkInterface netIf,
 			final InetAddress mcGroup, final boolean enableLoopback) throws KNXException
 		{
-			super(null, 512, 0);
+			super(null, false, 512, 0);
 			svcCont = sc;
 			r = new RoutingServiceHandler(netIf, mcGroup, enableLoopback);
 			s = r.getLocalDataSocket();
@@ -2038,8 +2044,8 @@ public class KNXnetIPServer
 		 */
 		public void quit()
 		{
-			r.close();
 			super.quit();
+			r.close();
 		}
 	}
 
