@@ -59,7 +59,6 @@ import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
-import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
@@ -602,7 +601,7 @@ public class KnxServerGateway implements Runnable
 						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 
 			// we get L-data.ind if client uses routing protocol
-			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND))
+			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
 				try {
 					// send confirmation on .req type
 					if (mc == CEMILData.MC_LDATA_REQ) {
@@ -614,24 +613,17 @@ public class KnxServerGateway implements Runnable
 						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
 						// TODO wait for ACK is correct, but should be done asynchronously
 						// otherwise, it might block the processing of a next queued frame
-						//c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
-						try {
-							c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.NONBLOCKING);
-						}
-						catch (final KNXIllegalStateException e) {
-							// an ACK is still pending from a previous non-blocking send
-							e.printStackTrace();
-						}
+						c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
 					}
 					final CEMILData send = adjustHopCount(f);
 					if (send != null)
 						dispatchToSubnets(send);
-					}
-				catch (final KNXException e) {
-					logger.error("sending L-data confirmation of "
-							+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
-					e.printStackTrace();
 				}
+				catch (final KNXException e) {
+					logger.error("sending L_Data.con of "
+							+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
+				}
+			}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
 				if (send == null)
@@ -728,7 +720,7 @@ public class KnxServerGateway implements Runnable
 			if (exclude != null && lnk.equals(exclude.getSubnetLink()))
 				logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			else
-			send(lnk, f);
+				send(lnk, f);
 		}
 		else {
 			// group destination address, check forwarding settings
