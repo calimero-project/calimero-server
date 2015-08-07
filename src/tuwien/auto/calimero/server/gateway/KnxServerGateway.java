@@ -625,12 +625,9 @@ public class KnxServerGateway implements Runnable
 						}
 					}
 					final CEMILData send = adjustHopCount(f);
-					if (send == null)
-						logger.info("hop count 0, discarded frame to " + f.getDestination());
-					else {
+					if (send != null)
 						dispatchToSubnets(send);
 					}
-				}
 				catch (final KNXException e) {
 					logger.error("sending L-data confirmation of "
 							+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
@@ -638,10 +635,8 @@ public class KnxServerGateway implements Runnable
 				}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
-				if (send == null) {
-					logger.warn("hop count 0, discarded frame to " + f.getDestination());
+				if (send == null)
 					return;
-				}
 				// get connector of that subnet
 				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 				if (connector != null)
@@ -1038,8 +1033,10 @@ public class KnxServerGateway implements Runnable
 	{
 		int count = msg.getHopCount();
 		// if counter == 0, discard frame
-		if (count == 0)
+		if (count == 0) {
+			logger.warn("hop count 0, discard frame {}->{}", msg.getSource(), msg.getDestination());
 			return null;
+		}
 		// if counter == 7, simply forward
 		if (count == 7)
 			return msg;
