@@ -2402,7 +2402,9 @@ public class KNXnetIPServer
 
 			final boolean accept = acceptConnection(svcCont, sh, device, busmonitor);
 			if (!accept) {
-				sh.close();
+				// don't use sh.close() here, we would initiate tunneling disconnect sequence
+				// but we have to call svcLoop.quit() to close local data socket
+				svcLoop.quit();
 				return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
 			}
 			dataConnections.add(sh);
