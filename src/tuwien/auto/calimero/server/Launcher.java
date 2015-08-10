@@ -45,36 +45,25 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.KNXAddress;
-import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
-import tuwien.auto.calimero.cemi.CEMIFactory;
-import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
-import tuwien.auto.calimero.exception.KNXFormatException;
-import tuwien.auto.calimero.exception.KNXIllegalStateException;
-import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
-import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
-import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
@@ -545,8 +534,8 @@ public class Launcher implements Runnable
 			if ("virtual".equals(subnetType)) {
 				// use network buffer to emulate KNX subnet
 				final NetworkBuffer nb = NetworkBuffer.createBuffer("Virtual " + sc.getName());
-				final VirtualLink vl = new VirtualLink("virtual link", new IndividualAddress(
-						new byte[] { 0, 0 }), false);
+				final VirtualLink vl = new VirtualLink("virtual link",
+						new IndividualAddress(new byte[] { 0, 0 }));
 				virtualLinks.add(vl);
 				final Configuration config = nb.addConfiguration(vl);
 				config.setQueryBufferOnly(false);
@@ -655,211 +644,6 @@ public class Launcher implements Runnable
 			final IndividualAddress ia = (IndividualAddress) addresses.get(i);
 			ios.setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1, ia.toByteArray());
-		}
-	}
-
-	// A subnet link implementation used for virtual KNX networks.
-	// In such network, the Calimero network buffer (and Calimero KNX devices) are used to emulate
-	// a KNX subnetwork without existing link to a real KNX installation.
-	public class VirtualLink implements KNXNetworkLink
-	{
-		private final EventListeners listeners = new EventListeners();
-		private final List deviceLinks = new ArrayList();
-
-		private final String name;
-		private volatile boolean closed;
-		private volatile int hopCount = 6;
-		private KNXMediumSettings settings;
-		private final boolean isDeviceLink;
-
-		public VirtualLink(final String name, final IndividualAddress endpoint,
-			final boolean isDeviceLink)
-		{
-			this.name = name;
-			settings = new TPSettings(endpoint, true);
-			this.isDeviceLink = isDeviceLink;
-		}
-
-		public KNXNetworkLink createDeviceLink(final IndividualAddress device)
-		{
-			// we could allow this in theory, but not really needed
-			if (isDeviceLink)
-				throw new KNXIllegalStateException("don't create device link from device link");
-
-			final VirtualLink devLink = new VirtualLink("device " + device, device, true);
-			devLink.deviceLinks.add(this);
-			deviceLinks.add(devLink);
-			return devLink;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #addLinkListener(tuwien.auto.calimero.link.event.NetworkLinkListener)
-		 */
-		public void addLinkListener(final NetworkLinkListener l)
-		{
-			listeners.add(l);
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #removeLinkListener(tuwien.auto.calimero.link.event.NetworkLinkListener)
-		 */
-		public void removeLinkListener(final NetworkLinkListener l)
-		{
-			listeners.remove(l);
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#setHopCount(int)
-		 */
-		public void setHopCount(final int count)
-		{
-			hopCount = count;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getHopCount()
-		 */
-		public int getHopCount()
-		{
-			return hopCount;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #setKNXMedium(tuwien.auto.calimero.link.medium.KNXMediumSettings)
-		 */
-		public void setKNXMedium(final KNXMediumSettings settings)
-		{
-			this.settings = settings;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getKNXMedium()
-		 */
-		public KNXMediumSettings getKNXMedium()
-		{
-			return settings;
-		}
-
-		/**
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink #send(tuwien.auto.calimero.cemi.CEMILData,
-		 *      boolean)
-		 * @param waitForCon
-		 */
-		public void send(final CEMILData msg, final boolean waitForCon)
-		{
-			for (final Iterator i = deviceLinks.iterator(); i.hasNext();) {
-				send(msg, listeners, (VirtualLink) i.next());
-			}
-		}
-
-		private void send(final CEMILData msg, final EventListeners confirmation,
-			final VirtualLink uplink)
-		{
-			// if the uplink is a device link:
-			// we indicate all group destinations, and our device individual address,
-			// filter out other individual addresses for device destination
-			if (uplink.isDeviceLink) {
-				// the default individual address
-				final IndividualAddress defaultAddress = new IndividualAddress(0xffff);
-				if (msg.getDestination() instanceof GroupAddress)
-					; // accept
-				else if (msg.getDestination().equals(defaultAddress))
-					; // accept
-				else if (!msg.getDestination().equals(uplink.settings.getDeviceAddress()))
-					return;
-			}
-
-			try {
-				// send a .con for a .req
-				EventListener[] el = confirmation.listeners();
-				if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
-					final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON,
-							msg.getPayload(), msg);
-					final FrameEvent e = new FrameEvent(this, f);
-					for (int i = 0; i < el.length; i++) {
-						final NetworkLinkListener l = (NetworkLinkListener) el[i];
-						l.confirmation(e);
-					}
-				}
-				// forward .ind as is, but convert req. to .ind
-				final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
-						: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(),
-								msg);
-				el = uplink.listeners.listeners();
-				final FrameEvent e = new FrameEvent(this, f);
-				for (int i = 0; i < el.length; i++) {
-					final NetworkLinkListener l = (NetworkLinkListener) el[i];
-					l.indication(e);
-				}
-			}
-			catch (final KNXFormatException e) {
-				logger.error("create cEMI for KNX link " + uplink.getName() + " using: " + msg, e);
-			}
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #sendRequest(tuwien.auto.calimero.KNXAddress, tuwien.auto.calimero.Priority,
-		 * byte[])
-		 */
-		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu)
-		{
-			send(new CEMILData(CEMILData.MC_LDATA_REQ, settings.getDeviceAddress(), dst, nsdu, p),
-					false);
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #sendRequestWait(tuwien.auto.calimero.KNXAddress,
-		 * tuwien.auto.calimero.Priority, byte[])
-		 */
-		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
-		{
-			send(new CEMILData(CEMILData.MC_LDATA_REQ, settings.getDeviceAddress(), dst, nsdu, p),
-					true);
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getName()
-		 */
-		public String getName()
-		{
-			return name;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#isOpen()
-		 */
-		public boolean isOpen()
-		{
-			return !closed;
-		}
-
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#close()
-		 */
-		public void close()
-		{
-			closed = true;
-		}
-
-		public String toString()
-		{
-			return getName() + " " + settings.getDeviceAddress();
 		}
 	}
 }
