@@ -65,7 +65,6 @@ import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
-import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
@@ -650,10 +649,11 @@ public class KnxServerGateway implements Runnable
 			// create temporary array to not block concurrent access during iteration
 			final KNXnetIPConnection[] sca = serverConnections
 					.toArray(new KNXnetIPConnection[serverConnections.size()]);
+			// we can have at most 2 elements: 1 routing endpoint, 1 busmonitor tunnel
 			for (final KNXnetIPConnection c : sca) {
 				try {
-					// only tunnel connection does serve busmonitor mode
-					if (c instanceof KNXnetIPTunnel) {
+					// routing does not serve busmonitor mode
+					if (!(c instanceof KNXnetIPRouting)) {
 						c.send(frame, KNXnetIPConnection.WAIT_FOR_ACK);
 						setNetworkState(false, false);
 						incMsgTransmitted(false);
@@ -749,7 +749,20 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 		}
-		send((KNXNetworkLink) subnet.getSubnetLink(), f);
+		if (isNetworkLink(subnet))
+			send((KNXNetworkLink) subnet.getSubnetLink(), f);
+	}
+
+		// ensure we have a network link open (and no monitor link)
+	private boolean isNetworkLink(final SubnetConnector subnet)
+	{
+		final AutoCloseable link = subnet.getSubnetLink();
+		if (!(link instanceof KNXNetworkLink)) {
+			final IndividualAddress addr = subnet.getServiceContainer().getSubnetAddress();
+			logger.warn("cannot dispatch to KNX subnet {}, no network link ({})", addr, link);
+			return false;
+		}
+		return true;
 	}
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
@@ -774,13 +787,14 @@ public class KnxServerGateway implements Runnable
 			if (c.isActivated()) {
 				final IndividualAddress subnet = c.getSubnetAddress();
 				if (matchesSubnet(dst, subnet)) {
-					if (logger.isTraceEnabled())
-						logger.trace("dispatch to KNX subnet " + subnet + " ("
-								+ ((KNXNetworkLink) b.getSubnetLink()).getName()
-								+ " in service container " + b.getName() + ")");
+					if (!isNetworkLink(b))
+						break;
+					final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
+					logger.trace("dispatch to KNX subnet {} ({} in service container {})",
+							subnet, link.getName(), b.getName());
 					// assuming a proper address assignment of area/line coupler
 					// addresses, this has to be the correct knx subnet link
-					return (KNXNetworkLink) b.getSubnetLink();
+					return link;
 				}
 				logger.trace("subnet=" + subnet + " dst=" + dst);
 			}
