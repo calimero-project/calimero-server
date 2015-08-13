@@ -158,6 +158,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getName()
 	 */
+	@Override
 	public String getName()
 	{
 		return id;
@@ -166,6 +167,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getControlEndpoint()
 	 */
+	@Override
 	public HPAI getControlEndpoint()
 	{
 		return ctrlEndpt;
@@ -174,6 +176,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getKNXMedium()
 	 */
+	@Override
 	public int getKNXMedium()
 	{
 		return settings.getMedium();
@@ -182,6 +185,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getSubnetAddress()
 	 */
+	@Override
 	public IndividualAddress getSubnetAddress()
 	{
 		return settings.getDeviceAddress();
@@ -196,6 +200,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#setActivationState(boolean)
 	 */
+	@Override
 	public void setActivationState(final boolean activate)
 	{
 		activated = activate;
@@ -204,6 +209,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#isActivated()
 	 */
+	@Override
 	public boolean isActivated()
 	{
 		return activated;
@@ -212,6 +218,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#reuseControlEndpoint()
 	 */
+	@Override
 	public boolean reuseControlEndpoint()
 	{
 		return reuseEndpt;
@@ -220,6 +227,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#isNetworkMonitoringAllowed()
 	 */
+	@Override
 	public boolean isNetworkMonitoringAllowed()
 	{
 		return networkMonitor;

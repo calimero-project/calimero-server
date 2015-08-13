@@ -129,6 +129,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	 * #send(tuwien.auto.calimero.cemi.CEMI,
 	 * tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection.BlockingMode)
 	 */
+	@Override
 	public void send(final CEMI frame, final BlockingMode mode) throws KNXTimeoutException,
 		KNXConnectionClosedException
 	{
@@ -139,6 +140,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection#getName()
 	 */
+	@Override
 	public String getName()
 	{
 		if (tunnel && monitor)
@@ -151,6 +153,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	/* (non-Javadoc)
 	 * @see java.lang.Object#toString()
 	 */
+	@Override
 	public String toString()
 	{
 		return getName() + " channel " + getChannelId();
@@ -160,12 +163,14 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	 * @see tuwien.auto.calimero.knxnetip.ConnectionBase#close(int,
 	 * java.lang.String, tuwien.auto.calimero.log.LogLevel, java.lang.Throwable)
 	 */
+	@Override
 	protected void close(final int initiator, final String reason, final LogLevel level,
 		final Throwable t)
 	{
 		super.close(initiator, reason, level, t);
 	}
 
+	@Override
 	protected void cleanup(final int initiator, final String reason, final LogLevel level,
 		final Throwable t)
 	{

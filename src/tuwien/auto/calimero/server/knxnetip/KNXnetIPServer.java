@@ -775,6 +775,7 @@ public class KNXnetIPServer
 		IosListener()
 		{}
 
+		@Override
 		public void onPropertyValueChanged(final PropertyEvent pe)
 		{
 			if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
@@ -1468,6 +1469,7 @@ public class KNXnetIPServer
 			super(socket, closeSocket, receiveBufferSize, socketTimeout, 0);
 		}
 
+		@Override
 		public void run()
 		{
 			try {
@@ -1492,6 +1494,7 @@ public class KNXnetIPServer
 		/* (non-Javadoc)
 		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#onReceive(byte[], int, int)
 		 */
+		@Override
 		public void onReceive(final InetSocketAddress source, final byte[] data, final int offset,
 			final int length) throws IOException
 		{
@@ -1517,6 +1520,7 @@ public class KNXnetIPServer
 			}
 		}
 
+		@Override
 		protected void onTimeout()
 		{
 			logger.error("socket timeout - ignored, but should not happen");
@@ -1670,6 +1674,7 @@ public class KNXnetIPServer
 			builder = serviceBuilder;
 		}
 
+		@Override
 		public void run()
 		{
 			final int inc = maxRetries == -1 ? 0 : 1;
@@ -1852,6 +1857,7 @@ public class KNXnetIPServer
 				throw thrown;
 		}
 
+		@Override
 		boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
 			final InetAddress src, final int port) throws KNXFormatException, IOException
 		{
@@ -1939,6 +1945,7 @@ public class KNXnetIPServer
 		/* (non-Javadoc)
 		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#quit()
 		 */
+		@Override
 		public void quit()
 		{
 			try {
@@ -1962,6 +1969,7 @@ public class KNXnetIPServer
 			}
 
 			// forwarder for RoutingService dispatch, called from handleServiceType
+			@Override
 			protected boolean handleServiceType(final KNXnetIPHeader h, final byte[] data,
 				final int offset, final InetAddress src, final int port) throws KNXFormatException,
 				IOException
@@ -1969,6 +1977,7 @@ public class KNXnetIPServer
 				return super.handleServiceType(h, data, offset, src, port);
 			}
 
+			@Override
 			public String getName()
 			{
 				return "KNXnet/IP routing service on " + ctrlEndpt.getAddress().getHostAddress();
@@ -2034,6 +2043,7 @@ public class KNXnetIPServer
 			return svcCont;
 		}
 
+		@Override
 		boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
 			final InetAddress src, final int port) throws KNXFormatException, IOException
 		{
@@ -2043,6 +2053,7 @@ public class KNXnetIPServer
 		/* (non-Javadoc)
 		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#quit()
 		 */
+		@Override
 		public void quit()
 		{
 			super.quit();
@@ -2063,6 +2074,7 @@ public class KNXnetIPServer
 		}
 
 		// a data connection created over this endpoint was closed
+		@Override
 		public void connectionClosed(final DataEndpointServiceHandler h,
 			final IndividualAddress device)
 		{
@@ -2084,6 +2096,7 @@ public class KNXnetIPServer
 		 * @see tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback
 		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler)
 		 */
+		@Override
 		public void resetRequest(final DataEndpointServiceHandler h)
 		{
 			final InetSocketAddress ctrlEndpoint = null;
@@ -2093,6 +2106,7 @@ public class KNXnetIPServer
 		/* (non-Javadoc)
 		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#quit()
 		 */
+		@Override
 		public void quit()
 		{
 			// we close our data connections only, if we were intentionally closed,
@@ -2106,6 +2120,7 @@ public class KNXnetIPServer
 			return svcCont;
 		}
 
+		@Override
 		boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
 			final InetAddress src, final int port) throws KNXFormatException, IOException
 		{
@@ -2457,6 +2472,7 @@ public class KNXnetIPServer
 			logger.debug("created socket on " + s.getLocalSocketAddress());
 		}
 
+		@Override
 		public void connectionClosed(final DataEndpointServiceHandler h,
 			final IndividualAddress assigned)
 		{
@@ -2468,12 +2484,14 @@ public class KNXnetIPServer
 		 * @see tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback
 		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler)
 		 */
+		@Override
 		public void resetRequest(final DataEndpointServiceHandler h)
 		{
 			final InetSocketAddress ctrlEndpoint = null;
 			fireResetRequest(h.getName(), ctrlEndpoint);
 		}
 
+		@Override
 		protected void onTimeout()
 		{
 			// at first check if control endpoint received a connection-state request in
@@ -2486,6 +2504,7 @@ public class KNXnetIPServer
 				setTimeout();
 		}
 
+		@Override
 		void cleanup(final LogLevel level, final Throwable t)
 		{
 			if (t != null)
@@ -2496,6 +2515,7 @@ public class KNXnetIPServer
 		 * @param src
 		 * @param port
 		 */
+		@Override
 		boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
 			final InetAddress src, final int port) throws KNXFormatException, IOException
 		{

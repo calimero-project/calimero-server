@@ -150,6 +150,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.RoutingEndpoint#getRoutingMulticastAddress()
 	 */
+	@Override
 	public InetAddress getRoutingMulticastAddress()
 	{
 		return mcast;
@@ -158,6 +159,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 	/* (non-Javadoc)
 	 * @see tuwien.auto.calimero.server.knxnetip.RoutingEndpoint#getRoutingInterface()
 	 */
+	@Override
 	public NetworkInterface getRoutingInterface()
 	{
 		return netIf;

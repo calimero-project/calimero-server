@@ -120,6 +120,7 @@ public class KnxServerGateway implements Runnable
 			addr = device;
 		}
 
+		@Override
 		public void frameReceived(final FrameEvent e)
 		{
 			synchronized (KnxServerGateway.this) {
@@ -140,12 +141,14 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.server.knxnetip.RoutingListener
 		 * #lostMessage(tuwien.auto.calimero.server.knxnetip.LostMessageEvent)
 		 */
+		@Override
 		public void lostMessage(final LostMessageEvent e)
 		{
 			logger.warn("routing message loss of " + "KNXnet/IP router " + e.getSender()
 					+ " increased to a total of " + e.getLostMessages());
 		}
 
+		@Override
 		public void connectionClosed(final CloseEvent e)
 		{
 			logger.debug("remove {} ({})", name, e.getReason());
@@ -156,6 +159,7 @@ public class KnxServerGateway implements Runnable
 
 	private final class KNXnetIPServerListener implements ServerListener
 	{
+		@Override
 		public boolean acceptDataConnection(final ServiceContainer svcContainer,
 			final KNXnetIPConnection conn, final IndividualAddress assignedDeviceAddress,
 			final boolean networkMonitor)
@@ -199,6 +203,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
 		 * #propertyChanged(tuwien.auto.calimero.server.knxnetip.PropertyEvent)
 		 */
+		@Override
 		public void onPropertyValueChanged(final PropertyEvent pe)
 		{
 			//logger.trace("property id " + pe.getPropertyId() + " changed to ["
@@ -229,6 +234,7 @@ public class KnxServerGateway implements Runnable
 		 * onServiceContainerChange
 		 * (tuwien.auto.calimero.server.knxnetip.ServiceContainerEvent)
 		 */
+		@Override
 		public void onServiceContainerChange(final ServiceContainerEvent sce)
 		{
 			final int event = sce.getEventType();
@@ -269,6 +275,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
 		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.ShutdownEvent)
 		 */
+		@Override
 		public void onResetRequest(final ShutdownEvent se)
 		{}
 
@@ -277,6 +284,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
 		 * #shutdown(tuwien.auto.calimero.server.knxnetip.ShutdownEvent)
 		 */
+		@Override
 		public void onShutdown(final ShutdownEvent se)
 		{
 			// shutdown is guaranteed to be called before server is shutdown, therefore
@@ -320,6 +328,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.link.event.NetworkLinkListener
 		 * #confirmation(tuwien.auto.calimero.FrameEvent)
 		 */
+		@Override
 		public void confirmation(final FrameEvent e)
 		{}
 
@@ -328,6 +337,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.link.event.LinkListener
 		 * #indication(tuwien.auto.calimero.FrameEvent)
 		 */
+		@Override
 		public void indication(final FrameEvent e)
 		{
 			synchronized (KnxServerGateway.this) {
@@ -351,6 +361,7 @@ public class KnxServerGateway implements Runnable
 		 * @see tuwien.auto.calimero.link.event.LinkListener
 		 * #linkClosed(tuwien.auto.calimero.CloseEvent)
 		 */
+		@Override
 		public void linkClosed(final CloseEvent e)
 		{
 			logger.info("KNX subnet link closed (" + e.getReason() + ")");
@@ -403,6 +414,7 @@ public class KnxServerGateway implements Runnable
 			setName("Gateway IP to subnet dispatcher");
 		}
 
+		@Override
 		public void run()
 		{
 			try {
@@ -492,6 +504,7 @@ public class KnxServerGateway implements Runnable
 	 * (non-Javadoc)
 	 * @see java.lang.Runnable#run()
 	 */
+	@Override
 	public void run()
 	{
 		launchServer();
@@ -761,7 +774,7 @@ public class KnxServerGateway implements Runnable
 			send((KNXNetworkLink) subnet.getSubnetLink(), f);
 	}
 
-		// ensure we have a network link open (and no monitor link)
+	// ensure we have a network link open (and no monitor link)
 	private boolean isNetworkLink(final SubnetConnector subnet)
 	{
 		final AutoCloseable link = subnet.getSubnetLink();
