@@ -557,6 +557,14 @@ public class KnxServerGateway implements Runnable
 		return name;
 	}
 
+	/**
+	 * @return the list of subnet connectors currently maintained by the gateway
+	 */
+	public final List<SubnetConnector> getSubnetConnectors()
+	{
+		return new ArrayList<>(connectors);
+	}
+
 	private synchronized FrameEvent getSubnetEvent()
 	{
 		if (subnetEvents.isEmpty())
