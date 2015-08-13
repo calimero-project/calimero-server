@@ -52,9 +52,6 @@ import java.util.Map;
 
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.buffer.Configuration;
-import tuwien.auto.calimero.buffer.NetworkBuffer;
-import tuwien.auto.calimero.buffer.StateFilter;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
@@ -148,8 +145,6 @@ public class Launcher implements Runnable
 		// the service containers the KNX server will host
 		private final List svcContainers = new ArrayList();
 
-		// virtual links locally used with the KNX server for KNX subnet emulation
-		private final List virtualLinks = new ArrayList();
 		// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 		private final Map subnetDatapoints = new HashMap();
 
@@ -311,7 +306,7 @@ public class Launcher implements Runnable
 									port), s, reuse, monitor);
 						sc.setActivationState(activate);
 						subnetTypes.add(subnetType);
-						if ("virtual".equals(subnetType) && datapoints != null)
+						if ("emulate".equals(subnetType) && datapoints != null)
 							subnetDatapoints.put(sc, datapoints);
 						subnetAddresses.add(addr);
 						svcContainers.add(sc);
@@ -383,7 +378,6 @@ public class Launcher implements Runnable
 
 	private final KNXnetIPServer server;
 	private KnxServerGateway gw;
-	private final List virtualLinks;
 
 	private XmlConfiguration xml;
 
@@ -424,7 +418,6 @@ public class Launcher implements Runnable
 	{
 		xml = new XmlConfiguration();
 		final Map config = xml.load(configUri);
-		virtualLinks = xml.virtualLinks;
 
 		server = new KNXnetIPServer(((String)config.get("name")), ((String) config.get("friendlyName")));
 		// load property definitions
@@ -511,16 +504,13 @@ public class Launcher implements Runnable
 	}
 
 	/**
-	 * Returns the virtual links created to emulate virtual KNX subnets if requested in the
-	 * configuration.
-	 * <p>
+	 * Returns the KNX server gateway.
 	 *
-	 * @return the server virtual links as array of type KNXNetworkLink, with array length equal to
-	 *         the number of virtual links (length 0 for no virtual links used)
+	 * @return the gateway
 	 */
-	public KNXNetworkLink[] getVirtualLinks()
+	public final KnxServerGateway getGateway()
 	{
-		return (KNXNetworkLink[]) virtualLinks.toArray(new KNXNetworkLink[virtualLinks.size()]);
+		return gw;
 	}
 
 	private void connect(final List linksToClose,
@@ -528,47 +518,26 @@ public class Launcher implements Runnable
 	{
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = (ServiceContainer) xml.svcContainers.get(i);
-
-			final KNXNetworkLink link;
 			final String subnetType = (String) xml.subnetTypes.get(i);
-			if ("virtual".equals(subnetType)) {
-				// use network buffer to emulate KNX subnet
-				final NetworkBuffer nb = NetworkBuffer.createBuffer("Virtual " + sc.getName());
-				final VirtualLink vl = new VirtualLink("virtual link",
-						new IndividualAddress(new byte[] { 0, 0 }));
-				virtualLinks.add(vl);
-				final Configuration config = nb.addConfiguration(vl);
-				config.setQueryBufferOnly(false);
-				if (xml.subnetDatapoints.containsKey(sc))
-					config.setDatapointModel((DatapointModel) xml.subnetDatapoints.get(sc));
-				final StateFilter f = new StateFilter();
-				config.setFilter(f, f);
-				config.activate(true);
-				link = config.getBufferedLink();
+			final String subnetArgs = (String) xml.subnetAddresses.get(i);
+			final SubnetConnector connector;
 
-				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc,
-						subnetType, null, 1);
-				connectors.add(connector);
-			}
-			else {
-				final String subnetArgs = (String) xml.subnetAddresses.get(i);
-				SubnetConnector connector;
-				if ("knxip".equals(subnetType))
-					connector = SubnetConnector.newWithRoutingLink(sc,
-							(NetworkInterface) xml.subnetNetIf.get(sc), subnetArgs, 1);
-				else if ("user-supplied".equals(subnetType))
-					connector = SubnetConnector.newWithUserLink(sc,
-							(String) xml.subnetLinkClasses.get(sc), subnetArgs, 1);
-				else
-					connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
+			if ("knxip".equals(subnetType))
+				connector = SubnetConnector.newWithRoutingLink(sc,
+						(NetworkInterface) xml.subnetNetIf.get(sc), subnetArgs, 1);
+			else if ("user-supplied".equals(subnetType))
+				connector = SubnetConnector.newWithUserLink(sc,
+						(String) xml.subnetLinkClasses.get(sc), subnetArgs, 1);
+			else if ("emulate".equals(subnetType))
+				connector = SubnetConnector.newCustom(sc, "emulate", 1,
+						new Object[] { xml.subnetDatapoints.get(sc) });
+			else
+				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
 
-				logger.info("connect to " + subnetArgs);
-				link = connector.openNetworkLink();
-				connectors.add(connector);
-			}
-
+			logger.info("connect to " + subnetArgs);
+			linksToClose.add(connector.openNetworkLink());
+			connectors.add(connector);
 			server.addServiceContainer(sc);
-			linksToClose.add(link);
 
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			if (xml.additionalAddresses.containsKey(sc))

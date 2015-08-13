@@ -39,6 +39,11 @@ package tuwien.auto.calimero.server.gateway;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 
+import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.buffer.Configuration;
+import tuwien.auto.calimero.buffer.NetworkBuffer;
+import tuwien.auto.calimero.buffer.StateFilter;
+import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -51,6 +56,7 @@ import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.server.InterfaceObjectServer;
+import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
 /**
@@ -68,6 +74,7 @@ public class SubnetConnector
 	private final NetworkInterface netif;
 	private final String className;
 	private final int gatoi;
+	private final Object[] args;
 
 	private Object subnetLink;
 	private LinkListener listener;
@@ -87,7 +94,7 @@ public class SubnetConnector
 		final int groupAddrTableInstance)
 	{
 		return new SubnetConnector(container, "knxip", routingNetif, null, subnetArgs,
-				groupAddrTableInstance);
+				groupAddrTableInstance, new Object[0]);
 	}
 
 	/**
@@ -104,7 +111,7 @@ public class SubnetConnector
 		final String className, final String subnetArgs, final int groupAddrTableInstance)
 	{
 		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs,
-				groupAddrTableInstance);
+				groupAddrTableInstance, new Object[0]);
 	}
 
 	/**
@@ -121,19 +128,37 @@ public class SubnetConnector
 		final String interfaceType, final String subnetArgs, final int groupAddrTableInstance)
 	{
 		return new SubnetConnector(container, interfaceType, null, null, subnetArgs,
-				groupAddrTableInstance);
+				groupAddrTableInstance, new Object[0]);
+	}
+
+	/**
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet
+	 * interface.
+	 *
+	 * @param container service container
+	 * @param interfaceType the interface type
+	 * @param groupAddrTableInstance instance of the server group address table in the
+	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @param subnetArgs the arguments to create the subnet link
+	 */
+	public static final SubnetConnector newCustom(final ServiceContainer container,
+		final String interfaceType, final int groupAddrTableInstance, final Object[] subnetArgs)
+	{
+		return new SubnetConnector(container, interfaceType, null, null, null,
+				groupAddrTableInstance, subnetArgs);
 	}
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs,
-		final int groupAddrTableInstance)
+		final int groupAddrTableInstance, final Object[] args)
 	{
 		sc = container;
 		subnetType = interfaceType;
 		netif = routingNetif;
 		this.className = className;
-		this.linkArgs = subnetArgs;
+		linkArgs = subnetArgs;
 		gatoi = groupAddrTableInstance;
+		this.args = args;
 	}
 
 	/**
@@ -191,6 +216,28 @@ public class SubnetConnector
 			link = new KNXNetworkLinkFT12(linkArgs, settings);
 		else if ("user-supplied".equals(subnetType))
 			link = (KNXNetworkLink) newLinkUsing(className, linkArgs.split(",|\\|"));
+		else if ("virtual".equals(subnetType)) {
+			// if we use connector, we cannot cast link to VirtualLink for creating device links
+			link = new VirtualLink(linkArgs, new IndividualAddress(0));
+		}
+		else if ("emulate".equals(subnetType)) {
+			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
+			final VirtualLink vl = new VirtualLink("virtual link", new IndividualAddress(0));
+			final Configuration config = nb.addConfiguration(vl);
+			config.setQueryBufferOnly(false);
+
+			if (args.length > 0 && args[0] instanceof DatapointModel) {
+				final DatapointModel model = (DatapointModel) args[0];
+				config.setDatapointModel(model);
+			}
+			final StateFilter f = new StateFilter();
+			config.setFilter(f, f);
+			config.activate(true);
+			// necessary to get .ind/.con notification for the buffer
+			vl.createDeviceLink(new IndividualAddress(0));
+
+			link = config.getBufferedLink();
+		}
 		else
 			throw new KNXException("unknown KNX subnet specifier " + subnetType);
 
