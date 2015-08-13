@@ -489,7 +489,7 @@ public class KnxServerGateway implements Runnable
 		// 3: Multiple KNX installations supported
 		// 4: Group address mapping supported
 		// other bits reserved
-		final byte caps = 1 << 0 | 1 << 1;
+		final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
 		try {
 			server.getInterfaceObjectServer().setProperty(
 					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
