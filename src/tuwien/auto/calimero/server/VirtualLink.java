@@ -78,9 +78,8 @@ public class VirtualLink extends AbstractLink
 	private VirtualLink(final String name, final IndividualAddress endpoint,
 		final boolean isDeviceLink)
 	{
-		super(null, name, new TPSettings(endpoint));
+		super(name, new TPSettings(endpoint));
 		this.isDeviceLink = isDeviceLink;
-		notifier.quit();
 	}
 
 	public KNXNetworkLink createDeviceLink(final IndividualAddress device)
