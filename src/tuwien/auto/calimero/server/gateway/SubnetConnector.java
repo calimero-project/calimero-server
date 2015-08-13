@@ -40,8 +40,14 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.util.concurrent.TimeUnit;
 
+import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.buffer.Configuration;
+import tuwien.auto.calimero.buffer.NetworkBuffer;
+import tuwien.auto.calimero.buffer.StateFilter;
+import tuwien.auto.calimero.datapoint.Datapoint;
+import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.TSupplier;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -56,6 +62,7 @@ import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.server.InterfaceObjectServer;
+import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
 /**
@@ -73,6 +80,7 @@ public class SubnetConnector
 	private final NetworkInterface netif;
 	private final String className;
 	private final int gatoi;
+	private final Object[] args;
 
 	private AutoCloseable subnetLink;
 	private LinkListener listener;
@@ -129,16 +137,34 @@ public class SubnetConnector
 				groupAddrTableInstance);
 	}
 
+	/**
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet
+	 * interface.
+	 *
+	 * @param container service container
+	 * @param interfaceType the interface type
+	 * @param groupAddrTableInstance instance of the server group address table in the
+	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @param subnetArgs the arguments to create the subnet link
+	 */
+	public static final SubnetConnector newCustom(final ServiceContainer container,
+		final String interfaceType, final int groupAddrTableInstance, final Object ... subnetArgs)
+	{
+		return new SubnetConnector(container, interfaceType, null, null, null,
+				groupAddrTableInstance, subnetArgs);
+	}
+
 	private SubnetConnector(final ServiceContainer container, final String interfaceType,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs,
-		final int groupAddrTableInstance)
+		final int groupAddrTableInstance, final Object ... args)
 	{
 		sc = container;
 		subnetType = interfaceType;
 		netif = routingNetif;
 		this.className = className;
-		this.linkArgs = subnetArgs;
+		linkArgs = subnetArgs;
 		gatoi = groupAddrTableInstance;
+		this.args = args;
 	}
 
 	/**
@@ -196,9 +222,34 @@ public class SubnetConnector
 			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
 		else if ("user-supplied".equals(subnetType))
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+		else if ("virtual".equals(subnetType)) {
+			// if we use connector, we cannot cast link to VirtualLink for creating device links
+			final KNXNetworkLink link = new VirtualLink(linkArgs, new IndividualAddress(0));
+			setSubnetLink(link);
+			return link;
+		}
+		else if ("emulate".equals(subnetType)) {
+			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
+			final VirtualLink vl = new VirtualLink("virtual link", new IndividualAddress(0));
+			final Configuration config = nb.addConfiguration(vl);
+			config.setQueryBufferOnly(false);
+
+			if (args.length > 0 && args[0] instanceof DatapointModel) {
+				@SuppressWarnings("unchecked")
+				final DatapointModel<Datapoint> model = (DatapointModel<Datapoint>) args[0];
+				config.setDatapointModel(model);
+			}
+			final StateFilter f = new StateFilter();
+			config.setFilter(f, f);
+			config.activate(true);
+			// necessary to get .ind/.con notification for the buffer
+			vl.createDeviceLink(new IndividualAddress(0));
+
+			ts = () -> config.getBufferedLink();
+		}
 		else
 			throw new KNXException("unknown KNX subnet specifier " + subnetType);
-	
+
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectWait(10, TimeUnit.SECONDS).maxConnectAttempts(Connector.NoMaxAttempts);
 		final KNXNetworkLink link = c.newLink(ts);
@@ -225,7 +276,7 @@ public class SubnetConnector
 			link = newLinkUsing(className, linkArgs.split(",|\\|"));
 		else
 			throw new KNXException("unknown KNX subnet specifier " + subnetType);
-	
+
 		setSubnetLink(link);
 		return link;
 	}
