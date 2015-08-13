@@ -63,11 +63,7 @@ import tuwien.auto.calimero.link.medium.TPSettings;
  */
 public class VirtualLink extends AbstractLink
 {
-	// we use this listener list, not the (threaded) EventNotifier of our super type
-	private final EventListeners<NetworkLinkListener> listeners = new EventListeners<>(
-			NetworkLinkListener.class);
 	private final List<VirtualLink> deviceLinks = new ArrayList<>();
-
 	private final boolean isDeviceLink;
 
 	public VirtualLink(final String name, final IndividualAddress endpoint)
@@ -95,18 +91,6 @@ public class VirtualLink extends AbstractLink
 	}
 
 	@Override
-	public void addLinkListener(final NetworkLinkListener l)
-	{
-		listeners.add(l);
-	}
-
-	@Override
-	public void removeLinkListener(final NetworkLinkListener l)
-	{
-		listeners.remove(l);
-	}
-
-	@Override
 	public String toString()
 	{
 		return getName() + " " + getKNXMedium().getDeviceAddress();
@@ -121,7 +105,7 @@ public class VirtualLink extends AbstractLink
 	protected void onSend(final CEMILData msg, final boolean waitForCon)
 	{
 		for (final VirtualLink l : deviceLinks)
-			send(msg, listeners, l);
+			send(msg, notifier.getListeners(), l);
 	}
 
 	@Override
@@ -160,7 +144,7 @@ public class VirtualLink extends AbstractLink
 			// forward .ind as is, but convert req. to .ind
 			final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
 					: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg);
-			el = uplink.listeners.listeners();
+			el = uplink.notifier.getListeners().listeners();
 			final FrameEvent e = new FrameEvent(this, f);
 			for (int i = 0; i < el.length; i++) {
 				final NetworkLinkListener l = el[i];
