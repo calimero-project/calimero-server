@@ -55,11 +55,14 @@ import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
+import tuwien.auto.calimero.knxnetip.servicetype.ConnectionstateRequest;
+import tuwien.auto.calimero.knxnetip.servicetype.ConnectionstateResponse;
 import tuwien.auto.calimero.knxnetip.servicetype.ErrorCodes;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceAck;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
+import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
@@ -258,6 +261,33 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				if (internalState == ACK_ERROR)
 					logger.warn("received service acknowledgment status " + res.getStatusString());
 			}
+		}
+		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
+			// For some weird reason (or no reason, because it's not in the spec), ETS sends a
+			// connection-state.req from its data endpoint to our data endpoint immediately after
+			// a new connection was established.
+			// It expects it to be answered by the control endpoint (!), so do that here.
+			// If we ignore that connection-state.req, the ETS connection establishment
+			// gets delayed by the connection-state.res timeout.
+			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
+			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+			if (status == ErrorCodes.NO_ERROR
+					&& csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
+				status = ErrorCodes.HOST_PROTOCOL_TYPE;
+
+			if (status == ErrorCodes.NO_ERROR) {
+				logger.trace("data endpoint received connection state request from " + dataEndpt
+						+ " for channel " + csr.getChannelID());
+				updateLastMsgTimestamp();
+			}
+			else
+				logger.warn("received invalid connection state request: "
+						+ ErrorCodes.getErrorMessage(status));
+
+			final byte[] buf = PacketHelper
+					.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
+			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
+			ctrlSocket.send(p);
 		}
 		else
 			return false;
