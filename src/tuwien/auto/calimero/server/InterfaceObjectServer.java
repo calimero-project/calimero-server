@@ -40,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
-import java.util.EventListener;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,8 +107,8 @@ public class InterfaceObjectServer implements PropertyAccess
 
 	private final boolean strictMode;
 
-	private final EventListeners<InterfaceObjectServerListener> listeners =
-			new EventListeners<>(InterfaceObjectServerListener.class, logger);
+	private final EventListeners<InterfaceObjectServerListener> listeners = new EventListeners<>(
+			logger);
 
 	/**
 	 * Creates a new interface object server.
@@ -611,18 +610,8 @@ public class InterfaceObjectServer implements PropertyAccess
 	private void firePropertyChanged(final InterfaceObject io, final int propertyId,
 		final int start, final int elements, final byte[] data)
 	{
-		final PropertyEvent fe = new PropertyEvent(this, io, propertyId, start, elements, data);
-		final EventListener[] el = listeners.listeners();
-		for (int i = 0; i < el.length; i++) {
-			final InterfaceObjectServerListener l = (InterfaceObjectServerListener) el[i];
-			try {
-				l.onPropertyValueChanged(fe);
-			}
-			catch (final RuntimeException e) {
-				removeServerListener(l);
-				logger.error("removed event listener", e);
-			}
-		}
+		final PropertyEvent pe = new PropertyEvent(this, io, propertyId, start, elements, data);
+		listeners.fire(l -> l.onPropertyValueChanged(pe));
 	}
 
 	private Property getDefinition(final int objectType, final int pid)

@@ -131,25 +131,17 @@ public class VirtualLink extends AbstractLink
 
 		try {
 			// send a .con for a .req
-			NetworkLinkListener[] el = confirmation.listeners();
 			if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
 				final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON,
 						msg.getPayload(), msg);
 				final FrameEvent e = new FrameEvent(this, f);
-				for (int i = 0; i < el.length; i++) {
-					final NetworkLinkListener l = el[i];
-					l.confirmation(e);
-				}
+				confirmation.fire(l -> l.confirmation(e));
 			}
 			// forward .ind as is, but convert req. to .ind
 			final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
 					: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg);
-			el = uplink.notifier.getListeners().listeners();
 			final FrameEvent e = new FrameEvent(this, f);
-			for (int i = 0; i < el.length; i++) {
-				final NetworkLinkListener l = el[i];
-				l.indication(e);
-			}
+			uplink.notifier.getListeners().fire(l -> l.indication(e));
 		}
 		catch (final KNXFormatException e) {
 			logger.error("create cEMI for KNX link {} using: {}", uplink.getName(), msg, e);

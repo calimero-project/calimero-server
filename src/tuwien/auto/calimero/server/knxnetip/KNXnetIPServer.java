@@ -54,7 +54,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -375,7 +374,7 @@ public class KNXnetIPServer
 			throw new Error("missing ISO 8859-1 charset, " + e.getMessage());
 		}
 		logger = LogService.getLogger(getName());
-		listeners = new EventListeners<>(ServerListener.class, logger);
+		listeners = new EventListeners<>(logger);
 
 		try {
 			initBasicServerProperties();
@@ -505,13 +504,11 @@ public class KNXnetIPServer
 		if (server == null)
 			throw new IllegalArgumentException("there must exist an IOS");
 		synchronized (listeners) {
-			final EventListener[] l = listeners.listeners();
-			for (int i = 0; i < l.length; i++)
-				ios.removeServerListener((ServerListener) l[i]);
+			listeners.fire(l -> {
+				ios.removeServerListener(l);
+				server.addServerListener(l);
+			});
 			ios = server;
-			if (ios != null)
-				for (int i = 0; i < l.length; i++)
-					ios.addServerListener((ServerListener) l[i]);
 		}
 	}
 
@@ -1384,49 +1381,19 @@ public class KNXnetIPServer
 
 	private void fireOnServiceContainerChange(final ServiceContainerEvent sce)
 	{
-		final EventListener[] el = listeners.listeners();
-		for (int i = 0; i < el.length; i++) {
-			final ServerListener l = (ServerListener) el[i];
-			try {
-				l.onServiceContainerChange(sce);
-			}
-			catch (final RuntimeException e) {
-				removeServerListener(l);
-				logger.error("removed event listener", e);
-			}
-		}
+		listeners.fire(l -> l.onServiceContainerChange(sce));
 	}
 
 	private void fireResetRequest(final String endpointName, final InetSocketAddress ctrlEndpoint)
 	{
 		final ShutdownEvent se = new ShutdownEvent(this, endpointName, ctrlEndpoint);
-		final EventListener[] el = listeners.listeners();
-		for (int i = 0; i < el.length; i++) {
-			final ServerListener l = (ServerListener) el[i];
-			try {
-				l.onResetRequest(se);
-			}
-			catch (final RuntimeException e) {
-				removeServerListener(l);
-				logger.error("removed event listener", e);
-			}
-		}
+		listeners.fire(l -> l.onResetRequest(se));
 	}
 
 	private void fireShutdown()
 	{
 		final ShutdownEvent se = new ShutdownEvent(this, CloseEvent.USER_REQUEST, "user shutdown");
-		final EventListener[] el = listeners.listeners();
-		for (int i = 0; i < el.length; i++) {
-			final ServerListener l = (ServerListener) el[i];
-			try {
-				l.onShutdown(se);
-			}
-			catch (final RuntimeException e) {
-				removeServerListener(l);
-				logger.error("removed event listener", e);
-			}
-		}
+		listeners.fire(l -> l.onShutdown(se));
 	}
 
 	private static String[] split(final String text, final String delim)
@@ -2435,13 +2402,8 @@ public class KNXnetIPServer
 		private boolean acceptConnection(final ServiceContainer sc, final KNXnetIPConnection conn,
 			final IndividualAddress addr, final boolean busmonitor)
 		{
-			final EventListener[] el = listeners.listeners();
-			for (int i = 0; i < el.length; i++) {
-				final ServerListener l = (ServerListener) el[i];
-				if (!l.acceptDataConnection(sc, conn, addr, busmonitor))
-					return false;
-			}
-			return true;
+			final List<ServerListener> l = listeners.listeners();
+			return l.stream().allMatch(e -> e.acceptDataConnection(sc, conn, addr, busmonitor));
 		}
 
 		private DataEndpointServiceHandler findConnection(final int channelId)

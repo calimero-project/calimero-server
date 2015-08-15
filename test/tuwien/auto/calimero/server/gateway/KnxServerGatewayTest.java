@@ -252,8 +252,7 @@ public class KnxServerGatewayTest extends TestCase
 	// dummy link for setting up gateway
 	public static class DummyLink implements KNXNetworkLink
 	{
-		private final EventListeners<NetworkLinkListener> listeners =
-				new EventListeners<>(NetworkLinkListener.class, null);
+		private final EventListeners<NetworkLinkListener> listeners = new EventListeners<>(null);
 
 		public DummyLink(final Object[] s) {}
 
