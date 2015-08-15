@@ -564,6 +564,14 @@ public class KnxServerGateway implements Runnable
 	}
 
 	/**
+	 * @return the KNXnet/IP server used by this gateway
+	 */
+	public final KNXnetIPServer getServer()
+	{
+		return server;
+	}
+
+	/**
 	 * @return the list of subnet connectors currently maintained by the gateway
 	 */
 	public final List getSubnetConnectors()
