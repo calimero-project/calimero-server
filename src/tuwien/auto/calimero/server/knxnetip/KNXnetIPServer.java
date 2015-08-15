@@ -2126,15 +2126,15 @@ public class KNXnetIPServer
 					if (channelId == 0)
 						status = ErrorCodes.NO_MORE_CONNECTIONS;
 				}
+				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(),
+						src, port, 1);
 				final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(),
 						src, port, 2);
-				byte[] buf = null;
 
+				byte[] buf = null;
 				if (status == ErrorCodes.NO_ERROR) {
 					logger.info("{}: setup data endpoint (channel {}) for connection request "
-							+ "from {}", svcCont.getName(), channelId, dataEndpt);
-					final InetSocketAddress ctrlEndpt = createResponseAddress(
-							req.getControlEndpoint(), src, port, 1);
+							+ "from {}", svcCont.getName(), channelId, ctrlEndpt);
 					final Object[] init = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					status = ((Integer) init[0]).intValue();
 					if (status == ErrorCodes.NO_ERROR)
@@ -2147,7 +2147,7 @@ public class KNXnetIPServer
 					logger.warn("no data endpoint for connection with " + dataEndpt + ", "
 							+ ErrorCodes.getErrorMessage(status));
 				}
-				final DatagramPacket p = new DatagramPacket(buf, buf.length, dataEndpt);
+				final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
 				s.send(p);
 			}
 			else if (svc == KNXnetIPHeader.CONNECT_RES)
