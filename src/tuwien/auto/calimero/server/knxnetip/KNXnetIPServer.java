@@ -1275,7 +1275,7 @@ public class KNXnetIPServer
 			logger.warn(e.getMessage());
 		}
 		// there are no free addresses, or no additional address at all
-		logger.info("no additional individual addresses available that matches subnet " + forSubnet);
+		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
 
 		if (!routingEndpoints.isEmpty()) {
 			logger.warn("KNXnet/IP routing active, can not assign server device address");
@@ -1308,8 +1308,10 @@ public class KNXnetIPServer
 						+ "can not assign server device address");
 				return false;
 			}
-			if (usedKnxAddresses.contains(device))
+			if (usedKnxAddresses.contains(device)) {
+				logger.debug("address {} already assigned", device);
 				return false;
+			}
 			final String s = isServerAddress ? "assigning server device address "
 					: "assigning additional individual address ";
 			logger.info(s + device);
@@ -1531,7 +1533,7 @@ public class KNXnetIPServer
 			else {
 				addr = new InetSocketAddress(resIP, resPort);
 				if (logEndpointType != 0)
-					logger.trace("using client-assigned response " + type + " endpoint " + addr);
+					logger.trace("for responses, use client-assigned {} endpoint {}", type, addr);
 			}
 			return addr;
 		}

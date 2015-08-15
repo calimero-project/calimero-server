@@ -127,7 +127,7 @@ Elements and attributes of `server-config.xml`:
 
 	`<knxSubnet type="user-supplied" class="my.knx.SubnetLink">o1,i2|i4</knxSubnet>`
 
-* Provide a KNXnet/IP server for a KNX USB RF connection, using the USB vendor:product ID
+* Provide a KNXnet/IP server for a KNX RF USB connection, using the USB vendor:product ID
 
 	`<knxSubnet type="usb" medium="rf" domainAddress="000000004b01">0409:005a</knxSubnet>`
 
