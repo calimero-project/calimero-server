@@ -239,7 +239,7 @@ public class SubnetConnector
 			link = config.getBufferedLink();
 		}
 		else
-			throw new KNXException("unknown KNX subnet specifier " + subnetType);
+			throw new KNXException("network link: unknown KNX subnet specifier " + subnetType);
 
 		setSubnetLink(link);
 		return link;
@@ -263,7 +263,7 @@ public class SubnetConnector
 		else if ("user-supplied".equals(subnetType))
 			link = (KNXNetworkMonitor) newLinkUsing(className, linkArgs.split(",|\\|"));
 		else
-			throw new KNXException("unknown KNX subnet specifier " + subnetType);
+			throw new KNXException("monitor link: unknown KNX subnet specifier " + subnetType);
 
 		setSubnetLink(link);
 		return link;
