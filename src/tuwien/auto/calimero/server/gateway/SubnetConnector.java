@@ -48,6 +48,7 @@ import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointModel;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.TSupplier;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -61,7 +62,6 @@ import tuwien.auto.calimero.link.KNXNetworkMonitorUsb;
 import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.server.InterfaceObjectServer;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 

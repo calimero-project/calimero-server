@@ -37,8 +37,8 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServerListener;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
-import tuwien.auto.calimero.server.InterfaceObjectServerListener;
 
 /**
  * A listener for use with a {@link KNXnetIPServer}.
