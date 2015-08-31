@@ -80,6 +80,7 @@ import tuwien.auto.calimero.server.InterfaceObject;
 import tuwien.auto.calimero.server.InterfaceObjectServer;
 import tuwien.auto.calimero.server.KNXPropertyException;
 import tuwien.auto.calimero.server.PropertyEvent;
+import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
@@ -175,6 +176,10 @@ public class KnxServerGateway implements Runnable
 					connector.openNetworkLink();
 				}
 				else if (networkMonitor && !(subnetLink instanceof KNXNetworkMonitor)) {
+					// XXX workaround to ensure a virtual link stays open: we currently don't
+					// support virtual monitoring
+					if (subnetLink instanceof VirtualLink)
+						return false;
 					closeLink(subnetLink);
 					connector.openMonitorLink();
 				}
