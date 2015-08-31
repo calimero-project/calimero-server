@@ -66,6 +66,11 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServerListener;
+import tuwien.auto.calimero.device.ios.KNXPropertyException;
+import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
@@ -103,11 +108,6 @@ import tuwien.auto.calimero.log.LogLevel;
 import tuwien.auto.calimero.log.LogManager;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
-import tuwien.auto.calimero.server.InterfaceObject;
-import tuwien.auto.calimero.server.InterfaceObjectServer;
-import tuwien.auto.calimero.server.InterfaceObjectServerListener;
-import tuwien.auto.calimero.server.KNXPropertyException;
-import tuwien.auto.calimero.server.PropertyEvent;
 import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback;
 
 /**

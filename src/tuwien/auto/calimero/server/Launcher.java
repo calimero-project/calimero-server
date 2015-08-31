@@ -54,6 +54,9 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
+import tuwien.auto.calimero.device.ios.KNXPropertyException;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -579,8 +582,8 @@ public class Launcher implements Runnable
 		if (table.length > 0) {
 			// create interface object and set the address table object property
 			ios.addInterfaceObject(InterfaceObject.ADDRESSTABLE_OBJECT);
-			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1,
-					size, table);
+			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size,
+					table);
 		}
 
 		// set the handling of group addressed frames, based on whether we have set a

@@ -53,10 +53,15 @@
 		</dependency>
 		<dependency>
 			<groupId>com.github.calimero</groupId>
+			<artifactId>calimero-device</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.calimero</groupId>
 			<artifactId>calimero-rxtx</artifactId>
 			<version>${project.version}</version>
 			<scope>runtime</scope>
 			<optional>true</optional>
-		</dependency>		
+		</dependency>
 	</dependencies>
 </project>

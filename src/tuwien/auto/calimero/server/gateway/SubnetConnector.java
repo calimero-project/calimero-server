@@ -60,7 +60,6 @@ import tuwien.auto.calimero.link.KNXNetworkMonitorTpuart;
 import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.server.InterfaceObjectServer;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 

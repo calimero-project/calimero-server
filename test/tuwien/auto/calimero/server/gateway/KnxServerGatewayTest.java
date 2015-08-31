@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2015 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -48,6 +48,9 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.cemi.CEMILData;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
+import tuwien.auto.calimero.device.ios.KNXPropertyException;
 import tuwien.auto.calimero.exception.KNXFormatException;
 import tuwien.auto.calimero.exception.KNXIllegalStateException;
 import tuwien.auto.calimero.internal.EventListeners;
@@ -58,9 +61,6 @@ import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
-import tuwien.auto.calimero.server.InterfaceObject;
-import tuwien.auto.calimero.server.InterfaceObjectServer;
-import tuwien.auto.calimero.server.KNXPropertyException;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
@@ -125,7 +125,7 @@ public class KnxServerGatewayTest extends TestCase
 
 	/**
 	 * Test method for {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#run()}.
-	 * 
+	 *
 	 * @throws InterruptedException
 	 */
 	public final void testRun() throws InterruptedException
@@ -149,7 +149,7 @@ public class KnxServerGatewayTest extends TestCase
 
 	/**
 	 * Test method for {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#quit()} .
-	 * 
+	 *
 	 * @throws InterruptedException
 	 */
 	public final void testQuit() throws InterruptedException
@@ -176,8 +176,8 @@ public class KnxServerGatewayTest extends TestCase
 	private InterfaceObjectServer ios;
 
 	/**
-	 * Test gateway group address lookup performance
-	 * 
+	 * Test gateway group address lookup performance.
+	 *
 	 * @throws KNXPropertyException
 	 */
 	public final void testAddressLookupPerformance() throws KNXPropertyException
