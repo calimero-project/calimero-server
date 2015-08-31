@@ -413,8 +413,8 @@ public class KnxServerGateway implements Runnable
 		{
 			try {
 				while (trucking) {
-					while (!ipEvents.isEmpty())
-						onFrameReceived((FrameEvent) ipEvents.remove(0), true);
+					for (FrameEvent event = getIPEvent(); event != null; event = getIPEvent())
+						onFrameReceived(event, true);
 					synchronized (this) {
 						wait();
 					}
@@ -422,6 +422,13 @@ public class KnxServerGateway implements Runnable
 			}
 			catch (final InterruptedException e) {}
 		};
+
+		private FrameEvent getIPEvent()
+		{
+			synchronized (KnxServerGateway.this) {
+				return (FrameEvent) (ipEvents.isEmpty() ? null : ipEvents.remove(0));
+			}
+		}
 	};
 
 	/**
