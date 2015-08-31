@@ -2408,6 +2408,7 @@ public class KNXnetIPServer
 				// don't use sh.close() here, we would initiate tunneling disconnect sequence
 				// but we have to call svcLoop.quit() to close local data socket
 				svcLoop.quit();
+				freeDeviceAddress(device);
 				return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
 			}
 			dataConnections.add(sh);
