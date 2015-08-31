@@ -76,10 +76,9 @@ import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
-import tuwien.auto.calimero.xml.Element;
 import tuwien.auto.calimero.xml.KNXMLException;
-import tuwien.auto.calimero.xml.XMLFactory;
-import tuwien.auto.calimero.xml.XMLReader;
+import tuwien.auto.calimero.xml.XmlInputFactory;
+import tuwien.auto.calimero.xml.XmlReader;
 
 /**
  * Contains the startup and execution logic for the KNX server gateway. The server configuration is
@@ -167,10 +166,10 @@ public class Launcher implements Runnable
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
-			final XMLReader r = XMLFactory.getInstance().createXMLReader(serverConfigUri);
+			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
 
-			if (r.read() != XMLReader.START_TAG
-					|| !r.getCurrent().getName().equals(XmlConfiguration.knxServer))
+			if (r.nextTag() != XmlReader.START_ELEMENT
+					|| !r.getLocalName().equals(XmlConfiguration.knxServer))
 				throw new KNXMLException("no valid KNX server configuration (no "
 						+ XmlConfiguration.knxServer + " element)");
 
@@ -178,24 +177,23 @@ public class Launcher implements Runnable
 			put(m, r, XmlConfiguration.attrName);
 			put(m, r, XmlConfiguration.attrFriendly);
 
-			while (r.read() != XMLReader.END_DOC) {
-				final Element e = r.getCurrent();
-				final String name = e.getName();
-				if (r.getPosition() == XMLReader.START_TAG) {
+			while (r.next() != XmlReader.END_DOCUMENT) {
+				if (r.getEventType() == XmlReader.START_ELEMENT) {
+					final String name = r.getLocalName();
 					if (name.equals(XmlConfiguration.discovery)) {
-						r.complete(e);
+//						r.complete(e);
 						put(m, r, XmlConfiguration.attrListenNetIf);
 						put(m, r, XmlConfiguration.attrOutgoingNetIf);
 						put(m, r, XmlConfiguration.attrActivate);
 					}
 					else if (name.equals(XmlConfiguration.propDefs)) {
-						final String res = e.getAttribute(XmlConfiguration.attrRef);
+						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
 						// NYI if resource is null, definitions are directly included in element
 						if (res != null) {
-							r.complete(e);
+//							r..complete(e);
 							if (m.containsKey(XmlConfiguration.attrRef))
 								logger.warn("multiple property definition resources, ignore {}, "
-										+ "line {}", res, r.getLineNumber());
+										+ "line {}", res, r.getLocation().getLineNumber());
 							else
 								m.put(XmlConfiguration.attrRef, res);
 						}
@@ -207,20 +205,22 @@ public class Launcher implements Runnable
 			return m;
 		}
 
-		private void readServiceContainer(final XMLReader r) throws KNXMLException
+		private void readServiceContainer(final XmlReader r) throws KNXMLException
 		{
-			Element e = r.getCurrent();
-			if (r.getPosition() != XMLReader.START_TAG
-					|| !e.getName().equals(XmlConfiguration.svcCont))
+			if (r.getEventType() != XmlReader.START_ELEMENT
+					|| !r.getLocalName().equals(XmlConfiguration.svcCont))
 				throw new KNXMLException("no service container element");
 
-			final String attrActivate = e.getAttribute(XmlConfiguration.attrActivate);
+			final String attrActivate = r.getAttributeValue(null, XmlConfiguration.attrActivate);
 			final boolean activate = attrActivate == null || Boolean.parseBoolean(attrActivate);
-			final boolean routing = Boolean.parseBoolean(e.getAttribute(XmlConfiguration.attrRouting));
-			final boolean reuse = Boolean.parseBoolean(e.getAttribute(XmlConfiguration.attrReuseEP));
-			final boolean monitor = Boolean.parseBoolean(e.getAttribute(XmlConfiguration.attrMonitor));
-			final int port = Integer.parseInt(e.getAttribute(XmlConfiguration.attrUdpPort));
-			final NetworkInterface routingNetIf = routing ? getNetIf(e) : null;
+			final boolean routing = Boolean
+					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
+			final boolean reuse = Boolean
+					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
+			final boolean monitor = Boolean
+					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrMonitor));
+			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
+			final NetworkInterface routingNetIf = routing ? getNetIf(r) : null;
 
 			String addr = "";
 			String subnetType = "";
@@ -239,26 +239,25 @@ public class Launcher implements Runnable
 			}
 			catch (final UnknownHostException ignore) {}
 
-			while (r.read() != XMLReader.END_DOC) {
-				e = r.getCurrent();
-				final String name = e.getName();
-				if (r.getPosition() == XMLReader.START_TAG) {
+			while (r.nextTag() != XmlReader.END_DOCUMENT) {
+				final String name = r.getLocalName();
+				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					if (name.equals(XmlConfiguration.datapoints)) {
 						final DatapointMap<Datapoint> dps = new DatapointMap<>();
-						final String res = e.getAttribute(XmlConfiguration.attrRef);
-						final XMLReader dpReader = res != null ? XMLFactory.getInstance()
-								.createXMLReader(res) : r;
+						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
+						final XmlReader dpReader = res != null
+								? XmlInputFactory.newInstance().createXMLReader(res) : r;
 						dps.load(dpReader);
 						datapoints = dps;
 					}
 					else if (name.equals(XmlConfiguration.subnet)) {
-						subnetType = e.getAttribute(XmlConfiguration.attrType);
-						String medium = e.getAttribute(XmlConfiguration.attrMedium);
+						subnetType = r.getAttributeValue(null, XmlConfiguration.attrType);
+						String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
 						if (medium == null)
 							medium = "tp1";
 						subnetMedium = KNXMediumSettings.getMedium(medium);
 
-						final String doa = e.getAttribute(XmlConfiguration.attrDoA);
+						final String doa = r.getAttributeValue(null, XmlConfiguration.attrDoA);
 						if (doa != null) {
 							long l = Long.parseLong(doa, 16);
 							final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
@@ -268,20 +267,20 @@ public class Launcher implements Runnable
 						}
 
 						if (subnetType.equals("knxip"))
-							subnetKnxipNetif = getNetIf(e);
+							subnetKnxipNetif = getNetIf(r);
 						else if (subnetType.equals("user-supplied"))
-							subnetLinkClass = e.getAttribute(XmlConfiguration.attrClass);
-						r.complete(e);
-						addr = e.getCharacterData();
+							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
+//						r.complete(e);
+						addr = r.getElementText();
 					}
 					else if (name.equals(XmlConfiguration.grpAddrFilter))
 						filter = readGroupAddressFilter(r);
 					else if (name.equals(XmlConfiguration.addAddresses))
 						indAddressPool = readAdditionalAddresses(r);
 					else if (name.equals(XmlConfiguration.routingMcast)) {
-						r.complete(e);
+//						r.complete(e);
 						try {
-							routingMcast = InetAddress.getByName(e.getCharacterData());
+							routingMcast = InetAddress.getByName(r.getElementText());
 						}
 						catch (final UnknownHostException uhe) {
 							throw new KNXMLException(uhe.getMessage(), r);
@@ -291,7 +290,7 @@ public class Launcher implements Runnable
 						subnet = new IndividualAddress(r);
 					}
 				}
-				else if (r.getPosition() == XMLReader.END_TAG) {
+				else if (r.getEventType() == XmlReader.END_ELEMENT) {
 					if (name.equals(XmlConfiguration.svcCont)) {
 						final DefaultServiceContainer sc;
 						final KNXMediumSettings s = KNXMediumSettings.create(subnetMedium, subnet);
@@ -301,11 +300,12 @@ public class Launcher implements Runnable
 							((RFSettings) s).setDomainAddress(subnetDoA);
 
 						if (routing)
-							sc = new RoutingServiceContainer(addr, new HPAI((InetAddress) null,
-									port), s, reuse, monitor, routingMcast, routingNetIf);
+							sc = new RoutingServiceContainer(addr,
+									new HPAI((InetAddress) null, port), s, reuse, monitor,
+									routingMcast, routingNetIf);
 						else
-							sc = new DefaultServiceContainer(addr, new HPAI((InetAddress) null,
-									port), s, reuse, monitor);
+							sc = new DefaultServiceContainer(addr,
+									new HPAI((InetAddress) null, port), s, reuse, monitor);
 						sc.setActivationState(activate);
 						subnetTypes.add(subnetType);
 						if ("emulate".equals(subnetType) && datapoints != null)
@@ -322,44 +322,42 @@ public class Launcher implements Runnable
 			}
 		}
 
-		private static List<GroupAddress> readGroupAddressFilter(final XMLReader r)
+		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r)
 			throws KNXMLException
 		{
-			assert r.getCurrent().getName().equals(XmlConfiguration.grpAddrFilter);
-			assert r.getPosition() == XMLReader.START_TAG;
-			r.read();
+			assert r.getLocalName().equals(XmlConfiguration.grpAddrFilter);
+			assert r.getEventType() == XmlReader.START_ELEMENT;
+			r.nextTag();
 			final List<GroupAddress> list = new ArrayList<>();
-			while (!(r.getCurrent().getName().equals(XmlConfiguration.grpAddrFilter) && r
-					.getPosition() == XMLReader.END_TAG)) {
+			while (!(r.getLocalName().equals(XmlConfiguration.grpAddrFilter)
+					&& r.getEventType() == XmlReader.END_ELEMENT)) {
 				list.add(new GroupAddress(r));
-				r.read();
+				r.nextTag();
 			}
 			return list;
 		}
 
-		private static List<IndividualAddress> readAdditionalAddresses(final XMLReader r)
+		private static List<IndividualAddress> readAdditionalAddresses(final XmlReader r)
 			throws KNXMLException
 		{
-			assert r.getCurrent().getName().equals(XmlConfiguration.addAddresses);
-			assert r.getPosition() == XMLReader.START_TAG;
-			r.read();
+			assert r.getLocalName().equals(XmlConfiguration.addAddresses);
+			assert r.getEventType() == XmlReader.START_ELEMENT;
 			final List<IndividualAddress> list = new ArrayList<>();
-			while (!(r.getCurrent().getName().equals(XmlConfiguration.addAddresses) && r
-					.getPosition() == XMLReader.END_TAG)) {
+			while (r.nextTag() != XmlReader.END_ELEMENT
+					&& !(r.getLocalName().equals(XmlConfiguration.addAddresses))) {
 				list.add(new IndividualAddress(r));
-				r.read();
 			}
 			return list;
 		}
 
-		private static void put(final Map<String, String> m, final XMLReader r, final String attr)
+		private static void put(final Map<String, String> m, final XmlReader r, final String attr)
 		{
-			m.put(attr, r.getCurrent().getAttribute(attr));
+			m.put(attr, r.getAttributeValue(null, attr));
 		}
 
-		private static NetworkInterface getNetIf(final Element e)
+		private static NetworkInterface getNetIf(final XmlReader r)
 		{
-			final String attr = e.getAttribute(XmlConfiguration.attrListenNetIf);
+			final String attr = r.getAttributeValue(null, XmlConfiguration.attrListenNetIf);
 			if (attr != null) {
 				try {
 					final NetworkInterface netIf = NetworkInterface.getByName(attr);
@@ -600,7 +598,7 @@ public class Launcher implements Runnable
 	// set KNXnet/IP server additional individual addresses assigned to individual connections
 	private void setAdditionalIndividualAddresses(final InterfaceObjectServer ios,
 		final int objectInstance, final List<IndividualAddress> addresses)
-		throws KNXPropertyException
+			throws KNXPropertyException
 	{
 		for (int i = 0; i < addresses.size(); i++) {
 			final IndividualAddress ia = addresses.get(i);
