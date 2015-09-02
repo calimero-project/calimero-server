@@ -38,8 +38,11 @@ package tuwien.auto.calimero.server.gateway;
 
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.util.Arrays;
+import java.util.List;
 
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
@@ -49,9 +52,11 @@ import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkFT12;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
+import tuwien.auto.calimero.link.KNXNetworkLinkTpuart;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.KNXNetworkMonitorFT12;
 import tuwien.auto.calimero.link.KNXNetworkMonitorIP;
+import tuwien.auto.calimero.link.KNXNetworkMonitorTpuart;
 import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -214,6 +219,11 @@ public class SubnetConnector
 			throw new KNXException("no USB support");
 		else if ("ft12".equals(subnetType))
 			link = new KNXNetworkLinkFT12(linkArgs, settings);
+		else if ("tpuart".equals(subnetType)) {
+			// TODO workaround for the only case when server ctrl endpoint address is reused!!
+			final List ack = Arrays.asList(new KNXAddress[] { sc.getSubnetAddress() });
+			link = new KNXNetworkLinkTpuart(linkArgs, settings, ack);
+		}
 		else if ("user-supplied".equals(subnetType))
 			link = (KNXNetworkLink) newLinkUsing(className, linkArgs.split(",|\\|"));
 		else if ("virtual".equals(subnetType)) {
@@ -260,6 +270,8 @@ public class SubnetConnector
 			throw new KNXException("no USB support");
 		else if ("ft12".equals(subnetType))
 			link = new KNXNetworkMonitorFT12(linkArgs, settings);
+		else if ("tpuart".equals(subnetType))
+			link = new KNXNetworkMonitorTpuart(linkArgs, false);
 		else if ("user-supplied".equals(subnetType))
 			link = (KNXNetworkMonitor) newLinkUsing(className, linkArgs.split(",|\\|"));
 		else

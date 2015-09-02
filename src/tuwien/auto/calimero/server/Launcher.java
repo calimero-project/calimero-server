@@ -133,7 +133,7 @@ public class Launcher implements Runnable
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
 		public static final String attrMonitor = "allowNetworkMonitoring";
-		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "virtual", "user-supplied"] */
+		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"] */
 		public static final String attrType = "type";
 		/** KNX subnet communication medium: { "tp1", "pl110", "pl132", "knxip", "rf" } */
 		public static final String attrMedium = "medium";
@@ -428,10 +428,8 @@ public class Launcher implements Runnable
 		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, netIfListen);
 		final String netIfOutgoing = (String) config.get(XmlConfiguration.attrOutgoingNetIf);
 		server.setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, netIfOutgoing);
-		final String runDiscovery;
-		if (config.containsKey(XmlConfiguration.attrActivate))
-			runDiscovery = (String) config.get(XmlConfiguration.attrActivate);
-		else
+		String runDiscovery = (String) config.get(XmlConfiguration.attrActivate);
+		if (runDiscovery == null)
 			runDiscovery = "true";
 		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, runDiscovery);
 
@@ -486,7 +484,10 @@ public class Launcher implements Runnable
 			logger.error("initialization of KNX server interrupted");
 		}
 		catch (final KNXException e) {
-			logger.error("initialization of KNX server, " + e.getMessage());
+			logger.error("initialization of KNX server", e);
+		}
+		catch (final RuntimeException e) {
+			logger.error("initialization of KNX server", e);
 		}
 		finally {
 			for (final Iterator i = linksToClose.iterator(); i.hasNext();)

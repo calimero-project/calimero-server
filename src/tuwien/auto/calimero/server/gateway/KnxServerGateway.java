@@ -196,6 +196,13 @@ public class KnxServerGateway implements Runnable
 				return false;
 			}
 
+			// if this is a TP-UART link (not monitor), we do have to tell it the assigned device
+			// address, so it can generate the acks on the bus for our clients
+			if (connector.getSubnetLink() instanceof KNXNetworkLink) {
+				final KNXNetworkLink link = (KNXNetworkLink) connector.getSubnetLink();
+				// XXX we deal with proxies here -> verify/cast TP-UART link
+				//link.addAddress(assignedDeviceAddress);
+			}
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
 			if (assignedDeviceAddress != null)
@@ -924,7 +931,7 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KNXTimeoutException e) {
 			setNetworkState(true, true);
-			e.printStackTrace();
+			logger.warn("timeout sending to " + f.getDestination() + ": " + e);
 		}
 		catch (final KNXFormatException e) {
 			e.printStackTrace();
