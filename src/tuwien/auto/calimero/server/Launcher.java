@@ -134,7 +134,7 @@ public class Launcher implements Runnable
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
 		public static final String attrMonitor = "allowNetworkMonitoring";
-		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "virtual", "user-supplied"] */
+		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"] */
 		public static final String attrType = "type";
 		/** KNX subnet communication medium: { "tp1", "pl110", "pl132", "knxip", "rf" } */
 		public static final String attrMedium = "medium";
@@ -477,7 +477,7 @@ public class Launcher implements Runnable
 		catch (final InterruptedException e) {
 			logger.error("initialization of KNX server interrupted");
 		}
-		catch (final KNXException e) {
+		catch (final KNXException | RuntimeException e) {
 			logger.error("initialization of KNX server, " + e.getMessage());
 		}
 		finally {

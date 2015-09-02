@@ -38,6 +38,7 @@ Supported Features
 * KNX RF USB
 * KNX USB
 * KNX FT1.2 Protocol (serial connections)
+* TP-UART (serial connections)
 
 ### Configuration
 * XML configuration for startup
@@ -104,7 +105,7 @@ Elements and attributes of `server-config.xml`:
 * `<knxAddress type="individual">7.1.1</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
 * `<routingMcast>` (optional): the multicast group used by the service container with KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12 
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port], or USB interface name/ID, constructor arguments, ... Attributes:
-	- `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "virtual", "user-supplied"
+	- `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
 	- `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "pl132", "knxip", "rf"
 	- `listenNetIf` (KNX IP only): network interface for KNX IP communication
 	- `domainAddress` (open media only): domain address for power-line or RF transmission medium
