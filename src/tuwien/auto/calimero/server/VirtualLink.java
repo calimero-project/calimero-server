@@ -132,11 +132,7 @@ public class VirtualLink extends AbstractLink
 		// we indicate all group destinations, and our device individual address,
 		// filter out other individual addresses for device destination
 		if (uplink.isDeviceLink) {
-			// the default individual address
-			final IndividualAddress defaultAddress = new IndividualAddress(0xffff);
 			if (msg.getDestination() instanceof GroupAddress)
-				; // accept
-			else if (msg.getDestination().equals(defaultAddress))
 				; // accept
 			else if (!msg.getDestination().equals(uplink.getKNXMedium().getDeviceAddress()))
 				return;
