@@ -183,7 +183,6 @@ public class Launcher implements Runnable
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					final String name = r.getLocalName();
 					if (name.equals(XmlConfiguration.discovery)) {
-//						r.complete(e);
 						put(m, r, XmlConfiguration.attrListenNetIf);
 						put(m, r, XmlConfiguration.attrOutgoingNetIf);
 						put(m, r, XmlConfiguration.attrActivate);
@@ -192,7 +191,6 @@ public class Launcher implements Runnable
 						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
 						// NYI if resource is null, definitions are directly included in element
 						if (res != null) {
-//							r..complete(e);
 							if (m.containsKey(XmlConfiguration.attrRef))
 								logger.warn("multiple property definition resources, ignore {}, "
 										+ "line {}", res, r.getLocation().getLineNumber());
@@ -272,7 +270,6 @@ public class Launcher implements Runnable
 							subnetKnxipNetif = getNetIf(r);
 						else if (subnetType.equals("user-supplied"))
 							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
-//						r.complete(e);
 						addr = r.getElementText();
 					}
 					else if (name.equals(XmlConfiguration.grpAddrFilter))
@@ -280,7 +277,6 @@ public class Launcher implements Runnable
 					else if (name.equals(XmlConfiguration.addAddresses))
 						indAddressPool = readAdditionalAddresses(r);
 					else if (name.equals(XmlConfiguration.routingMcast)) {
-//						r.complete(e);
 						try {
 							routingMcast = InetAddress.getByName(r.getElementText());
 						}
@@ -387,7 +383,6 @@ public class Launcher implements Runnable
 
 	/**
 	 * Main entry routine for starting the KNX server gateway.
-	 * <p>
 	 *
 	 * @param args the file name or URI to the KNX server XML configuration
 	 */
@@ -408,7 +403,7 @@ public class Launcher implements Runnable
 	}
 
 	/**
-	 * Launcher constructor
+	 * Launcher constructor.
 	 *
 	 * @param configUri location/file of KNX server and gateway configuration
 	 * @throws KNXException
@@ -450,9 +445,7 @@ public class Launcher implements Runnable
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Runnable#run()
-	 */
+	@Override
 	public void run()
 	{
 		final List<SubnetConnector> connectors = new ArrayList<>();
@@ -480,7 +473,7 @@ public class Launcher implements Runnable
 			logger.error("initialization of KNX server interrupted");
 		}
 		catch (final KNXException | RuntimeException e) {
-			logger.error("initialization of KNX server, " + e.getMessage());
+			logger.error("initialization of KNX server failed", e);
 		}
 		finally {
 			for (final Iterator<KNXNetworkLink> i = linksToClose.iterator(); i.hasNext();)

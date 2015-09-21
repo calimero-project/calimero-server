@@ -816,8 +816,9 @@ public class KNXnetIPServer
 
 		// initialize interface device object properties
 
-		// TODO check what's max value for long frames (and actually enforce it ;)
-		ios.setProperty(devObject, objectInstance, PID.MAX_APDULENGTH, 1, 1, new byte[] { 0, 15 });
+		// max APDU length is in range [15 .. 254]
+		ios.setProperty(devObject, objectInstance, PID.MAX_APDULENGTH, 1, 1,
+				new byte[] { 0, (byte) 254 });
 		ios.setProperty(devObject, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = split(Settings.getLibraryVersion(), ". -");
@@ -1118,7 +1119,7 @@ public class KNXnetIPServer
 				return;
 		}
 		final Builder builder = new Builder(outgoing, listen);
-		final LooperThread t = new LooperThread(serverName + "/KNXnet/IP discovery endpoint",
+		final LooperThread t = new LooperThread(serverName + " discovery endpoint",
 				retryAttempts, builder);
 		discovery = t;
 		discovery.start();
@@ -1134,8 +1135,8 @@ public class KNXnetIPServer
 
 	private void startControlEndpoint(final ServiceContainer sc)
 	{
-		final LooperThread t = new LooperThread(serverName + "/" + sc.getName()
-				+ " control endpoint", 9, new Builder(true, sc, null));
+		final LooperThread t = new LooperThread(serverName + " control endpoint " + sc.getName(), 9,
+				new Builder(true, sc, null));
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingEndpoint)
@@ -1165,7 +1166,7 @@ public class KNXnetIPServer
 		final Builder builder = new Builder(sc, endpoint.getRoutingInterface(), mcast,
 				multicastLoopback);
 		final LooperThread t = new LooperThread(
-				serverName + "/routing service " + mcast.getHostAddress(), 9, builder);
+				serverName + " routing service " + mcast.getHostAddress(), 9, builder);
 		routingEndpoints.add(t);
 		t.start();
 	}

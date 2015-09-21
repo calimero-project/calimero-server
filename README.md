@@ -98,8 +98,8 @@ Elements and attributes of `server-config.xml`:
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
 	- `routing`: serve KNXnet/IP routing connections (set `true`) or disable KNXnet/IP routing (set `false`)
 	- `allowNetworkMonitoring`: allow connection requests in KNX busmonitor layer
-	- `udpPort`: (optional) UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671"
-	-  `listenNetIf`: (optional): network interface to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network interface
+	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671"
+	-  `listenNetIf` (optional): network interface to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network interface
 	- `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections. If reuse is enabled, no list of additional KNX individual addresses is required (see below). Reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated.
 
 * `<knxAddress type="individual">7.1.1</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
