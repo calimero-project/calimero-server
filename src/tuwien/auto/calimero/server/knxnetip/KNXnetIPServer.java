@@ -288,8 +288,7 @@ public class KNXnetIPServer
 	private static final int devObject = InterfaceObject.DEVICE_OBJECT;
 	private static final int knxObject = InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
-	// The object instance determines which instance of an object type the server
-	// will query for properties. Always defaults to 1.
+	// TODO use service container specific object instance, and not a default of 1
 	private final int objectInstance = 1;
 
 	private final EventListeners listeners = new EventListeners();
@@ -899,7 +898,7 @@ public class KNXnetIPServer
 		if (endpoint != null)
 			setRoutingConfiguration(endpoint);
 		else
-			resetRoutingConfiguration();
+			resetRoutingConfiguration(objectInstance);
 
 		// ip and setup multicast
 		byte[] ip = new byte[4];
@@ -946,7 +945,8 @@ public class KNXnetIPServer
 			else {
 				byte[] data = null;
 				try {
-					data = ios.getProperty(knxObject, 1, PID.ROUTING_MULTICAST_ADDRESS, 1, 1);
+					data = ios.getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS,
+							1, 1);
 				}
 				catch (final KNXPropertyException e) {
 					logger.warn("no routing multicast address property value", e);
@@ -969,16 +969,17 @@ public class KNXnetIPServer
 			logger.fatal(s, e);
 			throw new KNXPropertyException(s, CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 		}
-		ios.setProperty(knxObject, 1, PID.ROUTING_MULTICAST_ADDRESS, 1, 1, mcast.getAddress());
+		ios.setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, 1, 1,
+				mcast.getAddress());
 
 		matchRoutingServerDeviceAddress(objectInstance, true);
 	}
 
-	private void resetRoutingConfiguration()
+	private void resetRoutingConfiguration(final int objectInstance)
 	{
 		// routing multicast shall be set 0 if no routing service offered
 		try {
-			ios.setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, 1,
+			ios.setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.ROUTING_MULTICAST_ADDRESS, 1, 1, new byte[4]);
 		}
 		catch (final KNXPropertyException e) {
