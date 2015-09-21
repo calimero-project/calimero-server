@@ -751,6 +751,17 @@ public class KnxServerGateway implements Runnable
 	private void dispatchToOtherSubnets(final CEMILData f, final SubnetConnector exclude)
 	{
 		if (f.getDestination() instanceof IndividualAddress) {
+			// deal with medium independent default individual address
+			if (f.getDestination().getRawAddress() == 0xffff) {
+				logger.trace("default individual address, dispatch to all active KNX subnets");
+				for (final SubnetConnector subnet : connectors) {
+					if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet)) {
+						send((KNXNetworkLink) subnet.getSubnetLink(), f);
+						incMsgTransmitted(true);
+					}
+				}
+				return;
+			}
 			final KNXNetworkLink lnk = findSubnetLink((IndividualAddress) f.getDestination());
 			if (lnk == null) {
 				logger.warn("no subnet configured for destination " + f.getDestination() + " ("
