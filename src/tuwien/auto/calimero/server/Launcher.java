@@ -44,11 +44,13 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -554,6 +556,8 @@ public class Launcher implements Runnable
 		catch (final IOException e) {}
 	}
 
+	private enum RoutingConfig { Reserved, All, None, Table };
+
 	private void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
 		final List<GroupAddress> filter) throws KNXPropertyException
 	{
@@ -568,31 +572,33 @@ public class Launcher implements Runnable
 		}
 
 		if (table.length > 0) {
-			// create interface object and set the address table object property
-			ios.addInterfaceObject(InterfaceObject.ADDRESSTABLE_OBJECT);
+			ensureInterfaceObjectInstance(ios, InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance);
 			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size,
 					table);
 		}
 
+		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
+
 		// set the handling of group addressed frames, based on whether we have set a
 		// group address filter table or not
+		final RoutingConfig route = table.length > 0 ? RoutingConfig.Table : RoutingConfig.All;
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
+				new byte[] {
+					(byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()) });
+		// we currently don't check the group address filter table for subnetworks
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCGROUPCONFIG, 1, 1,
+				new byte[] {
+					(byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()) });
+	}
 
-		// TODO existence should be ensured in the KNXnet/IP router already?
-		boolean routerObject = false;
-		final InterfaceObject[] objects = ios.getInterfaceObjects();
-		for (final InterfaceObject io : objects) {
-			if (io.getType() == InterfaceObject.ROUTER_OBJECT)
-				routerObject = true;
-		}
-		if (!routerObject)
-			ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
-		// TODO explain what the available values are and set them accordingly
-		final int PID_MAIN_GROUPCONFIG = 54;
-		final int PID_SUB_GROUPCONFIG = 55;
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID_MAIN_GROUPCONFIG, 1, 1,
-				new byte[] { 0 });
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID_SUB_GROUPCONFIG, 1, 1,
-				new byte[] { 0 });
+	private void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
+		final int interfaceType, final int instance)
+	{
+		long l = Arrays.asList(ios.getInterfaceObjects()).stream()
+				.filter((io) -> io.getType() == interfaceType).collect(Collectors.counting());
+		// create interface object and set the address table object property
+		while (l++ < instance)
+			ios.addInterfaceObject(interfaceType);
 	}
 
 	// set KNXnet/IP server additional individual addresses assigned to individual connections
