@@ -153,7 +153,7 @@ public class SubnetConnector
 	 * @param subnetArgs the arguments to create the subnet link
 	 */
 	public static final SubnetConnector newCustom(final ServiceContainer container,
-		final String interfaceType, final int groupAddrTableInstance, final Object ... subnetArgs)
+		final String interfaceType, final int groupAddrTableInstance, final Object... subnetArgs)
 	{
 		return new SubnetConnector(container, interfaceType, null, null, null,
 				groupAddrTableInstance, subnetArgs);
@@ -161,7 +161,7 @@ public class SubnetConnector
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs,
-		final int groupAddrTableInstance, final Object ... args)
+		final int groupAddrTableInstance, final Object... args)
 	{
 		sc = container;
 		subnetType = interfaceType;
@@ -270,25 +270,31 @@ public class SubnetConnector
 	public KNXNetworkMonitor openMonitorLink() throws KNXException, InterruptedException
 	{
 		final KNXMediumSettings settings = sc.getMediumSettings();
-		KNXNetworkMonitor link;
+		final TSupplier<KNXNetworkMonitor> ts;
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
 			final String[] args = linkArgs.split(":");
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			link = new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false, settings);
+			ts = () -> new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false,
+					settings);
 		}
 		else if ("usb".equals(subnetType))
-			link = new KNXNetworkMonitorUsb(linkArgs, settings);
+			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
 		else if ("ft12".equals(subnetType))
-			link = new KNXNetworkMonitorFT12(linkArgs, settings);
+			ts = () -> new KNXNetworkMonitorFT12(linkArgs, settings);
 		else if ("tpuart".equals(subnetType))
-			link = new KNXNetworkMonitorTpuart(linkArgs, false);
+			ts = () -> new KNXNetworkMonitorTpuart(linkArgs, false);
 		else if ("user-supplied".equals(subnetType))
-			link = newLinkUsing(className, linkArgs.split(",|\\|"));
+			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+		else if ("virtual".equals(subnetType) || "emulate".equals(subnetType))
+			return null;
 		else
 			throw new KNXException("monitor link: unknown KNX subnet specifier " + subnetType);
 
+		final Connector c = new Connector().reconnectOn(true, true, true)
+				.reconnectWait(10, TimeUnit.SECONDS).maxConnectAttempts(Connector.NoMaxAttempts);
+		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
 	}
