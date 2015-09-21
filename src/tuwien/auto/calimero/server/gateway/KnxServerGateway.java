@@ -71,9 +71,11 @@ import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
+import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
+import tuwien.auto.calimero.link.KNXNetworkLinkTpuart;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -168,22 +170,22 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
 			if (connector == null)
 				return false;
-			final AutoCloseable subnetLink = connector.getSubnetLink();
 			final String subnetType = connector.getInterfaceType();
 			final String subnetArgs = connector.getLinkArguments();
 			final ServiceContainer serviceContainer = connector.getServiceContainer();
 			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
 
+			AutoCloseable subnetLink = connector.getSubnetLink();
+			if (subnetLink instanceof Link)
+				subnetLink = ((Link<?>) subnetLink).target();
 			try {
-				if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
+				if (subnetLink instanceof VirtualLink)
+					;
+				else if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
 					closeLink(subnetLink);
 					connector.openNetworkLink();
 				}
 				else if (networkMonitor && !(subnetLink instanceof KNXNetworkMonitor)) {
-					// XXX workaround to ensure a virtual link stays open: we currently don't
-					// support virtual monitoring
-					if (subnetLink instanceof VirtualLink)
-						return false;
 					closeLink(subnetLink);
 					connector.openMonitorLink();
 				}
@@ -198,10 +200,12 @@ public class KnxServerGateway implements Runnable
 
 			// if this is a TP-UART link (not monitor), we do have to tell it the assigned device
 			// address, so it can generate the acks on the bus for our clients
-			if (connector.getSubnetLink() instanceof KNXNetworkLink) {
-				final KNXNetworkLink link = (KNXNetworkLink) connector.getSubnetLink();
-				// XXX we deal with proxies here -> verify/cast TP-UART link
-				//link.addAddress(assignedDeviceAddress);
+			AutoCloseable unknown = connector.getSubnetLink();
+			if (unknown instanceof Link)
+				unknown = ((Link<?>) unknown).target();
+			if (unknown instanceof KNXNetworkLinkTpuart) {
+				final KNXNetworkLinkTpuart tpuart = (KNXNetworkLinkTpuart) unknown;
+				tpuart.addAddress(assignedDeviceAddress);
 			}
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
