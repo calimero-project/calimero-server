@@ -155,7 +155,7 @@ public class SubnetConnector
 	public static final SubnetConnector newCustom(final ServiceContainer container,
 		final String interfaceType, final int groupAddrTableInstance, final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, null,
+		return new SubnetConnector(container, interfaceType, null, null, interfaceType,
 				groupAddrTableInstance, subnetArgs);
 	}
 
@@ -234,13 +234,13 @@ public class SubnetConnector
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
 		else if ("virtual".equals(subnetType)) {
 			// if we use connector, we cannot cast link to VirtualLink for creating device links
-			final KNXNetworkLink link = new VirtualLink(linkArgs, new IndividualAddress(0));
+			final KNXNetworkLink link = new VirtualLink(linkArgs, settings);
 			setSubnetLink(link);
 			return link;
 		}
 		else if ("emulate".equals(subnetType)) {
 			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
-			final VirtualLink vl = new VirtualLink("virtual link", new IndividualAddress(0));
+			final VirtualLink vl = new VirtualLink(linkArgs, settings);
 			final Configuration config = nb.addConfiguration(vl);
 			config.setQueryBufferOnly(false);
 
