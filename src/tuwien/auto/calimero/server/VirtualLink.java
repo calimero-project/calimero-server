@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -54,7 +54,9 @@ import tuwien.auto.calimero.link.AbstractLink;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.NetworkLinkListener;
-import tuwien.auto.calimero.link.medium.TPSettings;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.PLSettings;
+import tuwien.auto.calimero.link.medium.RFSettings;
 
 /**
  * A subnet link implementation used for virtual KNX networks. In such networks, the KNX
@@ -71,15 +73,15 @@ public class VirtualLink extends AbstractLink
 
 	private final boolean isDeviceLink;
 
-	public VirtualLink(final String name, final IndividualAddress endpoint)
+	public VirtualLink(final String name, final KNXMediumSettings settings)
 	{
-		this(name, endpoint, false);
+		this(name, settings, false);
 	}
 
-	private VirtualLink(final String name, final IndividualAddress endpoint,
+	private VirtualLink(final String name, final KNXMediumSettings settings,
 		final boolean isDeviceLink)
 	{
-		super(name, new TPSettings(endpoint));
+		super(name, settings);
 		this.isDeviceLink = isDeviceLink;
 	}
 
@@ -89,25 +91,17 @@ public class VirtualLink extends AbstractLink
 		if (isDeviceLink)
 			throw new KNXIllegalStateException("don't create device link from device link");
 
-		final VirtualLink devLink = new VirtualLink("device " + device, device, true);
+		final KNXMediumSettings ms = getKNXMedium();
+		final KNXMediumSettings devSettings = KNXMediumSettings.create(ms.getMedium(), device);
+		if (ms instanceof PLSettings)
+			((PLSettings) devSettings).setDomainAddress(((PLSettings) ms).getDomainAddress());
+		if (ms instanceof RFSettings)
+			((RFSettings) devSettings).setDomainAddress(((RFSettings) ms).getDomainAddress());
+
+		final VirtualLink devLink = new VirtualLink(device.toString(), devSettings, true);
 		devLink.deviceLinks.add(this);
 		deviceLinks.add(devLink);
 		return devLink;
-	}
-
-	public void addLinkListener(final NetworkLinkListener l)
-	{
-		listeners.add(l);
-	}
-
-	public void removeLinkListener(final NetworkLinkListener l)
-	{
-		listeners.remove(l);
-	}
-
-	public String toString()
-	{
-		return getName() + " " + getKNXMedium().getDeviceAddress();
 	}
 
 	protected void onSend(final KNXAddress dst, final byte[] msg, final boolean waitForCon)

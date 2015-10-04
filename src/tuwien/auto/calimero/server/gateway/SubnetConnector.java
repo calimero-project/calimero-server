@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,6 +47,7 @@ import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
 import tuwien.auto.calimero.datapoint.DatapointModel;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -148,7 +149,7 @@ public class SubnetConnector
 	public static final SubnetConnector newCustom(final ServiceContainer container,
 		final String interfaceType, final int groupAddrTableInstance, final Object[] subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, null,
+		return new SubnetConnector(container, interfaceType, null, null, interfaceType,
 				groupAddrTableInstance, subnetArgs);
 	}
 
@@ -227,11 +228,13 @@ public class SubnetConnector
 			link = (KNXNetworkLink) newLinkUsing(className, linkArgs.split(",|\\|"));
 		else if ("virtual".equals(subnetType)) {
 			// if we use connector, we cannot cast link to VirtualLink for creating device links
-			link = new VirtualLink(linkArgs, new IndividualAddress(0));
+			link = new VirtualLink(linkArgs, settings);
+			setSubnetLink(link);
+			return link;
 		}
 		else if ("emulate".equals(subnetType)) {
 			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
-			final VirtualLink vl = new VirtualLink("virtual link", new IndividualAddress(0));
+			final VirtualLink vl = new VirtualLink(linkArgs, settings);
 			final Configuration config = nb.addConfiguration(vl);
 			config.setQueryBufferOnly(false);
 
