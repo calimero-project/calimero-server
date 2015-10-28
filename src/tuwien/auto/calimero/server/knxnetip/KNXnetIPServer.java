@@ -85,6 +85,7 @@ import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
+import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel.TunnelingLayer;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectResponse;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectionstateRequest;
@@ -2291,12 +2292,18 @@ public class KNXnetIPServer
 
 			final int connType = req.getCRI().getConnectionType();
 			if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
-				final int knxLayer = ((TunnelCRI) req.getCRI()).getKNXLayer();
-				if (knxLayer != KNXnetIPTunnel.LINK_LAYER
-						&& knxLayer != KNXnetIPTunnel.BUSMONITOR_LAYER)
+				TunnelingLayer knxLayer;
+				try {
+					knxLayer = TunnelingLayer.from(((TunnelCRI) req.getCRI()).getKNXLayer());
+				}
+				catch (final KNXIllegalArgumentException e) {
+					return new Object[] { new Integer(ErrorCodes.TUNNELING_LAYER) };
+				}
+				if (knxLayer != TunnelingLayer.LinkLayer
+						&& knxLayer != TunnelingLayer.BusMonitorLayer)
 					return new Object[] { new Integer(ErrorCodes.TUNNELING_LAYER) };
 
-				busmonitor = knxLayer == KNXnetIPTunnel.BUSMONITOR_LAYER;
+				busmonitor = knxLayer == TunnelingLayer.BusMonitorLayer;
 				if (busmonitor) {
 					// check if service container has busmonitor allowed
 					if (!svcCont.isNetworkMonitoringAllowed())
