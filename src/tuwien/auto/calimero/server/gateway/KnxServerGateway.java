@@ -875,9 +875,15 @@ public class KnxServerGateway implements Runnable
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
 				}
-				else
-					logger.warn("no active KNXnet/IP connection for destination {}",
+				else {
+					logger.warn("no active KNXnet/IP connection for destination {}, send to all",
 							f.getDestination());
+					// create temporary array to not block concurrent access during iteration
+					final KNXnetIPConnection[] sca = serverConnections
+							.toArray(new KNXnetIPConnection[serverConnections.size()]);
+					for (int i = 0; i < sca.length; i++)
+						sca[i].send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+				}
 			}
 			else {
 				final int raw = f.getDestination().getRawAddress();
