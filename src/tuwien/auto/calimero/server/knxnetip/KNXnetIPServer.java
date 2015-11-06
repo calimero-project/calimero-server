@@ -64,6 +64,7 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 
 import tuwien.auto.calimero.CloseEvent;
+import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
@@ -835,6 +836,13 @@ public class KNXnetIPServer
 		// revision counting is not aligned with library version for now
 		ios.setProperty(devObject, objectInstance, PID.FIRMWARE_REVISION, 1, 1, new byte[] { 1 });
 
+		ios.setProperty(devObject, objectInstance, PID.DEVICE_DESCRIPTOR, 1, 1,
+				DeviceDescriptor.DD0.TYPE_091A.toByteArray());
+
+		// requested by ETS during its interface discovery
+		ios.setProperty(devObject, objectInstance, PID.DOMAIN_ADDRESS, 1, 1,
+				new byte[] { 0x0, 0x0 });
+
 		//
 		// set properties used in device DIB for search response during discovery
 		//
@@ -845,7 +853,6 @@ public class KNXnetIPServer
 		// server KNX device address, since we don't know about routing at this time
 		// address is always 0.0.0; might be updated later or by routing configuration
 		final byte[] device = new IndividualAddress(0).toByteArray();
-
 		// equal to PID.KNX_INDIVIDUAL_ADDRESS
 		ios.setProperty(devObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1,
 				new byte[] { device[0] });
