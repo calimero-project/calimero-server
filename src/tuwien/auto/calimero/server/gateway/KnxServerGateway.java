@@ -931,8 +931,11 @@ public class KnxServerGateway implements Runnable
 			// we have to adjust a possible routing .ind from server-side to .req,
 			// or vice versa a .req to .ind if we use KNXnet/IP routing on the KNX subnet
 			// ??? HACK: do we use routing on the KNX subnet
-			final boolean routing = lnk instanceof KNXNetworkLinkIP
-					&& lnk.toString().contains("routing");
+			AutoCloseable subnetLink = lnk;
+			if (subnetLink instanceof Link)
+				subnetLink = ((Link<?>) subnetLink).target();
+			final boolean routing = subnetLink instanceof KNXNetworkLinkIP
+					&& subnetLink.toString().contains("routing");
 
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
