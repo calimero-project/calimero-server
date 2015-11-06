@@ -434,14 +434,14 @@ public class KNXnetIPServer
 			final InterfaceObject[] objects = io.getInterfaceObjects();
 			svcContToIfObj.put(sc, objects[objects.length - 1]);
 			// init the parameter object
+			svcContainers.add(sc);
 			final RoutingEndpoint ep = sc instanceof RoutingEndpoint ? (RoutingEndpoint) sc : null;
 			try {
-				initKNXnetIpParameterObject(svcContainers.size() + 1, ep);
+				initKNXnetIpParameterObject(svcContainers.size(), ep);
 			}
 			catch (final KNXPropertyException e) {
 				e.printStackTrace();
 			}
-			svcContainers.add(sc);
 			synchronized (this) {
 				if (running)
 					startControlEndpoint(sc);
@@ -1007,6 +1007,9 @@ public class KNXnetIPServer
 			else if (!routingSupported && device.equals(defKnxAddress))
 				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1,
 						new IndividualAddress(0).toByteArray());
+			else if (!routingSupported && device.getRawAddress() == 0)
+				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1,
+						svcContainers.get(svcContainers.size() - 1).getSubnetAddress().toByteArray());
 		}
 		catch (final KNXPropertyException e) {
 			logger.warn("matching server device address to routing capabilities, " + e.getMessage());
