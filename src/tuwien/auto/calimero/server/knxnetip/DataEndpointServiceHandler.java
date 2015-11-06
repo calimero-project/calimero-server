@@ -396,10 +396,10 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			if (monitor) {
 				if (!(frame instanceof CEMIBusMon))
 					throw new KNXIllegalArgumentException(
-							"bus monitor uses cEMI bus monitor frame type");
+							"bus monitor requires cEMI bus monitor frame type");
 			}
 			else if (!(frame instanceof CEMILData))
-				throw new KNXIllegalArgumentException("link layer uses cEMI L-Data frame type");
+				throw new KNXIllegalArgumentException("link layer requires cEMI L-Data frame type");
 		}
 		else if (!(frame instanceof CEMIDevMgmt))
 			throw new KNXIllegalArgumentException("expect cEMI device management frame type");
