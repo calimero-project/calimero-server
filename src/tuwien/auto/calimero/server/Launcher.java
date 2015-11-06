@@ -253,7 +253,9 @@ public class Launcher implements Runnable
 					else if (name.equals(XmlConfiguration.subnet)) {
 						subnetType = r.getAttributeValue(null, XmlConfiguration.attrType);
 						String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
-						if (medium == null)
+						if (subnetType.equals("knxip"))
+							medium = "knxip";
+						else if (medium == null)
 							medium = "tp1";
 						subnetMedium = KNXMediumSettings.getMedium(medium);
 
