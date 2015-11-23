@@ -21,6 +21,10 @@
 		</developer>
 	</developers>
 
+	<properties>
+		<exec.mainClass>tuwien.auto.calimero.server.Launcher</exec.mainClass>
+	</properties>
+
 	<build>
 		<resources>
 			<resource>
@@ -50,6 +54,18 @@
 					<compilerArguments>
 						<profile>compact1</profile>
 					</compilerArguments>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+							<mainClass>${exec.mainClass}</mainClass>
+						</manifest>
+					</archive>
 				</configuration>
 			</plugin>
 			<plugin>
