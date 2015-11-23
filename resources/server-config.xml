@@ -11,32 +11,35 @@
 		udpPort="3671" listenNetIf="eth0" reuseCtrlEP="true">
 		<knxAddress type="individual">7.1.1</knxAddress>
 
-		<!-- Specify the KNX subnet type, connecting the KNX network -->
-		<!-- KNX communication medium: one of { "tp1" (default), "pl110", "pl132", "knxip", "rf" }  -->
+		<!-- Specify the KNX subnet type, connecting the KNX network. Subnet connection type: one of 
+			{ "ip", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" } -->
+		<!-- KNX communication medium: one of { "tp1" (default), "pl110", "knxip", "rf" }  -->
+		
 		<!-- <knxSubnet type="virtual">virtual-subnet</knxSubnet> -->
 		<!-- <knxSubnet type="ip">192.168.10.12:3676</knxSubnet> -->
 		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
-		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->		
+		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->
+		<!-- if USB interface identifier (here "siemens") is left empty, the first found KNX USB interface is used -->
 		<knxSubnet type="usb" medium="pl110" domainAddress="6f">siemens</knxSubnet>
+		<!-- <knxSubnet type="tpuart" medium="tp1">/dev/ttyACM0</knxSubnet> -->
 		<!-- <knxSubnet type="user-supplied" class="my.knx.NetworkLink">o1,i2|i4</knxSubnet> -->
 
-		<!-- Datapoints are only required if a virtual KNX subnet is used -->
+		<!-- Datapoints are only required if an emulated KNX subnet is used -->
 		<!-- <datapoints ref="datapointMap.xml" /> -->
 
 		<!-- KNX group address filter applied for this service container (optional) -->
 		<groupAddressFilter>
-			<knxAddress type="group">2561</knxAddress>
-			<knxAddress type="group">2562</knxAddress>
-			<knxAddress type="group">2563</knxAddress>
-			<knxAddress type="group">2564</knxAddress>
-			<knxAddress type="group">2565</knxAddress>
+			<knxAddress type="group">0/0/0</knxAddress>
+			<knxAddress type="group">2/1/1</knxAddress>
+			<knxAddress type="group">2/1/0</knxAddress>
+			<knxAddress type="group">2/1/20</knxAddress>
 		</groupAddressFilter>
 		<!-- Additional KNX individual addresses assigned to KNXnet/IP connections (optional) -->
 		<additionalAddresses>
-			<knxAddress type="individual">4406</knxAddress>
-			<knxAddress type="individual">4407</knxAddress>
-			<knxAddress type="individual">4408</knxAddress>
-			<knxAddress type="individual">4409</knxAddress>
+			<knxAddress type="individual">7.1.10</knxAddress>
+			<knxAddress type="individual">7.1.11</knxAddress>
+			<knxAddress type="individual">7.1.12</knxAddress>
+			<knxAddress type="individual">7.1.13</knxAddress>
 		</additionalAddresses>
 	</serviceContainer>
 	<!-- Next service container (optional) -->
