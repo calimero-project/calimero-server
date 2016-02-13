@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -206,18 +206,8 @@ public class KNXnetIPServer
 	private static final InetAddress systemSetupMulticast = defRoutingMulticast;
 
 	// PID.MAC_ADDRESS
-	private static final byte[] defMacAddress;
-	static {
-		final byte[] mac = new byte[6];
-		// getHardwareAddress is not supported on ME CDC
-		//try {
-		//	mac = NetworkInterface.getByInetAddress(InetAddress.getLocalHost())
-		//			.getHardwareAddress();
-		//}
-		//catch (final SocketException e) {}
-		//catch (final UnknownHostException e) {}
-		defMacAddress = mac;
-	}
+	// we set the actual MAC address per service container when we have the socket information
+	private static final byte[] defMacAddress = new byte[6];
 
 	// Values used for service families DIB
 
@@ -897,6 +887,7 @@ public class KNXnetIPServer
 		// address is always 0.0.0, but is updated in setRoutingConfiguration
 		final byte[] device = new IndividualAddress(0).toByteArray();
 		ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1, device);
+
 		ios.setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1, defMacAddress);
 
 		// routing stuff
@@ -1869,8 +1860,16 @@ public class KNXnetIPServer
 					if (sc.isActivated()) {
 						// we create our own HPAI from the actual socket, since
 						// the service container might have opted for ephemeral port use
-						final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(),
-								(InetSocketAddress) ces.getSocket().getLocalSocketAddress());
+						InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
+						final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
+
+						byte[] mac = null;
+						try {
+							mac = NetworkInterface.getByInetAddress(local.getAddress()).getHardwareAddress();
+							ios.setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1, mac);
+						}
+						catch (final SocketException | KNXPropertyException e) {}
+
 						final DeviceDIB device = createDeviceDIB(sc);
 						final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device,
 								svcFamilies));
