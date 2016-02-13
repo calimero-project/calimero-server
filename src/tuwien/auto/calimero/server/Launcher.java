@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -138,7 +138,7 @@ public class Launcher implements Runnable
 		public static final String attrMonitor = "allowNetworkMonitoring";
 		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"] */
 		public static final String attrType = "type";
-		/** KNX subnet communication medium: { "tp1", "pl110", "pl132", "knxip", "rf" } */
+		/** KNX subnet communication medium: { "tp1", "pl110", "knxip", "rf" } */
 		public static final String attrMedium = "medium";
 		/** KNX subnet domain address for power-line and RF, as hexadecimal value string */
 		public static final String attrDoA = "domainAddress";
