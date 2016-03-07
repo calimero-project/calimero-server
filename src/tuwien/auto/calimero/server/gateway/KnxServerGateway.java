@@ -72,6 +72,7 @@ import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
+import tuwien.auto.calimero.link.KNXNetworkLinkTpuart;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -171,17 +172,13 @@ public class KnxServerGateway implements Runnable
 			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
 
 			try {
-				if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
+				if (subnetLink instanceof VirtualLink)
+					logger.info("connect request to virtual network (no support for busmonitor layer)");
+				else if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
 					closeLink(subnetLink);
 					connector.openNetworkLink();
 				}
 				else if (networkMonitor && !(subnetLink instanceof KNXNetworkMonitor)) {
-					// XXX workaround to ensure a virtual link stays open: we currently don't
-					// support virtual monitoring
-					if (subnetLink instanceof VirtualLink) {
-						logger.warn("deny connect request, virtual network does not support busmonitor layer");
-						return false;
-					}
 					closeLink(subnetLink);
 					connector.openMonitorLink();
 				}
@@ -200,10 +197,9 @@ public class KnxServerGateway implements Runnable
 
 			// if this is a TP-UART link (not monitor), we do have to tell it the assigned device
 			// address, so it can generate the acks on the bus for our clients
-			if (connector.getSubnetLink() instanceof KNXNetworkLink) {
-				final KNXNetworkLink link = (KNXNetworkLink) connector.getSubnetLink();
-				// XXX we deal with proxies here -> verify/cast TP-UART link
-				//link.addAddress(assignedDeviceAddress);
+			if (connector.getSubnetLink() instanceof KNXNetworkLinkTpuart) {
+				final KNXNetworkLinkTpuart tpuart = (KNXNetworkLinkTpuart) connector.getSubnetLink();
+				tpuart.addAddress(assignedDeviceAddress);
 			}
 			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
