@@ -90,18 +90,28 @@ public class VirtualLink extends AbstractLink
 		// we could allow this in theory, but not really needed
 		if (isDeviceLink)
 			throw new KNXIllegalStateException("don't create device link from device link");
-
+	
 		final KNXMediumSettings ms = getKNXMedium();
 		final KNXMediumSettings devSettings = KNXMediumSettings.create(ms.getMedium(), device);
 		if (ms instanceof PLSettings)
 			((PLSettings) devSettings).setDomainAddress(((PLSettings) ms).getDomainAddress());
 		if (ms instanceof RFSettings)
 			((RFSettings) devSettings).setDomainAddress(((RFSettings) ms).getDomainAddress());
-
+	
 		final VirtualLink devLink = new VirtualLink(device.toString(), devSettings, true);
 		devLink.deviceLinks.add(this);
 		deviceLinks.add(devLink);
 		return devLink;
+	}
+
+	public void addLinkListener(final NetworkLinkListener l)
+	{
+		listeners.add(l);
+	}
+
+	public void removeLinkListener(final NetworkLinkListener l)
+	{
+		listeners.remove(l);
 	}
 
 	protected void onSend(final KNXAddress dst, final byte[] msg, final boolean waitForCon)
