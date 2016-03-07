@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -580,32 +580,40 @@ public class Launcher implements Runnable
 		}
 
 		if (table.length > 0) {
-			// create interface object and set the address table object property
-			ios.addInterfaceObject(InterfaceObject.ADDRESSTABLE_OBJECT);
-			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size,
-					table);
+			ensureInterfaceObjectInstance(ios, InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance);
+			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size, table);
 		}
+
+		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
+
+		// Routing Config
+//		final int Reserved = 0;
+		final int All = 1;
+//		final int None = 2;
+		final int Table = 3;
 
 		// set the handling of group addressed frames, based on whether we have set a
 		// group address filter table or not
+		final int route = table.length > 0 ? Table : All;
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
+				new byte[] { (byte) (1 << 4 | All << 2 | route) });
+		// we currently don't check the group address filter table for subnetworks
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCGROUPCONFIG, 1, 1,
+				new byte[] { (byte) (All << 2 | All) });
+	}
 
-		// TODO existence should be ensured in the KNXnet/IP router already?
-		boolean routerObject = false;
+	private void ensureInterfaceObjectInstance(final InterfaceObjectServer ios, final int interfaceType,
+		final int instance)
+	{
+		long l = 0;
 		final InterfaceObject[] objects = ios.getInterfaceObjects();
 		for (int i = 0; i < objects.length; i++) {
-			final InterfaceObject io = objects[i];
-			if (io.getType() == InterfaceObject.ROUTER_OBJECT)
-				routerObject = true;
+			if (objects[i].getType() == interfaceType)
+				l++;
 		}
-		if (!routerObject)
-			ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
-		// TODO explain what the available values are and set them accordingly
-		final int PID_MAIN_GROUPCONFIG = 54;
-		final int PID_SUB_GROUPCONFIG = 55;
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID_MAIN_GROUPCONFIG, 1, 1,
-				new byte[] { 0 });
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID_SUB_GROUPCONFIG, 1, 1,
-				new byte[] { 0 });
+		// create interface object and set the address table object property
+		while (l++ < instance)
+			ios.addInterfaceObject(interfaceType);
 	}
 
 	// set KNXnet/IP server additional individual addresses assigned to individual connections
