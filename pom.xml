@@ -32,22 +32,6 @@
 	</properties>
 
 	<build>
-		<resources>
-			<resource>
-				<directory>${basedir}</directory>
-				<targetPath>META-INF</targetPath>
-				<includes>
-					<include>LICENSE.txt</include>
-				</includes>
-			</resource>
-			<resource>
-				<directory>resources</directory>
-				<includes>
-					<include>properties.xml</include>
-					<include>server-config.xml</include>
-				</includes>
-			</resource>
-		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
