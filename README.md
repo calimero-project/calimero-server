@@ -1,7 +1,8 @@
 Calimero KNXnet/IP Server
 =========================
 
-A Java KNXnet/IP server.
+A Java KNXnet/IP server to access KNX networks, which also supports wrapping 
+other KNX interfaces into KNXnet/IP server endpoints, e.g., TP-UART.
 
 Download
 --------
@@ -14,7 +15,9 @@ $ git clone https://github.com/calimero-project/calimero-server.git
 $ hub clone calimero-project/calimero-server
 ~~~
 
-The Calimero KNXnet/IP server requires the calimero-core library.
+The Calimero KNXnet/IP server requires the calimero-core and calimero-device library.
+Optional dependencies -- required for communication over serial ports -- are either any of the native libraries 
+of serial-native, or calimero-rxtx for using RXTX (or any RXTX-compliant library) already available on the platform.
 
 Supported Features
 ------------------
@@ -47,14 +50,14 @@ How-to & Examples
 -----------------
 
 The server provides a `Launcher`, together with a server configuration template `server-config.xml` (in the folder `resources`) to start the KNXnet/IP server. The launcher expects a URI or file name pointing to a server configuration.
-Alternatively, one can also run the KNXnet/IP server and gateway in your Java code; see the implementation in `Launcher.java` as a guide.
+Alternatively, one can also run the KNXnet/IP server and gateway directly in Java code; see the implementation in `Launcher.java` as a guide.
 
-First, make sure Java is installed correctly, and all required `jar` packages are available (`calimero-core`). With the following command, the server should print a message that it expects a configuration file and quit:
+First, make sure Java is installed correctly, and all required `jar` packages are available (`calimero-core`, `calimero-device`). With the following command, the server should print a message that it expects a configuration file and quit:
 
 #### Maven
 
 ~~~ sh
-$ mvn exec:java -Dexec.mainClass=tuwien.auto.calimero.server.Launcher
+$ mvn exec:java
 ~~~
 
 #### Java
@@ -64,7 +67,7 @@ $ mvn exec:java -Dexec.mainClass=tuwien.auto.calimero.server.Launcher
 $ java -cp "./*" tuwien.auto.calimero.server.Launcher
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-$ java -cp "calimero-core-2.3-SNAPSHOT.jar:calimero-server-2.3-SNAPSHOT.jar" tuwien.auto.calimero.server.Launcher
+$ java -cp "calimero-core-2.3-beta.jar:calimero-device-2.3-beta.jar:calimero-server-2.3-beta.jar" tuwien.auto.calimero.server.Launcher
 ~~~
 
 ### Start Server with Configuration
@@ -74,7 +77,7 @@ $ java -cp "calimero-core-2.3-SNAPSHOT.jar:calimero-server-2.3-SNAPSHOT.jar" tuw
 Using maven
 
 ~~~ sh
-$ mvn exec:java -Dexec.mainClass=tuwien.auto.calimero.server.Launcher -Dexec.args=resources/server-config.xml
+$ mvn exec:java -Dexec.args=resources/server-config.xml
 ~~~
 
 or Java (make sure any referenced files in the folder `resources` are found, or copy them into the current working directory.)
@@ -99,13 +102,14 @@ Elements and attributes of `server-config.xml`:
 	- `allowNetworkMonitoring`: allow connection requests in KNX busmonitor layer
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671"
 	-  `listenNetIf` (optional): network interface to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network interface
-	- `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections. If reuse is enabled, no list of additional KNX individual addresses is required (see below). Reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated.
+	- `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections. If reuse is enabled, no list of additional KNX individual addresses is required (see below). Reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint at most 1 connection can be established at a time.
+
 
 * `<knxAddress type="individual">7.1.1</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
-* `<routingMcast>` (optional): the multicast group used by the service container with KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12 
+* `<routingMcast>` (optional): the multicast group used by the service container with KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12. If the `routing` attribute is set to `false`, this setting has no effect.
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port], or USB interface name/ID, constructor arguments, ... Attributes:
-	- `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
-	- `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "pl132", "knxip", "rf"
+	- `type`: interface type to KNX subnet, one of "ip", "knxip", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
+	- `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
 	- `listenNetIf` (KNX IP only): network interface for KNX IP communication
 	- `domainAddress` (open media only): domain address for power-line or RF transmission medium
 	- `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
