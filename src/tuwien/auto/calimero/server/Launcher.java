@@ -440,7 +440,7 @@ public class Launcher implements Runnable
 			final String type = xml.subnetTypes.get(i);
 			logger.info("    " + type + " connection, " + sc.getMediumSettings());
 			if (xml.groupAddressFilters.containsKey(sc))
-				logger.info("    GrpAddrFilter " + xml.groupAddressFilters.get(sc));
+				logger.info("    Set group address filter " + xml.groupAddressFilters.get(sc));
 			if (xml.subnetDatapoints.containsKey(sc))
 				logger.info("    Datapoints "
 						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints());
