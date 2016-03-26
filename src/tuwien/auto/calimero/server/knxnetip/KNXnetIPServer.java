@@ -694,7 +694,7 @@ public class KNXnetIPServer
 			return;
 		if (svcContainers.isEmpty())
 			throw new KNXIllegalStateException(serverName + " has no service containers added");
-		logger.info("launch KNXnet/IP server " + getFriendlyName());
+		logger.info("launch KNXnet/IP server \'{}\'", getFriendlyName());
 		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
 		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
