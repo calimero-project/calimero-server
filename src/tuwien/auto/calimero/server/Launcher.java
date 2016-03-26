@@ -363,7 +363,7 @@ public class Launcher implements Runnable
 		private static NetworkInterface getNetIf(final Element e)
 		{
 			final String attr = e.getAttribute(XmlConfiguration.attrListenNetIf);
-			if (attr != null) {
+			if (attr != null && !"any".equals(attr)) {
 				try {
 					final NetworkInterface netIf = NetworkInterface.getByName(attr);
 					if (netIf != null)
