@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
@@ -904,7 +905,13 @@ public class KnxServerGateway implements Runnable
 						.toArray(new KNXnetIPConnection[serverConnections.size()]);
 				for (int i = 0; i < sca.length; i++) {
 					final KNXnetIPConnection c = sca[i];
-					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+					try {
+						c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+					} catch (final KNXIllegalArgumentException e) {
+						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
+						// frames. Catch here, so we can continue serving other open connections.
+						logger.warn("frame not accepted by connection {}: {}", c.getName(), f, e);
+					}
 				}
 			}
 			incMsgTransmitted(false);
