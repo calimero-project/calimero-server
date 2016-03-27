@@ -172,10 +172,9 @@ public class Launcher implements Runnable
 		{
 			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
 
-			if (r.nextTag() != XmlReader.START_ELEMENT
-					|| !r.getLocalName().equals(XmlConfiguration.knxServer))
-				throw new KNXMLException("no valid KNX server configuration (no "
-						+ XmlConfiguration.knxServer + " element)");
+			if (r.nextTag() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.knxServer))
+				throw new KNXMLException(
+						"no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
 
 			final Map<String, String> m = new HashMap<>();
 			put(m, r, XmlConfiguration.attrName);
@@ -209,16 +208,13 @@ public class Launcher implements Runnable
 
 		private void readServiceContainer(final XmlReader r) throws KNXMLException
 		{
-			if (r.getEventType() != XmlReader.START_ELEMENT
-					|| !r.getLocalName().equals(XmlConfiguration.svcCont))
+			if (r.getEventType() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.svcCont))
 				throw new KNXMLException("no service container element");
 
 			final String attrActivate = r.getAttributeValue(null, XmlConfiguration.attrActivate);
 			final boolean activate = attrActivate == null || Boolean.parseBoolean(attrActivate);
-			final boolean routing = Boolean
-					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
-			final boolean reuse = Boolean
-					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
+			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
+			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
 			final boolean monitor = Boolean
 					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring))
 					|| Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrMonitorOld));
@@ -303,12 +299,11 @@ public class Launcher implements Runnable
 							((RFSettings) s).setDomainAddress(subnetDoA);
 
 						if (routing)
-							sc = new RoutingServiceContainer(addr,
-									new HPAI((InetAddress) null, port), s, reuse, monitor,
-									routingMcast, routingNetIf);
+							sc = new RoutingServiceContainer(addr, new HPAI((InetAddress) null, port), s, reuse,
+									monitor, routingMcast, routingNetIf);
 						else
-							sc = new DefaultServiceContainer(addr,
-									new HPAI((InetAddress) null, port), s, reuse, monitor);
+							sc = new DefaultServiceContainer(addr, new HPAI((InetAddress) null, port), s, reuse,
+									monitor);
 						sc.setActivationState(activate);
 						subnetTypes.add(subnetType);
 						if ("emulate".equals(subnetType) && datapoints != null)
@@ -346,8 +341,7 @@ public class Launcher implements Runnable
 			assert r.getLocalName().equals(XmlConfiguration.addAddresses);
 			assert r.getEventType() == XmlReader.START_ELEMENT;
 			final List<IndividualAddress> list = new ArrayList<>();
-			while (r.nextTag() != XmlReader.END_ELEMENT
-					&& !(r.getLocalName().equals(XmlConfiguration.addAddresses))) {
+			while (r.nextTag() != XmlReader.END_ELEMENT && !(r.getLocalName().equals(XmlConfiguration.addAddresses))) {
 				list.add(new IndividualAddress(r));
 			}
 			return list;
@@ -437,8 +431,7 @@ public class Launcher implements Runnable
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			logger.info("Service container " + sc.getName() + ": ");
-			logger.info("    " + sc.getControlEndpoint() + " routing "
-					+ (sc instanceof RoutingServiceContainer));
+			logger.info("    " + sc.getControlEndpoint() + " routing " + (sc instanceof RoutingServiceContainer));
 
 			final String type = xml.subnetTypes.get(i);
 			logger.info("    " + type + " connection, " + sc.getMediumSettings());
@@ -515,14 +508,11 @@ public class Launcher implements Runnable
 			final SubnetConnector connector;
 
 			if ("knxip".equals(subnetType))
-				connector = SubnetConnector.newWithRoutingLink(sc, xml.subnetNetIf.get(sc),
-						subnetArgs, 1);
+				connector = SubnetConnector.newWithRoutingLink(sc, xml.subnetNetIf.get(sc), subnetArgs, 1);
 			else if ("user-supplied".equals(subnetType))
-				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc),
-						subnetArgs, 1);
+				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, 1);
 			else if ("emulate".equals(subnetType))
-				connector = SubnetConnector.newCustom(sc, "emulate", 1,
-						xml.subnetDatapoints.get(sc));
+				connector = SubnetConnector.newCustom(sc, "emulate", 1, xml.subnetDatapoints.get(sc));
 			else
 				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
 
@@ -571,8 +561,7 @@ public class Launcher implements Runnable
 
 		if (table.length > 0) {
 			ensureInterfaceObjectInstance(ios, InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance);
-			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size,
-					table);
+			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size, table);
 		}
 
 		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
@@ -581,12 +570,10 @@ public class Launcher implements Runnable
 		// group address filter table or not
 		final RoutingConfig route = table.length > 0 ? RoutingConfig.Table : RoutingConfig.All;
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
-				new byte[] {
-					(byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()) });
+				new byte[] { (byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()) });
 		// we currently don't check the group address filter table for subnetworks
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCGROUPCONFIG, 1, 1,
-				new byte[] {
-					(byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()) });
+				new byte[] { (byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()) });
 	}
 
 	private void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
@@ -600,9 +587,8 @@ public class Launcher implements Runnable
 	}
 
 	// set KNXnet/IP server additional individual addresses assigned to individual connections
-	private void setAdditionalIndividualAddresses(final InterfaceObjectServer ios,
-		final int objectInstance, final List<IndividualAddress> addresses)
-			throws KNXPropertyException
+	private void setAdditionalIndividualAddresses(final InterfaceObjectServer ios, final int objectInstance,
+		final List<IndividualAddress> addresses) throws KNXPropertyException
 	{
 		for (int i = 0; i < addresses.size(); i++) {
 			final IndividualAddress ia = addresses.get(i);
