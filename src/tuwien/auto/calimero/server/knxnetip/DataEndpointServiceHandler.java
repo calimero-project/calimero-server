@@ -319,6 +319,11 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		return !tunnel;
 	}
 
+	boolean isMonitor()
+	{
+		return monitor;
+	}
+
 	private boolean checkVersion(final KNXnetIPHeader h)
 	{
 		final boolean ok = h.getVersion() == KNXnetIPConnection.KNXNETIP_VERSION_10;
