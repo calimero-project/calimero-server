@@ -57,9 +57,9 @@ import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
 
 /**
- * A subnet link implementation used for virtual KNX networks. In such networks, the KNX
- * installation is realized by a network buffer or software KNX devices. The main purpose is to run
- * virtual KNX installations for development, testing, and visualization.
+ * A subnet link implementation used for virtual KNX networks. In such networks, the KNX installation is realized by a
+ * network buffer or software KNX devices. The main purpose is to run virtual KNX installations for development,
+ * testing, and visualization.
  *
  * @author B. Malinowsky
  */
@@ -73,8 +73,7 @@ public class VirtualLink extends AbstractLink
 		this(name, settings, false);
 	}
 
-	private VirtualLink(final String name, final KNXMediumSettings settings,
-		final boolean isDeviceLink)
+	private VirtualLink(final String name, final KNXMediumSettings settings, final boolean isDeviceLink)
 	{
 		super(name, settings);
 		this.isDeviceLink = isDeviceLink;
@@ -131,8 +130,7 @@ public class VirtualLink extends AbstractLink
 		try {
 			// send a .con for a .req
 			if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
-				final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON,
-						msg.getPayload(), msg);
+				final CEMILData f = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_CON, msg.getPayload(), msg);
 				final FrameEvent e = new FrameEvent(this, f);
 				confirmation.fire(l -> l.confirmation(e));
 			}

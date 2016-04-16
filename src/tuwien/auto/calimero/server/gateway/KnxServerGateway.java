@@ -769,9 +769,9 @@ public class KnxServerGateway implements Runnable
 			}
 			final KNXNetworkLink lnk = findSubnetLink((IndividualAddress) f.getDestination());
 			if (lnk == null) {
-				logger.warn("no subnet configured for destination " + f.getDestination() + " ("
+				logger.warn("no subnet configured for destination " + f.getDestination() + " (received "
 						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination())
-						+ " received from " + f.getSource() + ")");
+						+ " from " + f.getSource() + ")");
 				return;
 			}
 			if (exclude != null && lnk.equals(exclude.getSubnetLink()))
@@ -910,7 +910,7 @@ public class KnxServerGateway implements Runnable
 					} catch (final KNXIllegalArgumentException e) {
 						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
-						logger.warn("frame not accepted by connection {}: {}", c.getName(), f, e);
+						logger.warn("frame not accepted by connection {} ({}): {}", c.getName(), e.getMessage(), f);
 					}
 				}
 			}

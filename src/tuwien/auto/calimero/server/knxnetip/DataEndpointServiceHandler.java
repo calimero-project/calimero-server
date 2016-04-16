@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -332,8 +332,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	{
 		final int mc = cemi.getMessageCode();
 		if (monitor)
-			logger.warn("client is not allowed to send cEMI messages in busmonitor "
-					+ "mode - ignored");
+			logger.warn("client is not allowed to send cEMI messages in busmonitor mode - ignored");
 		else if (mc == CEMILData.MC_LDATA_REQ) {
 			CEMILData ldata = (CEMILData) cemi;
 			if (ldata.getSource().equals(new IndividualAddress(0)))
