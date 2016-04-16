@@ -1860,7 +1860,7 @@ public class KNXnetIPServer
 					if (sc.isActivated()) {
 						// we create our own HPAI from the actual socket, since
 						// the service container might have opted for ephemeral port use
-						InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
+						final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
 						final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
 
 						byte[] mac = null;
@@ -2134,33 +2134,24 @@ public class KNXnetIPServer
 				else if (!checkVersion(h))
 					status = ErrorCodes.VERSION_NOT_SUPPORTED;
 
-				int channelId = 0;
-				if (status == ErrorCodes.NO_ERROR) {
-					channelId = assignChannelId();
-					if (channelId == 0)
-						status = ErrorCodes.NO_MORE_CONNECTIONS;
-				}
-				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(),
-						src, port, 1);
-				final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(),
-						src, port, 2);
+				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
+				final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
 
 				byte[] buf = null;
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.info("{}: setup data endpoint (channel {}) for connection request "
-							+ "from {}", svcCont.getName(), channelId, ctrlEndpt);
-					final Object[] init = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
-					status = ((Integer) init[0]).intValue();
-					if (status == ErrorCodes.NO_ERROR)
-						buf = PacketHelper.toPacket(new ConnectResponse(channelId, status,
-								(HPAI) init[1], (CRD) init[2]));
+					final int channelId = assignChannelId();
+					if (channelId == 0)
+						status = ErrorCodes.NO_MORE_CONNECTIONS;
+					if (status == ErrorCodes.NO_ERROR) {
+						logger.info("{}: setup data endpoint (channel {}) for connection request " + "from {}",
+								svcCont.getName(), channelId, ctrlEndpt);
+						final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
+						buf = PacketHelper.toPacket(res);
+					}
 				}
-				if (buf == null) {
-					freeChannelId(channelId);
-					buf = PacketHelper.toPacket(new ConnectResponse(status));
-					logger.warn("no data endpoint for connection with " + dataEndpt + ", "
-							+ ErrorCodes.getErrorMessage(status));
-				}
+				if (buf == null)
+					buf = PacketHelper.toPacket(errorResponse(status, 0, ctrlEndpt.toString()));
+
 				final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
 				s.send(p);
 			}
@@ -2286,37 +2277,36 @@ public class KNXnetIPServer
 			return s;
 		}
 
-		// returns Object[] = { Integer(status), localEndpt, CRD }
-		// CRD and localEndpt might be null if status != NO_ERROR
-		private Object[] initNewConnection(final ConnectRequest req,
+		private ConnectResponse initNewConnection(final ConnectRequest req,
 			final InetSocketAddress ctrlEndpt, final InetSocketAddress dataEndpt,
 			final int channelId)
 		{
-			final Object[] ret = new Object[3];
-			ret[0] = new Integer(ErrorCodes.NO_ERROR);
+			// information about remote endpoint in case of error response
+			final String endpoint = ctrlEndpt.toString();
 
 			boolean tunnel = true;
 			boolean busmonitor = false;
 			IndividualAddress device = null;
+			CRD crd = null;
 
 			final int connType = req.getCRI().getConnectionType();
 			if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
-				TunnelingLayer knxLayer;
+
+				final TunnelingLayer knxLayer;
 				try {
 					knxLayer = TunnelingLayer.from(((TunnelCRI) req.getCRI()).getKNXLayer());
 				}
 				catch (final KNXIllegalArgumentException e) {
-					return new Object[] { new Integer(ErrorCodes.TUNNELING_LAYER) };
+					return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
 				}
-				if (knxLayer != TunnelingLayer.LinkLayer
-						&& knxLayer != TunnelingLayer.BusMonitorLayer)
-					return new Object[] { new Integer(ErrorCodes.TUNNELING_LAYER) };
+				if (knxLayer != TunnelingLayer.LinkLayer && knxLayer != TunnelingLayer.BusMonitorLayer)
+					return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
 
 				busmonitor = knxLayer == TunnelingLayer.BusMonitorLayer;
 				if (busmonitor) {
 					// check if service container has busmonitor allowed
 					if (!svcCont.isNetworkMonitoringAllowed())
-						return new Object[] { new Integer(ErrorCodes.TUNNELING_LAYER) };
+						return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
 
 					// KNX specification says that if tunneling on busmonitor is
 					// supported, only one tunneling connection is allowed per subnetwork,
@@ -2337,16 +2327,15 @@ public class KNXnetIPServer
 					// i.e., if there is an active bus monitor connection, we don't
 					// allow any other tunneling connections.
 					if (activeMonitorConnection) {
-						logger.warn("active tunneling on busmonitor connection, "
-								+ "no more connections allowed");
-						return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
+						logger.warn("active tunneling on busmonitor connection, no other connections allowed");
+						return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 					}
 				}
 
 				device = assignDeviceAddress(svcCont.getSubnetAddress());
 				if (device == null)
-					return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
-				ret[2] = new TunnelCRD(device);
+					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+				crd = new TunnelCRD(device);
 			}
 			else if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION) {
 				// At first, check if we are allowed to open mgmt connection at all; if
@@ -2357,7 +2346,7 @@ public class KNXnetIPServer
 								knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1)))) {
 							logger.warn("server assigned its own device address, "
 									+ "no management connections allowed at this time");
-							return new Object[] { new Integer(ErrorCodes.CONNECTION_TYPE) };
+							return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
 						}
 					}
 					catch (final KNXPropertyException e) {
@@ -2368,10 +2357,10 @@ public class KNXnetIPServer
 				}
 
 				tunnel = false;
-				ret[2] = CRD.createResponse(KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION, null);
+				crd = CRD.createResponse(KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION, null);
 			}
 			else
-				return new Object[] { new Integer(ErrorCodes.CONNECTION_TYPE) };
+				return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
 
 			ServiceLoop svcLoop = null;
 			ServiceCallback cb = null;
@@ -2390,25 +2379,19 @@ public class KNXnetIPServer
 				catch (final SocketException e) {
 					// if thread did not initialize properly, we get null returned
 					// we don't have any better error than NO_MORE_CONNECTIONS for this
-					return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
+					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 				}
 			}
 
-			// we always create our own HPAI from the socket, since the service container
-			// might have opted for ephemeral port use
-			ret[1] = new HPAI(svcCont.getControlEndpoint().getHostProtocol(),
-					(InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
-			final DataEndpointServiceHandler sh = new DataEndpointServiceHandler(cb, s,
-					svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
-					busmonitor, useNat);
-
+			final DataEndpointServiceHandler sh = new DataEndpointServiceHandler(cb, s, svcLoop.getSocket(), ctrlEndpt,
+					dataEndpt, channelId, device, tunnel, busmonitor, useNat);
 			final boolean accept = acceptConnection(svcCont, sh, device, busmonitor);
 			if (!accept) {
 				// don't use sh.close() here, we would initiate tunneling disconnect sequence
 				// but we have to call svcLoop.quit() to close local data socket
 				svcLoop.quit();
 				freeDeviceAddress(device);
-				return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 			}
 			dataConnections.add(sh);
 			activeMonitorConnection = busmonitor;
@@ -2417,7 +2400,19 @@ public class KNXnetIPServer
 				new LooperThread(serverName + "/" + svcCont.getName() + " data endpoint", 0,
 						new Builder(false, null, (DataEndpointService) svcLoop)).start();
 			}
-			return ret;
+
+			// we always create our own HPAI from the socket, since the service container
+			// might have opted for ephemeral port use
+			final HPAI hpai = new HPAI(svcCont.getControlEndpoint().getHostProtocol(),
+					(InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
+			return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
+		}
+
+		private ConnectResponse errorResponse(final int status, final int channelId, final String endpoint)
+		{
+			freeChannelId(channelId);
+			logger.warn("no data endpoint for remote endpoint " + endpoint + ", " + ErrorCodes.getErrorMessage(status));
+			return new ConnectResponse(status);
 		}
 
 		private boolean acceptConnection(final ServiceContainer sc, final KNXnetIPConnection conn,
