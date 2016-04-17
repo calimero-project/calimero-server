@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 
@@ -2045,7 +2046,6 @@ public class KNXnetIPServer
 	private final class ControlEndpointService extends ServiceLoop implements ServiceCallback
 	{
 		private final ServiceContainer svcCont;
-		private boolean activeMonitorConnection;
 
 		private ControlEndpointService(final ServiceContainer sc) throws SocketException
 		{
@@ -2063,9 +2063,6 @@ public class KNXnetIPServer
 			// free knx address and channel id we assigned to the connection
 			freeDeviceAddress(device);
 			freeChannelId(h.getChannelId());
-
-			// we can always safely reset monitor connection flag
-			activeMonitorConnection = false;
 
 			if (h.isDeviceMgmt())
 				synchronized (usedKnxAddresses) {
@@ -2312,13 +2309,20 @@ public class KNXnetIPServer
 					// supported, only one tunneling connection is allowed per subnetwork,
 					// i.e., if there are any active link-layer connections, we don't
 					// allow tunneling on busmonitor.
-					for (final Iterator<DataEndpointServiceHandler> i = dataConnections.iterator(); i.hasNext();) {
-						final DataEndpointServiceHandler h = i.next();
-						if (h.getCtrlSocketAddress().equals(s.getLocalSocketAddress())) {
-							logger.warn("active tunneling on link-layer connections, "
-									+ "tunneling on busmonitor currently not allowed");
-							return new Object[] { new Integer(ErrorCodes.NO_MORE_CONNECTIONS) };
-						}
+					final List<String> active = dataConnections.stream()
+							.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
+							.filter(h -> !h.isMonitor()).map(h -> h.getName()).collect(Collectors.toList());
+					if (active.size() > 0) {
+						logger.warn("{}: active connections for tunneling on link-layer, tunneling on busmonitor-layer "
+								+ "currently not allowed\n\tcurrently connected: {}", svcCont.getName(), active);
+						return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+					}
+
+					// but we can allow several monitor connections at the same time (not spec-conform)
+					final boolean allowMultiMonitorConnections = true;
+					if (allowMultiMonitorConnections) {
+						final long monitoring = activeMonitorConnections();
+						logger.info("{}: active monitor connections: {}", svcCont.getName(), monitoring);
 					}
 				}
 				else {
@@ -2326,8 +2330,9 @@ public class KNXnetIPServer
 					// supported, only one tunneling connection is allowed per subnetwork,
 					// i.e., if there is an active bus monitor connection, we don't
 					// allow any other tunneling connections.
-					if (activeMonitorConnection) {
-						logger.warn("active tunneling on busmonitor connection, no other connections allowed");
+					if (activeMonitorConnections() > 0) {
+						logger.warn("{}: active connections for tunneling on busmonitor-layer, "
+								+ "other connections currently not allowed", svcCont.getName());
 						return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 					}
 				}
@@ -2394,7 +2399,6 @@ public class KNXnetIPServer
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 			}
 			dataConnections.add(sh);
-			activeMonitorConnection = busmonitor;
 			if (!useThisCtrlEp) {
 				((DataEndpointService) svcLoop).svcHandler = sh;
 				new LooperThread(serverName + "/" + svcCont.getName() + " data endpoint", 0,
@@ -2406,6 +2410,13 @@ public class KNXnetIPServer
 			final HPAI hpai = new HPAI(svcCont.getControlEndpoint().getHostProtocol(),
 					(InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
 			return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
+		}
+
+		private long activeMonitorConnections()
+		{
+			return dataConnections.stream()
+					.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
+					.filter(DataEndpointServiceHandler::isMonitor).map(h -> h.getName()).count();
 		}
 
 		private ConnectResponse errorResponse(final int status, final int channelId, final String endpoint)
