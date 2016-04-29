@@ -1454,14 +1454,10 @@ public class KNXnetIPServer
 				cleanup(LogLevel.ERROR, e);
 			}
 			catch (final RuntimeException e) {
-				final SocketAddress addr = s != null && !s.isClosed() ? s.getLocalSocketAddress()
-						: null;
-				final String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-				final StackTraceElement[] trace = e.getStackTrace();
-				final String frame = trace.length > 0 ? trace[0].toString() : "frame n/a";
-				logger.error("runtime exception in service loop " + addr + ": " + msg + " ["
-						+ frame + "]");
-				cleanup(LogLevel.ERROR, e);
+				final Object id = s != null && !s.isClosed() ? s.getLocalSocketAddress()
+						: Thread.currentThread().getName();
+				logger.error("runtime exception in service loop of {}", id, e);
+				cleanup(LogLevel.INFO, null);
 			}
 		}
 
