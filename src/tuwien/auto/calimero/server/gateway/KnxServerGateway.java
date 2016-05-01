@@ -1029,7 +1029,7 @@ public class KnxServerGateway implements Runnable
 							f.getStartIndex(), elems, f.getPayload());
 			}
 			catch (final KNXPropertyException e) {
-				logger.warn(e.getMessage() + ": " + CEMIDevMgmt.getErrorMessage(e.getStatusCode()));
+				logger.warn(e.getMessage());
 				data = new byte[] { (byte) e.getStatusCode() };
 				elems = 0;
 			}
