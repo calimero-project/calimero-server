@@ -1936,6 +1936,8 @@ public class KNXnetIPServer
 
 	private final class RoutingService extends ServiceLoop
 	{
+		private boolean closing;
+
 		private final class RoutingServiceHandler extends KNXnetIPRouting
 		{
 			private RoutingServiceHandler(final NetworkInterface netIf, final InetAddress mcGroup,
@@ -2000,6 +2002,16 @@ public class KNXnetIPServer
 			{
 				return getName();
 			}
+
+			@Override
+			protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t)
+			{
+				// quit routing service before, so the UdpSocketLooper has its quit flag set and won't re-throw
+				// any I/O or socket exception while exiting
+				closing = true;
+				RoutingService.this.quit();
+				super.close(initiator, reason, level, t);
+			}
 		}
 
 		private final RoutingServiceHandler r;
@@ -2034,7 +2046,8 @@ public class KNXnetIPServer
 		public void quit()
 		{
 			super.quit();
-			r.close();
+			if (!closing)
+				r.close();
 		}
 	}
 
