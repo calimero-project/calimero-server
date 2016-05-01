@@ -1501,7 +1501,7 @@ public class KNXnetIPServer
 
 		void cleanup(final LogLevel level, final Throwable t)
 		{
-			LogService.log(logger, level, Thread.currentThread().getName() + " cleanup", t);
+			LogService.log(logger, level, "cleanup {}", Thread.currentThread().getName(), t);
 		}
 
 		DatagramSocket getSocket()
@@ -1860,20 +1860,19 @@ public class KNXnetIPServer
 						final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
 						final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
 
-						byte[] mac = null;
 						try {
-							mac = NetworkInterface.getByInetAddress(local.getAddress()).getHardwareAddress();
+							final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
+							final byte[] mac = ni != null ? ni.getHardwareAddress() : new byte[6];
 							ios.setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1, mac);
 						}
 						catch (final SocketException | KNXPropertyException e) {}
 
 						final DeviceDIB device = createDeviceDIB(sc);
-						final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device,
-								svcFamilies));
+						final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device, svcFamilies));
 						final DatagramPacket p = new DatagramPacket(buf, buf.length, addr);
-						logger.trace("sending search response with container \'" + sc.getName()
-								+ "\' to " + addr);
+						logger.trace("sending search response with container '" + sc.getName() + "' to " + addr);
 						sendOnInterfaces(p);
+						logger.info("KNXnet/IP discovery: identify ourself as '{}' to {}", device.getName(), addr);
 					}
 				}
 				return true;
@@ -2397,7 +2396,7 @@ public class KNXnetIPServer
 			dataConnections.add(sh);
 			if (!useThisCtrlEp) {
 				((DataEndpointService) svcLoop).svcHandler = sh;
-				new LooperThread(serverName + "/" + svcCont.getName() + " data endpoint", 0,
+				new LooperThread(svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0,
 						new Builder(false, null, (DataEndpointService) svcLoop)).start();
 			}
 
