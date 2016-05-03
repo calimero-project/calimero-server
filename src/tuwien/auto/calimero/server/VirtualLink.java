@@ -117,15 +117,8 @@ public class VirtualLink extends AbstractLink
 	private void send(final CEMILData msg, final EventListeners<NetworkLinkListener> confirmation,
 		final VirtualLink uplink)
 	{
-		// if the uplink is a device link:
-		// we indicate all group destinations, and our device individual address,
-		// filter out other individual addresses for device destination
-		if (uplink.isDeviceLink) {
-			if (msg.getDestination() instanceof GroupAddress)
-				; // accept
-			else if (!msg.getDestination().equals(uplink.getKNXMedium().getDeviceAddress()))
-				return;
-		}
+		if (!accept(uplink, msg))
+			return;
 
 		try {
 			// send a .con for a .req
@@ -140,12 +133,31 @@ public class VirtualLink extends AbstractLink
 			final FrameEvent e = new FrameEvent(this, f);
 			// if we are a device link sending to the uplink, send the .ind to all other device links of that uplink
 			if (isDeviceLink)
-				uplink.deviceLinks.forEach(link -> link.notifier.getListeners().fire(l -> l.indication(e)));
+				uplink.deviceLinks.stream().filter(l -> accept(l, msg))
+						.forEach(link -> link.notifier.getListeners().fire(l -> l.indication(e)));
 			// send the .ind to our uplink
 			uplink.notifier.getListeners().fire(l -> l.indication(e));
 		}
 		catch (final KNXFormatException e) {
 			logger.error("create cEMI for KNX link {} using: {}", uplink.getName(), msg, e);
 		}
+	}
+
+	// if the uplink is a device link:
+	//   -) accept all group destinations, i.e., indicate all
+	//   -) accept our device individual address as destination
+	//   -) filter out other individual addresses given as device destination
+	// if the uplink is not a device link:
+	//   -) accept all
+	private static boolean accept(final VirtualLink uplink, final CEMILData msg)
+	{
+		if (uplink.isDeviceLink) {
+			final KNXAddress dst = msg.getDestination();
+			if (dst instanceof GroupAddress)
+				return true;
+			if (!dst.equals(uplink.getKNXMedium().getDeviceAddress()))
+				return false;
+		}
+		return true;
 	}
 }
