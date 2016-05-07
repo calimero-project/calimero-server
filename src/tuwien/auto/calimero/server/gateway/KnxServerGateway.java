@@ -665,7 +665,7 @@ public class KnxServerGateway implements Runnable
 					if (send != null)
 						dispatchToSubnets(send);
 				}
-				catch (final KNXException e) {
+				catch (KNXException | InterruptedException e) {
 					logger.error("sending L_Data.con of {}",
 							DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
 				}
@@ -712,7 +712,7 @@ public class KnxServerGateway implements Runnable
 						incMsgTransmitted(false);
 					}
 				}
-				catch (final KNXConnectionClosedException e) {}
+				catch (KNXConnectionClosedException | InterruptedException e) {}
 				catch (final KNXTimeoutException e) {
 					setNetworkState(false, true);
 				}
@@ -917,7 +917,7 @@ public class KnxServerGateway implements Runnable
 			incMsgTransmitted(false);
 			setNetworkState(false, false);
 		}
-		catch (final KNXException e) {
+		catch (KNXException | InterruptedException e) {
 			logger.error("send to server-side failed for " + f.toString(), e);
 			if (e instanceof KNXTimeoutException)
 				setNetworkState(false, true);
@@ -1041,7 +1041,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				c.send(dm, KNXnetIPConnection.WAIT_FOR_ACK);
 			}
-			catch (final KNXException e) {
+			catch (KNXException | InterruptedException e) {
 				logger.error("send failed", e);
 			}
 		}

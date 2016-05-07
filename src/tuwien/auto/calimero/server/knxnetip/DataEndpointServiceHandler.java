@@ -127,14 +127,9 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		setState(OK);
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection
-	 * #send(tuwien.auto.calimero.cemi.CEMI,
-	 * tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection.BlockingMode)
-	 */
 	@Override
-	public void send(final CEMI frame, final BlockingMode mode) throws KNXTimeoutException,
-		KNXConnectionClosedException
+	public void send(final CEMI frame, final BlockingMode mode)
+		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
 		checkFrameType(frame);
 		super.send(frame, mode);
