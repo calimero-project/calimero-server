@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.gateway;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -114,11 +115,14 @@ public class KnxServerGateway implements Runnable
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
 	{
+		final ServiceContainer sc;
 		final String name;
 		final IndividualAddress addr;
 
-		ConnectionListener(final String connectionName, final IndividualAddress device)
+		ConnectionListener(final ServiceContainer svcContainer, final String connectionName,
+			final IndividualAddress device)
 		{
+			sc = svcContainer;
 			// same as calling ((KNXnetIPConnection) getSource()).getName()
 			name = connectionName;
 			addr = device;
@@ -192,8 +196,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 			catch (KNXException | InterruptedException e) {
-				logger.error("open network link using {} interface {} for {}", subnetType,
-						subnetArgs, settings, e);
+				logger.error("open network link using {} interface {} for {}", subnetType, subnetArgs, settings, e);
 				if (e instanceof InterruptedException)
 					Thread.currentThread().interrupt();
 				return false;
@@ -208,7 +211,7 @@ public class KnxServerGateway implements Runnable
 				final KNXNetworkLinkTpuart tpuart = (KNXNetworkLinkTpuart) unknown;
 				tpuart.addAddress(assignedDeviceAddress);
 			}
-			conn.addConnectionListener(new ConnectionListener(conn.getName(), assignedDeviceAddress));
+			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName(), assignedDeviceAddress));
 			serverConnections.add(conn);
 			if (assignedDeviceAddress != null)
 				serverDataConnections.put(assignedDeviceAddress, conn);
@@ -259,7 +262,7 @@ public class KnxServerGateway implements Runnable
 			if (event == ServiceContainerEvent.ROUTING_SVC_STARTED) {
 				final KNXnetIPConnection conn = sce.getConnection();
 				logger.info(sc.getName() + " started " + conn.getName());
-				conn.addConnectionListener(new ConnectionListener(conn.getName(), null));
+				conn.addConnectionListener(new ConnectionListener(sc, conn.getName(), null));
 				serverConnections.add(conn);
 			}
 			else if (event == ServiceContainerEvent.ADDED_TO_SERVER) {
@@ -394,8 +397,7 @@ public class KnxServerGateway implements Runnable
 
 	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = Collections
 			.synchronizedMap(new HashMap<>());
-	private final List<KNXnetIPConnection> serverConnections = Collections
-			.synchronizedList(new ArrayList<>());
+	private final List<KNXnetIPConnection> serverConnections = Collections.synchronizedList(new ArrayList<>());
 
 	private final int maxEventQueueSize = 200;
 	private final List<FrameEvent> ipEvents = new LinkedList<>();
@@ -437,7 +439,12 @@ public class KnxServerGateway implements Runnable
 			try {
 				while (trucking) {
 					for (FrameEvent event = getIPEvent(); event != null; event = getIPEvent())
-						onFrameReceived(event, true);
+						try {
+							onFrameReceived(event, true);
+						}
+						catch (final RuntimeException e) {
+							logger.error("on server-side frame event", e);
+						}
 					synchronized (this) {
 						wait();
 					}
@@ -464,8 +471,7 @@ public class KnxServerGateway implements Runnable
 	 * @param subnetConnectors list of {@link SubnetConnector} objects, which specify the
 	 *        associations between the connections from either side of the gateway
 	 */
-	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s,
-		final SubnetConnector[] subnetConnectors)
+	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final SubnetConnector[] subnetConnectors)
 	{
 		name = gatewayName;
 		server = s;
@@ -479,8 +485,8 @@ public class KnxServerGateway implements Runnable
 
 		// group address routing settings
 		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT,
-					objectInstance, MAIN_LCGRPCONFIG, 1, 1);
+			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT, objectInstance,
+					MAIN_LCGRPCONFIG, 1, 1);
 			mainGroupAddressConfig = data[0] & 0x03;
 			logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
 		}
@@ -682,8 +688,7 @@ public class KnxServerGateway implements Runnable
 				dispatchToOtherSubnets(send, connector);
 			}
 			else {
-				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x"
-						+ Integer.toString(mc, 16);
+				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x" + Integer.toString(mc, 16);
 				logger.warn(s + " L-data" + type + " ["
 						+ DataUnitBuilder.toHex(f.toByteArray(), "") + "] - ignored");
 			}
@@ -719,8 +724,7 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		else
-			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16)
-					+ " - ignored");
+			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16) + " - ignored");
 	}
 
 	private static CEMI createCon(final byte[] data, final CEMILData original, final boolean error)
@@ -820,7 +824,9 @@ public class KnxServerGateway implements Runnable
 	// ensure we have a network link open (and no monitor link)
 	private boolean isNetworkLink(final SubnetConnector subnet)
 	{
-		final AutoCloseable link = subnet.getSubnetLink();
+		AutoCloseable link = subnet.getSubnetLink();
+		if (link instanceof Link)
+			link = ((Link<?>) link).target();
 		if (!(link instanceof KNXNetworkLink)) {
 			final IndividualAddress addr = subnet.getServiceContainer().getSubnetAddress();
 			logger.warn("cannot dispatch to KNX subnet {}, no network link ({})", addr, link);
@@ -870,15 +876,13 @@ public class KnxServerGateway implements Runnable
 	{
 		try {
 			if (f.getDestination() instanceof IndividualAddress) {
-				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f
-						.getDestination());
+				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
 				}
 				else {
-					logger.warn("no active KNXnet/IP connection for destination {}, send to all",
-							f.getDestination());
+					logger.warn("no active KNXnet/IP connection for destination {}, send to all", f.getDestination());
 					// create temporary array to not block concurrent access during iteration
 					final KNXnetIPConnection[] sca = serverConnections
 							.toArray(new KNXnetIPConnection[serverConnections.size()]);
@@ -967,7 +971,7 @@ public class KnxServerGateway implements Runnable
 			logger.warn("timeout sending to {}: {}", f.getDestination(), e);
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
-			e.printStackTrace();
+			logger.error("error sending to {} on subnet {}", f.getDestination(), lnk.getName(), e);
 		}
 	}
 
@@ -1029,7 +1033,7 @@ public class KnxServerGateway implements Runnable
 							f.getStartIndex(), elems, f.getPayload());
 			}
 			catch (final KNXPropertyException e) {
-				logger.warn(e.getMessage());
+				logger.info(e.getMessage());
 				data = new byte[] { (byte) e.getStatusCode() };
 				elems = 0;
 			}
