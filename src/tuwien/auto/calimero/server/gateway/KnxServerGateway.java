@@ -197,20 +197,25 @@ public class KnxServerGateway implements Runnable
 				return false;
 			}
 
-			// if this is a TP-UART link (not monitor), we do have to tell it the assigned device
-			// address, so it can generate the acks on the bus for our clients
 			AutoCloseable unknown = connector.getSubnetLink();
 			if (unknown instanceof Link)
 				unknown = ((Link<?>) unknown).target();
+			// if this is a TP-UART link (not monitor), we do have to tell it the assigned device
+			// address, so it can generate the acks on the bus for our clients
 			if (unknown instanceof KNXNetworkLinkTpuart) {
 				final KNXNetworkLinkTpuart tpuart = (KNXNetworkLinkTpuart) unknown;
 				tpuart.addAddress(assignedDeviceAddress);
 			}
 			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName(), assignedDeviceAddress));
-			serverConnections.add(conn);
 			if (assignedDeviceAddress != null)
 				serverDataConnections.put(assignedDeviceAddress, conn);
 			return true;
+		}
+
+		@Override
+		public void connectionEstablished(final ServiceContainer svcContainer, final KNXnetIPConnection connection)
+		{
+			serverConnections.add(connection);
 		}
 
 		@Override

@@ -2120,6 +2120,7 @@ public class KNXnetIPServer
 				final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
 
 				byte[] buf = null;
+				boolean established = false;
 				if (status == ErrorCodes.NO_ERROR) {
 					final int channelId = assignChannelId();
 					if (channelId == 0)
@@ -2129,6 +2130,7 @@ public class KNXnetIPServer
 								svcCont.getName(), channelId, ctrlEndpt);
 						final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 						buf = PacketHelper.toPacket(res);
+						established = res.getStatus() == ErrorCodes.NO_ERROR;
 					}
 				}
 				if (buf == null)
@@ -2136,6 +2138,8 @@ public class KNXnetIPServer
 
 				final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
 				s.send(p);
+				if (established)
+					connectionEstablished(svcCont, dataConnections.get(dataConnections.size() - 1));
 			}
 			else if (svc == KNXnetIPHeader.CONNECT_RES)
 				logger.warn("received connect response - ignored");
@@ -2413,6 +2417,12 @@ public class KNXnetIPServer
 		{
 			final List<ServerListener> l = listeners.listeners();
 			return l.stream().allMatch(e -> e.acceptDataConnection(sc, conn, addr, busmonitor));
+		}
+
+		private void connectionEstablished(final ServiceContainer sc, final KNXnetIPConnection conn)
+		{
+			final List<ServerListener> l = listeners.listeners();
+			l.stream().forEach(e -> e.connectionEstablished(sc, conn));
 		}
 
 		private DataEndpointServiceHandler findConnection(final int channelId)
