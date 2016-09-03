@@ -36,6 +36,9 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
+
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -85,6 +88,7 @@ import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.VirtualLink;
+import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
@@ -444,6 +448,8 @@ public class KnxServerGateway implements Runnable
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
+			final ServiceContainer sc = b.getServiceContainer();
+			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
 		}
 
 		// group address routing settings
@@ -624,7 +630,7 @@ public class KnxServerGateway implements Runnable
 						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
 						// TODO wait for ACK is correct, but should be done asynchronously
 						// otherwise, it might block the processing of a next queued frame
-						c.send(createCon(f.getPayload(), f, error), KNXnetIPConnection.WAIT_FOR_ACK);
+						c.send(createCon(f.getPayload(), f, error), WaitForAck);
 					}
 					final CEMILData send = adjustHopCount(f);
 					if (send != null)
@@ -671,7 +677,7 @@ public class KnxServerGateway implements Runnable
 				try {
 					// routing does not serve busmonitor mode
 					if (!(c instanceof KNXnetIPRouting)) {
-						c.send(frame, KNXnetIPConnection.WAIT_FOR_ACK);
+						send(connector.getServiceContainer(), c, frame);
 						setNetworkState(false, false);
 						incMsgTransmitted(false);
 					}
@@ -838,7 +844,7 @@ public class KnxServerGateway implements Runnable
 				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
-					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+					send(subnetConnector.getServiceContainer(), c, f);
 				}
 				else {
 					logger.warn("no active KNXnet/IP connection for destination {}, send to all", f.getDestination());
@@ -846,7 +852,7 @@ public class KnxServerGateway implements Runnable
 					final KNXnetIPConnection[] sca = serverConnections
 							.toArray(new KNXnetIPConnection[serverConnections.size()]);
 					for (int i = 0; i < sca.length; i++)
-						sca[i].send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+						send(subnetConnector.getServiceContainer(), sca[i], f);
 				}
 			}
 			else {
@@ -869,7 +875,7 @@ public class KnxServerGateway implements Runnable
 				for (int i = 0; i < sca.length; i++) {
 					final KNXnetIPConnection c = sca[i];
 					try {
-						c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+						send(subnetConnector.getServiceContainer(), c, f);
 					} catch (final KNXIllegalArgumentException e) {
 						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
@@ -896,6 +902,12 @@ public class KnxServerGateway implements Runnable
 			if (e instanceof KNXnetIPRouting)
 				return e;
 		return null;
+	}
+
+	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
+		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
+	{
+		c.send(f, WaitForAck);
 	}
 
 	private void send(final KNXNetworkLink lnk, final CEMILData f)
@@ -1002,7 +1014,7 @@ public class KnxServerGateway implements Runnable
 					: new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(),
 							f.getStartIndex(), elems);
 			try {
-				c.send(dm, KNXnetIPConnection.WAIT_FOR_ACK);
+				c.send(dm, WaitForAck);
 			}
 			catch (KNXException | InterruptedException e) {
 				logger.error("send failed", e);
