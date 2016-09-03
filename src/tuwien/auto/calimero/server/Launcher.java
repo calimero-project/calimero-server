@@ -138,8 +138,6 @@ public class Launcher implements Runnable
 		/** */
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
-		// TODO remove old attribute
-		public static final String attrMonitorOld = "allowNetworkMonitoring";
 		public static final String attrNetworkMonitoring = "networkMonitoring";
 		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"] */
 		public static final String attrType = "type";
@@ -221,8 +219,7 @@ public class Launcher implements Runnable
 			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
 			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
 			final boolean monitor = Boolean
-					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring))
-					|| Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrMonitorOld));
+					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface routingNetIf = routing ? getNetIf(r) : null;
 

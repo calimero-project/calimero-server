@@ -586,7 +586,6 @@ public class KNXnetIPServer
 	 */
 	public static final String OPTION_OUTGOING_INTERFACE = "discovery.outoingInterface";
 
-	// ??? unused by now, make public if useful, also correctly synchronize setOption then
 	synchronized String getOption(final String optionKey)
 	{
 		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
@@ -612,15 +611,13 @@ public class KNXnetIPServer
 	 * @param optionKey the server option key to identify the option to set or modify
 	 * @param value the corresponding option value, possibly replacing any previously set value
 	 */
-	public void setOption(final String optionKey, final String value)
+	public synchronized void setOption(final String optionKey, final String value)
 	{
 		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
-			synchronized (this) {
-				runDiscovery = Boolean.valueOf(value).booleanValue();
-				stopDiscoveryService();
-				if (runDiscovery && running)
-					startDiscoveryService(outgoingIf, discoveryIfs, 9);
-			}
+			runDiscovery = Boolean.valueOf(value).booleanValue();
+			stopDiscoveryService();
+			if (runDiscovery && running)
+				startDiscoveryService(outgoingIf, discoveryIfs, 9);
 		}
 		else if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
 			multicastLoopback = Boolean.valueOf(value).booleanValue();
@@ -1448,7 +1445,7 @@ public class KNXnetIPServer
 		{
 			try {
 				loop();
-				cleanup(LogLevel.INFO, null);
+				cleanup(LogLevel.DEBUG, null);
 			}
 			catch (final IOException e) {
 				cleanup(LogLevel.ERROR, e);
@@ -1461,9 +1458,6 @@ public class KNXnetIPServer
 			}
 		}
 
-		/* (non-Javadoc)
-		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#onReceive(byte[], int, int)
-		 */
 		@Override
 		public void onReceive(final InetSocketAddress source, final byte[] data, final int offset,
 			final int length) throws IOException
@@ -1472,11 +1466,9 @@ public class KNXnetIPServer
 				final KNXnetIPHeader h = new KNXnetIPHeader(data, offset);
 				if (!sanitize(h, length))
 					return;
-				if (!handleServiceType(h, data, offset + h.getStructLength(), source.getAddress(),
-						source.getPort())) {
+				if (!handleServiceType(h, data, offset + h.getStructLength(), source.getAddress(), source.getPort())) {
 					final int svc = h.getServiceType();
-					logger.warn("received unknown frame (service type 0x"
-							+ Integer.toHexString(svc) + ") - ignored");
+					logger.warn("received unknown frame (service type 0x" + Integer.toHexString(svc) + ") - ignored");
 				}
 			}
 			catch (final KNXFormatException e) {
@@ -1528,8 +1520,7 @@ public class KNXnetIPServer
 				addr = new InetSocketAddress(senderHost, senderPort);
 				useNat = true;
 				if (logEndpointType != 0)
-					logger.info("NAT aware: using " + addr + " for client response " + type
-							+ " endpoint");
+					logger.info("NAT aware: using " + addr + " for client response " + type + " endpoint");
 			}
 			else {
 				addr = new InetSocketAddress(resIP, resPort);
@@ -1782,8 +1773,7 @@ public class KNXnetIPServer
 					s.joinGroup(group, null);
 				else
 					s.joinGroup(systemSetupMulticast);
-				logger.info("KNXnet/IP discovery listens on interface with address "
-						+ s.getInterface());
+				logger.info("KNXnet/IP discovery listens on interface with address " + s.getInterface());
 				return;
 			}
 			final List<NetworkInterface> nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
@@ -1797,8 +1787,7 @@ public class KNXnetIPServer
 				final NetworkInterface ni = i.next();
 				final Enumeration<InetAddress> addrs = ni.getInetAddresses();
 				if (!addrs.hasMoreElements()) {
-					logger.warn("KNXnet/IP discovery join fails with no IP address "
-							+ "bound to interface " + ni.getName());
+					logger.warn("KNXnet/IP discovery join fails with no IP address bound to interface " + ni.getName());
 					continue;
 				}
 				found.append(" ").append(ni.getName()).append(" [");
@@ -1814,8 +1803,7 @@ public class KNXnetIPServer
 						catch (final IOException e) {
 							if (thrown == null)
 								thrown = e;
-							logger.error("KNXnet/IP discovery could not join on interface "
-								+ ni.getName(), e);
+							logger.error("KNXnet/IP discovery could not join on interface " + ni.getName(), e);
 						}
 						break;
 					}
@@ -2039,9 +2027,6 @@ public class KNXnetIPServer
 			return r.handleServiceType(h, data, offset, src, port);
 		}
 
-		/* (non-Javadoc)
-		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#quit()
-		 */
 		@Override
 		public void quit()
 		{
@@ -2078,10 +2063,6 @@ public class KNXnetIPServer
 				}
 		}
 
-		/* (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback
-		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler)
-		 */
 		@Override
 		public void resetRequest(final DataEndpointServiceHandler h)
 		{
@@ -2089,9 +2070,6 @@ public class KNXnetIPServer
 			fireResetRequest(h.getName(), ctrlEndpoint);
 		}
 
-		/* (non-Javadoc)
-		 * @see tuwien.auto.calimero.internal.UdpSocketLooper#quit()
-		 */
 		@Override
 		public void quit()
 		{
@@ -2122,10 +2100,9 @@ public class KNXnetIPServer
 				final DeviceDIB device = createDeviceDIB(svcCont);
 				final ServiceFamiliesDIB svcFamilies = createServiceFamiliesDIB();
 				final ManufacturerDIB mfr = createManufacturerDIB();
-				final byte[] buf = PacketHelper.toPacket(new DescriptionResponse(device,
-						svcFamilies, mfr));
-				final DatagramPacket p = new DatagramPacket(buf, buf.length, createResponseAddress(
-						dr.getEndpoint(), src, port, 1));
+				final byte[] buf = PacketHelper.toPacket(new DescriptionResponse(device, svcFamilies, mfr));
+				final DatagramPacket p = new DatagramPacket(buf, buf.length,
+						createResponseAddress(dr.getEndpoint(), src, port, 1));
 				s.send(p);
 			}
 			else if (svc == KNXnetIPHeader.CONNECT_REQ) {
@@ -2184,10 +2161,9 @@ public class KNXnetIPServer
 					logger.warn("disconnect request: sender control endpoint changed from "
 							+ ctrlEndpt + " to " + src + ", not recommended");
 				}
-				final byte[] buf = PacketHelper.toPacket(new DisconnectResponse(channelId,
-						ErrorCodes.NO_ERROR));
-				final DatagramPacket p = new DatagramPacket(buf, buf.length,
-						ctrlEndpt.getAddress(), ctrlEndpt.getPort());
+				final byte[] buf = PacketHelper.toPacket(new DisconnectResponse(channelId, ErrorCodes.NO_ERROR));
+				final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt.getAddress(),
+						ctrlEndpt.getPort());
 				try {
 					s.send(p);
 				}
@@ -2202,15 +2178,13 @@ public class KNXnetIPServer
 			else if (svc == KNXnetIPHeader.DISCONNECT_RES) {
 				final DisconnectResponse res = new DisconnectResponse(data, offset);
 				if (res.getStatus() != ErrorCodes.NO_ERROR)
-					logger.warn("received disconnect response status 0x"
-							+ Integer.toHexString(res.getStatus()) + " ("
+					logger.warn("received disconnect response status 0x" + Integer.toHexString(res.getStatus()) + " ("
 							+ ErrorCodes.getErrorMessage(res.getStatus()) + ")");
 				// finalize closing
 			}
 			else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 				final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
-				int status = checkVersion(h) ? ErrorCodes.NO_ERROR
-						: ErrorCodes.VERSION_NOT_SUPPORTED;
+				int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
 				if (status == ErrorCodes.NO_ERROR
 						&& csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
 					status = ErrorCodes.HOST_PROTOCOL_TYPE;

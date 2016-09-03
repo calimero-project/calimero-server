@@ -144,11 +144,6 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.RoutingListener
-		 * #lostMessage(tuwien.auto.calimero.server.knxnetip.LostMessageEvent)
-		 */
 		@Override
 		public void lostMessage(final LostMessageEvent e)
 		{
@@ -218,11 +213,6 @@ public class KnxServerGateway implements Runnable
 			return true;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
-		 * #propertyChanged(tuwien.auto.calimero.server.knxnetip.PropertyEvent)
-		 */
 		@Override
 		public void onPropertyValueChanged(final PropertyEvent pe)
 		{
@@ -248,12 +238,6 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener#
-		 * onServiceContainerChange
-		 * (tuwien.auto.calimero.server.knxnetip.ServiceContainerEvent)
-		 */
 		@Override
 		public void onServiceContainerChange(final ServiceContainerEvent sce)
 		{
@@ -273,8 +257,7 @@ public class KnxServerGateway implements Runnable
 				// the following is not working!
 				// XXX subnet link and group address table is missing!
 				// what is the best way to get them here?
-				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null,
-						null, 1);
+				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null, null, 1);
 				connectors.add(connector);
 				connector.setSubnetListener(new SubnetListener(connector.getName()));
 			}
@@ -290,20 +273,10 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
-		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.ShutdownEvent)
-		 */
 		@Override
 		public void onResetRequest(final ShutdownEvent se)
 		{}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.ServerListener
-		 * #shutdown(tuwien.auto.calimero.server.knxnetip.ShutdownEvent)
-		 */
 		@Override
 		public void onShutdown(final ShutdownEvent se)
 		{
@@ -343,20 +316,10 @@ public class KnxServerGateway implements Runnable
 			scid = svcContainerId;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.event.NetworkLinkListener
-		 * #confirmation(tuwien.auto.calimero.FrameEvent)
-		 */
 		@Override
 		public void confirmation(final FrameEvent e)
 		{}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.event.LinkListener
-		 * #indication(tuwien.auto.calimero.FrameEvent)
-		 */
 		@Override
 		public void indication(final FrameEvent e)
 		{
@@ -376,11 +339,6 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.event.LinkListener
-		 * #linkClosed(tuwien.auto.calimero.CloseEvent)
-		 */
 		@Override
 		public void linkClosed(final CloseEvent e)
 		{
@@ -477,11 +435,11 @@ public class KnxServerGateway implements Runnable
 		server = s;
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
+		logger = LogService.getLogger(name);
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
 		}
-		logger = LogService.getLogger(name);
 
 		// group address routing settings
 		try {
@@ -530,10 +488,6 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see java.lang.Runnable#run()
-	 */
 	@Override
 	public void run()
 	{
@@ -559,7 +513,7 @@ public class KnxServerGateway implements Runnable
 				}
 
 				synchronized (this) {
-					if (ipEvents.isEmpty() && subnetEvents.isEmpty())
+					if (subnetEvents.isEmpty())
 						wait();
 				}
 			}

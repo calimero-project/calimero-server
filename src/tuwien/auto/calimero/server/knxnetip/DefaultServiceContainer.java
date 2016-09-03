@@ -47,9 +47,7 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 
 /**
- * The default implementation of the {@link ServiceContainer}.
- * <p>
- * It allows for UDP communication only.
+ * The default implementation of the {@link ServiceContainer} for UDP communication only.
  *
  * @author B. Malinowsky
  */
@@ -157,36 +155,24 @@ public class DefaultServiceContainer implements ServiceContainer
 		this(name, controlEndpoint, knxMedium, knxSubnet, false, true);
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getName()
-	 */
 	@Override
 	public String getName()
 	{
 		return id;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getControlEndpoint()
-	 */
 	@Override
 	public HPAI getControlEndpoint()
 	{
 		return ctrlEndpt;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getKNXMedium()
-	 */
 	@Override
 	public int getKNXMedium()
 	{
 		return settings.getMedium();
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#getSubnetAddress()
-	 */
 	@Override
 	public IndividualAddress getSubnetAddress()
 	{
@@ -199,36 +185,24 @@ public class DefaultServiceContainer implements ServiceContainer
 		return settings;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#setActivationState(boolean)
-	 */
 	@Override
 	public void setActivationState(final boolean activate)
 	{
 		activated = activate;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#isActivated()
-	 */
 	@Override
 	public boolean isActivated()
 	{
 		return activated;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#reuseControlEndpoint()
-	 */
 	@Override
 	public boolean reuseControlEndpoint()
 	{
 		return reuseEndpt;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.ServiceContainer#isNetworkMonitoringAllowed()
-	 */
 	@Override
 	public boolean isNetworkMonitoringAllowed()
 	{
