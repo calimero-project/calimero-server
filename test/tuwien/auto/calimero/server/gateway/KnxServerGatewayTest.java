@@ -92,8 +92,8 @@ public class KnxServerGatewayTest extends TestCase
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
 
-		final ServiceContainer sc = new DefaultServiceContainer("test container", new HPAI(
-				(InetAddress) null, 5647), DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1));
+		final ServiceContainer sc = new DefaultServiceContainer("test container", new HPAI((InetAddress) null, 5647),
+				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true);
 		server.addServiceContainer(sc);
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc,
 				DummyLink.class.getName(), "", 1);

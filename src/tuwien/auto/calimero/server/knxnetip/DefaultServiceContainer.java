@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -123,7 +123,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
 	 *        this service container, <code>false</code> otherwise
 	 */
-	public DefaultServiceContainer(final String name, final HPAI controlEndpoint,
+	DefaultServiceContainer(final String name, final HPAI controlEndpoint,
 		final int knxMedium, final IndividualAddress knxSubnet, final boolean reuseCtrlEndpt,
 		final boolean allowNetworkMonitoring)
 	{
@@ -149,7 +149,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param knxSubnet KNX address of the connected KNX subnet, usually an address identifying the
 	 *        area and line
 	 */
-	public DefaultServiceContainer(final String name, final HPAI controlEndpoint,
+	DefaultServiceContainer(final String name, final HPAI controlEndpoint,
 		final int knxMedium, final IndividualAddress knxSubnet)
 	{
 		this(name, controlEndpoint, knxMedium, knxSubnet, false, true);
