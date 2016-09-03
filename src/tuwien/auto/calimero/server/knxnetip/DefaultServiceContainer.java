@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
+import java.time.Duration;
 import java.util.Arrays;
 
 import tuwien.auto.calimero.IndividualAddress;
@@ -60,6 +61,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private final KNXMediumSettings settings;
 	private final boolean reuseEndpt;
 	private final boolean networkMonitor;
+	private volatile Duration disruptionBufferTimeout;
 
 
 	/**
@@ -231,5 +233,17 @@ public class DefaultServiceContainer implements ServiceContainer
 	public boolean isNetworkMonitoringAllowed()
 	{
 		return networkMonitor;
+	}
+
+	public void setDisruptionBufferTimeout(final Duration expirationTimeout)
+	{
+		if (expirationTimeout.isNegative())
+			throw new KNXIllegalArgumentException("disruption buffer timeout " + expirationTimeout + " < 0");
+		disruptionBufferTimeout = expirationTimeout;
+	}
+
+	public final Duration disruptionBufferTimeout()
+	{
+		return disruptionBufferTimeout;
 	}
 }

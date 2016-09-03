@@ -43,6 +43,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -115,6 +116,8 @@ public class Launcher implements Runnable
 		public static final String discovery = "discovery";
 		/** */
 		public static final String addAddresses = "additionalAddresses";
+		/** */
+		public static final String disruptionBuffer = "disruptionBuffer";
 
 		/** */
 		public static final String attrName = "name";
@@ -146,6 +149,8 @@ public class Launcher implements Runnable
 		public static final String attrDoA = "domainAddress";
 		/** */
 		public static final String attrRef = "ref";
+		/** */
+		public static final String attrExpirationTimeout = "expirationTimeout";
 
 		// the service containers the KNX server will host
 		private final List<ServiceContainer> svcContainers = new ArrayList<>();
@@ -232,6 +237,7 @@ public class Launcher implements Runnable
 			DatapointModel<Datapoint> datapoints = null;
 			List<GroupAddress> filter = Collections.emptyList();
 			List<IndividualAddress> indAddressPool = Collections.emptyList();
+			String expirationTimeout = "0";
 
 			try {
 				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
@@ -285,6 +291,8 @@ public class Launcher implements Runnable
 							throw new KNXMLException(uhe.getMessage(), r);
 						}
 					}
+					else if (name.equals(XmlConfiguration.disruptionBuffer))
+						expirationTimeout = r.getAttributeValue(null, XmlConfiguration.attrExpirationTimeout);
 					else {
 						subnet = new IndividualAddress(r);
 					}
@@ -305,6 +313,7 @@ public class Launcher implements Runnable
 							sc = new DefaultServiceContainer(addr, new HPAI((InetAddress) null, port), s, reuse,
 									monitor);
 						sc.setActivationState(activate);
+						sc.setDisruptionBufferTimeout(Duration.ofSeconds(Integer.parseInt(expirationTimeout)));
 						subnetTypes.add(subnetType);
 						if ("emulate".equals(subnetType) && datapoints != null)
 							subnetDatapoints.put(sc, datapoints);
