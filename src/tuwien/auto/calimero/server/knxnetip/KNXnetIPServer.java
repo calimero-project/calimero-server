@@ -798,8 +798,7 @@ public class KNXnetIPServer
 		// initialize interface device object properties
 
 		// max APDU length is in range [15 .. 254]
-		ios.setProperty(devObject, objectInstance, PID.MAX_APDULENGTH, 1, 1,
-				new byte[] { 0, (byte) 254 });
+		ios.setProperty(devObject, objectInstance, PID.MAX_APDULENGTH, 1, 1, new byte[] { 0, (byte) 254 });
 		ios.setProperty(devObject, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = split(Settings.getLibraryVersion(), ". -");
@@ -819,36 +818,29 @@ public class KNXnetIPServer
 				DeviceDescriptor.DD0.TYPE_091A.toByteArray());
 
 		// requested by ETS during its interface discovery
-		ios.setProperty(devObject, objectInstance, PID.DOMAIN_ADDRESS, 1, 1,
-				new byte[] { 0x0, 0x0 });
+		ios.setProperty(devObject, objectInstance, PID.DOMAIN_ADDRESS, 1, 1, new byte[] { 0x0, 0x0 });
 
 		//
 		// set properties used in device DIB for search response during discovery
 		//
 		// device status is not in programming mode
-		ios.setProperty(devObject, objectInstance, PID.PROGMODE, 1, 1,
-				new byte[] { defDeviceStatus });
+		ios.setProperty(devObject, objectInstance, PID.PROGMODE, 1, 1, new byte[] { defDeviceStatus });
 		ios.setProperty(devObject, objectInstance, PID.SERIAL_NUMBER, 1, 1, defSerialNumber);
 		// server KNX device address, since we don't know about routing at this time
 		// address is always 0.0.0; might be updated later or by routing configuration
 		final byte[] device = new IndividualAddress(0).toByteArray();
 		// equal to PID.KNX_INDIVIDUAL_ADDRESS
-		ios.setProperty(devObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1,
-				new byte[] { device[0] });
-		ios.setProperty(devObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1,
-				new byte[] { device[1] });
+		ios.setProperty(devObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { device[0] });
+		ios.setProperty(devObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { device[1] });
 
 		//
 		// set properties used in manufacturer data DIB for discovery self description
 		//
-		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_ID, 1, 1,
-				bytesFromWord(defMfrId));
-		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4,
-				defMfrData);
+		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_ID, 1, 1, bytesFromWord(defMfrId));
+		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
 
 		// set default medium to TP1 (Bit 1 set)
-		ios.setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, 1, 1,
-				new byte[] { 0, 2 });
+		ios.setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, 1, 1, new byte[] { 0, 2 });
 	}
 
 	// precondition: we have an IOS instance
@@ -1089,14 +1081,11 @@ public class KNXnetIPServer
 
 	private ManufacturerDIB createManufacturerDIB()
 	{
-		final int mfrId = getProperty(InterfaceObject.DEVICE_OBJECT, PID.MANUFACTURER_ID, 1,
-				defMfrId);
+		final int mfrId = getProperty(InterfaceObject.DEVICE_OBJECT, PID.MANUFACTURER_ID, 1, defMfrId);
 		byte[] data = defMfrData;
 		try {
-			final int elems = toInt(ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1,
-					PID.MANUFACTURER_DATA, 0, 1));
-			data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1,
-					elems);
+			final int elems = toInt(ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 0, 1));
+			data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, elems);
 		}
 		catch (final KNXPropertyException e) {}
 		return new ManufacturerDIB(mfrId, data);
@@ -1418,8 +1407,7 @@ public class KNXnetIPServer
 	{
 		boolean useNat;
 
-		ServiceLoop(final DatagramSocket socket, final int receiveBufferSize,
-			final int socketTimeout)
+		ServiceLoop(final DatagramSocket socket, final int receiveBufferSize, final int socketTimeout)
 		{
 			super(socket, true, receiveBufferSize, socketTimeout, 0);
 		}
@@ -1462,13 +1450,7 @@ public class KNXnetIPServer
 				}
 			}
 			catch (final KNXFormatException e) {
-				// if available log bad item, too
-				if (e.getItem() != null) {
-					logger.warn("received invalid frame, item " + e.getItem(), e);
-				}
-				else {
-					logger.warn("received invalid frame", e);
-				}
+				logger.warn("received invalid frame", e);
 			}
 		}
 
@@ -1608,8 +1590,7 @@ public class KNXnetIPServer
 		{
 			quit = true;
 			interrupt();
-			// we also call quit() for looper, since interrupt will get ignored on non-
-			// interruptible sockets
+			// we also call quit() for looper, since interrupt will get ignored on non-interruptible sockets
 			final ServiceLoop l = getLooper();
 			if (l != null)
 				l.quit();
@@ -1869,9 +1850,8 @@ public class KNXnetIPServer
 
 			// forwarder for RoutingService dispatch, called from handleServiceType
 			@Override
-			protected boolean handleServiceType(final KNXnetIPHeader h, final byte[] data,
-				final int offset, final InetAddress src, final int port) throws KNXFormatException,
-				IOException
+			protected boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
+				final InetAddress src, final int port) throws KNXFormatException, IOException
 			{
 				return super.handleServiceType(h, data, offset, src, port);
 			}
@@ -2398,10 +2378,6 @@ public class KNXnetIPServer
 			callback.connectionClosed(h, assigned);
 		}
 
-		/* (non-Javadoc)
-		 * @see tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback
-		 * #resetRequest(tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler)
-		 */
 		@Override
 		public void resetRequest(final DataEndpointServiceHandler h)
 		{
