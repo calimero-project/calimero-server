@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -76,7 +77,6 @@ import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
-import tuwien.auto.calimero.device.ios.InterfaceObjectServerListener;
 import tuwien.auto.calimero.device.ios.KNXPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.internal.EventListeners;
@@ -756,44 +756,35 @@ public class KNXnetIPServer
 		return friendlyName;
 	}
 
-	private class IosListener implements InterfaceObjectServerListener
+	private void onPropertyValueChanged(final PropertyEvent pe)
 	{
-		IosListener()
-		{}
-
-		@Override
-		public void onPropertyValueChanged(final PropertyEvent pe)
-		{
-			if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
-				final ServiceContainer sc = findContainer(pe.getInterfaceObject());
-				// multicast routing lost message
-				final LooperThread t = findRoutingLooperThread(sc);
-				if (t == null)
+		if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
+			final ServiceContainer sc = findContainer(pe.getInterfaceObject());
+			// multicast routing lost message
+			final LooperThread t = findRoutingLooperThread(sc);
+			if (t == null)
+				return;
+			try {
+				final byte[] data = pe.getNewData();
+				final int lost = toInt(data);
+				if (lost == 0)
 					return;
+				int state = 0;
 				try {
-					final byte[] data = pe.getNewData();
-					final int lost = toInt(data);
-					if (lost == 0)
-						return;
-					int state = 0;
-					try {
-						final byte[] stateData = ios.getProperty(
-								InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-								PID.KNXNETIP_DEVICE_STATE, 1, 1);
-						state = stateData[0] & 0xff;
-					}
-					catch (final KNXPropertyException e) {
-						logger.warn("on querying device state for sending "
-								+ "routing lost message", e);
-					}
+					final byte[] stateData = ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+							PID.KNXNETIP_DEVICE_STATE, 1, 1);
+					state = stateData[0] & 0xff;
+				}
+				catch (final KNXPropertyException e) {
+					logger.warn("on querying device state for sending routing lost message", e);
+				}
 
-					final RoutingLostMessage msg = new RoutingLostMessage(lost, state);
-					final RoutingService svc = (RoutingService) t.getLooper();
-					svc.r.send(msg);
-				}
-				catch (final KNXConnectionClosedException e) {
-					logger.error("sending routing lost message notification", e);
-				}
+				final RoutingLostMessage msg = new RoutingLostMessage(lost, state);
+				final RoutingService svc = (RoutingService) t.getLooper();
+				svc.r.send(msg);
+			}
+			catch (final KNXConnectionClosedException e) {
+				logger.error("sending routing lost message notification", e);
 			}
 		}
 	}
@@ -802,7 +793,7 @@ public class KNXnetIPServer
 	{
 		if (ios == null)
 			ios = new InterfaceObjectServer(false);
-		ios.addServerListener(new IosListener());
+		ios.addServerListener(this::onPropertyValueChanged);
 
 		// initialize interface device object properties
 
@@ -1118,9 +1109,8 @@ public class KNXnetIPServer
 			if (!runDiscovery)
 				return;
 		}
-		final Builder builder = new Builder(outgoing, listen);
-		final LooperThread t = new LooperThread(serverName + " discovery endpoint",
-				retryAttempts, builder);
+		final Supplier<ServiceLoop> builder = () -> new DiscoveryService(outgoing, listen);
+		final LooperThread t = new LooperThread(null, serverName + " discovery endpoint", retryAttempts, builder);
 		discovery = t;
 		discovery.start();
 	}
@@ -1135,8 +1125,8 @@ public class KNXnetIPServer
 
 	private void startControlEndpoint(final ServiceContainer sc)
 	{
-		final LooperThread t = new LooperThread(serverName + " control endpoint " + sc.getName(), 9,
-				new Builder(true, sc, null));
+		final Supplier<ServiceLoop> builder = () -> new ControlEndpointService(sc);
+		final LooperThread t = new LooperThread(sc, serverName + " control endpoint " + sc.getName(), 9, builder);
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingEndpoint)
@@ -1163,10 +1153,10 @@ public class KNXnetIPServer
 	private void startRoutingService(final ServiceContainer sc, final RoutingEndpoint endpoint)
 	{
 		final InetAddress mcast = endpoint.getRoutingMulticastAddress();
-		final Builder builder = new Builder(sc, endpoint.getRoutingInterface(), mcast,
+		final Supplier<ServiceLoop> builder = () -> new RoutingService(sc, endpoint.getRoutingInterface(), mcast,
 				multicastLoopback);
-		final LooperThread t = new LooperThread(
-				serverName + " routing service " + mcast.getHostAddress(), 9, builder);
+		final LooperThread t = new LooperThread(sc, serverName + " routing service " + mcast.getHostAddress(), 9,
+				builder);
 		routingEndpoints.add(t);
 		t.start();
 	}
@@ -1544,95 +1534,25 @@ public class KNXnetIPServer
 		}
 	}
 
-	private final class Builder
-	{
-		// discovery = 1, routing = 2, control endpoint = 3, data endpoint = 4
-		private final int service;
-
-		// routing arguments
-		private final NetworkInterface[] send;
-		private final NetworkInterface[] ni;
-		private final InetAddress mc;
-		// control arguments
-		private final ServiceContainer sc;
-		private boolean loopback;
-		// data endpoint arguments
-		private final DataEndpointService conn;
-
-		// discovery
-		Builder(final NetworkInterface[] outgoing, final NetworkInterface[] listen)
-		{
-			service = 1;
-			send = outgoing;
-			ni = listen;
-			mc = null;
-			sc = null;
-			conn = null;
-		}
-
-		// routing
-		Builder(final ServiceContainer svcCont, final NetworkInterface netIf,
-			final InetAddress multicast, final boolean enableLoopback)
-		{
-			service = 2;
-			send = null;
-			ni = new NetworkInterface[] { netIf };
-			mc = multicast;
-			loopback = enableLoopback;
-			sc = svcCont;
-			conn = null;
-		}
-
-		Builder(final boolean ctrlEndpoint, final ServiceContainer ctrl,
-			final DataEndpointService svc)
-		{
-			this.service = ctrlEndpoint ? 3 : 4;
-			sc = ctrl;
-			send = null;
-			ni = null;
-			mc = null;
-			conn = svc;
-		}
-
-		ServiceLoop create()
-		{
-			try {
-				switch (service) {
-				case 1:
-					return new DiscoveryService(send, ni);
-				case 2:
-					return new RoutingService(sc, ni[0], mc, loopback);
-				case 3:
-					return new ControlEndpointService(sc);
-				case 4:
-					return conn;
-				default:
-					break;
-				}
-			}
-			catch (final Exception e) {
-				logger.error("initialization of service failed", e);
-			}
-			return null;
-		}
-	}
-
 	// interrupt policy: cleanup and exit
 	private class LooperThread extends Thread
 	{
 		private final int maxRetries;
 		private volatile boolean quit;
 
-		private final Builder builder;
+		private final ServiceContainer sc;
+		private final Supplier<ServiceLoop> supplier;
 		private volatile ServiceLoop looper;
 
 		// maxRetries: -1: always retry, 0 none, 1: at most one retry, ...
-		LooperThread(final String serviceName, final int retryAttempts, final Builder serviceBuilder)
+		LooperThread(final ServiceContainer svcContainer, final String serviceName, final int retryAttempts,
+			final Supplier<ServiceLoop> serviceSupplier)
 		{
 			super(serviceName);
+			sc = svcContainer;
 			setDaemon(true);
 			maxRetries = retryAttempts >= -1 ? retryAttempts : 0;
-			builder = serviceBuilder;
+			supplier = serviceSupplier;
 		}
 
 		@Override
@@ -1647,28 +1567,31 @@ public class KNXnetIPServer
 					quit = true;
 					break;
 				}
-				looper = builder.create();
-				if (looper != null) {
+				try {
+					looper = supplier.get();
 					// reset for the next reconnection attempt
 					retries = 0;
 					logger.info(super.getName() + " is up and running");
 					looper.run();
 					cleanup(LogLevel.INFO, null);
 				}
-				else if (retries == -1 || retries < maxRetries) {
-					final int wait = 10;
-					logger.info("retry to start " + super.getName() + " in " + wait + " seconds");
-					try {
-						sleep(wait * 1000);
+				catch (final RuntimeException e) {
+					logger.error("initialization of {} failed", super.getName(), e);
+					if (retries == -1 || retries < maxRetries) {
+						final int wait = 10;
+						logger.info("retry to start " + super.getName() + " in " + wait + " seconds");
+						try {
+							sleep(wait * 1000);
+						}
+						catch (final InterruptedException ie) {
+							quit();
+						}
 					}
-					catch (final InterruptedException e) {
-						quit();
+					else {
+						logger.error("error setting up " + super.getName());
+						if (sc != null)
+							closeDataConnections(sc);
 					}
-				}
-				else {
-					logger.error("error setting up " + super.getName());
-					if (builder.sc != null)
-						closeDataConnections(builder.sc);
 				}
 			}
 		}
@@ -1701,19 +1624,23 @@ public class KNXnetIPServer
 		}
 	}
 
+	private static RuntimeException wrappedException(final Exception e)
+	{
+		return new RuntimeException(e);
+	}
+
 	private final class DiscoveryService extends ServiceLoop
 	{
 		private final NetworkInterface[] outgoing;
 
 		private DiscoveryService(final NetworkInterface[] outgoing, final NetworkInterface[] joinOn)
-			throws IOException
 		{
 			super(null, 512, 0);
 			this.outgoing = outgoing;
 			s = createSocket(joinOn);
 		}
 
-		private MulticastSocket createSocket(final NetworkInterface[] joinOn) throws IOException
+		private MulticastSocket createSocket(final NetworkInterface[] joinOn)
 		{
 			final String p = System.getProperties().getProperty("java.net.preferIPv4Stack");
 			logger.trace("network stack uses IPv4 addresses: " + (p == null ? "unknown" : p));
@@ -1723,7 +1650,7 @@ public class KNXnetIPServer
 			}
 			catch (final IOException e) {
 				logger.error("failed to create discovery socket for " + serverName, e);
-				throw e;
+				throw wrappedException(e);
 			}
 
 			// send out beyond local network
@@ -1754,7 +1681,7 @@ public class KNXnetIPServer
 			}
 			catch (final IOException e) {
 				s.close();
-				throw e;
+				throw wrappedException(e);
 			}
 			return s;
 		}
@@ -1929,10 +1856,15 @@ public class KNXnetIPServer
 		private final class RoutingServiceHandler extends KNXnetIPRouting
 		{
 			private RoutingServiceHandler(final NetworkInterface netIf, final InetAddress mcGroup,
-				final boolean enableLoopback) throws KNXException
+				final boolean enableLoopback)
 			{
 				super(mcGroup);
-				init(netIf, enableLoopback, false);
+				try {
+					init(netIf, enableLoopback, false);
+				}
+				catch (final KNXException e) {
+					throw wrappedException(e);
+				}
 			}
 
 			// forwarder for RoutingService dispatch, called from handleServiceType
@@ -2006,7 +1938,7 @@ public class KNXnetIPServer
 		private final ServiceContainer svcCont;
 
 		private RoutingService(final ServiceContainer sc, final NetworkInterface netIf,
-			final InetAddress mcGroup, final boolean enableLoopback) throws KNXException
+			final InetAddress mcGroup, final boolean enableLoopback)
 		{
 			super(null, false, 512, 0);
 			svcCont = sc;
@@ -2040,7 +1972,7 @@ public class KNXnetIPServer
 	{
 		private final ServiceContainer svcCont;
 
-		private ControlEndpointService(final ServiceContainer sc) throws SocketException
+		private ControlEndpointService(final ServiceContainer sc)
 		{
 			super(null, 512, 0);
 			svcCont = sc;
@@ -2239,25 +2171,22 @@ public class KNXnetIPServer
 			return true;
 		}
 
-		private DatagramSocket createSocket() throws SocketException
+		private DatagramSocket createSocket()
 		{
-			DatagramSocket s;
 			final HPAI ep = svcCont.getControlEndpoint();
 			try {
-				s = new DatagramSocket(null);
-				// if we use the KNXnet/IP default port, we have to enable address reuse
-				// for a successful bind
+				final DatagramSocket s = new DatagramSocket(null);
+				// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 				if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 					s.setReuseAddress(true);
 				s.bind(new InetSocketAddress(ep.getAddress(), ep.getPort()));
 				logger.debug("created socket on " + s.getLocalSocketAddress());
+				return s;
 			}
 			catch (final SocketException e) {
-				logger.error("socket creation failed for "
-						+ new InetSocketAddress(ep.getAddress(), ep.getPort()), e);
-				throw e;
+				logger.error("socket creation failed for " + new InetSocketAddress(ep.getAddress(), ep.getPort()), e);
+				throw wrappedException(e);
 			}
-			return s;
 		}
 
 		private ConnectResponse initNewConnection(final ConnectRequest req,
@@ -2353,7 +2282,7 @@ public class KNXnetIPServer
 			else
 				return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
 
-			ServiceLoop svcLoop = null;
+			final ServiceLoop svcLoop;
 			ServiceCallback cb = null;
 			final boolean useThisCtrlEp = svcCont.reuseControlEndpoint();
 
@@ -2367,8 +2296,7 @@ public class KNXnetIPServer
 					cb = looper;
 					svcLoop = looper;
 				}
-				catch (final SocketException e) {
-					// if thread did not initialize properly, we get null returned
+				catch (final RuntimeException e) {
 					// we don't have any better error than NO_MORE_CONNECTIONS for this
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 				}
@@ -2387,8 +2315,9 @@ public class KNXnetIPServer
 			dataConnections.add(sh);
 			if (!useThisCtrlEp) {
 				((DataEndpointService) svcLoop).svcHandler = sh;
-				new LooperThread(svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0,
-						new Builder(false, null, (DataEndpointService) svcLoop)).start();
+				final Supplier<ServiceLoop> builder = () -> svcLoop;
+				new LooperThread(svcCont, svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0, builder)
+						.start();
 			}
 
 			// we always create our own HPAI from the socket, since the service container
@@ -2436,6 +2365,16 @@ public class KNXnetIPServer
 		}
 	}
 
+	private static DatagramSocket newSocketUsingIp(final DatagramSocket localCtrlEndpt)
+	{
+		try {
+			return new DatagramSocket(0, localCtrlEndpt.getLocalAddress());
+		}
+		catch (final SocketException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	private final class DataEndpointService extends ServiceLoop implements ServiceCallback
 	{
 		// KNX receive timeout in seconds
@@ -2445,10 +2384,8 @@ public class KNXnetIPServer
 		private final ServiceCallback callback;
 
 		DataEndpointService(final ServiceCallback callback, final DatagramSocket localCtrlEndpt)
-			throws SocketException
 		{
-			super(new DatagramSocket(0, localCtrlEndpt.getLocalAddress()), 512,
-					MAX_RECEIVE_INTERVAL * 1000);
+			super(newSocketUsingIp(localCtrlEndpt), 512, MAX_RECEIVE_INTERVAL * 1000);
 			this.callback = callback;
 			logger.debug("created socket on " + s.getLocalSocketAddress());
 		}
