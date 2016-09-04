@@ -42,7 +42,6 @@ import java.util.Arrays;
 
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
-import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 
@@ -100,59 +99,6 @@ public class DefaultServiceContainer implements ServiceContainer
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;
 		networkMonitor = allowNetworkMonitoring;
-	}
-
-	/**
-	 * Creates a new service container with the supplied parameters.
-	 * <p>
-	 * The control endpoint of this service container must contain UDP host protocol information.
-	 *
-	 * @param name service container name; the name shall allow an identification within a set of
-	 *        service containers, and provide a descriptive name of the container. Therefore, a
-	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
-	 * @param controlEndpoint control endpoint address information which uniquely identifies this
-	 *        service container to KNXnet/IP clients, UDP host protocol only, the HPAI has to
-	 *        contain an IP address not 0; if parameter is <code>null</code>, a control endpoint is
-	 *        created using the local host address and ephemeral port assignment
-	 * @param knxMedium KNX medium of the KNX subnet this service container is connected to, use one
-	 *        of the constants listed in {@link KNXMediumSettings}
-	 * @param knxSubnet KNX address of the connected KNX subnet, usually an address identifying the
-	 *        area and line
-	 * @param reuseCtrlEndpt <code>true</code> to reuse control endpoint, <code>false</code>
-	 *        otherwise, see {@link #reuseControlEndpoint()}
-	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
-	 *        this service container, <code>false</code> otherwise
-	 */
-	DefaultServiceContainer(final String name, final HPAI controlEndpoint,
-		final int knxMedium, final IndividualAddress knxSubnet, final boolean reuseCtrlEndpt,
-		final boolean allowNetworkMonitoring)
-	{
-		this(name, controlEndpoint, KNXMediumSettings.create(knxMedium, knxSubnet), reuseCtrlEndpt,
-				allowNetworkMonitoring);
-	}
-
-	/**
-	 * Creates a new service container with the supplied parameters.
-	 * <p>
-	 * The control endpoint of this service container must contain UDP host protocol information.<br>
-	 * Reuse of control endpoint is not allowed, bus monitor connections are allowed.
-	 *
-	 * @param name service container name; the name shall allow an identification within a set of
-	 *        service containers, and provide a descriptive name of the container. Therefore, a
-	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
-	 * @param controlEndpoint control endpoint address information which uniquely identifies this
-	 *        service container to KNXnet/IP clients, UDP host protocol only, the HPAI has to
-	 *        contain an IP address not 0; if parameter is <code>null</code>, a control endpoint is
-	 *        created using the local host address and ephemeral port assignment
-	 * @param knxMedium KNX medium of the KNX subnet this service container is connected to, use one
-	 *        of the constants listed in {@link DeviceDIB}
-	 * @param knxSubnet KNX address of the connected KNX subnet, usually an address identifying the
-	 *        area and line
-	 */
-	DefaultServiceContainer(final String name, final HPAI controlEndpoint,
-		final int knxMedium, final IndividualAddress knxSubnet)
-	{
-		this(name, controlEndpoint, knxMedium, knxSubnet, false, true);
 	}
 
 	@Override

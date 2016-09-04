@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@ package tuwien.auto.calimero.server.knxnetip;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 
-import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -91,74 +90,12 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 		netIf = routingInterface;
 	}
 
-	/**
-	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
-	 * <p>
-	 *
-	 * @param name see {@link DefaultServiceContainer}
-	 * @param controlEndpoint see {@link DefaultServiceContainer}
-	 * @param knxMedium see {@link DefaultServiceContainer}
-	 * @param knxSubnet see {@link DefaultServiceContainer}
-	 * @param reuseCtrlEndpt see {@link DefaultServiceContainer}
-	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
-	 * @param routingMulticast the routing multicast address this service container should use for
-	 *        KNXnet/IP routing; if you are unsure about a supported multicast address, use
-	 *        {@link KNXnetIPRouting#DEFAULT_MULTICAST}
-	 * @param routingInterface the network interface this service container should use for KNXnet/IP
-	 *        routing, might be <code>null</code> to use the system default. Note that choosing a
-	 *        particular interface can be tied to the selected routing multicast address parameter
-	 *        <code>routingMulticast</code>.
-	 */
-	public RoutingServiceContainer(final String name, final HPAI controlEndpoint,
-		final int knxMedium, final IndividualAddress knxSubnet, final boolean reuseCtrlEndpt,
-		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
-		final NetworkInterface routingInterface)
-	{
-		super(name, controlEndpoint, knxMedium, knxSubnet, reuseCtrlEndpt, allowNetworkMonitoring);
-		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
-			throw new KNXIllegalArgumentException(routingMulticast
-					+ " is not a valid KNX routing multicast address");
-		mcast = routingMulticast;
-		netIf = routingInterface;
-	}
-
-	/**
-	 * @param name see {@link DefaultServiceContainer}
-	 * @param controlEndpoint see {@link DefaultServiceContainer}
-	 * @param knxMedium see {@link DefaultServiceContainer}
-	 * @param knxSubnet see {@link DefaultServiceContainer}
-	 * @param routingMulticast the routing multicast address this service container should use for
-	 *        KNXnet/IP routing; if you are unsure about a supported multicast address, use
-	 *        {@link KNXnetIPRouting#DEFAULT_MULTICAST}
-	 * @param routingInterface the network interface this service container should use for KNXnet/IP
-	 *        routing, might be <code>null</code> to use the system default. Note that choosing a
-	 *        particular interface can be tied to the routing multicast address parameter
-	 *        <code>routingMulticast</code>.
-	 */
-	public RoutingServiceContainer(final String name, final HPAI controlEndpoint,
-		final int knxMedium, final IndividualAddress knxSubnet, final InetAddress routingMulticast,
-		final NetworkInterface routingInterface)
-	{
-		super(name, controlEndpoint, knxMedium, knxSubnet);
-		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
-			throw new KNXIllegalArgumentException(routingMulticast
-					+ " is not a valid KNX routing multicast address");
-		mcast = routingMulticast;
-		netIf = routingInterface;
-	}
-
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.RoutingEndpoint#getRoutingMulticastAddress()
-	 */
 	@Override
 	public InetAddress getRoutingMulticastAddress()
 	{
 		return mcast;
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.RoutingEndpoint#getRoutingInterface()
-	 */
 	@Override
 	public NetworkInterface getRoutingInterface()
 	{
