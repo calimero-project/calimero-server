@@ -37,16 +37,12 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 
-import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
@@ -93,32 +89,7 @@ final class RoutingService extends ServiceLooper
 
 		public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException
 		{
-			final int state = getState();
-			if (state == CLOSED) {
-				logger.warn("send invoked on closed connection - aborted");
-				throw new KNXConnectionClosedException("connection closed");
-			}
-			if (state < 0) {
-				logger.error("send invoked in error state " + state + " - aborted");
-				throw new KNXIllegalStateException("in error state, send aborted");
-			}
-			try {
-				final byte[] buf = PacketHelper.toPacket(lost);
-				final DatagramPacket p = new DatagramPacket(buf, buf.length, dataEndpt.getAddress(),
-						dataEndpt.getPort());
-				logger.info("sending lost message info");
-				socket.send(p);
-				setState(OK);
-			}
-			catch (final InterruptedIOException e) {
-				close(CloseEvent.USER_REQUEST, "interrupted", LogLevel.WARN, e);
-				Thread.currentThread().interrupt();
-				throw new KNXConnectionClosedException("interrupted connection got closed");
-			}
-			catch (final IOException e) {
-				close(CloseEvent.INTERNAL, "communication failure", LogLevel.ERROR, e);
-				throw new KNXConnectionClosedException("connection closed");
-			}
+			send(PacketHelper.toPacket(lost));
 		}
 
 		@Override
