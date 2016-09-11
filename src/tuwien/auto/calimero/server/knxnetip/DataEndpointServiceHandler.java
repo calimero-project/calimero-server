@@ -68,7 +68,6 @@ import tuwien.auto.calimero.log.LogService.LogLevel;
 
 /**
  * Server-side implementation of KNXnet/IP tunneling and device management protocol.
- * <p>
  *
  * @author B. Malinowsky
  */
@@ -179,8 +178,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			shutdown = true;
 		}
 
-		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason,
-				t);
+		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason, t);
 		callback.connectionClosed(this, device);
 		super.cleanup(initiator, reason, level, t);
 	}
@@ -203,10 +201,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				return true;
 			final int seq = req.getSequenceNumber();
 			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
-				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR
-						: ErrorCodes.VERSION_NOT_SUPPORTED;
-				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq,
-						status));
+				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
 				final DatagramPacket p = new DatagramPacket(buf, buf.length, dataEndpt);
 				socket.send(p);
 				if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
@@ -215,8 +211,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				}
 			}
 			else
-				logger.warn(type + " request with invalid receive sequence " + seq + ", expected "
-						+ getSeqRcv() + " - ignored");
+				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv()
+						+ " - ignored");
 
 			if (seq == getSeqRcv()) {
 				incSeqRcv();
@@ -266,21 +262,18 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			// gets delayed by the connection-state.res timeout.
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (status == ErrorCodes.NO_ERROR
-					&& csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
+			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
 				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				logger.trace("data endpoint received connection state request from " + dataEndpt
-						+ " for channel " + csr.getChannelID());
+				logger.trace("data endpoint received connection state request from " + dataEndpt + " for channel "
+						+ csr.getChannelID());
 				updateLastMsgTimestamp();
 			}
 			else
-				logger.warn("received invalid connection state request: "
-						+ ErrorCodes.getErrorMessage(status));
+				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
 
-			final byte[] buf = PacketHelper
-					.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
+			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
 			ctrlSocket.send(p);
 		}
@@ -394,8 +387,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		if (tunnel) {
 			if (monitor) {
 				if (!(frame instanceof CEMIBusMon))
-					throw new KNXIllegalArgumentException(
-							"bus monitor requires cEMI bus monitor frame type");
+					throw new KNXIllegalArgumentException("bus monitor requires cEMI bus monitor frame type");
 			}
 			else if (!(frame instanceof CEMILData))
 				throw new KNXIllegalArgumentException("link layer requires cEMI L-Data frame type");

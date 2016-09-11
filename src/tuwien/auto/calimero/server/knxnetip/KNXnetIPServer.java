@@ -122,7 +122,6 @@ public class KNXnetIPServer
 
 	// Core specification:
 	// In a routing server, raw and bus monitor connections shall not be supported.
-	// I will see for a workaround.
 
 	// If busmonitor tunneling is implemented, the server shall only support one
 	// active connection per KNX subnetwork, and may not support any other KNXnet/IP
@@ -140,7 +139,6 @@ public class KNXnetIPServer
 	// private static final int PID_DEVICE_CONTROL = 14;
 
 	// TODO limit routing indications to <= 50 messages per seconds as required by the KNX spec
-	// TODO send routing busy indication when frame queues get filled up
 
 	/*
 	  KNX property default values
@@ -859,8 +857,7 @@ public class KNXnetIPServer
 
 		ios.setProperty(knxObject, objectInstance, PID.IP_CAPABILITIES, 1, 1, zero);
 		ios.setProperty(knxObject, objectInstance, PID.IP_ASSIGNMENT_METHOD, 1, 1, new byte[] { 1 });
-		ios.setProperty(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, 1, 1,
-				new byte[] { 1 });
+		ios.setProperty(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, 1, 1, new byte[] { 1 });
 	}
 
 	private void setRoutingConfiguration(final RoutingEndpoint endpoint)

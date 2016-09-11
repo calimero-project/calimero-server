@@ -350,8 +350,8 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 						.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
 						.filter(h -> !h.isMonitor()).map(h -> h.getName()).collect(Collectors.toList());
 				if (active.size() > 0) {
-					logger.warn("{}: active connections for tunneling on link-layer, tunneling on busmonitor-layer "
-							+ "currently not allowed\n\tcurrently connected: {}", svcCont.getName(), active);
+					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
+							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 				}
 
@@ -368,8 +368,8 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				// i.e., if there is an active bus monitor connection, we don't
 				// allow any other tunneling connections.
 				if (activeMonitorConnections() > 0) {
-					logger.warn("{}: active connections for tunneling on busmonitor-layer, "
-							+ "other connections currently not allowed", svcCont.getName());
+					logger.warn("{}: connection currently not allowed (active connections for tunneling on "
+							+ "busmonitor-layer)", svcCont.getName());
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 				}
 			}
