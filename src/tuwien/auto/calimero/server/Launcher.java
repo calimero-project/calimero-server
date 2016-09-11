@@ -51,6 +51,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -235,6 +236,8 @@ public class Launcher implements Runnable
 			List<GroupAddress> filter = Collections.emptyList();
 			List<IndividualAddress> indAddressPool = Collections.emptyList();
 			String expirationTimeout = "0";
+			int disruptionBufferLowerPort = 0;
+			int disruptionBufferUpperPort = 0;
 
 			try {
 				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
@@ -288,8 +291,13 @@ public class Launcher implements Runnable
 							throw new KNXMLException(uhe.getMessage(), r);
 						}
 					}
-					else if (name.equals(XmlConfiguration.disruptionBuffer))
-						expirationTimeout = r.getAttributeValue(null, XmlConfiguration.attrExpirationTimeout);
+					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
+						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
+						final Optional<String> ports = Optional.ofNullable(r.getAttributeValue(null, attrUdpPort));
+						final String range[] = ports.orElse("0-65535").split("-");
+						disruptionBufferLowerPort = Integer.parseInt(range[0]);
+						disruptionBufferUpperPort = Integer.parseInt(range.length > 1 ? range[1] : range[0]);
+					}
 					else {
 						subnet = new IndividualAddress(r);
 					}
@@ -303,14 +311,14 @@ public class Launcher implements Runnable
 						else if (s.getMedium() == KNXMediumSettings.MEDIUM_RF)
 							((RFSettings) s).setDomainAddress(subnetDoA);
 
+						final HPAI hpai = new HPAI((InetAddress) null, port);
 						if (routing)
-							sc = new RoutingServiceContainer(addr, new HPAI((InetAddress) null, port), s, reuse,
-									monitor, routingMcast, routingNetIf);
+							sc = new RoutingServiceContainer(addr, hpai, s, reuse, monitor, routingMcast, routingNetIf);
 						else
-							sc = new DefaultServiceContainer(addr, new HPAI((InetAddress) null, port), s, reuse,
-									monitor);
+							sc = new DefaultServiceContainer(addr, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
-						sc.setDisruptionBufferTimeout(Duration.ofSeconds(Integer.parseInt(expirationTimeout)));
+						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseInt(expirationTimeout)),
+								disruptionBufferLowerPort, disruptionBufferUpperPort);
 						subnetTypes.add(subnetType);
 						if ("emulate".equals(subnetType) && datapoints != null)
 							subnetDatapoints.put(sc, datapoints);

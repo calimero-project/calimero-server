@@ -59,7 +59,8 @@ public class DefaultServiceContainer implements ServiceContainer
 	private final boolean reuseEndpt;
 	private final boolean networkMonitor;
 	private volatile Duration disruptionBufferTimeout;
-
+	private volatile int disruptionBufferLowerPort;
+	private volatile int disruptionBufferUpperPort;
 
 	/**
 	 * Creates a new service container with the supplied parameters. The control endpoint of this
@@ -155,15 +156,22 @@ public class DefaultServiceContainer implements ServiceContainer
 		return networkMonitor;
 	}
 
-	public void setDisruptionBufferTimeout(final Duration expirationTimeout)
+	public void setDisruptionBuffer(final Duration expirationTimeout, final int lowerPort, final int upperPort)
 	{
 		if (expirationTimeout.isNegative())
 			throw new KNXIllegalArgumentException("disruption buffer timeout " + expirationTimeout + " < 0");
 		disruptionBufferTimeout = expirationTimeout;
+		disruptionBufferLowerPort = lowerPort;
+		disruptionBufferUpperPort = upperPort;
 	}
 
 	public final Duration disruptionBufferTimeout()
 	{
 		return disruptionBufferTimeout;
+	}
+
+	public final int[] disruptionBufferPortRange()
+	{
+		return new int[] { disruptionBufferLowerPort, disruptionBufferUpperPort };
 	}
 }
