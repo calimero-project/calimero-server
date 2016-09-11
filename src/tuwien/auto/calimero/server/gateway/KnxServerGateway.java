@@ -592,7 +592,7 @@ public class KnxServerGateway implements Runnable
 		server = s;
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
-		logger = LogService.getLogger(name);
+		logger = LogService.getLogger("calimero.server.gateway." + name);
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
@@ -785,7 +785,7 @@ public class KnxServerGateway implements Runnable
 						dispatchToSubnets(send);
 				}
 				catch (KNXException | InterruptedException e) {
-					logger.error("sending L_Data.con of {}",
+					logger.error("sending L_Data.con for {}",
 							DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
 				}
 			}
@@ -1027,7 +1027,7 @@ public class KnxServerGateway implements Runnable
 					} catch (final KNXIllegalArgumentException e) {
 						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
-						logger.warn("frame not accepted by connection {} ({}): {}", c.getName(), e.getMessage(), f);
+						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), f);
 					}
 				}
 			}

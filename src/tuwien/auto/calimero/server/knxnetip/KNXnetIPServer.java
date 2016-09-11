@@ -318,7 +318,7 @@ public class KNXnetIPServer
 			// ISO 8859-1 support is mandatory on every Java platform
 			throw new Error("missing ISO 8859-1 charset, " + e.getMessage());
 		}
-		logger = LogService.getLogger(getName());
+		logger = LogService.getLogger("calimero.server." + getName());
 		listeners = new EventListeners<>(logger);
 
 		try {

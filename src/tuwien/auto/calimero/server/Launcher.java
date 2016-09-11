@@ -466,7 +466,7 @@ public class Launcher implements Runnable
 		try {
 			connect(linksToClose, connectors);
 			xml = null;
-			final String name = "Calimero KNX server gateway";
+			final String name = server.getName();
 			// create a gateway which forwards and answers most of the KNX stuff
 			// if no connectors were created, gateway will throw
 			gw = new KnxServerGateway(name, server, connectors.toArray(new SubnetConnector[0]));
