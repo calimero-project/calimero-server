@@ -828,6 +828,8 @@ public class KNXnetIPServer
 			setRoutingConfiguration(endpoint);
 		else
 			resetRoutingConfiguration(objectInstance);
+		// 100 ms is the default busy wait time
+		ios.setProperty(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, 1, 1, bytesFromWord(100));
 
 		// ip and setup multicast
 		byte[] ip = new byte[4];

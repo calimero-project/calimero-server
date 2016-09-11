@@ -36,9 +36,16 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,6 +55,12 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 
@@ -75,7 +88,9 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
+import tuwien.auto.calimero.knxnetip.RoutingBusyEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
+import tuwien.auto.calimero.knxnetip.servicetype.RoutingBusy;
 import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -85,11 +100,13 @@ import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.log.LogService;
+import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
+import tuwien.auto.calimero.server.knxnetip.RoutingEndpoint;
 import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainerEvent;
@@ -116,12 +133,32 @@ import tuwien.auto.calimero.server.knxnetip.ShutdownEvent;
  */
 public class KnxServerGateway implements Runnable
 {
+	// KNX IP routing busy flow control
+	// currently only 1 routing service is supported per server
+	private static final Duration randomWaitScale = Duration.ofMillis(50);
+	private static final Duration throttleScale = Duration.ofMillis(100);
+	private volatile Instant currentWaitUntil = Instant.EPOCH;
+	private volatile Instant pauseSendingUntil = Instant.EPOCH;
+	private volatile Instant throttleUntil = Instant.EPOCH;
+
+	private final AtomicInteger routingBusyCounter = new AtomicInteger();
+	private static final ScheduledExecutorService busyCounterDecrementor = Executors
+			.newSingleThreadScheduledExecutor(r -> {
+				final Thread t = new Thread(r, "Calimero routing busy counter");
+				t.setDaemon(true);
+				return t;
+			});
+
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
 	{
 		final ServiceContainer sc;
 		final String name;
 		final IndividualAddress addr;
+
+		private Instant lastRoutingBusy = Instant.EPOCH;
+		// avoid null, assign bogus future
+		private volatile ScheduledFuture<?> decrement = busyCounterDecrementor.schedule(() -> {}, 0, TimeUnit.SECONDS);
 
 		ConnectionListener(final ServiceContainer svcContainer, final String connectionName,
 			final IndividualAddress device)
@@ -153,6 +190,75 @@ public class KnxServerGateway implements Runnable
 		{
 			logger.warn("routing message loss of " + "KNXnet/IP router " + e.getSender()
 					+ " increased to a total of " + e.getLostMessages());
+		}
+
+		@Override
+		public void routingBusy(final RoutingBusyEvent e)
+		{
+			// in case we sent the routing busy notification, ignore it
+//			if (sentByUs(e.sender()))
+//				return;
+
+			// setup timing for routing busy flow control
+			final Instant now = Instant.now();
+			final Instant waitUntil = now.plus(e.waitTime(), ChronoUnit.MILLIS);
+			LogLevel level = LogLevel.TRACE;
+			boolean update = false;
+			if (waitUntil.isAfter(currentWaitUntil)) {
+				currentWaitUntil = waitUntil;
+				level = LogLevel.WARN;
+				update = true;
+			}
+			LogService.log(logger, level, "routing busy from device {}, wait time {} ms, KNX network fault = {}",
+					e.sender(), e.waitTime(), e.get().isKnxFault());
+
+			// increment random wait scaling iff >= 10 ms have passed since the last counted routing busy
+			if (now.isAfter(lastRoutingBusy.plusMillis(10))) {
+				lastRoutingBusy = now;
+				routingBusyCounter.incrementAndGet();
+				update = true;
+			}
+
+			if (!update)
+				return;
+
+			final double rand = new Random().nextDouble();
+			final long randomWait = Math.round(rand * routingBusyCounter.get() * randomWaitScale.toMillis());
+
+			// invariant on instants: throttle >= pause sending >= current wait
+			pauseSendingUntil = currentWaitUntil.plusMillis(randomWait);
+			final long throttle = routingBusyCounter.get() * throttleScale.toMillis();
+			throttleUntil = pauseSendingUntil.plusMillis(throttle);
+
+			final long continueIn = Duration.between(Instant.now(), pauseSendingUntil).toMillis();
+			logger.info("set routing busy counter = {}, random wait = {} ms, continue sending in {} ms, throttle {} ms",
+					routingBusyCounter, randomWait, continueIn, throttle);
+
+			final long initialDelay = Duration.between(now, throttleUntil).toMillis() + 5;
+			decrement.cancel(false);
+			decrement = busyCounterDecrementor.scheduleAtFixedRate(this::decrementBusyCounter, initialDelay, 5,
+					TimeUnit.MILLISECONDS);
+		}
+
+		private void decrementBusyCounter()
+		{
+			// decrement iff counter > 0, otherwise cancel decrementing
+			if (routingBusyCounter.accumulateAndGet(0, (v, u) -> v > 0 ? --v : v) == 0)
+				decrement.cancel(false);
+		}
+
+		// this will give a false positive if sending device and server are on same host
+		private boolean sentByUs(final InetSocketAddress sender)
+		{
+			final NetworkInterface netif = ((RoutingEndpoint) sc).getRoutingInterface();
+			// workaround for svc container routing interface, can return null meaning "any" interface
+			List<InetAddress> addrs = Collections.emptyList();
+			try {
+				addrs = netif != null ? Collections.list(netif.getInetAddresses())
+						: Arrays.asList(InetAddress.getLocalHost());
+			}
+			catch (final UnknownHostException ignore) {}
+			return addrs.contains(sender.getAddress());
 		}
 
 		@Override
@@ -395,10 +501,10 @@ public class KnxServerGateway implements Runnable
 	// forwarding settings to sub line for addresses <= 0x6fff
 	private int subGroupAddressConfig = 3;
 
-	private final Thread dispatcher = new Thread() {
-		{
-			setName("Gateway IP to subnet dispatcher");
-		}
+	private final Thread dispatcher = new Thread("Gateway IP to subnet dispatcher") {
+		// threshold for multicasting routing busy msg is 10 incoming routing indications
+		private static final int routingBusyMsgThreshold = 10;
+		private int ipMsgCount;
 
 		@Override
 		public void run()
@@ -407,6 +513,7 @@ public class KnxServerGateway implements Runnable
 				while (trucking) {
 					for (FrameEvent event = getIPEvent(); event != null; event = getIPEvent())
 						try {
+							checkRoutingBusy();
 							onFrameReceived(event, true);
 						}
 						catch (final RuntimeException e) {
@@ -424,6 +531,47 @@ public class KnxServerGateway implements Runnable
 		{
 			synchronized (KnxServerGateway.this) {
 				return ipEvents.isEmpty() ? null : ipEvents.remove(0);
+			}
+		}
+
+		private void checkRoutingBusy()
+		{
+			final Duration observationPeriod = Duration.ofMillis(100);
+			// TODO adjust for KNX subnet capacity
+			final int maxMsgsPerSecond = 200;
+
+			ipMsgCount++;
+			final int msgs;
+			synchronized (KnxServerGateway.this) {
+				msgs = ipEvents.size();
+			}
+			final double seconds = ((double) observationPeriod.toMillis()) / 1000;
+			final int msgsPerPeriod = (int) (maxMsgsPerSecond * seconds);
+			if (msgs >= msgsPerPeriod)
+				sendRoutingBusy();
+		}
+
+		private void sendRoutingBusy()
+		{
+			if (ipMsgCount < routingBusyMsgThreshold)
+				return;
+			ipMsgCount = 0;
+			serverConnections.stream().filter(c -> c instanceof KNXnetIPRouting)
+					.forEach(c -> sendRoutingBusy((KNXnetIPRouting) c));
+		}
+
+		private void sendRoutingBusy(final KNXnetIPRouting connection)
+		{
+			final int deviceState = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					PID.KNXNETIP_DEVICE_STATE, 0);
+			final int waitTime = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					PID.ROUTING_BUSY_WAIT_TIME, 100);
+			final RoutingBusy msg = new RoutingBusy(deviceState, waitTime, 0);
+			try {
+				connection.send(msg);
+			}
+			catch (final KNXConnectionClosedException e) {
+				logger.warn("trying to send routing busy message on closed {}", connection, e);
 			}
 		}
 	};
@@ -904,9 +1052,32 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
+	// check whether we have to slow down or pause sending for routing flow control
+	private void applyRoutingFlowControl(final KNXnetIPConnection c) throws InterruptedException
+	{
+		if (!(c instanceof KNXnetIPRouting) || routingBusyCounter.get() == 0)
+			return;
+
+		// we have to loop because a new arrival of routing busy might update timings
+		while (true) {
+			final Instant now = Instant.now();
+			final Duration sleep = Duration.between(now, pauseSendingUntil);
+			if (!sleep.isNegative()) {
+				Thread.sleep(sleep.toMillis());
+			}
+			else if (now.isBefore(throttleUntil)) {
+				Thread.sleep(5);
+				break;
+			}
+			else
+				break;
+		}
+	}
+
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
+		applyRoutingFlowControl(c);
 		c.send(f, WaitForAck);
 	}
 
@@ -943,6 +1114,18 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
 			logger.error("error sending to {} on subnet {}", f.getDestination(), lnk.getName(), e);
+		}
+	}
+
+	private int getPropertyOrDefault(final int objectType, final int objectInstance, final int propertyId,
+		final int defaultValue)
+	{
+		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+		try {
+			return (int) toUnsignedInt(ios.getProperty(objectType, objectInstance, propertyId, 1, 1));
+		}
+		catch (final KNXPropertyException e) {
+			return defaultValue;
 		}
 	}
 
@@ -1129,6 +1312,8 @@ public class KnxServerGateway implements Runnable
 
 	private static long toUnsignedInt(final byte[] data)
 	{
+		if (data.length == 1)
+			return (data[0] & 0xff);
 		if (data.length == 2)
 			return (data[0] & 0xff) << 8 | data[1] & 0xff;
 		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3]
