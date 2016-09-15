@@ -13,18 +13,15 @@
 		<url>https://github.com/calimero-project/calimero-server.git</url>
 	</scm>
 	<url>https://github.com/calimero-project/calimero-server</url>
-
 	<developers>
 		<developer>
 			<name>Boris Malinowsky</name>
 			<email>b.malinowsky@gmail.com</email>
 		</developer>
 	</developers>
-
 	<properties>
 		<exec.mainClass>tuwien.auto.calimero.server.Launcher</exec.mainClass>
 	</properties>
-
 	<build>
 		<plugins>
 			<plugin>
@@ -37,6 +34,14 @@
 							<mainClass>${exec.mainClass}</mainClass>
 						</manifest>
 					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.5.0</version>
+				<configuration>
+					<cleanupDaemonThreads>false</cleanupDaemonThreads>
 				</configuration>
 			</plugin>
 		</plugins>
