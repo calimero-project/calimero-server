@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -222,7 +223,7 @@ public class Launcher implements Runnable
 			final boolean monitor = Boolean
 					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
-			final NetworkInterface routingNetIf = routing ? getNetIf(r) : null;
+			final NetworkInterface netif = getNetIf(r);
 
 			String addr = "";
 			String subnetType = "";
@@ -311,9 +312,14 @@ public class Launcher implements Runnable
 						else if (s.getMedium() == KNXMediumSettings.MEDIUM_RF)
 							((RFSettings) s).setDomainAddress(subnetDoA);
 
-						final HPAI hpai = new HPAI((InetAddress) null, port);
+						// try to get an IPv4 address from the optional netif
+						InetAddress ia = null;
+						if (netif != null)
+							ia = Collections.list(netif.getInetAddresses()).stream()
+									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
+						final HPAI hpai = new HPAI(ia, port);
 						if (routing)
-							sc = new RoutingServiceContainer(addr, hpai, s, reuse, monitor, routingMcast, routingNetIf);
+							sc = new RoutingServiceContainer(addr, hpai, s, reuse, monitor, routingMcast, netif);
 						else
 							sc = new DefaultServiceContainer(addr, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
