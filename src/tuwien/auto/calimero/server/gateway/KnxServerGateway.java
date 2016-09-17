@@ -341,8 +341,7 @@ public class KnxServerGateway implements Runnable
 			if (pe.getPropertyId() == MAIN_LCGRPCONFIG) {
 				if (pe.getInterfaceObject().getType() == ROUTER_OBJECT) {
 					mainGroupAddressConfig = pe.getNewData()[0] & 0x03;
-					logger.info("main-line group address config changed to "
-							+ mainGroupAddressConfig);
+					logger.info("main-line group address config changed to " + mainGroupAddressConfig);
 				}
 			}
 			else if (pe.getPropertyId() == SUB_LCGRPCONFIG) {
@@ -1093,8 +1092,7 @@ public class KnxServerGateway implements Runnable
 			AutoCloseable subnetLink = lnk;
 			if (subnetLink instanceof Link)
 				subnetLink = ((Link<?>) subnetLink).target();
-			final boolean routing = subnetLink instanceof KNXNetworkLinkIP
-					&& subnetLink.toString().contains("routing");
+			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
 
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			if (mc == CEMILData.MC_LDATA_IND && !routing)

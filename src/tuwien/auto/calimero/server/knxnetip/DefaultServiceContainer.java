@@ -79,9 +79,8 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
 	 *        this service container, <code>false</code> otherwise
 	 */
-	public DefaultServiceContainer(final String name, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt,
-		final boolean allowNetworkMonitoring)
+	public DefaultServiceContainer(final String name, final HPAI controlEndpoint, final KNXMediumSettings subnet,
+		final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring)
 	{
 		if (name == null)
 			throw new NullPointerException("container identifier must not be null");

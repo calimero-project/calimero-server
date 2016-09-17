@@ -95,24 +95,22 @@ import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
  * <p>
  * A running server instance needs specific device and configuration data to answer search and
  * description requests during discovery and description, to accept connection requests, and so on.
- * Therefore, during construction of a KNXnet/IP server, every instance creates its own default
+ * Therefore, every KNXnet/IP server maintains an
  * interface object server (IOS). The IOS is initialized with basic information by adding KNX
- * properties, allowing the server to run properly. A user can subsequently get the IOS by calling
- * {@link #getInterfaceObjectServer()} to query or modify the initial set of server properties, or
+ * properties, allowing the server to run properly. A user can access the IOS by calling
+ * {@link #getInterfaceObjectServer()} to query or modify KNXnet/IP server properties, or
  * replace the IOS with another one by calling
  * {@link #setInterfaceObjectServer(InterfaceObjectServer)}.<br>
- * See the server constructor for a list with the default settings of an IOS during initialization.<br>
- * Different services are allowed to alter certain KNX properties in the set IOS.
+ * See the server constructor for the minimum set of default settings the IOS is initialized with.
+ * Different services will update certain KNX properties in the IOS during runtime.
  * <p>
  * Note, that if data required by the server is not available in the IOS (e.g., due to deletion of
  * KNX properties by a user) or is not valid, the server will at first try to fall back on defaults
  * to fill in the missing data ensuring a minimum service, but finally might provide degraded
- * service only. It will, however, not add or alter such properties in the IOS.
+ * service only. It will, however, not always re-add or alter such properties in the IOS.
  * <p>
- * A server instance can be started ({@link #launch()} and shut down ( {@link #shutdown()} )
+ * A server instance can be started ({@link #launch()}) and shut down ({@link #shutdown()})
  * repeatedly, without loosing server-global configuration settings.
- * <p>
- * The following properties are modified while the server is running:<br>
  *
  * @author B. Malinowsky
  */
