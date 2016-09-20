@@ -230,11 +230,9 @@ public class KNXnetIPServer
 	final List<DataEndpointServiceHandler> dataConnections = new ArrayList<>();
 
 	private InterfaceObjectServer ios;
-	private static final int devObject = DEVICE_OBJECT;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
 
-	// TODO use service container specific object instance, and not a default of 1
-	private final int objectInstance = 1;
+	private static final int objectInstance = 1;
 
 	private final EventListeners<ServerListener> listeners;
 
@@ -415,8 +413,7 @@ public class KNXnetIPServer
 			}
 			final boolean removed = svcContainers.remove(sc);
 			if (removed)
-				getInterfaceObjectServer().removeInterfaceObject(
-						svcContToIfObj.get(sc));
+				getInterfaceObjectServer().removeInterfaceObject(svcContToIfObj.get(sc));
 		}
 		fireServiceContainerRemoved(sc);
 	}
@@ -722,7 +719,8 @@ public class KNXnetIPServer
 					return;
 				int state = 0;
 				try {
-					final byte[] stateData = ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					final int oi = objectInstance(findContainer(pe.getInterfaceObject()));
+					final byte[] stateData = ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, oi,
 							PID.KNXNETIP_DEVICE_STATE, 1, 1);
 					state = stateData[0] & 0xff;
 				}
@@ -748,8 +746,8 @@ public class KNXnetIPServer
 		// initialize interface device object properties
 
 		// max APDU length is in range [15 .. 254]
-		ios.setProperty(devObject, objectInstance, PID.MAX_APDULENGTH, 1, 1, new byte[] { 0, (byte) 254 });
-		ios.setProperty(devObject, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, 1, 1, new byte[] { 0, (byte) 254 });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = split(Settings.getLibraryVersion(), ". -");
 		int last = 0;
@@ -758,36 +756,36 @@ public class KNXnetIPServer
 		}
 		catch (final NumberFormatException e) {}
 		final int ver = Integer.parseInt(sver[0]) << 12 | Integer.parseInt(sver[1]) << 6 | last;
-		ios.setProperty(devObject, objectInstance, PID.VERSION, 1, 1, new byte[] {
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.VERSION, 1, 1, new byte[] {
 			(byte) (ver >>> 8), (byte) (ver & 0xff) });
 
 		// revision counting is not aligned with library version for now
-		ios.setProperty(devObject, objectInstance, PID.FIRMWARE_REVISION, 1, 1, new byte[] { 1 });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.FIRMWARE_REVISION, 1, 1, new byte[] { 1 });
 
-		ios.setProperty(devObject, objectInstance, PID.DEVICE_DESCRIPTOR, 1, 1,
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_DESCRIPTOR, 1, 1,
 				DeviceDescriptor.DD0.TYPE_091A.toByteArray());
 
 		// requested by ETS during its interface discovery
-		ios.setProperty(devObject, objectInstance, PID.DOMAIN_ADDRESS, 1, 1, new byte[] { 0x0, 0x0 });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS, 1, 1, new byte[] { 0x0, 0x0 });
 
 		//
 		// set properties used in device DIB for search response during discovery
 		//
 		// device status is not in programming mode
-		ios.setProperty(devObject, objectInstance, PID.PROGMODE, 1, 1, new byte[] { defDeviceStatus });
-		ios.setProperty(devObject, objectInstance, PID.SERIAL_NUMBER, 1, 1, defSerialNumber);
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.PROGMODE, 1, 1, new byte[] { defDeviceStatus });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.SERIAL_NUMBER, 1, 1, defSerialNumber);
 		// server KNX device address, since we don't know about routing at this time
 		// address is always 0.0.0; might be updated later or by routing configuration
 		final byte[] device = new IndividualAddress(0).toByteArray();
 		// equal to PID.KNX_INDIVIDUAL_ADDRESS
-		ios.setProperty(devObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { device[0] });
-		ios.setProperty(devObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { device[1] });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { device[0] });
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { device[1] });
 
 		//
 		// set properties used in manufacturer data DIB for discovery self description
 		//
-		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_ID, 1, 1, bytesFromWord(defMfrId));
-		ios.setProperty(devObject, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_ID, 1, 1, bytesFromWord(defMfrId));
+		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
 
 		// set default medium to TP1 (Bit 1 set)
 		ios.setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, 1, 1, new byte[] { 0, 2 });
@@ -823,7 +821,7 @@ public class KNXnetIPServer
 
 		// routing stuff
 		if (endpoint != null)
-			setRoutingConfiguration(endpoint);
+			setRoutingConfiguration(endpoint, objectInstance);
 		else
 			resetRoutingConfiguration(objectInstance);
 		// 100 ms is the default busy wait time
@@ -860,7 +858,7 @@ public class KNXnetIPServer
 		ios.setProperty(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, 1, 1, new byte[] { 1 });
 	}
 
-	private void setRoutingConfiguration(final RoutingEndpoint endpoint)
+	private void setRoutingConfiguration(final RoutingEndpoint endpoint, final int objectInstance)
 		throws KNXPropertyException
 	{
 		final InetAddress multicastAddr = endpoint.getRoutingMulticastAddress();
@@ -873,8 +871,7 @@ public class KNXnetIPServer
 			else {
 				byte[] data = null;
 				try {
-					data = ios.getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS,
-							1, 1);
+					data = ios.getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, 1, 1);
 				}
 				catch (final KNXPropertyException e) {
 					logger.warn("no routing multicast address property value", e);
@@ -939,8 +936,19 @@ public class KNXnetIPServer
 		}
 	}
 
+	int objectInstance(final ServiceContainer sc)
+	{
+		final ServiceContainer[] sca = getServiceContainers();
+		for (int i = 0; i < sca.length; i++) {
+			if (sca[i] == sc) {
+				return i + 1;
+			}
+		}
+		throw new KNXIllegalStateException("service container \"" + sc.getName() + "\" not found");
+	}
+
 	// returns a property element value as integer, or the supplied default on error
-	int getProperty(final int objectType, final int propertyId, final int elements,
+	int getProperty(final int objectType, final int objectInstance, final int propertyId, final int elements,
 		final int def)
 	{
 		try {
@@ -956,7 +964,7 @@ public class KNXnetIPServer
 		byte[] name;
 		try {
 			// friendly name property entry is an array of 30 characters
-			name = ios.getProperty(knxObject, objectInstance, PID.FRIENDLY_NAME, 1, 30);
+			name = ios.getProperty(knxObject, objectInstance(sc), PID.FRIENDLY_NAME, 1, 30);
 		}
 		catch (final KNXPropertyException e) {
 			name = new byte[30];
@@ -967,26 +975,26 @@ public class KNXnetIPServer
 			sb.append((char) (name[i] & 0xff));
 		final String friendly = sb.toString();
 
-		final int deviceStatus = getProperty(devObject, PID.PROGMODE, 1, defDeviceStatus);
-		final int projectInstallationId = getProperty(knxObject, PID.PROJECT_INSTALLATION_ID, 1,
+		final int deviceStatus = getProperty(DEVICE_OBJECT, objectInstance, PID.PROGMODE, 1, defDeviceStatus);
+		final int projectInstallationId = getProperty(knxObject, objectInstance(sc), PID.PROJECT_INSTALLATION_ID, 1,
 				defProjectInstallationId);
 
 		byte[] serialNumber = defSerialNumber;
 		try {
-			serialNumber = ios.getProperty(devObject, objectInstance, PID.SERIAL_NUMBER, 1, 1);
+			serialNumber = ios.getProperty(DEVICE_OBJECT, objectInstance, PID.SERIAL_NUMBER, 1, 1);
 		}
 		catch (final KNXPropertyException e) {}
 
 		IndividualAddress knxAddress = defKnxAddress;
 		try {
-			knxAddress = new IndividualAddress(ios.getProperty(knxObject, objectInstance,
+			knxAddress = new IndividualAddress(ios.getProperty(knxObject, objectInstance(sc),
 					PID.KNX_INDIVIDUAL_ADDRESS, 1, 1));
 		}
 		catch (final KNXPropertyException e) {}
 
 		InetAddress mcast = defRoutingMulticast;
 		try {
-			mcast = InetAddress.getByAddress(ios.getProperty(knxObject, objectInstance,
+			mcast = InetAddress.getByAddress(ios.getProperty(knxObject, objectInstance(sc),
 					PID.ROUTING_MULTICAST_ADDRESS, 1, 1));
 		}
 		catch (final UnknownHostException e) {}
@@ -994,7 +1002,7 @@ public class KNXnetIPServer
 
 		byte[] macAddress = defMacAddress;
 		try {
-			macAddress = ios.getProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1);
+			macAddress = ios.getProperty(knxObject, objectInstance(sc), PID.MAC_ADDRESS, 1, 1);
 		}
 		catch (final KNXPropertyException e) {}
 
@@ -1002,10 +1010,10 @@ public class KNXnetIPServer
 				knxAddress, serialNumber, mcast, macAddress);
 	}
 
-	ServiceFamiliesDIB createServiceFamiliesDIB()
+	ServiceFamiliesDIB createServiceFamiliesDIB(final ServiceContainer sc)
 	{
 		// we get a 2 byte value
-		final int caps = getProperty(knxObject, PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
+		final int caps = getProperty(knxObject, objectInstance(sc), PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
 
 		// service family 'core' is skipped here since not used in capabilities bitset
 		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT,

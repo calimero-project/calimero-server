@@ -86,8 +86,6 @@ import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCa
 
 final class ControlEndpointService extends ServiceLooper implements ServiceCallback
 {
-	// TODO use service container specific object instance, and not a default of 1
-	private static final int objectInstance = 1;
 	private final ServiceContainer svcCont;
 
 	private final List<IndividualAddress> usedKnxAddresses = new ArrayList<>();
@@ -157,7 +155,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				return true;
 			}
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
-			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB();
+			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont);
 			final ManufacturerDIB mfr = createManufacturerDIB();
 			final byte[] buf = PacketHelper.toPacket(new DescriptionResponse(device, svcFamilies, mfr));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length,
@@ -312,6 +310,11 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		}
 	}
 
+	private int objectInstance()
+	{
+		return server.objectInstance(svcCont);
+	}
+
 	private ConnectResponse initNewConnection(final ConnectRequest req, final InetSocketAddress ctrlEndpt,
 		final InetSocketAddress dataEndpt, final int channelId)
 	{
@@ -384,8 +387,9 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			// server assigned its own device address, we have to reject the request
 			synchronized (usedKnxAddresses) {
 				try {
-					if (usedKnxAddresses.contains(new IndividualAddress(server.getInterfaceObjectServer().getProperty(
-							KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1)))) {
+					final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT,
+							objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1);
+					if (usedKnxAddresses.contains(new IndividualAddress(data))) {
 						logger.warn("server assigned its own device address, "
 								+ "no management connections allowed at this time");
 						return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
@@ -470,11 +474,11 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		// - no unused additional addresses are available
 		// - we don't run KNXnet/IP routing
 		try {
-			byte[] data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+			byte[] data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
 					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 0, 1);
 			final int elems = (data[0] & 0xff) << 8 | data[1] & 0xff;
 			for (int i = 0; i < elems; ++i) {
-				data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES,
+				data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.ADDITIONAL_INDIVIDUAL_ADDRESSES,
 						i + 1, 1);
 				final IndividualAddress addr = new IndividualAddress(data);
 				if (matchesSubnet(addr, forSubnet))
@@ -488,14 +492,14 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		// there are no free addresses, or no additional address at all
 		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
 
-		if (!server.routingEndpoints.isEmpty()) {
+		if (svcCont instanceof RoutingEndpoint) {
 			logger.warn("KNXnet/IP routing active, can not assign server device address");
 			return null;
 		}
 
 		final byte[] data;
 		try {
-			data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1);
+			data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1);
 		}
 		catch (final KNXPropertyException e) {
 			logger.error("no server device address stored in interface object server!");
@@ -603,7 +607,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 
 	private ManufacturerDIB createManufacturerDIB()
 	{
-		final int mfrId = server.getProperty(InterfaceObject.DEVICE_OBJECT, PID.MANUFACTURER_ID, 1,
+		final int mfrId = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_ID, 1,
 				KNXnetIPServer.defMfrId);
 		byte[] data = KNXnetIPServer.defMfrData;
 		try {

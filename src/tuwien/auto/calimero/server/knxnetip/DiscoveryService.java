@@ -69,9 +69,6 @@ final class DiscoveryService extends ServiceLooper
 {
 	private static final InetAddress systemSetupMulticast = KNXnetIPServer.defRoutingMulticast;
 
-	// TODO use service container specific object instance, and not a default of 1
-	private static final int objectInstance = 1;
-
 	private final NetworkInterface[] outgoing;
 
 	DiscoveryService(final KNXnetIPServer server, final NetworkInterface[] outgoing, final NetworkInterface[] joinOn)
@@ -201,7 +198,6 @@ final class DiscoveryService extends ServiceLooper
 				return true;
 			}
 
-			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB();
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
@@ -218,12 +214,13 @@ final class DiscoveryService extends ServiceLooper
 					try {
 						final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
 						final byte[] mac = ni != null ? ni.getHardwareAddress() : new byte[6];
-						server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+						server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc),
 								PID.MAC_ADDRESS, 1, 1, mac);
 					}
 					catch (final SocketException | KNXPropertyException e) {}
 
 					final DeviceDIB device = server.createDeviceDIB(sc);
+					final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(sc);
 					final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device, svcFamilies));
 					final DatagramPacket p = new DatagramPacket(buf, buf.length, addr);
 					logger.trace("sending search response with container '" + sc.getName() + "' to " + addr);
@@ -284,5 +281,10 @@ final class DiscoveryService extends ServiceLooper
 		}
 		catch (final IOException ignore) {}
 		super.quit();
+	}
+
+	private int objectInstance(final ServiceContainer sc)
+	{
+		return server.objectInstance(sc);
 	}
 }
