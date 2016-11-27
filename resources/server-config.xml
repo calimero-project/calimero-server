@@ -10,7 +10,7 @@
 	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
 		udpPort="3671" listenNetIf="eth0" reuseCtrlEP="true">
 		<knxAddress type="individual">7.1.1</knxAddress>
-
+		<disruptionBuffer expirationTimeout="30" udpPort="5555-5559" />
 		<!-- Specify the KNX subnet type, connecting the KNX network. Subnet connection type: one of 
 			{ "ip", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" } -->
 		<!-- KNX communication medium: one of { "tp1" (default), "pl110", "knxip", "rf" }  -->
