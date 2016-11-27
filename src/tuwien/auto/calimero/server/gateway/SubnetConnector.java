@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -329,7 +329,7 @@ public class SubnetConnector
 		try {
 			@SuppressWarnings("unchecked")
 			final Class<? extends T> c = (Class<? extends T>) Class.forName(className);
-			final Class<?>[] paramTypes = new Class[] { Object[].class };
+			final Class<?>[] paramTypes = new Class<?>[] { Object[].class };
 			final Object[] args = new Object[] { initArgs };
 			return c.getConstructor(paramTypes).newInstance(args);
 		}
