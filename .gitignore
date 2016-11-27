@@ -12,5 +12,11 @@
 /doc
 /target/
 
+# gradle
+.gradle
+build
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
 # OS X
 .DS_Store
