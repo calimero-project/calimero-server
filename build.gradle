@@ -1,0 +1,46 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+}
+
+apply plugin:'java'
+
+version = '2.4-SNAPSHOT'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+compileJava.options*.compilerArgs = [
+	'-Xlint:all',
+	'-Werror'
+]
+
+compileTestJava.options*.compilerArgs = [
+	'-Xlint:all',
+	'-Xlint:-try',
+]
+
+sourceSets {
+    main {
+        java.srcDir 'src'
+        resources.srcDir 'resources'
+    }
+    test {
+        java.srcDirs = [ 'test' ]
+        file('build/classes/test').mkdirs()
+        runtimeClasspath = runtimeClasspath + files('build/classes/test')
+    }
+}
+
+dependencies {
+    compile "com.github.calimero:calimero-core:${version}"
+    compile "com.github.calimero:calimero-device:${version}"
+    compile 'org.slf4j:slf4j-api:1.7.21'
+}
