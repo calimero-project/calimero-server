@@ -126,37 +126,36 @@ public class SubnetConnector
 	}
 
 	/**
-	 * Creates a new subnet connector using an interface type identifier for the KNX subnet
-	 * interface.
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
 	 *
 	 * @param container service container
 	 * @param interfaceType the interface type, use on of "ip", "usb", or "ft12".
 	 * @param subnetArgs the arguments to create the subnet link
-	 * @param groupAddrTableInstance instance of the server group address table in the
-	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
+	 *        connection will use for group address filtering
+	 * @return the created subnet connector
 	 */
 	public static final SubnetConnector newWithInterfaceType(final ServiceContainer container,
 		final String interfaceType, final String subnetArgs, final int groupAddrTableInstance)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, subnetArgs,
-				groupAddrTableInstance);
+		return new SubnetConnector(container, interfaceType, null, null, subnetArgs, groupAddrTableInstance);
 	}
 
 	/**
-	 * Creates a new subnet connector using an interface type identifier for the KNX subnet
-	 * interface.
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
 	 *
 	 * @param container service container
 	 * @param interfaceType the interface type
-	 * @param groupAddrTableInstance instance of the server group address table in the
-	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
+	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
+	 *        connection will use for group address filtering
 	 * @param subnetArgs the arguments to create the subnet link
+	 * @return the created subnet connector
 	 */
-	public static final SubnetConnector newCustom(final ServiceContainer container,
-		final String interfaceType, final int groupAddrTableInstance, final Object... subnetArgs)
+	public static final SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
+		final int groupAddrTableInstance, final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, interfaceType,
-				groupAddrTableInstance, subnetArgs);
+		return new SubnetConnector(container, interfaceType, null, null, interfaceType, groupAddrTableInstance,
+				subnetArgs);
 	}
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType,

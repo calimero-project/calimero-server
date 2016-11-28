@@ -425,7 +425,7 @@ public class Launcher implements Runnable
 	 * Launcher constructor.
 	 *
 	 * @param configUri location/file of KNX server and gateway configuration
-	 * @throws KNXException
+	 * @throws KNXException on error loading property definitions from a resource (if specified in the configuration)
 	 */
 	public Launcher(final String configUri) throws KNXException
 	{
