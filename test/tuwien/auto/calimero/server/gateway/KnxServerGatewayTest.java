@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -88,18 +88,26 @@ public class KnxServerGatewayTest extends TestCase
 	protected void setUp() throws Exception
 	{
 		super.setUp();
-		server = new KNXnetIPServer();
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
-
+		server = setupServer();
 		final ServiceContainer sc = new DefaultServiceContainer("test container", new HPAI(
 				(InetAddress) null, 5647), DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1));
 		server.addServiceContainer(sc);
-		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc,
-				DummyLink.class.getName(), "", 1);
+		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "", 1);
 		connector.openNetworkLink();
 		subnetConnectors = new SubnetConnector[] { connector };
 		gw = new KnxServerGateway("gateway", server, subnetConnectors);
+	}
+
+	private KNXnetIPServer setupServer() throws KNXPropertyException
+	{
+		final KNXnetIPServer s = new KNXnetIPServer();
+		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
+		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
+		final int MAIN_LCGRPCONFIG = 54;
+		final int SUB_LCGRPCONFIG = 55;
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, MAIN_LCGRPCONFIG, 1, 1, new byte[] {0});
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, SUB_LCGRPCONFIG, 1, 1, new byte[] {0});
+		return s;
 	}
 
 	/* (non-Javadoc)
@@ -127,12 +135,13 @@ public class KnxServerGatewayTest extends TestCase
 	 * Test method for {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#run()}.
 	 *
 	 * @throws InterruptedException
+	 * @throws KNXPropertyException
 	 */
-	public final void testRun() throws InterruptedException
+	public final void testRun() throws InterruptedException, KNXPropertyException
 	{
 		try {
-			final KnxServerGateway gw2 = new KnxServerGateway("testGW", new KNXnetIPServer(),
-					new SubnetConnector[] {});
+			final KNXnetIPServer s = setupServer();
+			final KnxServerGateway gw2 = new KnxServerGateway("testGW", s, new SubnetConnector[] {});
 			gw2.run();
 			fail();
 		}
@@ -142,7 +151,7 @@ public class KnxServerGatewayTest extends TestCase
 
 		Thread t;
 		(t = new Thread(gw)).start();
-		Thread.sleep(4000);
+		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();
 	}
@@ -156,7 +165,7 @@ public class KnxServerGatewayTest extends TestCase
 	{
 		Thread t;
 		(t = new Thread(gw)).start();
-		Thread.sleep(4000);
+		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();
 		Thread.sleep(500);
