@@ -490,7 +490,7 @@ public class Launcher implements Runnable
 		catch (final InterruptedException e) {
 			logger.error("initialization of KNX server interrupted");
 		}
-		catch (final KNXException | RuntimeException e) {
+		catch (KNXException | RuntimeException e) {
 			logger.error("initialization of KNX server failed", e);
 		}
 		finally {

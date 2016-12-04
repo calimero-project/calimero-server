@@ -134,9 +134,6 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		super.send(frame, mode);
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.server.knxnetip.KNXnetIPConnection#getName()
-	 */
 	@Override
 	public String getName()
 	{
@@ -147,19 +144,12 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		return "KNXnet/IP DevMgmt " + super.getName();
 	}
 
-	/* (non-Javadoc)
-	 * @see java.lang.Object#toString()
-	 */
 	@Override
 	public String toString()
 	{
 		return getName() + " channel " + getChannelId();
 	}
 
-	/* (non-Javadoc)
-	 * @see tuwien.auto.calimero.knxnetip.ConnectionBase#close(int,
-	 * java.lang.String, tuwien.auto.calimero.log.LogLevel, java.lang.Throwable)
-	 */
 	@Override
 	protected void close(final int initiator, final String reason, final LogLevel level,
 		final Throwable t)

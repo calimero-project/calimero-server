@@ -526,7 +526,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				match = true;
 			}
 		}
-		logger.trace("match {} for KNX subnet {}: {}", addr, subnetMask, match ? "ok" : "no");
+		logger.trace("match additional address {} for KNX subnet {}: {}", addr, subnetMask, match ? "ok" : "no match");
 		return match;
 	}
 
@@ -541,9 +541,8 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				logger.debug("address {} already assigned", device);
 				return false;
 			}
-			final String s = isServerAddress ? "assigning server device address "
-					: "assigning additional individual address ";
-			logger.info(s + device);
+			logger.info(isServerAddress ? "assigning server device address {}"
+					: "assigning additional individual address {}", device);
 			usedKnxAddresses.add(device);
 			return true;
 		}
