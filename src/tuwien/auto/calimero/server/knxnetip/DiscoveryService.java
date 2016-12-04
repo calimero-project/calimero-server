@@ -213,9 +213,9 @@ final class DiscoveryService extends ServiceLooper
 
 					try {
 						final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
-						final byte[] mac = ni != null ? ni.getHardwareAddress() : new byte[6];
+						final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
 						server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc),
-								PID.MAC_ADDRESS, 1, 1, mac);
+								PID.MAC_ADDRESS, 1, 1, mac == null ? new byte[6] : mac);
 					}
 					catch (final SocketException | KNXPropertyException e) {}
 
