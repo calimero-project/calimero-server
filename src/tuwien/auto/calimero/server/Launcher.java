@@ -378,8 +378,7 @@ public class Launcher implements Runnable
 		}
 	}
 
-	private static final LogService logger = LogManager.getManager().getLogService(
-			"calimero.server");
+	private static final LogService logger = LogManager.getManager().getLogService("calimero.server");
 
 	private final KNXnetIPServer server;
 	private KnxServerGateway gw;
@@ -397,7 +396,7 @@ public class Launcher implements Runnable
 	 */
 	public static void main(final String[] args)
 	{
-		final LogWriter w = LogStreamWriter.newUnformatted(LogLevel.ALL, System.out, true, false);
+		final LogWriter w = new LogStreamWriter(LogLevel.ALL, System.out, true, false);
 		LogManager.getManager().addWriter("", w);
 		if (args.length == 0) {
 			logger.info("supply file name/URI for the KNX server configuration");
