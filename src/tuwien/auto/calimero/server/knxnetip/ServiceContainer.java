@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2015 B. Malinowsky
+    Copyright (c) 2010, 2016 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,7 +36,6 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
-import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -79,22 +78,6 @@ public interface ServiceContainer
 	 * @see HPAI
 	 */
 	HPAI getControlEndpoint();
-
-	/**
-	 * Returns the KNX medium of the connected KNX subnet.
-	 * <p>
-	 *
-	 * @return KNX medium
-	 */
-	int getKNXMedium();
-
-	/**
-	 * Returns the KNX subnet address of the KNX subnet this service container is connected to.
-	 * <p>
-	 *
-	 * @return KNX subnet individual address
-	 */
-	IndividualAddress getSubnetAddress();
 
 	/**
 	 * @return the KNX medium settings of the connected KNX subnet

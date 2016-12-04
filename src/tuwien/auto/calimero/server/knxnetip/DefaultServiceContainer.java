@@ -40,7 +40,6 @@ import java.net.InetAddress;
 import java.time.Duration;
 import java.util.Arrays;
 
-import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -111,18 +110,6 @@ public class DefaultServiceContainer implements ServiceContainer
 	public HPAI getControlEndpoint()
 	{
 		return ctrlEndpt;
-	}
-
-	@Override
-	public int getKNXMedium()
-	{
-		return settings.getMedium();
-	}
-
-	@Override
-	public IndividualAddress getSubnetAddress()
-	{
-		return settings.getDeviceAddress();
 	}
 
 	@Override
