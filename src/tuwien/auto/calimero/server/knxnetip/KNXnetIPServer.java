@@ -375,9 +375,8 @@ public class KNXnetIPServer
 			svcContToIfObj.put(sc, objects[objects.length - 1]);
 			// init the parameter object
 			svcContainers.add(sc);
-			final RoutingEndpoint ep = sc instanceof RoutingEndpoint ? (RoutingEndpoint) sc : null;
 			try {
-				initKNXnetIpParameterObject(svcContainers.size(), ep);
+				initKNXnetIpParameterObject(svcContainers.size(), sc);
 			}
 			catch (final KNXPropertyException e) {
 				e.printStackTrace();
@@ -793,7 +792,7 @@ public class KNXnetIPServer
 
 	// precondition: we have an IOS instance
 	private void initKNXnetIpParameterObject(final int objectInstance,
-		final RoutingEndpoint endpoint) throws KNXPropertyException
+		final ServiceContainer endpoint) throws KNXPropertyException
 	{
 		if (ios == null)
 			throw new KNXIllegalStateException("KNXnet/IP server has no IOS");
@@ -820,19 +819,15 @@ public class KNXnetIPServer
 		ios.setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1, defMacAddress);
 
 		// routing stuff
-		if (endpoint != null)
-			setRoutingConfiguration(endpoint, objectInstance);
+		if (endpoint instanceof RoutingEndpoint)
+			setRoutingConfiguration((RoutingEndpoint) endpoint, objectInstance);
 		else
 			resetRoutingConfiguration(objectInstance);
 		// 100 ms is the default busy wait time
 		ios.setProperty(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, 1, 1, bytesFromWord(100));
 
 		// ip and setup multicast
-		byte[] ip = new byte[4];
-		try {
-			ip = InetAddress.getLocalHost().getAddress();
-		}
-		catch (final UnknownHostException e) {}
+		final byte[] ip = endpoint.getControlEndpoint().getAddress().getAddress();
 		ios.setProperty(knxObject, objectInstance, PID.CURRENT_IP_ADDRESS, 1, 1, ip);
 		ios.setProperty(knxObject, objectInstance, PID.SYSTEM_SETUP_MULTICAST_ADDRESS, 1, 1,
 				defRoutingMulticast.getAddress());
@@ -894,8 +889,7 @@ public class KNXnetIPServer
 			logger.error(s, e);
 			throw new KNXPropertyException(s, CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 		}
-		ios.setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, 1, 1,
-				mcast.getAddress());
+		ios.setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, 1, 1, mcast.getAddress());
 
 		matchRoutingServerDeviceAddress(objectInstance, true);
 	}
