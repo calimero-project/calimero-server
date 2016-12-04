@@ -472,7 +472,7 @@ public class KnxServerGateway implements Runnable
 			logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
 		}
 		catch (final KNXPropertyException e1) {
-			e1.printStackTrace();
+			logger.warn("failed to set KNX property 'main LC group config'", e1);
 		}
 		try {
 			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT,
@@ -481,7 +481,7 @@ public class KnxServerGateway implements Runnable
 			logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
 		}
 		catch (final KNXPropertyException e1) {
-			e1.printStackTrace();
+			logger.warn("failed to set KNX property 'sub LC group config'", e1);
 		}
 
 		// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
@@ -491,7 +491,7 @@ public class KnxServerGateway implements Runnable
 					PID.PRIORITY_FIFO_ENABLED, 1, 1, new byte[] { 0 });
 		}
 		catch (final KNXPropertyException e) {
-			e.printStackTrace();
+			logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
 		}
 		// init capability list of different routing features
 		// bit field: bit 0: Queue overflow counter available
@@ -507,7 +507,7 @@ public class KnxServerGateway implements Runnable
 					PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, new byte[] { caps });
 		}
 		catch (final KNXPropertyException e) {
-			e.printStackTrace();
+			logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
 		}
 	}
 
