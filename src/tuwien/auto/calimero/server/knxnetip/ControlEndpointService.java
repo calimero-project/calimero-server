@@ -377,7 +377,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				}
 			}
 
-			device = assignDeviceAddress(svcCont.getSubnetAddress());
+			device = assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress());
 			if (device == null)
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 			crd = new TunnelCRD(device);

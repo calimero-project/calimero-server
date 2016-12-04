@@ -940,7 +940,7 @@ public class KnxServerGateway implements Runnable
 		if (link instanceof Link)
 			link = ((Link<?>) link).target();
 		if (!(link instanceof KNXNetworkLink)) {
-			final IndividualAddress addr = subnet.getServiceContainer().getSubnetAddress();
+			final IndividualAddress addr = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
 			logger.warn("cannot dispatch to KNX subnet {}, no network link ({})", addr, link);
 			return false;
 		}
@@ -967,7 +967,7 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector b = i.next();
 			final ServiceContainer c = b.getServiceContainer();
 			if (c.isActivated()) {
-				final IndividualAddress subnet = c.getSubnetAddress();
+				final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
 				if (matchesSubnet(dst, subnet)) {
 					if (!isNetworkLink(b))
 						break;

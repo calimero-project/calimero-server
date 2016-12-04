@@ -928,8 +928,8 @@ public class KNXnetIPServer
 				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1,
 						new IndividualAddress(0).toByteArray());
 			else if (!routingSupported && device.getRawAddress() == 0)
-				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1,
-						svcContainers.get(svcContainers.size() - 1).getSubnetAddress().toByteArray());
+				ios.setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1, svcContainers
+						.get(svcContainers.size() - 1).getMediumSettings().getDeviceAddress().toByteArray());
 		}
 		catch (final KNXPropertyException e) {
 			logger.warn("matching server device address to routing capabilities, " + e.getMessage());
@@ -1006,7 +1006,7 @@ public class KNXnetIPServer
 		}
 		catch (final KNXPropertyException e) {}
 
-		return new DeviceDIB(friendly, deviceStatus, projectInstallationId, sc.getKNXMedium(),
+		return new DeviceDIB(friendly, deviceStatus, projectInstallationId, sc.getMediumSettings().getMedium(),
 				knxAddress, serialNumber, mcast, macAddress);
 	}
 

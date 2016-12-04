@@ -226,7 +226,7 @@ public class SubnetConnector
 			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
 		else if ("tpuart".equals(subnetType)) {
 			// TODO workaround for the only case when server ctrl endpoint address is reused!!
-			final List<KNXAddress> ack = Arrays.asList(sc.getSubnetAddress());
+			final List<KNXAddress> ack = Arrays.asList(sc.getMediumSettings().getDeviceAddress());
 			ts = () -> new KNXNetworkLinkTpuart(linkArgs, settings, ack);
 		}
 		else if ("user-supplied".equals(subnetType))
