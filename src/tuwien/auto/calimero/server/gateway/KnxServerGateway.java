@@ -63,6 +63,7 @@ import tuwien.auto.calimero.device.ios.KNXPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.exception.KNXException;
 import tuwien.auto.calimero.exception.KNXFormatException;
+import tuwien.auto.calimero.exception.KNXIllegalArgumentException;
 import tuwien.auto.calimero.exception.KNXTimeoutException;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
@@ -896,7 +897,14 @@ public class KnxServerGateway implements Runnable
 						.toArray(new KNXnetIPConnection[serverConnections.size()]);
 				for (int i = 0; i < sca.length; i++) {
 					final KNXnetIPConnection c = sca[i];
-					c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+					try {
+						c.send(f, KNXnetIPConnection.WAIT_FOR_ACK);
+					}
+					catch (final KNXIllegalArgumentException e) {
+						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
+						// frames. Catch here, so we can continue serving other open connections.
+						logger.warn("frame not accepted by connection " + c.getName() + ": " + f, e);
+					}
 				}
 			}
 			incMsgTransmitted(false);
