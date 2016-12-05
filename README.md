@@ -57,7 +57,7 @@ First, make sure Java is installed correctly, and all required `jar` packages ar
 #### Maven
 
 ~~~ sh
-$ mvn exec:java -Dexec.mainClass=tuwien.auto.calimero.server.Launcher
+$ mvn exec:java
 ~~~
 
 #### Java
@@ -67,7 +67,7 @@ $ mvn exec:java -Dexec.mainClass=tuwien.auto.calimero.server.Launcher
 $ java -cp "./*" tuwien.auto.calimero.server.Launcher
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-$ java -cp "calimero-server-2.3-SNAPSHOT.jar:calimero-core-2.3-SNAPSHOT.jar:calimero-device-2.3-SNAPSHOT.jar:slf4j-api-1.7.7.jar:slf4j-simple-1.7.7.jar" tuwien.auto.calimero.server.Launcher
+$ java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.7.21.jar:slf4j-simple-1.7.21.jar" tuwien.auto.calimero.server.Launcher
 ~~~
 
 ### Start Server with Configuration
