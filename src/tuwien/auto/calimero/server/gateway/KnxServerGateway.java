@@ -55,7 +55,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -267,6 +269,10 @@ public class KnxServerGateway implements Runnable
 			logger.debug("remove {} ({})", name, e.getReason());
 			serverConnections.remove(e.getSource());
 			serverDataConnections.remove(addr);
+			if (e.getInitiator() == CloseEvent.CLIENT_REQUEST) {
+				final KNXnetIPConnection c = (KNXnetIPConnection) e.getSource();
+				subnetEventBuffers.computeIfPresent(sc, (sc, rb) -> { rb.remove(c); return rb; });
+			}
 		}
 	}
 
@@ -326,6 +332,23 @@ public class KnxServerGateway implements Runnable
 		public void connectionEstablished(final ServiceContainer svcContainer, final KNXnetIPConnection connection)
 		{
 			serverConnections.add(connection);
+
+			final InetSocketAddress remote = connection.getRemoteAddress();
+			logger.info("establish connection to remote " + remote);
+			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
+			if (buffer == null)
+				return;
+			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
+			final int port = remote.getPort();
+			if (port >= portRange[0] && port <= portRange[1]) {
+				buffer.add(connection);
+				if (buffer.isDisrupted(connection)) {
+					waitingForReplay.put(connection, svcContainer);
+					synchronized (KnxServerGateway.this) {
+						KnxServerGateway.this.notify();
+					}
+				}
+			}
 		}
 
 		@Override
@@ -475,6 +498,10 @@ public class KnxServerGateway implements Runnable
 	private final List<FrameEvent> ipEvents = new LinkedList<>();
 	private final List<FrameEvent> subnetEvents = new LinkedList<>();
 
+	// support replaying subnet events for disrupted tunneling connections
+	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
+	private final Map<KNXnetIPConnection, ServiceContainer> waitingForReplay = new ConcurrentHashMap<>();
+
 	private volatile boolean trucking;
 	private volatile boolean inReset;
 
@@ -597,6 +624,12 @@ public class KnxServerGateway implements Runnable
 			b.setSubnetListener(new SubnetListener(b.getName()));
 			final ServiceContainer sc = b.getServiceContainer();
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
+			if (!timeout.isZero()) {
+				final int[] portRange = ((DefaultServiceContainer) sc).disruptionBufferPortRange();
+				logger.info("activate \'{}\' disruption buffer on ports [{}-{}], disruption timeout {} s", sc.getName(),
+						portRange[0], portRange[1], timeout.getSeconds());
+				subnetEventBuffers.put(sc, new ReplayBuffer<>(timeout));
+			}
 		}
 
 		// group address routing settings
@@ -730,9 +763,32 @@ public class KnxServerGateway implements Runnable
 
 	private synchronized FrameEvent getSubnetEvent()
 	{
+		replayPendingSubnetEvents();
+
 		if (subnetEvents.isEmpty())
 			return null;
 		return subnetEvents.remove(0);
+	}
+
+	private void replayPendingSubnetEvents()
+	{
+		for (final Entry<KNXnetIPConnection, ServiceContainer> entry : waitingForReplay.entrySet()) {
+			final KNXnetIPConnection c = entry.getKey();
+			final ServiceContainer svcContainer = entry.getValue();
+			final ReplayBuffer<FrameEvent> replayBuffer = subnetEventBuffers.get(svcContainer);
+			final Collection<FrameEvent> events = replayBuffer.replay(c);
+			logger.warn("previous connection of {} got disrupted => replay {} pending messages", c, events.size());
+			events.forEach(fe -> {
+				try {
+					send(svcContainer, c, fe.getFrame());
+				}
+				catch (KNXException | InterruptedException e) {
+					logger.error("failed to replay frame event", e);
+				}
+			});
+			waitingForReplay.remove(c);
+			logger.debug("replay completed for connection {}", c);
+		}
 	}
 
 	private void launchServer()
@@ -744,6 +800,17 @@ public class KnxServerGateway implements Runnable
 			logger.error("cannot launch " + server.getFriendlyName(), e);
 			quit();
 			throw e;
+		}
+	}
+
+	private FrameEvent recordFrameEvent;
+
+	private void recordEvent(final SubnetConnector connector, final FrameEvent fe)
+	{
+		final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(connector.getServiceContainer());
+		if (buffer != null) {
+			buffer.recordEvent(fe);
+			recordFrameEvent = fe;
 		}
 	}
 
@@ -794,8 +861,10 @@ public class KnxServerGateway implements Runnable
 					return;
 				// get connector of that subnet
 				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
-				if (connector != null)
+				if (connector != null) {
+					recordEvent(connector, fe);
 					dispatchToServer(connector, send);
+				}
 
 				dispatchToOtherSubnets(send, connector);
 			}
@@ -816,6 +885,8 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 			if (connector == null)
 				return;
+			recordEvent(connector, fe);
+
 			// create temporary array to not block concurrent access during iteration
 			final KNXnetIPConnection[] sca = serverConnections
 					.toArray(new KNXnetIPConnection[serverConnections.size()]);
@@ -1078,6 +1149,9 @@ public class KnxServerGateway implements Runnable
 	{
 		applyRoutingFlowControl(c);
 		c.send(f, WaitForAck);
+		final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
+		if (buffer != null)
+			buffer.completeEvent(c, recordFrameEvent);
 	}
 
 	private void send(final KNXNetworkLink lnk, final CEMILData f)
