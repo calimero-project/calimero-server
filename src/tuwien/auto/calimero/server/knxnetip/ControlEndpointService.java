@@ -315,6 +315,18 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		return server.objectInstance(svcCont);
 	}
 
+	private IndividualAddress serverAddress()
+	{
+		try {
+			return new IndividualAddress(server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT,
+					objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1));
+		}
+		catch (final KNXPropertyException e) {
+			logger.error("no server device address set in KNXnet/IP parameter object!");
+			return null;
+		}
+	}
+
 	private ConnectResponse initNewConnection(final ConnectRequest req, final InetSocketAddress ctrlEndpt,
 		final InetSocketAddress dataEndpt, final int channelId)
 	{
@@ -386,18 +398,10 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			// At first, check if we are allowed to open mgmt connection at all; if
 			// server assigned its own device address, we have to reject the request
 			synchronized (usedKnxAddresses) {
-				try {
-					final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT,
-							objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1);
-					if (usedKnxAddresses.contains(new IndividualAddress(data))) {
-						logger.warn("server assigned its own device address, "
-								+ "no management connections allowed at this time");
-						return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
-					}
-				}
-				catch (final KNXPropertyException e) {
-					// if no such property, the user deleted it,
-					// and we simply allow the connection
+				if (usedKnxAddresses.contains(serverAddress())) {
+					logger.warn("server device address is currently assigned to connection, "
+							+ "no management connections allowed");
+					return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
 				}
 				++activeMgmtConnections;
 			}
@@ -497,20 +501,12 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			return null;
 		}
 
-		final byte[] data;
-		try {
-			data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1);
-		}
-		catch (final KNXPropertyException e) {
-			logger.error("no server device address stored in interface object server!");
-			return null;
-		}
-		final IndividualAddress addr = new IndividualAddress(data);
-		if (matchesSubnet(addr, forSubnet))
-			if (checkAndSetDeviceAddress(addr, true))
+		final IndividualAddress addr = serverAddress();
+		if (addr != null) {
+			if (matchesSubnet(addr, forSubnet) && checkAndSetDeviceAddress(addr, true))
 				return addr;
-
-		logger.warn("server device address {} already assigned to data connection", addr);
+			logger.warn("server device address {} already assigned to data connection", addr);
+		}
 		return null;
 	}
 
