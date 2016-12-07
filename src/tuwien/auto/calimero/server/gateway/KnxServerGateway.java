@@ -888,21 +888,18 @@ public class KnxServerGateway implements Runnable
 			recordEvent(connector, fe);
 
 			// create temporary array to not block concurrent access during iteration
-			final KNXnetIPConnection[] sca = serverConnections
-					.toArray(new KNXnetIPConnection[serverConnections.size()]);
-			// we can have at most 2 elements: 1 routing endpoint, 1 busmonitor tunnel
-			for (final KNXnetIPConnection c : sca) {
-				try {
-					// routing does not serve busmonitor mode
-					if (!(c instanceof KNXnetIPRouting)) {
+			for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
+				// routing does not support busmonitor mode
+				if (!(c instanceof KNXnetIPRouting)) {
+					try {
 						send(connector.getServiceContainer(), c, frame);
 						setNetworkState(false, false);
 						incMsgTransmitted(false);
 					}
-				}
-				catch (KNXConnectionClosedException | InterruptedException e) {}
-				catch (final KNXTimeoutException e) {
-					setNetworkState(false, true);
+					catch (KNXConnectionClosedException | InterruptedException e) {}
+					catch (final KNXTimeoutException e) {
+						setNetworkState(false, true);
+					}
 				}
 			}
 		}
@@ -1057,12 +1054,13 @@ public class KnxServerGateway implements Runnable
 
 	private void dispatchToServer(final SubnetConnector subnetConnector, final CEMILData f)
 	{
+		final ServiceContainer sc = subnetConnector.getServiceContainer();
 		try {
 			if (f.getDestination() instanceof IndividualAddress) {
 				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
-					send(subnetConnector.getServiceContainer(), c, f);
+					send(sc, c, f);
 				}
 				else {
 					logger.warn("no active KNXnet/IP connection for destination {}, send to all", f.getDestination());
@@ -1070,7 +1068,7 @@ public class KnxServerGateway implements Runnable
 					final KNXnetIPConnection[] sca = serverConnections
 							.toArray(new KNXnetIPConnection[serverConnections.size()]);
 					for (int i = 0; i < sca.length; i++)
-						send(subnetConnector.getServiceContainer(), sca[i], f);
+						send(sc, sca[i], f);
 				}
 			}
 			else {
@@ -1088,16 +1086,18 @@ public class KnxServerGateway implements Runnable
 				}
 
 				// create temporary array to not block concurrent access during iteration
-				final KNXnetIPConnection[] sca = serverConnections
-						.toArray(new KNXnetIPConnection[serverConnections.size()]);
-				for (int i = 0; i < sca.length; i++) {
-					final KNXnetIPConnection c = sca[i];
+				for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
+					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
+					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
+					final boolean monitoring = c.getName().toLowerCase().contains("monitor");
+					final CEMI send = monitoring ? convertToBusmon(f, sc.getMediumSettings()) : f;
 					try {
-						send(subnetConnector.getServiceContainer(), c, f);
-					} catch (final KNXIllegalArgumentException e) {
-						// For example, occurs if we serve a management connection which expects only cEMI device mgmt
+						send(sc, c, send);
+					}
+					catch (final KNXIllegalArgumentException e) {
+						// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
-						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), f);
+						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), send);
 					}
 				}
 			}
@@ -1380,6 +1380,53 @@ public class KnxServerGateway implements Runnable
 		catch (final KNXPropertyException e) {
 			logger.error("on modifying network fault in device state", e);
 		}
+	}
+
+	// TODO maintain sequence for each subnet, this only works for single subnet with single busmon connection
+	private volatile int busmonSequence = 0;
+
+	private CEMI convertToBusmon(final CEMILData ldata, final KNXMediumSettings settings)
+	{
+		final int seq = busmonSequence;
+		busmonSequence = (busmonSequence + 1) % 8;
+
+		// provide 32 bit timestamp with 1 us precision
+		final long timestamp = (System.nanoTime() / 1000) & 0xFFFFFFFFL;
+
+		byte[] doa = new byte[2];
+		final CEMILData copy = (CEMILData) CEMIFactory.copy(ldata);
+		if (copy instanceof CEMILDataEx) {
+			final CEMILDataEx ex = (CEMILDataEx) copy;
+			doa = ex.getAdditionalInfo(CEMILDataEx.ADDINFO_PLMEDIUM);
+			ex.getAdditionalInfo().forEach(i -> ex.removeAdditionalInfo(i.getType()));
+		}
+
+		final byte[] src = copy.toByteArray();
+		final boolean hasDoA = settings.getMedium() == KNXMediumSettings.MEDIUM_PL110;
+		final int doaLength = hasDoA ? 2 : 0;
+		// -2 to remove msg code and add.info field, +length for DoA (if any), +1 for fcs
+		final byte[] raw = new byte[src.length - 2 + doaLength + 1];
+		System.arraycopy(src, 2, raw, 0, src.length - 2);
+		if (hasDoA) {
+			// insert DoA, we create an extended busmonitor frame, and put DoA after ctrl fields
+			System.arraycopy(raw, 2, raw, 4, raw.length - 4);
+			raw[2] = doa[0];
+			raw[3] = doa[1];
+		}
+
+		final int extFrameFormatFlag = 0x80;
+		raw[0] &= ~extFrameFormatFlag; // clear bit to indicate ext. frame format
+		raw[raw.length - 1] = (byte) checksum(raw); // fcs
+
+		return CEMIBusMon.newWithSequenceNumber(seq, timestamp, true, raw);
+	}
+
+	private static int checksum(final byte[] frame)
+	{
+		int cs = 0;
+		for (final byte b : frame)
+			cs ^= b;
+		return ~cs;
 	}
 
 	private static long toUnsignedInt(final byte[] data)
