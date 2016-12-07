@@ -110,9 +110,7 @@ class ReplayBuffer<T extends FrameEvent>
 		final Long lastTx = completedEvent.get(c);
 		if (lastTx == null)
 			return false;
-		synchronized (buffer) {
-			return lastTx < latestEventCount();
-		}
+		return lastTx < latestEventCount();
 	}
 
 	// only call iff synchronized on connectionToKey
@@ -196,24 +194,21 @@ class ReplayBuffer<T extends FrameEvent>
 
 	public void completeEvent(final KNXnetIPConnection c, final T e)
 	{
-		completedEvent.put(c, e.id());
-		connectionToKey.computeIfPresent(c, (k, v) -> {
-			v[2] = System.currentTimeMillis();
-			return v;
-		});
-
-		// log status of completed vs latest event
-		final long events;
-		synchronized (buffer) {
-			events = latestEventCount();
+		synchronized (connectionToKey) {
+			final Object[] key = connectionToKey.get(c);
+			if (key == null)
+				return;
+			key[2] = System.currentTimeMillis();
 		}
-		logger.debug("{} successfully completed event '{}/{}'", c, e.id(), events);
+		completedEvent.put(c, e.id());
+		logger.debug("{} successfully completed event '{}/{}'", c, e.id(), latestEventCount());
 	}
 
-	// call only iff synchronized on buffer
 	private long latestEventCount()
 	{
-		return buffer.get(buffer.size() - 1).id();
+		synchronized (buffer) {
+			return buffer.get(buffer.size() - 1).id();
+		}
 	}
 
 	public void remove(final KNXnetIPConnection c)
