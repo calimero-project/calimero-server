@@ -481,12 +481,11 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		// - no unused additional addresses are available
 		// - we don't run KNXnet/IP routing
 		try {
-			byte[] data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 0, 1);
-			final int elems = (data[0] & 0xff) << 8 | data[1] & 0xff;
+			final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
 			for (int i = 0; i < elems; ++i) {
-				data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.ADDITIONAL_INDIVIDUAL_ADDRESSES,
-						i + 1, 1);
+				final byte[] data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
+						PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1);
 				final IndividualAddress addr = new IndividualAddress(data);
 				if (matchesSubnet(addr, forSubnet))
 					if (checkAndSetDeviceAddress(addr, false))
@@ -606,13 +605,14 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		final int mfrId = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_ID, 1,
 				KNXnetIPServer.defMfrId);
 		byte[] data = KNXnetIPServer.defMfrData;
-		try {
-			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-			final int elems = KNXnetIPServer
-					.toInt(ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 0, 1));
-			data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, elems);
+		final int elems = server.getPropertyElems(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA);
+		if (elems > 0) {
+			try {
+				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+				data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, elems);
+			}
+			catch (final KNXPropertyException e) {}
 		}
-		catch (final KNXPropertyException e) {}
 		return new ManufacturerDIB(mfrId, data);
 	}
 }

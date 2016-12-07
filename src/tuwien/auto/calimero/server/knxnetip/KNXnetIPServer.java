@@ -953,6 +953,17 @@ public class KNXnetIPServer
 		}
 	}
 
+	// returns the current number of property elements, or 0 if property is not found
+	int getPropertyElems(final int objectType, final int objectInstance, final int propertyId)
+	{
+		try {
+			return toInt(ios.getProperty(objectType, objectInstance, propertyId, 0, 1));
+		}
+		catch (final KNXPropertyException e) {}
+		return 0;
+	}
+
+
 	DeviceDIB createDeviceDIB(final ServiceContainer sc)
 	{
 		byte[] name;
