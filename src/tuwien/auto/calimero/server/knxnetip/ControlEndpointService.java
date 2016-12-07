@@ -374,7 +374,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				final boolean allowMultiMonitorConnections = true;
 				if (allowMultiMonitorConnections) {
 					final long monitoring = activeMonitorConnections();
-					logger.info("{}: active monitor connections: {}", svcCont.getName(), monitoring);
+					logger.info("{}: active monitor connections: {}, 1 connect request", svcCont.getName(), monitoring);
 				}
 			}
 			else {
@@ -383,8 +383,8 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 				// i.e., if there is an active bus monitor connection, we don't
 				// allow any other tunneling connections.
 				if (activeMonitorConnections() > 0) {
-					logger.warn("{}: connection currently not allowed (active connections for tunneling on "
-							+ "busmonitor-layer)", svcCont.getName());
+					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
+							+ "busmonitor-layer connections)", svcCont.getName());
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 				}
 			}
@@ -392,6 +392,9 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			device = assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress());
 			if (device == null)
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+			final boolean isServerAddress = device.equals(serverAddress());
+			logger.info("assigning {} address {} to channel {}",
+					isServerAddress ? "server device" : "additional individual", device, channelId);
 			crd = new TunnelCRD(device);
 		}
 		else if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION) {
@@ -497,7 +500,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
 
 		if (svcCont instanceof RoutingEndpoint) {
-			logger.warn("KNXnet/IP routing active, can not assign server device address");
+			logger.warn("KNXnet/IP routing active, cannot assign server device address");
 			return null;
 		}
 
@@ -530,15 +533,13 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 	{
 		synchronized (usedKnxAddresses) {
 			if (isServerAddress && activeMgmtConnections > 0) {
-				logger.warn("active management connection, " + "can not assign server device address");
+				logger.warn("active management connection, cannot assign server device address");
 				return false;
 			}
 			if (usedKnxAddresses.contains(device)) {
 				logger.debug("address {} already assigned", device);
 				return false;
 			}
-			logger.info(isServerAddress ? "assigning server device address {}"
-					: "assigning additional individual address {}", device);
 			usedKnxAddresses.add(device);
 			return true;
 		}
