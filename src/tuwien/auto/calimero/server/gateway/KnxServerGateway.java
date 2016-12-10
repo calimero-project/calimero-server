@@ -334,7 +334,7 @@ public class KnxServerGateway implements Runnable
 			serverConnections.add(connection);
 
 			final InetSocketAddress remote = connection.getRemoteAddress();
-			logger.info("establish connection to remote " + remote);
+			logger.info("established connection to remote " + remote);
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 			if (buffer == null)
 				return;
@@ -1063,28 +1063,30 @@ public class KnxServerGateway implements Runnable
 					send(sc, c, f);
 				}
 				else {
-					logger.warn("no active KNXnet/IP connection for destination {}, send to all", f.getDestination());
+					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} "
+							+ "to all server-side connections", f.getDestination(), f.getSource(), f.getDestination());
 					// create temporary array to not block concurrent access during iteration
-					final KNXnetIPConnection[] sca = serverConnections
-							.toArray(new KNXnetIPConnection[serverConnections.size()]);
-					for (int i = 0; i < sca.length; i++)
-						send(sc, sca[i], f);
+					for (final KNXnetIPConnection conn : serverConnections.toArray(new KNXnetIPConnection[0]))
+						send(sc, conn, f);
 				}
 			}
 			else {
+				// group destination address
 				final int raw = f.getDestination().getRawAddress();
 				if (raw <= 0x6fff) {
-					// group destination address, check forwarding settings
+					// check if forwarding requests us to block all frames
 					if (mainGroupAddressConfig == 2)
 						return;
+					// check if forwarding requests us to use the filter table
+					final int gatObjInst = subnetConnector.getGroupAddressTableObjectInstance();
 					if ((mainGroupAddressConfig == 0 || mainGroupAddressConfig == 3)
-							&& !inGroupAddressTable((GroupAddress) f.getDestination(),
-									subnetConnector.getGroupAddressTableObjectInstance())) {
+							&& !inGroupAddressTable((GroupAddress) f.getDestination(), gatObjInst)) {
 						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
 				}
 
+				logger.debug("dispatch {}->{} to all server-side connections", f.getSource(), f.getDestination());
 				// create temporary array to not block concurrent access during iteration
 				for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,

@@ -121,7 +121,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		dataEndpt = remoteDataEndpt;
 
 		useNat = useNAT;
-		logger = LogService.getLogger(getName());
+		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 
 		setState(OK);
 	}
@@ -147,7 +147,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	@Override
 	public String toString()
 	{
-		return getName() + " channel " + getChannelId();
+		return getName() + " (channel " + getChannelId() + ")";
 	}
 
 	@Override

@@ -48,6 +48,7 @@ import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingLostMessage;
+import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
 final class RoutingService extends ServiceLooper
@@ -62,6 +63,7 @@ final class RoutingService extends ServiceLooper
 			super(mcGroup);
 			try {
 				init(netIf, enableLoopback, false);
+				logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 			}
 			catch (final KNXException e) {
 				throw wrappedException(e);

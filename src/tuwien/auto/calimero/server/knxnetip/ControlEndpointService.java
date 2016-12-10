@@ -393,7 +393,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			if (device == null)
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 			final boolean isServerAddress = device.equals(serverAddress());
-			logger.info("assigning {} address {} to channel {}",
+			logger.info("assign {} address {} to channel {}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
 			crd = new TunnelCRD(device);
 		}
