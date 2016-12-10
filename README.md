@@ -15,23 +15,22 @@ $ git clone https://github.com/calimero-project/calimero-server.git
 $ hub clone calimero-project/calimero-server
 ~~~
 
-The Calimero KNXnet/IP server requires the calimero-core, calimero-device, and slf4j libraries. 
-Optional dependencies -- required for communication over serial ports -- are either any of the native libraries 
-of serial-native, or calimero-rxtx for using RXTX (or any RXTX descendant) already present on the platform.
+The Calimero KNXnet/IP server mandatory requires the `calimero-core`, `calimero-device`, and `slf4j` libraries.
+Optional dependencies -- required for communication over serial ports -- are either any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX (or any RXTX descendant) already present on the platform. For USB or RF USB communication links, `calimero-core` has a dependency on `org.usb4java:usb4java-javax`.
 
 Supported Features
 ------------------
 
 * Run your own KNXnet/IP server in software
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
-* Intercept a KNXnet/IP connection (e.g., for monitoring/debugging purposes)
-* Emulate a KNX network
+* Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
+* Emulate/virtualize a KNX network
 
 ### Client-side KNXnet/IP Support
-* Discovery and Self-description
+* Discovery and self-description
 * Tunneling
 * Routing
-* Busmonitor (for KNX subnet interfaces that support busmonitor mode)
+* Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are currently realized by converting cEMI L-Data to cEMI bus monitor messages)
 * Local device management
 
 ### KNX Subnet-side (Communication with the KNX Bus)
@@ -43,13 +42,13 @@ Supported Features
 * TP-UART (serial connections)
 
 ### Configuration
-* XML configuration for startup
-* KNX Interface Object Server during runtime, e.g., Device object, KNXnet/IP parameter object, cEMI server object, Group object table object
+* XML server configuration for startup
+* KNX Interface Object Server during runtime, offering interface objects, e.g., Device Object, KNXnet/IP Parameter Object, cEMI Server Object, Group-Object Table Object
 
 How-to & Examples
 -----------------
 
-The server provides a `Launcher`, together with a server configuration template `server-config.xml` (in the folder `resources`) to start the KNXnet/IP server. The launcher expects a URI or file name pointing to a server configuration.
+The server provides a `Launcher`, together with a server configuration template `server-config.xml` (the server configuration, located in the folder `resources`) to start the KNXnet/IP server. The launcher expects a URI or file name pointing to the XML server configuration.
 Alternatively, one can also run the KNXnet/IP server and gateway directly in Java code; see the implementation in `Launcher.java` as a guide.
 
 First, make sure Java is installed correctly, and all required `jar` packages are available (`calimero-core`, `calimero-device`, `slf4j`). With the following command, the server should print a message that it expects a configuration file and quit:
