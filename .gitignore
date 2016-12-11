@@ -8,8 +8,9 @@
 # Eclipse
 /.settings
 /.classpath
-
+/bin/
 /doc
+
 /target/
 
 # gradle
