@@ -835,8 +835,10 @@ public class KNXnetIPServer
 		//
 		// set properties used in service families DIB for description
 		//
-		ios.setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, 1, 1,
-				bytesFromWord(defDeviceCaps));
+
+		// if service container doesn't support routing, don't show it in device capabilities
+		final int deviceCaps = endpoint instanceof RoutingEndpoint ? defDeviceCaps : defDeviceCaps - 4;
+		ios.setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, 1, 1, bytesFromWord(deviceCaps));
 
 		//
 		// set properties used in manufacturer data DIB for discovery self description
