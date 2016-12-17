@@ -90,6 +90,10 @@ public class SubnetConnector
 	private AutoCloseable subnetLink;
 	private LinkListener listener;
 
+	// count received subnet frames for busmon sequence, using the last processed frame event
+	volatile long lastEventId;
+	long eventCounter;
+
 	/**
 	 * Creates a new subnet connector using a KNXnet/IP routing (KNX IP) subnet link.
 	 *

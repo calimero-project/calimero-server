@@ -190,7 +190,7 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void lostMessage(final LostMessageEvent e)
 		{
-			logger.warn("routing message loss of " + "KNXnet/IP router " + e.getSender()
+			logger.warn("routing message loss of KNXnet/IP router " + e.getSender()
 					+ " increased to a total of " + e.getLostMessages());
 		}
 
@@ -863,7 +863,7 @@ public class KnxServerGateway implements Runnable
 				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 				if (connector != null) {
 					recordEvent(connector, fe);
-					dispatchToServer(connector, send);
+					dispatchToServer(connector, send, fe.id());
 				}
 
 				dispatchToOtherSubnets(send, connector);
@@ -1052,7 +1052,7 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
-	private void dispatchToServer(final SubnetConnector subnetConnector, final CEMILData f)
+	private void dispatchToServer(final SubnetConnector subnetConnector, final CEMILData f, final long eventId)
 	{
 		final ServiceContainer sc = subnetConnector.getServiceContainer();
 		try {
@@ -1092,7 +1092,7 @@ public class KnxServerGateway implements Runnable
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
 					final boolean monitoring = c.getName().toLowerCase().contains("monitor");
-					final CEMI send = monitoring ? convertToBusmon(f, sc.getMediumSettings()) : f;
+					final CEMI send = monitoring ? convertToBusmon(f, eventId, subnetConnector) : f;
 					try {
 						send(sc, c, send);
 					}
@@ -1384,13 +1384,14 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	// TODO maintain sequence for each subnet, this only works for single subnet with single busmon connection
-	private volatile int busmonSequence = 0;
-
-	private CEMI convertToBusmon(final CEMILData ldata, final KNXMediumSettings settings)
+	private CEMI convertToBusmon(final CEMILData ldata, final long eventId, final SubnetConnector connector)
 	{
-		final int seq = busmonSequence;
-		busmonSequence = (busmonSequence + 1) % 8;
+		// maintain busmon frame sequence using the event id
+		if (eventId != connector.lastEventId) {
+			connector.eventCounter++;
+			connector.lastEventId = eventId;
+		}
+		final int seq = (int) (connector.eventCounter % 8);
 
 		// provide 32 bit timestamp with 1 us precision
 		final long timestamp = (System.nanoTime() / 1000) & 0xFFFFFFFFL;
@@ -1403,9 +1404,11 @@ public class KnxServerGateway implements Runnable
 			ex.getAdditionalInfo().forEach(i -> ex.removeAdditionalInfo(i.getType()));
 		}
 
-		final byte[] src = copy.toByteArray();
+		final KNXMediumSettings settings = connector.getServiceContainer().getMediumSettings();
 		final boolean hasDoA = settings.getMedium() == KNXMediumSettings.MEDIUM_PL110;
 		final int doaLength = hasDoA ? 2 : 0;
+
+		final byte[] src = copy.toByteArray();
 		// -2 to remove msg code and add.info field, +length for DoA (if any), +1 for fcs
 		final byte[] raw = new byte[src.length - 2 + doaLength + 1];
 		System.arraycopy(src, 2, raw, 0, src.length - 2);
