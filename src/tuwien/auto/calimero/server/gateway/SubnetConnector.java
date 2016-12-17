@@ -214,8 +214,7 @@ public class SubnetConnector
 			final String[] args = linkArgs.split(":");
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			ts = () -> new KNXNetworkLinkIP(KNXNetworkLinkIP.TUNNELING, null,
-					new InetSocketAddress(ip, port), false, settings);
+			ts = () -> KNXNetworkLinkIP.newTunnelingLink(null, new InetSocketAddress(ip, port), false, settings);
 		}
 		else if ("knxip".equals(subnetType))
 			ts = () -> new KNXNetworkLinkIP(netif, new InetSocketAddress(linkArgs, 0).getAddress(),
