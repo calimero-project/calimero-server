@@ -36,8 +36,10 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -220,9 +222,15 @@ public class SubnetConnector
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
 			ts = () -> KNXNetworkLinkIP.newTunnelingLink(null, new InetSocketAddress(ip, port), false, settings);
 		}
-		else if ("knxip".equals(subnetType))
-			ts = () -> new KNXNetworkLinkIP(netif, new InetSocketAddress(linkArgs, 0).getAddress(),
-					settings);
+		else if ("knxip".equals(subnetType)) {
+			try {
+				final InetAddress mcGroup = InetAddress.getByName(linkArgs);
+				ts = () -> KNXNetworkLinkIP.newRoutingLink(netif, mcGroup, settings);
+			}
+			catch (final UnknownHostException e) {
+				throw new KNXException("open network link (KNXnet/IP routing): invalid multicast group " + linkArgs, e);
+			}
+		}
 		else if ("usb".equals(subnetType))
 			ts = () -> new KNXNetworkLinkUsb(linkArgs, settings);
 		else if ("ft12".equals(subnetType))
