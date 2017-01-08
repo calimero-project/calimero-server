@@ -210,8 +210,8 @@ public class KnxServerGateway implements Runnable
 				level = LogLevel.WARN;
 				update = true;
 			}
-			LogService.log(logger, level, "routing busy from device {}, wait time {} ms, KNX network fault = {}",
-					e.sender(), e.waitTime(), e.get().isKnxFault());
+			LogService.log(logger, level, "routing busy from device {}, wait time {} ms{}", e.sender(), e.waitTime(),
+					e.get().isKnxFault() ? " (reason: KNX network fault)" : "");
 
 			// increment random wait scaling iff >= 10 ms have passed since the last counted routing busy
 			if (now.isAfter(lastRoutingBusy.plusMillis(10))) {
@@ -639,7 +639,7 @@ public class KnxServerGateway implements Runnable
 			logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
 		}
 		catch (final KNXPropertyException e1) {
-			e1.printStackTrace();
+			logger.warn("failed to set KNX property 'main LC group config'", e1);
 		}
 		try {
 			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT,
@@ -648,7 +648,7 @@ public class KnxServerGateway implements Runnable
 			logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
 		}
 		catch (final KNXPropertyException e1) {
-			e1.printStackTrace();
+			logger.warn("failed to set KNX property 'sub LC group config'", e1);
 		}
 
 		// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
@@ -658,7 +658,7 @@ public class KnxServerGateway implements Runnable
 					PID.PRIORITY_FIFO_ENABLED, 1, 1, new byte[] { 0 });
 		}
 		catch (final KNXPropertyException e) {
-			e.printStackTrace();
+			logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
 		}
 		// init capability list of different routing features
 		// bit field: bit 0: Queue overflow counter available
@@ -674,7 +674,7 @@ public class KnxServerGateway implements Runnable
 					PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, new byte[] { caps });
 		}
 		catch (final KNXPropertyException e) {
-			e.printStackTrace();
+			logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
 		}
 	}
 
@@ -869,8 +869,7 @@ public class KnxServerGateway implements Runnable
 			}
 			else {
 				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x" + Integer.toString(mc, 16);
-				logger.warn(s + " L-data" + type + " ["
-						+ DataUnitBuilder.toHex(f.toByteArray(), "") + "] - ignored");
+				logger.warn(s + " L-data" + type + " [" + DataUnitBuilder.toHex(f.toByteArray(), "") + "] - ignored");
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ
@@ -984,8 +983,7 @@ public class KnxServerGateway implements Runnable
 		dispatchToOtherSubnets(f, null);
 	}
 
-	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f,
-		final int rawAddress)
+	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f, final int rawAddress)
 	{
 		if (rawAddress <= 0x6fff) {
 			final GroupAddress d = (GroupAddress) f.getDestination();
@@ -1242,7 +1240,6 @@ public class KnxServerGateway implements Runnable
 		if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ) {
 			final boolean read = mc == CEMIDevMgmt.MC_PROPREAD_REQ;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-
 			byte[] data = null;
 			int elems = f.getElementCount();
 			try {
@@ -1278,8 +1275,7 @@ public class KnxServerGateway implements Runnable
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
 			// handle reset.req here since we have the connection name for logging
-			logger.info("received reset request " + c.getName() + " - restarting "
-					+ server.getName());
+			logger.info("received reset request " + c.getName() + " - restarting " + server.getName());
 			// corresponding launch is done in run()
 			inReset = true;
 			server.shutdown();
@@ -1328,9 +1324,8 @@ public class KnxServerGateway implements Runnable
 			catch (final KNXPropertyException e) {}
 
 			++overflow;
-			server.getInterfaceObjectServer().setProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
-					bytesFromWord(overflow));
+			server.getInterfaceObjectServer().setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					pid, 1, 1, bytesFromWord(overflow));
 		}
 		catch (final KNXPropertyException e) {
 			logger.error("on increasing queue overflow counter", e);
@@ -1365,17 +1360,15 @@ public class KnxServerGateway implements Runnable
 		// set the corresponding bit in device state field
 		try {
 			// 1 byte bit field
-			final byte[] data = server.getInterfaceObjectServer().getProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.KNXNETIP_DEVICE_STATE, 1, 1);
+			final byte[] data = server.getInterfaceObjectServer().getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT,
+					objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1);
 			// bit 0: KNX fault, bit 1: IP fault, others reserved
 			if (knxNetwork)
 				data[0] = (byte) (faulty ? data[0] | 1 : data[0] & 0xfe);
 			else
 				data[0] = (byte) (faulty ? data[0] | 2 : data[0] & 0xfd);
 
-			server.getInterfaceObjectServer().setProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+			server.getInterfaceObjectServer().setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.KNXNETIP_DEVICE_STATE, 1, 1, data);
 		}
 		catch (final KNXPropertyException e) {
@@ -1439,14 +1432,12 @@ public class KnxServerGateway implements Runnable
 			return (data[0] & 0xff);
 		if (data.length == 2)
 			return (data[0] & 0xff) << 8 | data[1] & 0xff;
-		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3]
-				& 0xff;
+		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3] & 0xff;
 	}
 
 	private static byte[] bytesFromInt(final long value)
 	{
-		return new byte[] { (byte) (value >> 24), (byte) (value >> 16), (byte) (value >> 8),
-			(byte) value };
+		return new byte[] { (byte) (value >> 24), (byte) (value >> 16), (byte) (value >> 8), (byte) value };
 	}
 
 	private static byte[] bytesFromWord(final int word)

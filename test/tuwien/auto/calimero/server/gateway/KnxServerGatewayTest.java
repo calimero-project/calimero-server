@@ -82,30 +82,32 @@ public class KnxServerGatewayTest extends TestCase
 		super(name);
 	}
 
-	/* (non-Javadoc)
-	 * @see junit.framework.TestCase#setUp()
-	 */
 	protected void setUp() throws Exception
 	{
 		super.setUp();
-		server = new KNXnetIPServer();
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
-
+		server = setupServer();
 		final ServiceContainer sc = new DefaultServiceContainer("test container", null,
 				new HPAI((InetAddress) null, 5647),
 				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true);
 		server.addServiceContainer(sc);
-		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc,
-				DummyLink.class.getName(), "", 1);
+		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "", 1);
 		connector.openNetworkLink();
 		subnetConnectors = new SubnetConnector[] { connector };
 		gw = new KnxServerGateway("gateway", server, subnetConnectors);
 	}
 
-	/* (non-Javadoc)
-	 * @see junit.framework.TestCase#tearDown()
-	 */
+	private KNXnetIPServer setupServer() throws KNXPropertyException
+	{
+		final KNXnetIPServer s = new KNXnetIPServer();
+		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
+		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
+		final int MAIN_LCGRPCONFIG = 54;
+		final int SUB_LCGRPCONFIG = 55;
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, MAIN_LCGRPCONFIG, 1, 1, new byte[] {0});
+		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, SUB_LCGRPCONFIG, 1, 1, new byte[] {0});
+		return s;
+	}
+
 	protected void tearDown() throws Exception
 	{
 		server.shutdown();
@@ -113,27 +115,25 @@ public class KnxServerGatewayTest extends TestCase
 	}
 
 	/**
-	 * Test method for
-	 * {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#KnxServerGateway(
-	 * java.lang.String, tuwien.auto.calimero.server.knxnetip.KNXnetIPServer,
-	 * tuwien.auto.calimero.server.gateway.SubnetConnector[])}.
+	 * Test method for {@link KnxServerGateway#KnxServerGateway(java.lang.String, KNXnetIPServer, SubnetConnector[])}.
+	 * @throws KNXPropertyException
 	 */
-	public final void testKnxServerGateway()
+	public final void testKnxServerGateway() throws KNXPropertyException
 	{
-		/*final KnxServerGateway gw2 =*/ new KnxServerGateway("testGW", new KNXnetIPServer(),
-				new SubnetConnector[] {});
+		/*final KnxServerGateway gw2 =*/ new KnxServerGateway("testGW", setupServer(), new SubnetConnector[] {});
 	}
 
 	/**
 	 * Test method for {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#run()}.
 	 *
 	 * @throws InterruptedException on interrupted thread
+	 * @throws KNXPropertyException
 	 */
-	public final void testRun() throws InterruptedException
+	public final void testRun() throws InterruptedException, KNXPropertyException
 	{
 		try {
-			final KnxServerGateway gw2 = new KnxServerGateway("testGW", new KNXnetIPServer(),
-					new SubnetConnector[] {});
+			final KNXnetIPServer s = setupServer();
+			final KnxServerGateway gw2 = new KnxServerGateway("testGW", s, new SubnetConnector[] {});
 			gw2.run();
 			fail();
 		}
@@ -143,7 +143,7 @@ public class KnxServerGatewayTest extends TestCase
 
 		Thread t;
 		(t = new Thread(gw)).start();
-		Thread.sleep(4000);
+		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();
 	}
@@ -157,7 +157,7 @@ public class KnxServerGatewayTest extends TestCase
 	{
 		Thread t;
 		(t = new Thread(gw)).start();
-		Thread.sleep(4000);
+		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();
 		Thread.sleep(500);
@@ -224,13 +224,12 @@ public class KnxServerGatewayTest extends TestCase
 	private boolean inGroupAddressTable(final GroupAddress addr)
 	{
 		try {
-			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1,
-					PropertyAccess.PID.TABLE, 0, 1);
+			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE, 0, 1);
 			final int elems = ((data[0] & 0xff) << 8) | data[1] & 0xff;
 			if (elems == 0)
 				return true;
-			final byte[] addrTable = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1,
-					PropertyAccess.PID.TABLE, 1, elems);
+			final byte[] addrTable = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE,
+					1, elems);
 			final byte hi = (byte) (addr.getRawAddress() >> 8);
 			final byte lo = (byte) addr.getRawAddress();
 			for (int i = 0; i < addrTable.length; i += 2)
@@ -257,54 +256,25 @@ public class KnxServerGatewayTest extends TestCase
 
 		public DummyLink(final Object[] s) {}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #addLinkListener(tuwien.auto.calimero.link.event.NetworkLinkListener)
-		 */
 		public void addLinkListener(final NetworkLinkListener l)
 		{
 			listeners.add(l);
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #removeLinkListener(tuwien.auto.calimero.link.event.NetworkLinkListener)
-		 */
 		public void removeLinkListener(final NetworkLinkListener l)
 		{
 			listeners.remove(l);
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#setHopCount(int)
-		 */
-		public void setHopCount(final int count)
-		{}
+		public void setHopCount(final int count) {}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getHopCount()
-		 */
 		public int getHopCount()
 		{
 			return 6;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #setKNXMedium(tuwien.auto.calimero.link.medium.KNXMediumSettings)
-		 */
-		public void setKNXMedium(final KNXMediumSettings settings)
-		{}
+		public void setKNXMedium(final KNXMediumSettings settings) {}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getKNXMedium()
-		 */
 		public KNXMediumSettings getKNXMedium()
 		{
 			return null;
@@ -313,69 +283,40 @@ public class KnxServerGatewayTest extends TestCase
 		/**
 		 * @param msg
 		 * @param waitForCon
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink #send(tuwien.auto.calimero.cemi.CEMILData,
-		 *      boolean)
+		 * @see tuwien.auto.calimero.link.KNXNetworkLink #send(tuwien.auto.calimero.cemi.CEMILData, boolean)
 		 */
-		public void send(final CEMILData msg, final boolean waitForCon)
-		{}
+		public void send(final CEMILData msg, final boolean waitForCon) {}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #sendRequest(tuwien.auto.calimero.KNXAddress, tuwien.auto.calimero.Priority,
-		 * byte[])
-		 */
 		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu)
 		{
 			try {
-				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst,
-						nsdu, p), false);
+				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), false);
 			}
 			catch (final KNXFormatException e) {
 				e.printStackTrace();
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink
-		 * #sendRequestWait(tuwien.auto.calimero.KNXAddress,
-		 * tuwien.auto.calimero.Priority, byte[])
-		 */
 		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
 		{
 			try {
-				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst,
-						nsdu, p), true);
+				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), true);
 			}
 			catch (final KNXFormatException e) {
 				e.printStackTrace();
 			}
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#getName()
-		 */
 		public String getName()
 		{
 			return "link";
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#isOpen()
-		 */
 		public boolean isOpen()
 		{
 			return true;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * @see tuwien.auto.calimero.link.KNXNetworkLink#close()
-		 */
-		public void close()
-		{}
+		public void close() {}
 	}
 }

@@ -147,15 +147,13 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	}
 
 	@Override
-	protected void close(final int initiator, final String reason, final LogLevel level,
-		final Throwable t)
+	protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t)
 	{
 		super.close(initiator, reason, level, t);
 	}
 
 	@Override
-	protected void cleanup(final int initiator, final String reason, final LogLevel level,
-		final Throwable t)
+	protected void cleanup(final int initiator, final String reason, final LogLevel level, final Throwable t)
 	{
 		// we want close/shutdown be called only once
 		synchronized (this) {
@@ -354,7 +352,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				logger.warn("received property read confirmation - ignored");
 				break;
 			case CEMIDevMgmt.MC_PROPWRITE_CON:
-				logger.warn("received property read confirmation - ignored");
+				logger.warn("received property write confirmation - ignored");
 				break;
 			case CEMIDevMgmt.MC_PROPINFO_IND:
 				logger.warn("received property info indication - ignored");

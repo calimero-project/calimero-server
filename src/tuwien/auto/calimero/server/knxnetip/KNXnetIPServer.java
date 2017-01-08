@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1096,10 +1096,8 @@ public class KNXnetIPServer
 	private void startRoutingService(final ServiceContainer sc, final RoutingEndpoint endpoint)
 	{
 		final InetAddress mcast = endpoint.getRoutingMulticastAddress();
-		final Supplier<ServiceLooper> builder = () -> new RoutingService(this, sc, endpoint.getRoutingInterface(),
-				mcast, multicastLoopback);
 		final LooperThread t = new LooperThread(this, sc, serverName + " routing service " + mcast.getHostAddress(), 9,
-				builder);
+				() -> new RoutingService(this, sc, endpoint.getRoutingInterface(), mcast, multicastLoopback));
 		routingEndpoints.add(t);
 		t.start();
 	}
@@ -1163,7 +1161,7 @@ public class KNXnetIPServer
 				.toArray(new DataEndpointServiceHandler[dataConnections.size()]);
 		for (int i = 0; i < handlerList.length; i++) {
 			final DataEndpointServiceHandler h = handlerList[i];
-			if (h.getCtrlSocketAddress().equals(addr))
+			if (addr.equals(h.getCtrlSocketAddress()))
 				h.close(CloseEvent.SERVER_REQUEST, "quit service container", LogLevel.INFO, null);
 		}
 	}

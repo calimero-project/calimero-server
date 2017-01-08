@@ -179,8 +179,8 @@ final class ControlEndpointService extends ServiceLooper
 				final int channelId = assignChannelId();
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
-				if (status == ErrorCodes.NO_ERROR) {
-					logger.info("{}: setup data endpoint (channel {}) for connection request " + "from {}",
+				else {
+					logger.info("{}: setup data endpoint (channel {}) for connection request from {}",
 							svcCont.getName(), channelId, ctrlEndpt);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
@@ -440,8 +440,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 
-		final boolean accept = acceptConnection(svcCont, sh, device, busmonitor);
-		if (!accept) {
+		if (!acceptConnection(svcCont, sh, device, busmonitor)) {
 			// don't use sh.close() here, we would initiate tunneling disconnect sequence
 			// but we have to call svcLoop.quit() to close local data socket
 			svcLoop.quit();
