@@ -185,10 +185,12 @@ final class ControlEndpointService extends ServiceLooper
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
+					if (!established)
+						freeChannelId(channelId);
 				}
 			}
 			if (buf == null)
-				buf = PacketHelper.toPacket(errorResponse(status, 0, ctrlEndpt.toString()));
+				buf = PacketHelper.toPacket(errorResponse(status, ctrlEndpt.toString()));
 
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
 			s.send(p);
@@ -343,16 +345,16 @@ final class ControlEndpointService extends ServiceLooper
 				knxLayer = TunnelingLayer.from(((TunnelCRI) req.getCRI()).getKNXLayer());
 			}
 			catch (final KNXIllegalArgumentException e) {
-				return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
+				return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
 			}
 			if (knxLayer != TunnelingLayer.LinkLayer && knxLayer != TunnelingLayer.BusMonitorLayer)
-				return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
+				return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
 
 			busmonitor = knxLayer == TunnelingLayer.BusMonitorLayer;
 			if (busmonitor) {
 				// check if service container has busmonitor allowed
 				if (!svcCont.isNetworkMonitoringAllowed())
-					return errorResponse(ErrorCodes.TUNNELING_LAYER, 0, endpoint);
+					return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
 
 				// KNX specification says that if tunneling on busmonitor is
 				// supported, only one tunneling connection is allowed per subnetwork,
@@ -364,7 +366,7 @@ final class ControlEndpointService extends ServiceLooper
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
 							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
-					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 
 				// but we can allow several monitor connections at the same time (not spec-conform)
@@ -381,14 +383,14 @@ final class ControlEndpointService extends ServiceLooper
 				// allow any other tunneling connections.
 				if (activeMonitorConnections() > 0) {
 					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
-							+ "busmonitor-layer connections)", svcCont.getName());
-					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
+					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 			}
 
 			device = assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress());
 			if (device == null)
-				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			final boolean isServerAddress = device.equals(serverAddress());
 			logger.info("assign {} address {} to channel {}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
@@ -401,7 +403,7 @@ final class ControlEndpointService extends ServiceLooper
 				if (usedKnxAddresses.contains(serverAddress())) {
 					logger.warn("server device address is currently assigned to connection, "
 							+ "no management connections allowed");
-					return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
+					return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 				}
 				++activeMgmtConnections;
 			}
@@ -410,7 +412,7 @@ final class ControlEndpointService extends ServiceLooper
 			crd = CRD.createResponse(KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION, null);
 		}
 		else
-			return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
+			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 
 		final ServiceLooper svcLoop;
 		final DataEndpointServiceHandler sh;
@@ -436,7 +438,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
-				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 		}
 
@@ -445,7 +447,7 @@ final class ControlEndpointService extends ServiceLooper
 			// but we have to call svcLoop.quit() to close local data socket
 			svcLoop.quit();
 			freeDeviceAddress(device);
-			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
+			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 		}
 		server.dataConnections.add(sh);
 		if (looperThread != null)
@@ -464,9 +466,8 @@ final class ControlEndpointService extends ServiceLooper
 				.filter(DataEndpointServiceHandler::isMonitor).map(h -> h.getName()).count();
 	}
 
-	private ConnectResponse errorResponse(final int status, final int channelId, final String endpoint)
+	private ConnectResponse errorResponse(final int status, final String endpoint)
 	{
-		freeChannelId(channelId);
 		logger.warn("no data endpoint for remote endpoint " + endpoint + ", " + ErrorCodes.getErrorMessage(status));
 		return new ConnectResponse(status);
 	}
