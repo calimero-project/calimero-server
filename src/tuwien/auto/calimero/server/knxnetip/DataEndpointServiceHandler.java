@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,6 +41,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.IndividualAddress;
@@ -73,13 +75,6 @@ import tuwien.auto.calimero.log.LogService.LogLevel;
  */
 final class DataEndpointServiceHandler extends ConnectionBase
 {
-	interface ServiceCallback
-	{
-		void connectionClosed(DataEndpointServiceHandler h, IndividualAddress assigned);
-
-		void resetRequest(DataEndpointServiceHandler h);
-	}
-
 	// sender SHALL wait 1 second for the acknowledgment response
 	// to a tunneling request
 	private static final int TUNNELING_REQ_TIMEOUT = 1;
@@ -87,7 +82,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	// to a device configuration request
 	private static final int CONFIGURATION_REQ_TIMEOUT = 10;
 
-	private final ServiceCallback callback;
+	private final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed;
+	private final Consumer<DataEndpointServiceHandler> resetRequest;
 
 	private final IndividualAddress device;
 	private final boolean tunnel;
@@ -98,17 +94,15 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	// updated on every correctly received message
 	private long lastMsgTimestamp;
 
-	DataEndpointServiceHandler(final ServiceCallback callback, final DatagramSocket localCtrlEndpt,
-		final DatagramSocket localDataEndpt, final InetSocketAddress remoteCtrlEndpt,
-		final InetSocketAddress remoteDataEndpt, final int channelId,
-		final IndividualAddress assigned, final boolean tunneling, final boolean busmonitor,
-		final boolean useNAT)
+	DataEndpointServiceHandler(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
+		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
+		final IndividualAddress assigned, final boolean tunneling, final boolean busmonitor, final boolean useNAT,
+		final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed,
+		final Consumer<DataEndpointServiceHandler> resetRequest)
 	{
 		super(tunneling ? KNXnetIPHeader.TUNNELING_REQ : KNXnetIPHeader.DEVICE_CONFIGURATION_REQ,
 				tunneling ? KNXnetIPHeader.TUNNELING_ACK : KNXnetIPHeader.DEVICE_CONFIGURATION_ACK,
 				tunneling ? 2 : 4, tunneling ? TUNNELING_REQ_TIMEOUT : CONFIGURATION_REQ_TIMEOUT);
-
-		this.callback = callback;
 		device = assigned;
 		tunnel = tunneling;
 		monitor = busmonitor;
@@ -121,8 +115,10 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		dataEndpt = remoteDataEndpt;
 
 		useNat = useNAT;
-		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+		this.connectionClosed = connectionClosed;
+		this.resetRequest = resetRequest;
 
+		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 		setState(OK);
 	}
 
@@ -169,7 +165,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		}
 
 		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason, t);
-		callback.connectionClosed(this, device);
+		connectionClosed.accept(this, device);
 		super.cleanup(initiator, reason, level, t);
 	}
 
@@ -324,7 +320,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
 			fireFrameReceived(cemi);
-			callback.resetRequest(this);
+			resetRequest.accept(this);
 		}
 		else {
 			switch (mc) {
@@ -350,7 +346,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				|| cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ) {
 			fireFrameReceived(cemi);
 			if (cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ)
-				callback.resetRequest(this);
+				resetRequest.accept(this);
 		}
 		else {
 			switch (cemi.getMessageCode()) {

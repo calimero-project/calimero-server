@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,37 +43,24 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 
 import tuwien.auto.calimero.CloseEvent;
-import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.log.LogService.LogLevel;
-import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback;
 
-final class DataEndpointService extends ServiceLooper implements ServiceCallback
+final class DataEndpointService extends ServiceLooper
 {
 	// KNX receive timeout in seconds
 	private static final int MAX_RECEIVE_INTERVAL = 120;
 
 	DataEndpointServiceHandler svcHandler;
-	private final ServiceCallback callback;
 
-	DataEndpointService(final KNXnetIPServer server, final ServiceCallback callback,
-		final DatagramSocket localCtrlEndpt)
+	DataEndpointService(final KNXnetIPServer server, final DatagramSocket localCtrlEndpt)
 	{
 		super(server, newSocketUsingIp(localCtrlEndpt), 512, MAX_RECEIVE_INTERVAL * 1000);
-		this.callback = callback;
 		logger.debug("created socket on " + s.getLocalSocketAddress());
 	}
 
-	@Override
-	public void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress assigned)
-	{
-		quit();
-		callback.connectionClosed(h, assigned);
-	}
-
-	@Override
-	public void resetRequest(final DataEndpointServiceHandler h)
+	void resetRequest(final DataEndpointServiceHandler h)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
 		fireResetRequest(h.getName(), ctrlEndpoint);

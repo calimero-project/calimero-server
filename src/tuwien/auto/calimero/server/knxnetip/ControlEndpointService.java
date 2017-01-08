@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.Supplier;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import tuwien.auto.calimero.CloseEvent;
@@ -82,9 +82,8 @@ import tuwien.auto.calimero.knxnetip.util.TunnelCRD;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRI;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
-import tuwien.auto.calimero.server.knxnetip.DataEndpointServiceHandler.ServiceCallback;
 
-final class ControlEndpointService extends ServiceLooper implements ServiceCallback
+final class ControlEndpointService extends ServiceLooper
 {
 	private final ServiceContainer svcCont;
 
@@ -107,8 +106,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 		s = createSocket();
 	}
 
-	@Override
-	public void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
+	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
 	{
 		server.dataConnections.remove(h);
 		// free knx address and channel id we assigned to the connection
@@ -121,8 +119,7 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			}
 	}
 
-	@Override
-	public void resetRequest(final DataEndpointServiceHandler h)
+	void resetRequest(final DataEndpointServiceHandler h)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
 		fireResetRequest(h.getName(), ctrlEndpoint);
@@ -416,18 +413,26 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, 0, endpoint);
 
 		final ServiceLooper svcLoop;
-		ServiceCallback cb = null;
-		final boolean useThisCtrlEp = svcCont.reuseControlEndpoint();
+		final DataEndpointServiceHandler sh;
+		LooperThread looperThread = null;
 
-		if (useThisCtrlEp) {
+		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
-			cb = this;
+			sh = new DataEndpointServiceHandler(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
+					busmonitor, useNat, this::connectionClosed, this::resetRequest);
 		}
 		else {
 			try {
-				final DataEndpointService looper = new DataEndpointService(server, this, s);
-				cb = looper;
-				svcLoop = looper;
+				svcLoop = new DataEndpointService(server, s);
+
+				final BiConsumer<DataEndpointServiceHandler, IndividualAddress> bc = (h, a) -> svcLoop.quit();
+				sh = new DataEndpointServiceHandler(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
+						tunnel, busmonitor, useNat, bc.andThen(this::connectionClosed),
+						((DataEndpointService) svcLoop)::resetRequest);
+				((DataEndpointService) svcLoop).svcHandler = sh;
+
+				looperThread = new LooperThread(server, svcCont,
+						svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
@@ -435,8 +440,6 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			}
 		}
 
-		final DataEndpointServiceHandler sh = new DataEndpointServiceHandler(cb, s, svcLoop.getSocket(), ctrlEndpt,
-				dataEndpt, channelId, device, tunnel, busmonitor, useNat);
 		final boolean accept = acceptConnection(svcCont, sh, device, busmonitor);
 		if (!accept) {
 			// don't use sh.close() here, we would initiate tunneling disconnect sequence
@@ -446,12 +449,8 @@ final class ControlEndpointService extends ServiceLooper implements ServiceCallb
 			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, 0, endpoint);
 		}
 		server.dataConnections.add(sh);
-		if (!useThisCtrlEp) {
-			((DataEndpointService) svcLoop).svcHandler = sh;
-			final Supplier<ServiceLooper> builder = () -> svcLoop;
-			new LooperThread(server, svcCont, svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0, builder)
-					.start();
-		}
+		if (looperThread != null)
+			looperThread.start();
 
 		// we always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
