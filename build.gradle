@@ -11,6 +11,9 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
+ext.junitJupiterVersion = '5.0.0-SNAPSHOT'
+ext.junitPlatformVersion = '1.0.0-SNAPSHOT'
+
 apply plugin:'java'
 apply plugin: "maven"
 apply plugin:'application'
@@ -49,4 +52,10 @@ dependencies {
     compile "com.github.calimero:calimero-device:${version}"
     compile 'org.slf4j:slf4j-api:1.7.21'
     runtime 'org.slf4j:slf4j-simple:1.7.21'
+
+    testCompile("org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}")
+    testCompile("org.junit.platform:junit-platform-runner:${junitPlatformVersion}")
+    testCompile 'junit:junit:4.12'
+    testRuntime("org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}")
+    testRuntime 'org.junit.vintage:junit-vintage-engine:4.12.0-SNAPSHOT'
 }
