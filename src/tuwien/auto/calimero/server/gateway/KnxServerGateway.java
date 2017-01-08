@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -144,12 +144,11 @@ public class KnxServerGateway implements Runnable
 	private volatile Instant throttleUntil = Instant.EPOCH;
 
 	private final AtomicInteger routingBusyCounter = new AtomicInteger();
-	private static final ScheduledExecutorService busyCounterDecrementor = Executors
-			.newSingleThreadScheduledExecutor(r -> {
-				final Thread t = new Thread(r, "Calimero routing busy counter");
-				t.setDaemon(true);
-				return t;
-			});
+	private static final ScheduledExecutorService busyCounterDecrementor = Executors.newScheduledThreadPool(0, r -> {
+		final Thread t = new Thread(r, "Calimero routing busy counter");
+		t.setDaemon(true);
+		return t;
+	});
 
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
