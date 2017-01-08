@@ -446,16 +446,19 @@ public class Launcher implements Runnable
 		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, runDiscovery);
 
 		// output the configuration we loaded
-		logger.info("Discovery service network interfaces:");
-		logger.info("    listen on {}", netIfListen);
-		logger.info("    outgoing {}", netIfOutgoing);
+		logger.info("KNXnet/IP discovery network interfaces: listen on [{}], send on [{}]", netIfListen, netIfOutgoing);
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
-			logger.info("Service container " + sc.getName() + ": ");
-			logger.info("    " + sc.getControlEndpoint() + " routing " + (sc instanceof RoutingServiceContainer));
+			logger.info("Service container '{}': ", sc.getName());
+
+			String mcast = "disabled";
+			if ((sc instanceof RoutingServiceContainer))
+				mcast = "multicast group "
+						+ ((RoutingServiceContainer) sc).getRoutingMulticastAddress().getHostAddress();
+			logger.info("    listen on {}, KNXnet/IP routing {}", sc.networkInterface(), mcast);
 
 			final String type = xml.subnetTypes.get(i);
-			logger.info("    " + type + " connection, " + sc.getMediumSettings());
+			logger.info("    " + type + " connection: " + sc.getMediumSettings());
 			if (xml.groupAddressFilters.containsKey(sc))
 				logger.info("    Set group address filter " + xml.groupAddressFilters.get(sc));
 			if (xml.subnetDatapoints.containsKey(sc))
