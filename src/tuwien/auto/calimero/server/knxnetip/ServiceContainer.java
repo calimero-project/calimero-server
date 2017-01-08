@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -69,6 +69,11 @@ public interface ServiceContainer
 	 * @return the service container name as non-empty, non-null string
 	 */
 	String getName();
+
+	/**
+	 * @return the name of the network interface for this service container
+	 */
+	String networkInterface();
 
 	/**
 	 * Returns the control endpoint which uniquely identifies the service container to a client.

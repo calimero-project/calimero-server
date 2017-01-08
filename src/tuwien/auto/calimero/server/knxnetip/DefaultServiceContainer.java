@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ public class DefaultServiceContainer implements ServiceContainer
 {
 	private volatile boolean activated = true;
 	private final String id;
+	private final String netif;
 	private final HPAI ctrlEndpt;
 	private final KNXMediumSettings settings;
 	private final boolean reuseEndpt;
@@ -68,6 +69,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param name service container name; the name shall allow an identification within a set of
 	 *        service containers, and provide a descriptive name of the container. Therefore, a
 	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
+	 * @param netif network interface name for the control endpoint to listen on, might be <code>"any"</code>
 	 * @param controlEndpoint control endpoint address information which uniquely identifies this
 	 *        service container to KNXnet/IP clients, UDP host protocol only, the HPAI has to
 	 *        contain an IP address not 0; if parameter is <code>null</code>, a control endpoint is
@@ -78,12 +80,13 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
 	 *        this service container, <code>false</code> otherwise
 	 */
-	public DefaultServiceContainer(final String name, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring)
+	public DefaultServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring)
 	{
 		if (name == null)
 			throw new NullPointerException("container identifier must not be null");
 		id = name;
+		this.netif = netif;
 		if (controlEndpoint == null)
 			// create with local host address and ephemeral port
 			ctrlEndpt = new HPAI((InetAddress) null, 0);
@@ -104,6 +107,12 @@ public class DefaultServiceContainer implements ServiceContainer
 	public String getName()
 	{
 		return id;
+	}
+
+	@Override
+	public String networkInterface()
+	{
+		return netif;
 	}
 
 	@Override

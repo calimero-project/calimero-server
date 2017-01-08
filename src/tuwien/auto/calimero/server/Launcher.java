@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -318,10 +318,11 @@ public class Launcher implements Runnable
 							ia = Collections.list(netif.getInetAddresses()).stream()
 									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 						final HPAI hpai = new HPAI(ia, port);
+						final String netifName = netif != null ? netif.getName() : "any";
 						if (routing)
 							sc = new RoutingServiceContainer(addr, hpai, s, reuse, monitor, routingMcast, netif);
 						else
-							sc = new DefaultServiceContainer(addr, hpai, s, reuse, monitor);
+							sc = new DefaultServiceContainer(addr, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);

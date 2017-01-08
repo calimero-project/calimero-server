@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -57,12 +58,9 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 public class RoutingServiceContainer extends DefaultServiceContainer implements RoutingEndpoint
 {
 	private final InetAddress mcast;
-	private final NetworkInterface netIf;
-
 
 	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
-	 * <p>
 	 *
 	 * @param name see {@link DefaultServiceContainer}
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
@@ -82,12 +80,12 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
 		final NetworkInterface routingInterface)
 	{
-		super(name, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring);
+		super(name, routingInterface != null ? routingInterface.getName() : "any", controlEndpoint, subnet,
+				reuseCtrlEndpt, allowNetworkMonitoring);
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
 			throw new KNXIllegalArgumentException(routingMulticast
 					+ " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
-		netIf = routingInterface;
 	}
 
 	@Override
@@ -99,6 +97,11 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 	@Override
 	public NetworkInterface getRoutingInterface()
 	{
-		return netIf;
+		try {
+			return NetworkInterface.getByName(networkInterface());
+		}
+		catch (final SocketException e) {
+			return null;
+		}
 	}
 }
