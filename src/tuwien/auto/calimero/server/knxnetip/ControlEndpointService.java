@@ -41,11 +41,15 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -101,7 +105,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
-		super(server, null, 512, 0);
+		super(server, null, 512, 10000);
 		svcCont = sc;
 		s = createSocket();
 	}
@@ -132,6 +136,20 @@ final class ControlEndpointService extends ServiceLooper
 		if (channelsAssigned())
 			server.closeDataConnections(svcCont);
 		super.quit();
+	}
+
+	@Override
+	protected void onTimeout()
+	{
+		final InetAddress ip = ((InetSocketAddress) s.getLocalSocketAddress()).getAddress();
+		try {
+			if (!assignedIpAddresses().contains(ip)) {
+				logger.error("{} control endpoint: interface {} updated its IP address (formerly {})",
+						svcCont.getName(), svcCont.networkInterface(), ip.getHostAddress());
+				quit();
+			}
+		}
+		catch (final IOException e) {}
 	}
 
 	ServiceContainer getServiceContainer()
@@ -300,14 +318,25 @@ final class ControlEndpointService extends ServiceLooper
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 			if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
-			s.bind(new InetSocketAddress(ep.getAddress(), ep.getPort()));
-			logger.debug("created socket on " + s.getLocalSocketAddress());
+
+			final List<InetAddress> assigned = assignedIpAddresses();
+			final InetAddress ip = assigned.stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
+			s.bind(new InetSocketAddress(ip, ep.getPort()));
+			logger.debug("{} control endpoint: created socket on {}", svcCont.getName(), s.getLocalSocketAddress());
 			return s;
 		}
-		catch (final SocketException e) {
+		catch (SocketException | UnknownHostException e) {
 			logger.error("socket creation failed for " + new InetSocketAddress(ep.getAddress(), ep.getPort()), e);
 			throw wrappedException(e);
 		}
+	}
+
+	private List<InetAddress> assignedIpAddresses() throws SocketException, UnknownHostException
+	{
+		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
+		final List<InetAddress> list = netif != null ? Collections.list(netif.getInetAddresses())
+				: Collections.singletonList(InetAddress.getLocalHost());
+		return list;
 	}
 
 	private int objectInstance()
