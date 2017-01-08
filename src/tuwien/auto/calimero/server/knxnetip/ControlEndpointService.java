@@ -128,8 +128,9 @@ final class ControlEndpointService extends ServiceLooper
 	@Override
 	public void quit()
 	{
-		// we close our data connections only if we were intentionally closed (and not always in cleanup() )
-		server.closeDataConnections(svcCont);
+		// check if we have open data connections before forwarding the call
+		if (channelsAssigned())
+			server.closeDataConnections(svcCont);
 		super.quit();
 	}
 
@@ -596,6 +597,13 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		synchronized (channelIds) {
 			channelIds.clear(channelId);
+		}
+	}
+
+	private boolean channelsAssigned()
+	{
+		synchronized (channelIds) {
+			return channelIds.cardinality() > 0;
 		}
 	}
 
