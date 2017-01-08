@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
@@ -101,6 +102,7 @@ public class DefaultServiceContainer implements ServiceContainer
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;
 		networkMonitor = allowNetworkMonitoring;
+		disruptionBufferTimeout = Duration.of(0, ChronoUnit.SECONDS);
 	}
 
 	@Override
