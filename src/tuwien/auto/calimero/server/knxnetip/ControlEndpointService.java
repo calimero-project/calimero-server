@@ -361,9 +361,9 @@ final class ControlEndpointService extends ServiceLooper
 				// supported, only one tunneling connection is allowed per subnetwork,
 				// i.e., if there are any active link-layer connections, we don't
 				// allow tunneling on busmonitor.
-				final List<String> active = server.dataConnections.stream()
+				final List<DataEndpointServiceHandler> active = server.dataConnections.stream()
 						.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
-						.filter(h -> !h.isMonitor()).map(h -> h.getName()).collect(Collectors.toList());
+						.filter(h -> !h.isMonitor()).collect(Collectors.toList());
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
 							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
@@ -373,16 +373,16 @@ final class ControlEndpointService extends ServiceLooper
 				// but we can allow several monitor connections at the same time (not spec-conform)
 				final boolean allowMultiMonitorConnections = true;
 				if (allowMultiMonitorConnections) {
-					final long monitoring = activeMonitorConnections();
+					final long monitoring = activeMonitorConnections().size();
 					logger.info("{}: active monitor connections: {}, 1 connect request", svcCont.getName(), monitoring);
 				}
 			}
 			else {
-				// KNX specification says that if tunneling on busmonitor is
-				// supported, only one tunneling connection is allowed per subnetwork,
-				// i.e., if there is an active bus monitor connection, we don't
+				// KNX specification says that if tunneling on busmonitor is supported, only one tunneling connection
+				// is allowed per subnetwork, i.e., if there is an active bus monitor connection, we don't
 				// allow any other tunneling connections.
-				if (activeMonitorConnections() > 0) {
+				final List<DataEndpointServiceHandler> active = activeMonitorConnections();
+				if (active.size() > 0) {
 					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
 							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
@@ -461,10 +461,10 @@ final class ControlEndpointService extends ServiceLooper
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}
 
-	private long activeMonitorConnections()
+	private List<DataEndpointServiceHandler> activeMonitorConnections()
 	{
 		return server.dataConnections.stream().filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
-				.filter(DataEndpointServiceHandler::isMonitor).map(h -> h.getName()).count();
+				.filter(DataEndpointServiceHandler::isMonitor).collect(Collectors.toList());
 	}
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)
