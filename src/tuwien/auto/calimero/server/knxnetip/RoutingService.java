@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
@@ -57,15 +58,14 @@ final class RoutingService extends ServiceLooper
 
 	private final class RoutingServiceHandler extends KNXnetIPRouting
 	{
-		private RoutingServiceHandler(final NetworkInterface netIf, final InetAddress mcGroup,
-			final boolean enableLoopback)
+		private RoutingServiceHandler(final String netIf, final InetAddress mcGroup, final boolean enableLoopback)
 		{
 			super(mcGroup);
 			try {
-				init(netIf, enableLoopback, false);
+				init(NetworkInterface.getByName(netIf), enableLoopback, false);
 				logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 			}
-			catch (final KNXException e) {
+			catch (SocketException | KNXException e) {
 				throw wrappedException(e);
 			}
 		}
@@ -114,12 +114,12 @@ final class RoutingService extends ServiceLooper
 	final RoutingServiceHandler r;
 	private final ServiceContainer svcCont;
 
-	RoutingService(final KNXnetIPServer server, final ServiceContainer sc, final NetworkInterface netIf,
-		final InetAddress mcGroup, final boolean enableLoopback)
+	RoutingService(final KNXnetIPServer server, final ServiceContainer sc, final InetAddress mcGroup,
+		final boolean enableLoopback)
 	{
 		super(server, null, false, 512, 0);
 		svcCont = sc;
-		r = new RoutingServiceHandler(netIf, mcGroup, enableLoopback);
+		r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback);
 		s = r.getLocalDataSocket();
 		fireRoutingServiceStarted(svcCont, r);
 	}

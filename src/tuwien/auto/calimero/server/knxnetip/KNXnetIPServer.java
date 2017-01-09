@@ -1073,7 +1073,7 @@ public class KNXnetIPServer
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingEndpoint)
-			startRoutingService(sc, (RoutingEndpoint) sc);
+			startRoutingService(sc);
 	}
 
 	private void stopControlEndpoint(final ServiceContainer sc)
@@ -1093,11 +1093,11 @@ public class KNXnetIPServer
 			stopRoutingService(sc);
 	}
 
-	private void startRoutingService(final ServiceContainer sc, final RoutingEndpoint endpoint)
+	private void startRoutingService(final ServiceContainer sc)
 	{
-		final InetAddress mcast = endpoint.getRoutingMulticastAddress();
+		final InetAddress mcast = ((RoutingEndpoint) sc).getRoutingMulticastAddress();
 		final LooperThread t = new LooperThread(this, sc, serverName + " routing service " + mcast.getHostAddress(), 9,
-				() -> new RoutingService(this, sc, endpoint.getRoutingInterface(), mcast, multicastLoopback));
+				() -> new RoutingService(this, sc, mcast, multicastLoopback));
 		routingEndpoints.add(t);
 		t.start();
 	}
