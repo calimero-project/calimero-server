@@ -1,45 +1,51 @@
 Calimero KNXnet/IP Server
 =========================
 
-This feature branch provides the Calimero KNXnet/IP server for Java SE Embedded 8. The minimum required runtime environment is 
+A KNXnet/IP server for Java SE Embedded 8 (or Java SE 8). The minimum required runtime environment is 
 the profile [compact1](http://www.oracle.com/technetwork/java/embedded/resources/tech/compact-profiles-overview-2157132.html).
+
+* Run your own KNXnet/IP server in software (no KNXnet/IP hardware required)
+* Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
+* Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
+* Emulate/virtualize a KNX network
 
 Download
 --------
 
 ~~~ sh
 # Either using git
-$ git clone https://github.com/calimero-project/calimero-server.git
+git clone https://github.com/calimero-project/calimero-server.git
 
 # Or using hub
-$ hub clone calimero-project/calimero-server
+hub clone calimero-project/calimero-server
 ~~~
 
-The Calimero KNXnet/IP server mandatory requires the `calimero-core`, `calimero-device`, and `slf4j` libraries.
-Optional dependencies -- required for communication over serial ports -- are either any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX (or any RXTX descendant) already present on the platform. For USB or RF USB communication links, `calimero-core` has a dependency on `org.usb4java:usb4java-javax`.
+### Dependencies
+
+The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`.
+
+_Optional_ dependencies, required for communication over serial ports:
+
+* Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library already present on your platform. 
+* For KNX USB or RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
 
 Supported Features
 ------------------
 
-* Run your own KNXnet/IP server in software
-* Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
-* Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
-* Emulate/virtualize a KNX network
-
-### Client-side KNXnet/IP Support
+### Client-side KNXnet/IP
 * Discovery and self-description
 * Tunneling
 * Routing
-* Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are currently realized by converting cEMI L-Data to cEMI bus monitor messages)
+* Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are realized by converting cEMI L-Data to cEMI bus monitor messages)
 * Local device management
 
-### KNX Subnet-side (Communication with the KNX Bus)
+### KNX subnet side (communication with the KNX bus)
 * KNXnet/IP
 * KNX IP
 * KNX RF USB
 * KNX USB
-* KNX FT1.2 Protocol (serial connections)
-* TP-UART (serial connections)
+* KNX FT1.2 Protocol
+* TP-UART
 
 ### Configuration
 * XML server configuration for startup
@@ -48,42 +54,49 @@ Supported Features
 How-to & Examples
 -----------------
 
-The server provides a `Launcher`, together with a server configuration template `server-config.xml` (the server configuration, located in the folder `resources`) to start the KNXnet/IP server. The launcher expects a URI or file name pointing to the XML server configuration.
-Alternatively, one can also run the KNXnet/IP server and gateway directly in Java code; see the implementation in `Launcher.java` as a guide.
+With one of the following commands, the server should print a message that it expects a configuration file and quit:
 
-First, make sure Java is installed correctly, and all required `jar` packages are available (`calimero-core`, `calimero-device`, `slf4j`). With the following command, the server should print a message that it expects a configuration file and quit:
+#### Gradle
+
+    ./gradlew run
 
 #### Maven
 
 ~~~ sh
-$ mvn exec:java
+mvn exec:java
 ~~~
 
 #### Java
 
+Make sure all required `jar` packages are available.
+
 ~~~ sh
 # Either, assuming all jar dependencies are located in the current working directory
-$ java -cp "./*" tuwien.auto.calimero.server.Launcher
+java -cp "./*" tuwien.auto.calimero.server.Launcher
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-$ java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.7.21.jar:slf4j-simple-1.7.21.jar" tuwien.auto.calimero.server.Launcher
+java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.7.22.jar:slf4j-simple-1.7.22.jar" tuwien.auto.calimero.server.Launcher
 ~~~
 
 ### Start Server with Configuration
 
 *Before trying the examples below with a configuration, make sure the configuration is appropriate for your KNX setup!*
 
+Using Gradle
+
+    ./gradlew run -Dexec.args=resources/server-config.xml
+
 Using maven
 
 ~~~ sh
-$ mvn exec:java -Dexec.args=resources/server-config.xml
+mvn exec:java -Dexec.args=resources/server-config.xml
 ~~~
 
-or Java (make sure any referenced files in the folder `resources` are found, or copy them into the current working directory.)
+Using Java (make sure any referenced files in the folder `resources` are found, or copy them into the current working directory).
 
 ~~~ sh
-# Either, assuming all `jar` dependencies are located in the current working directory
-$ java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
+# Assumes all `jar` dependencies are located in the current working directory
+java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
 ~~~
 
 On the terminal, the running server instance can be stopped by typing "stop".
@@ -133,10 +146,14 @@ Elements and attributes of `server-config.xml`:
 
 	`<knxSubnet type="usb" medium="rf" domainAddress="000000004b01">0409:005a</knxSubnet>`
 
+### Launcher Code
+
+The KNXnet/IP server startup code is in `Launcher.java`, a Java `Runnable` which also loads the server configuration (use the `server-config.xml` configuration template located in the folder `resources`). The launcher expects a URI or file name pointing to the XML server configuration.
+To run the KNXnet/IP server and gateway directly in Java code, see the implementation and Javadoc of `Launcher.java`.
 
 
 Logging
 -------
 
-Calimero KNXnet/IP server uses the [Simple Logging Facade for Java (slf4j)](http://www.slf4j.org/). Bind any desired logging frameworks of your choice. The default maven dependency is the [Simple Logger](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html). It logs everything to standard output. The simple logger can be configured via the file `simplelogger.properties`, JVM system properties, or `java` command line options, e.g., `-Dorg.slf4j.simpleLogger.defaultLogLevel=warn`.
+Calimero KNXnet/IP server uses the [Simple Logging Facade for Java (slf4j)](http://www.slf4j.org/). Bind any desired logging frameworks of your choice. The default gradle/maven dependency is the [Simple Logger](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html). It logs everything to standard output. The simple logger can be configured via the file `simplelogger.properties`, JVM system properties, or `java` command line options, e.g., `-Dorg.slf4j.simpleLogger.defaultLogLevel=warn`.
 
