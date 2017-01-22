@@ -42,6 +42,7 @@ import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.Wait
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
@@ -56,6 +57,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -108,7 +110,6 @@ import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
-import tuwien.auto.calimero.server.knxnetip.RoutingEndpoint;
 import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainerEvent;
@@ -251,15 +252,14 @@ public class KnxServerGateway implements Runnable
 		// this will give a false positive if sending device and server are on same host
 		private boolean sentByUs(final InetSocketAddress sender)
 		{
-			final NetworkInterface netif = ((RoutingEndpoint) sc).getRoutingInterface();
-			// workaround for svc container routing interface, can return null meaning "any" interface
-			List<InetAddress> addrs = Collections.emptyList();
 			try {
-				addrs = netif != null ? Collections.list(netif.getInetAddresses())
-						: Arrays.asList(InetAddress.getLocalHost());
+				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
+				return Optional.ofNullable(netif).map(ni -> (List<InetAddress>) Collections.list(ni.getInetAddresses()))
+						.orElse(Arrays.asList(InetAddress.getLocalHost())).contains(sender.getAddress());
 			}
-			catch (final UnknownHostException ignore) {}
-			return addrs.contains(sender.getAddress());
+			catch (UnknownHostException | SocketException e) {
+				return false;
+			}
 		}
 
 		@Override
