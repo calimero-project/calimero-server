@@ -819,8 +819,8 @@ public class KNXnetIPServer
 		ios.setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, 1, 1, defMacAddress);
 
 		// routing stuff
-		if (endpoint instanceof RoutingEndpoint)
-			setRoutingConfiguration((RoutingEndpoint) endpoint, objectInstance);
+		if (endpoint instanceof RoutingServiceContainer)
+			setRoutingConfiguration((RoutingServiceContainer) endpoint, objectInstance);
 		else
 			resetRoutingConfiguration(objectInstance);
 		// 100 ms is the default busy wait time
@@ -837,7 +837,7 @@ public class KNXnetIPServer
 		//
 
 		// if service container doesn't support routing, don't show it in device capabilities
-		final int deviceCaps = endpoint instanceof RoutingEndpoint ? defDeviceCaps : defDeviceCaps - 4;
+		final int deviceCaps = endpoint instanceof RoutingServiceContainer ? defDeviceCaps : defDeviceCaps - 4;
 		ios.setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, 1, 1, bytesFromWord(deviceCaps));
 
 		//
@@ -855,11 +855,10 @@ public class KNXnetIPServer
 		ios.setProperty(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, 1, 1, new byte[] { 1 });
 	}
 
-	private void setRoutingConfiguration(final RoutingEndpoint endpoint, final int objectInstance)
+	private void setRoutingConfiguration(final RoutingServiceContainer endpoint, final int objectInstance)
 		throws KNXPropertyException
 	{
-		final InetAddress multicastAddr = endpoint.getRoutingMulticastAddress();
-		// final NetworkInterface netIf = endpoint.getRoutingInterface();
+		final InetAddress multicastAddr = endpoint.routingMulticastAddress();
 
 		InetAddress mcast = null;
 		try {
@@ -1072,8 +1071,8 @@ public class KNXnetIPServer
 		final LooperThread t = new LooperThread(this, sc, serverName + " control endpoint " + sc.getName(), 9, builder);
 		controlEndpoints.add(t);
 		t.start();
-		if (sc instanceof RoutingEndpoint)
-			startRoutingService(sc);
+		if (sc instanceof RoutingServiceContainer)
+			startRoutingService((RoutingServiceContainer) sc);
 	}
 
 	private void stopControlEndpoint(final ServiceContainer sc)
@@ -1089,13 +1088,13 @@ public class KNXnetIPServer
 			}
 		}
 		controlEndpoints.remove(remove);
-		if (sc instanceof RoutingEndpoint)
+		if (sc instanceof RoutingServiceContainer)
 			stopRoutingService(sc);
 	}
 
-	private void startRoutingService(final ServiceContainer sc)
+	private void startRoutingService(final RoutingServiceContainer sc)
 	{
-		final InetAddress mcast = ((RoutingEndpoint) sc).getRoutingMulticastAddress();
+		final InetAddress mcast = sc.routingMulticastAddress();
 		final LooperThread t = new LooperThread(this, sc, serverName + " routing service " + mcast.getHostAddress(), 9,
 				() -> new RoutingService(this, sc, mcast, multicastLoopback));
 		routingEndpoints.add(t);

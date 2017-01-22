@@ -38,7 +38,6 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -48,14 +47,13 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 /**
  * A service container supporting configuration for a routing endpoint.
  * <p>
- * This class implements the interface {@link RoutingEndpoint}, to access the configuration for
- * KNXnet/IP routing. When this service container is handed to a KNXnet/IP server, the server will
+ * When this service container is handed to a KNXnet/IP server, the server will
  * access the configured KNXnet/IP routing configuration, and initialize its service container to
  * providing routing services to the clients.
  *
  * @author B. Malinowsky
  */
-public class RoutingServiceContainer extends DefaultServiceContainer implements RoutingEndpoint
+public class RoutingServiceContainer extends DefaultServiceContainer
 {
 	private final InetAddress mcast;
 
@@ -88,20 +86,14 @@ public class RoutingServiceContainer extends DefaultServiceContainer implements 
 		mcast = routingMulticast;
 	}
 
-	@Override
-	public InetAddress getRoutingMulticastAddress()
+	public final InetAddress routingMulticastAddress()
 	{
 		return mcast;
 	}
 
-	@Override
-	public NetworkInterface getRoutingInterface()
+	@Deprecated
+	public InetAddress getRoutingMulticastAddress()
 	{
-		try {
-			return NetworkInterface.getByName(networkInterface());
-		}
-		catch (final SocketException e) {
-			return null;
-		}
+		return mcast;
 	}
 }

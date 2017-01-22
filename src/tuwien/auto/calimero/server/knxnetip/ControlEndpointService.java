@@ -527,8 +527,8 @@ final class ControlEndpointService extends ServiceLooper
 		// there are no free addresses, or no additional address at all
 		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
 
-		if (svcCont instanceof RoutingEndpoint) {
-			logger.warn("KNXnet/IP routing active, cannot assign server device address");
+		if (svcCont instanceof RoutingServiceContainer) {
+			logger.warn("KNXnet/IP routing active, cannot assign server device address {}", serverAddress());
 			return null;
 		}
 
