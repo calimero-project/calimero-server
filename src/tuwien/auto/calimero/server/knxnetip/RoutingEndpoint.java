@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,41 +34,9 @@
     version.
 */
 
-/**
- * 
- */
-
 package tuwien.auto.calimero.server.knxnetip;
 
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-
-/**
- * Specifies the mix-in interface for service containers supporting KNXnet/IP Routing.
- * <p>
- * A service container which wants to provide a KNXnet/IP Routing service end-point to clients has
- * to implement this interface.
- * 
- * @author B. Malinowsky
- */
+@Deprecated
 public interface RoutingEndpoint
 {
-	/**
-	 * Returns the KNXnet/IP routing multicast address on which the routing service will receive and
-	 * multicast its routing datagrams.
-	 * <p>
-	 * 
-	 * @return an InetAddress with the routing multicast address
-	 */
-	InetAddress getRoutingMulticastAddress();
-
-	/**
-	 * Returns the local network interface used to join for multicasting KNXnet/IP routing
-	 * datagrams.
-	 * <p>
-	 * This method is useful on multi-homed platforms.
-	 * 
-	 * @return a NetworkInterface identifying a local network interface
-	 */
-	NetworkInterface getRoutingInterface();
 }
