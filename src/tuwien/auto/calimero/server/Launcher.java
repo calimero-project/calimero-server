@@ -453,8 +453,7 @@ public class Launcher implements Runnable
 
 			String mcast = "disabled";
 			if ((sc instanceof RoutingServiceContainer))
-				mcast = "multicast group "
-						+ ((RoutingServiceContainer) sc).getRoutingMulticastAddress().getHostAddress();
+				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
 			logger.info("    listen on {}, KNXnet/IP routing {}", sc.networkInterface(), mcast);
 
 			final String type = xml.subnetTypes.get(i);

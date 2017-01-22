@@ -14,9 +14,9 @@ repositories {
 ext.junitJupiterVersion = '5.0.0-SNAPSHOT'
 ext.junitPlatformVersion = '1.0.0-SNAPSHOT'
 
-apply plugin:'java'
-apply plugin: "maven"
-apply plugin:'application'
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'application'
 
 version = '2.4-SNAPSHOT'
 

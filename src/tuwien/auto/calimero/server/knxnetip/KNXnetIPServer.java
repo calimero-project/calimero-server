@@ -379,7 +379,7 @@ public class KNXnetIPServer
 				initKNXnetIpParameterObject(svcContainers.size(), sc);
 			}
 			catch (final KNXPropertyException e) {
-				e.printStackTrace();
+				logger.error("initializing KNXnet/IP parameter object of service container '{}'", sc.getName(), e);
 			}
 			synchronized (this) {
 				if (running)
@@ -877,18 +877,15 @@ public class KNXnetIPServer
 				else
 					mcast = InetAddress.getByAddress(data);
 
-				if (!KNXnetIPRouting.isValidRoutingMulticast(mcast)) {
-					final String s = mcast + " is not a valid routing multicast address";
-					logger.error(s);
-					throw new KNXPropertyException(s, CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
-				}
+				if (!KNXnetIPRouting.isValidRoutingMulticast(mcast))
+					throw new KNXPropertyException(mcast + " is not a valid routing multicast address",
+							CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 			}
 		}
 		catch (final UnknownHostException e) {
 			// possible data corruption in IOS
-			final String s = "routing multicast property value is no IP address!";
-			logger.error(s, e);
-			throw new KNXPropertyException(s, CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
+			throw new KNXPropertyException("routing multicast property value is no IP address",
+					CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 		}
 		ios.setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, 1, 1, mcast.getAddress());
 
