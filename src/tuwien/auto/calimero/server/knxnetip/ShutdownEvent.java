@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,51 +41,44 @@ import java.net.InetSocketAddress;
 import tuwien.auto.calimero.CloseEvent;
 
 /**
- * Event informing about a planned or requested shutdown of a {@link KNXnetIPServer}
- * instance.
+ * Event informing about a planned or requested shutdown of a {@link KNXnetIPServer} instance.
  * <p>
- * An example for a shutdown request would be a reset request received with a cEMI device
- * management message by the server from a KNXnet/IP client.
- * 
+ * An example for a shutdown request would be a reset request received with a cEMI device management message by the
+ * server from a KNXnet/IP client.
+ *
  * @author B. Malinowsky
  */
 public class ShutdownEvent extends CloseEvent
 {
 	private static final long serialVersionUID = 1L;
 
-	private final InetSocketAddress ctrlEndpt;
+//	private final InetSocketAddress ctrlEndpt;
 
 	/**
 	 * Creates a new shutdown event.
-	 * <p>
-	 * 
+	 *
 	 * @param source the KNXnet/IP server instance
-	 * @param initiator initiator of the close event, one of {@link #USER_REQUEST},
-	 *        {@link #CLIENT_REQUEST} or {@link #INTERNAL}
+	 * @param initiator initiator of the close event, one of {@link #USER_REQUEST}, {@link #CLIENT_REQUEST} or
+	 *        {@link #INTERNAL}
 	 * @param reason brief textual description
 	 */
-	public ShutdownEvent(final KNXnetIPServer source, final int initiator,
-		final String reason)
+	public ShutdownEvent(final KNXnetIPServer source, final int initiator, final String reason)
 	{
 		super(source, initiator, reason);
-		ctrlEndpt = null;
+//		ctrlEndpt = null;
 	}
 
 	/**
-	 * Creates a new client-requested shutdown event initiated by a received reset
-	 * message, using server endpoint information.
-	 * <p>
-	 * 
+	 * Creates a new client-requested shutdown event initiated by a received reset message, using server endpoint
+	 * information.
+	 *
 	 * @param source the KNXnet/IP server instance
-	 * @param endpointName name of the server-side endpoint of the connection the client request
-	 *        was received
-	 * @param ctrlEndpoint control endpoint of the service container with the client
-	 *        connection
+	 * @param endpointName name of the server-side endpoint of the connection the client request was received
+	 * @param ctrlEndpoint control endpoint of the service container with the client connection
 	 */
-	public ShutdownEvent(final KNXnetIPServer source, final String endpointName,
-		final InetSocketAddress ctrlEndpoint)
+	public ShutdownEvent(final KNXnetIPServer source, final String endpointName, final InetSocketAddress ctrlEndpoint)
 	{
 		super(source, CLIENT_REQUEST, "server reset request by " + endpointName);
-		ctrlEndpt = ctrlEndpoint;
+//		ctrlEndpt = ctrlEndpoint;
 	}
 }

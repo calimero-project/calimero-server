@@ -173,10 +173,12 @@ final class ControlEndpointService extends ServiceLooper
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
 			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont);
 			final ManufacturerDIB mfr = createManufacturerDIB();
-			final byte[] buf = PacketHelper.toPacket(new DescriptionResponse(device, svcFamilies, mfr));
-			final DatagramPacket p = new DatagramPacket(buf, buf.length,
-					createResponseAddress(dr.getEndpoint(), src, port, 1));
-			s.send(p);
+			final DescriptionResponse description = new DescriptionResponse(device, svcFamilies, mfr);
+
+			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, port, 1);
+			final byte[] buf = PacketHelper.toPacket(description);
+			s.send(new DatagramPacket(buf, buf.length, responseAddress));
+			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
 			final ConnectRequest req = new ConnectRequest(data, offset);

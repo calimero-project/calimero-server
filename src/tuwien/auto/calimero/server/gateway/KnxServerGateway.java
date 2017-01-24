@@ -509,8 +509,8 @@ public class KnxServerGateway implements Runnable
 	// located in the Router Object Interface Object (Object Type 6)
 	private static final int ROUTER_OBJECT = 6;
 	// properties for individual address forwarding
-	private static final int MAIN_LCCONFIG = 52;
-	private static final int SUB_LCCONFIG = 53;
+//	private static final int MAIN_LCCONFIG = 52;
+//	private static final int SUB_LCCONFIG = 53;
 	// properties for group address forwarding
 	// MAIN_LCGRPCONFIG/SUB_LCGRPCONFIG bits:
 	// Bits 0-1: address handling for addresses <= 0x6fff
@@ -1203,11 +1203,6 @@ public class KnxServerGateway implements Runnable
 	// implements KNX group address filtering using IOS addresstable object
 	private boolean inGroupAddressTable(final GroupAddress addr, final int objectInstance)
 	{
-		// ??? I tested lookup performance of properties vs using a local address set:
-		// as expected, we get a considerable performance hit on large tables and
-		// high numbers of lookups, compared to using a Set.
-		// Might be worth using our own HashSet with GroupAddress entries if we
-		// tend to use larger group address filter tables with lot of lookups.
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 		try {
 			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT,

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,6 +52,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.KNXPropertyException;
@@ -176,7 +177,7 @@ final class DiscoveryService extends ServiceLooper
 		}
 		logger.trace("found network interfaces" + found);
 		if (!joinedAny)
-			throw thrown;
+			throw Objects.requireNonNull(thrown);
 	}
 
 	@Override

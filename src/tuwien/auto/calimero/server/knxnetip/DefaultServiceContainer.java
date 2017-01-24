@@ -120,6 +120,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	@Override
 	public HPAI getControlEndpoint()
 	{
+		// be careful using HPAI::getAddress, because the IP of the control endpoint can change over time
 		return ctrlEndpt;
 	}
 
