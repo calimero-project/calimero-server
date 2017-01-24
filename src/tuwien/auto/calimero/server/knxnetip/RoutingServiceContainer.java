@@ -37,7 +37,6 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
-import java.net.NetworkInterface;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -61,28 +60,22 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
 	 *
 	 * @param name see {@link DefaultServiceContainer}
+	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
+	 *        <code>"any"</code> to use system default
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param reuseCtrlEndpt see {@link DefaultServiceContainer}
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
-	 * @param routingMulticast the routing multicast address this service container should use for
-	 *        KNXnet/IP routing; if you are unsure about a supported multicast address, use
-	 *        {@link KNXnetIPRouting#DEFAULT_MULTICAST}
-	 * @param routingInterface the network interface this service container should use for KNXnet/IP
-	 *        routing, might be <code>null</code> to use the system default. Note that choosing a
-	 *        particular interface can be tied to the selected routing multicast address parameter
-	 *        <code>routingMulticast</code>.
+	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
+	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
 	 */
-	public RoutingServiceContainer(final String name, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt,
-		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
-		final NetworkInterface routingInterface)
+	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+		final InetAddress routingMulticast)
 	{
-		super(name, routingInterface != null ? routingInterface.getName() : "any", controlEndpoint, subnet,
-				reuseCtrlEndpt, allowNetworkMonitoring);
+		super(name, netif, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring);
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
-			throw new KNXIllegalArgumentException(routingMulticast
-					+ " is not a valid KNX routing multicast address");
+			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
 	}
 

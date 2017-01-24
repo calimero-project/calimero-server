@@ -320,7 +320,7 @@ public class Launcher implements Runnable
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
 						if (routing)
-							sc = new RoutingServiceContainer(addr, hpai, s, reuse, monitor, routingMcast, netif);
+							sc = new RoutingServiceContainer(addr, netifName, hpai, s, reuse, monitor, routingMcast);
 						else
 							sc = new DefaultServiceContainer(addr, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
