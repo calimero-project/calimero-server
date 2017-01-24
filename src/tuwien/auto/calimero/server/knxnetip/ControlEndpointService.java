@@ -337,8 +337,18 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
 		final List<InetAddress> list = netif != null ? Collections.list(netif.getInetAddresses())
-				: Collections.singletonList(InetAddress.getLocalHost());
+				: Collections.singletonList(localHost());
 		return list;
+	}
+
+	private InetAddress localHost() throws UnknownHostException
+	{
+		final long start = System.nanoTime();
+		final InetAddress addr = InetAddress.getLocalHost();
+		final long elapsed = System.nanoTime() - start;
+		if (elapsed > 3_000_000_000L)
+			logger.warn("slow local host resolution, took {} ms", elapsed / 1000 / 1000);
+		return addr;
 	}
 
 	private int objectInstance()
