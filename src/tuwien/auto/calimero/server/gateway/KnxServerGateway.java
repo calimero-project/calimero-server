@@ -198,8 +198,8 @@ public class KnxServerGateway implements Runnable
 		public void routingBusy(final RoutingBusyEvent e)
 		{
 			// in case we sent the routing busy notification, ignore it
-//			if (sentByUs(e.sender()))
-//				return;
+			if (sentByUs(e.sender()))
+				return;
 
 			// setup timing for routing busy flow control
 			final Instant now = Instant.now();
