@@ -134,7 +134,7 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		// check if we have open data connections before forwarding the call
 		if (channelsAssigned())
-			server.closeDataConnections(svcCont);
+			server.closeDataConnections(this);
 		super.quit();
 	}
 

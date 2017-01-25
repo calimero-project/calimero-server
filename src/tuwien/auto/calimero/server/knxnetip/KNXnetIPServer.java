@@ -41,7 +41,6 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
@@ -77,7 +76,6 @@ import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
-import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
@@ -1138,27 +1136,22 @@ public class KNXnetIPServer
 		return null;
 	}
 
-	void closeDataConnections(final ServiceContainer sc)
+	void closeDataConnections(final ControlEndpointService ces)
 	{
-		final HPAI ep = sc.getControlEndpoint();
-		if (ep.getPort() == 0) {
-			logger.warn("service container with ephemeral port, "
-					+ "ignore closing data connections of " + sc.getName());
+		final String name = ces.getServiceContainer().getName();
+		final SocketAddress ctrl = ces.getSocket().getLocalSocketAddress();
+		if (ctrl == null) {
+			logger.warn("{} has no local socket address, skip closing data connections", name);
 			return;
 		}
-		logger.info("closing all data connections of " + sc.getName());
-		final SocketAddress addr = new InetSocketAddress(ep.getAddress(), ep.getPort());
-
-		// Note the indirect access to this list:
-		// h.close() invokes the control endpoint callback, which removes the data
-		// connection from the list, hence we create our local copy to avoid
-		// concurrent modifications
-		final DataEndpointServiceHandler[] handlerList = dataConnections
-				.toArray(new DataEndpointServiceHandler[dataConnections.size()]);
+		logger.info("closing all data connections of " + name);
+		// Note the indirect access to this list: h.close() invokes the control endpoint callback, which removes
+		// the data connection from the list, hence we create our local copy to avoid concurrent modifications
+		final DataEndpointServiceHandler[] handlerList = dataConnections.toArray(new DataEndpointServiceHandler[0]);
 		for (int i = 0; i < handlerList.length; i++) {
 			final DataEndpointServiceHandler h = handlerList[i];
-			if (addr.equals(h.getCtrlSocketAddress()))
-				h.close(CloseEvent.SERVER_REQUEST, "quit service container", LogLevel.INFO, null);
+			if (ctrl.equals(h.getCtrlSocketAddress()))
+				h.close(CloseEvent.SERVER_REQUEST, "quit service container " + name, LogLevel.INFO, null);
 		}
 	}
 
