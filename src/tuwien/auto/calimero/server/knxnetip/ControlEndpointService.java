@@ -315,20 +315,19 @@ final class ControlEndpointService extends ServiceLooper
 	private DatagramSocket createSocket()
 	{
 		final HPAI ep = svcCont.getControlEndpoint();
+		InetAddress ip = null;
 		try {
 			final DatagramSocket s = new DatagramSocket(null);
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 			if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
-
-			final List<InetAddress> assigned = assignedIpAddresses();
-			final InetAddress ip = assigned.stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
+			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			logger.debug("{} control endpoint: created socket on {}", svcCont.getName(), s.getLocalSocketAddress());
 			return s;
 		}
 		catch (SocketException | UnknownHostException e) {
-			logger.error("socket creation failed for " + new InetSocketAddress(ep.getAddress(), ep.getPort()), e);
+			logger.error("socket creation failed for {}:{}", ip, ep.getPort(), e);
 			throw wrappedException(e);
 		}
 	}
