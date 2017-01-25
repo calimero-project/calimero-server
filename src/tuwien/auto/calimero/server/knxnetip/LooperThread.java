@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -98,8 +98,6 @@ class LooperThread extends Thread
 				}
 				else {
 					server.logger.error("error setting up " + super.getName());
-					if (sc != null)
-						server.closeDataConnections(sc);
 				}
 			}
 		}
