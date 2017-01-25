@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -173,7 +173,9 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 
 	static RuntimeException wrappedException(final Exception e)
 	{
-		return new RuntimeException(e);
+		final RuntimeException rte = new RuntimeException(e);
+		rte.setStackTrace(e.getStackTrace());
+		return rte;
 	}
 
 	private boolean sanitize(final KNXnetIPHeader h, final int length)
