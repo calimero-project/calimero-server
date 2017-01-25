@@ -68,25 +68,26 @@ class LooperThread extends Thread
 	public void run()
 	{
 		final int inc = maxRetries == -1 ? 0 : 1;
-		// when we enter the loop we do not count the very first attempt as a retry
-		int retries = -1;
+		int attempt = 0;
 		while (!quit) {
-			retries += inc;
-			if (retries > maxRetries) {
+			if (attempt > maxRetries) {
 				quit = true;
 				break;
 			}
+			attempt += inc;
 			try {
 				looper = supplier.get();
 				// reset for the next reconnection attempt
-				retries = 0;
+				attempt = 0;
 				server.logger.info(super.getName() + " is up and running");
 				looper.run();
+				quit = maxRetries == 0;
 				cleanup(LogLevel.INFO, null);
 			}
 			catch (final RuntimeException e) {
-				server.logger.error("initialization of {} failed", super.getName(), e);
-				if (retries == -1 || retries < maxRetries) {
+				final String s = attempt > 0 ? " (attempt " + attempt + "/" + (maxRetries + 1) + ")" : "";
+				server.logger.error("initialization of {} failed{}", super.getName(), s, e);
+				if (maxRetries == -1 || attempt <= maxRetries) {
 					final int wait = 10;
 					server.logger.info("retry to start " + super.getName() + " in " + wait + " seconds");
 					try {
