@@ -59,6 +59,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -832,27 +834,28 @@ public class KnxServerGateway implements Runnable
 
 			// we get L-data.ind if client uses routing protocol
 			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
-				try {
-					// send confirmation on .req type
-					if (mc == CEMILData.MC_LDATA_REQ) {
-						// TODO check for reasons to send negative L-Data.con
-						final boolean error = false;
-						//if (f.getDestination().equals(a))
-						//	error = true;
-						logger.trace("send positive cEMI L_Data.con");
-						final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
-						// TODO wait for ACK is correct, but should be done asynchronously
-						// otherwise, it might block the processing of a next queued frame
-						c.send(createCon(f.getPayload(), f, error), WaitForAck);
-					}
-					final CEMILData send = adjustHopCount(f);
-					if (send != null)
-						dispatchToSubnets(send);
+				// send confirmation on .req type
+				if (mc == CEMILData.MC_LDATA_REQ) {
+					CompletableFuture.runAsync(() -> {
+						try {
+							// TODO check for reasons to send negative L-Data.con
+							final boolean error = false;
+							logger.trace("send positive cEMI L_Data.con");
+							final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
+							c.send(createCon(f.getPayload(), f, error), WaitForAck);
+						}
+						catch (final Exception e) {
+							throw new CompletionException(e);
+						}
+					}).exceptionally(t -> {
+						logger.error("sending L_Data.con for {}",
+								DataUnitBuilder.decode(f.getPayload(), f.getDestination()), t.getCause());
+						return null;
+					});
 				}
-				catch (KNXException | InterruptedException e) {
-					logger.error("sending L_Data.con for {}",
-							DataUnitBuilder.decode(f.getPayload(), f.getDestination()), e);
-				}
+				final CEMILData send = adjustHopCount(f);
+				if (send != null)
+					dispatchToSubnets(send);
 			}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
 				final CEMILData send = adjustHopCount(f);
