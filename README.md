@@ -1,4 +1,4 @@
-Calimero KNXnet/IP Server
+Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
 =========================
 
 A KNXnet/IP server for Java SE Embedded 8 (or Java SE 8). The minimum required runtime environment is 
