@@ -474,8 +474,8 @@ final class ControlEndpointService extends ServiceLooper
 						((DataEndpointService) svcLoop)::resetRequest);
 				((DataEndpointService) svcLoop).svcHandler = sh;
 
-				looperThread = new LooperThread(server, svcCont,
-						svcCont.getName() + " data endpoint " + sh.getRemoteAddress(), 0, () -> svcLoop);
+				looperThread = new LooperThread(server, svcCont.getName() + " data endpoint " + sh.getRemoteAddress(),
+						0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this

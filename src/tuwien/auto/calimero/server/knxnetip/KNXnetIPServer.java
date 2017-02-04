@@ -1047,7 +1047,7 @@ public class KNXnetIPServer
 				return;
 		}
 		final Supplier<ServiceLooper> builder = () -> new DiscoveryService(this, outgoing, listen);
-		final LooperThread t = new LooperThread(this, null, serverName + " discovery endpoint", retryAttempts, builder);
+		final LooperThread t = new LooperThread(this, serverName + " discovery endpoint", retryAttempts, builder);
 		discovery = t;
 		discovery.start();
 	}
@@ -1063,7 +1063,7 @@ public class KNXnetIPServer
 	private void startControlEndpoint(final ServiceContainer sc)
 	{
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
-		final LooperThread t = new LooperThread(this, sc, serverName + " control endpoint " + sc.getName(), 9, builder);
+		final LooperThread t = new LooperThread(this, serverName + " control endpoint " + sc.getName(), 9, builder);
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingServiceContainer)
@@ -1090,7 +1090,7 @@ public class KNXnetIPServer
 	private void startRoutingService(final RoutingServiceContainer sc)
 	{
 		final InetAddress mcast = sc.routingMulticastAddress();
-		final LooperThread t = new LooperThread(this, sc, serverName + " routing service " + mcast.getHostAddress(), 9,
+		final LooperThread t = new LooperThread(this, serverName + " routing service " + mcast.getHostAddress(), 9,
 				() -> new RoutingService(this, sc, mcast, multicastLoopback));
 		routingEndpoints.add(t);
 		t.start();

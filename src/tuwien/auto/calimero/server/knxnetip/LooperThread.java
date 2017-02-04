@@ -46,19 +46,16 @@ class LooperThread extends Thread
 {
 	private final KNXnetIPServer server;
 	private final int maxRetries;
-	private volatile boolean quit;
-
-	private final ServiceContainer sc;
 	private final Supplier<ServiceLooper> supplier;
 	private volatile ServiceLooper looper;
+	private volatile boolean quit;
 
 	// maxRetries: -1: always retry, 0 none, 1: at most one retry, ...
-	LooperThread(final KNXnetIPServer server, final ServiceContainer svcContainer, final String serviceName,
+	LooperThread(final KNXnetIPServer server, final String serviceName,
 		final int retryAttempts, final Supplier<ServiceLooper> serviceSupplier)
 	{
 		super(serviceName);
 		this.server = server;
-		sc = svcContainer;
 		setDaemon(true);
 		maxRetries = retryAttempts >= -1 ? retryAttempts : 0;
 		supplier = serviceSupplier;
