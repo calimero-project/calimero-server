@@ -528,7 +528,7 @@ public class KnxServerGateway implements Runnable
 	// forwarding settings to sub line for addresses <= 0x6fff
 	private int subGroupAddressConfig = 3;
 
-	private final Thread dispatcher = new Thread("Gateway IP to subnet dispatcher") {
+	private final Thread dispatcher = new Thread() {
 		// threshold for multicasting routing busy msg is 10 incoming routing indications
 		private static final int routingBusyMsgThreshold = 10;
 		private int ipMsgCount;
@@ -620,6 +620,7 @@ public class KnxServerGateway implements Runnable
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
 		logger = LogService.getLogger("calimero.server.gateway." + name);
+		dispatcher.setName(name + " subnet dispatcher");
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
