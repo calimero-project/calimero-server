@@ -61,7 +61,7 @@ import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
-import tuwien.auto.calimero.device.ios.KNXPropertyException;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
@@ -361,7 +361,7 @@ final class ControlEndpointService extends ServiceLooper
 			return new IndividualAddress(server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT,
 					objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1));
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.error("no server device address set in KNXnet/IP parameter object!");
 			return null;
 		}
@@ -532,7 +532,7 @@ final class ControlEndpointService extends ServiceLooper
 						return addr;
 			}
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.warn(e.getMessage());
 		}
 		// there are no free addresses, or no additional address at all
@@ -658,7 +658,7 @@ final class ControlEndpointService extends ServiceLooper
 				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 				data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, elems);
 			}
-			catch (final KNXPropertyException e) {}
+			catch (final KnxPropertyException e) {}
 		}
 		return new ManufacturerDIB(mfrId, data);
 	}

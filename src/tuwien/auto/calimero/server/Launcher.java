@@ -66,7 +66,7 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
-import tuwien.auto.calimero.device.ios.KNXPropertyException;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -570,7 +570,7 @@ public class Launcher implements Runnable
 	private enum RoutingConfig { Reserved, All, None, Table };
 
 	private void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
-		final List<GroupAddress> filter) throws KNXPropertyException
+		final List<GroupAddress> filter) throws KnxPropertyException
 	{
 		// create byte array table
 		final int size = filter.size();
@@ -611,7 +611,7 @@ public class Launcher implements Runnable
 
 	// set KNXnet/IP server additional individual addresses assigned to individual connections
 	private void setAdditionalIndividualAddresses(final InterfaceObjectServer ios, final int objectInstance,
-		final List<IndividualAddress> addresses) throws KNXPropertyException
+		final List<IndividualAddress> addresses) throws KnxPropertyException
 	{
 		for (int i = 0; i < addresses.size(); i++) {
 			final IndividualAddress ia = addresses.get(i);

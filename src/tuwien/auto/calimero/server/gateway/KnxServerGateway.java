@@ -88,7 +88,7 @@ import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
-import tuwien.auto.calimero.device.ios.KNXPropertyException;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
@@ -634,33 +634,20 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		// group address routing settings
-		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT, objectInstance,
-					MAIN_LCGRPCONFIG, 1, 1);
-			mainGroupAddressConfig = data[0] & 0x03;
-			logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
-		}
-		catch (final KNXPropertyException e1) {
-			logger.warn("failed to set KNX property 'main LC group config'", e1);
-		}
-		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(ROUTER_OBJECT,
-					objectInstance, SUB_LCGRPCONFIG, 1, 1);
-			subGroupAddressConfig = data[0] & 0x03;
-			logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
-		}
-		catch (final KNXPropertyException e1) {
-			logger.warn("failed to set KNX property 'sub LC group config'", e1);
-		}
+		int value = getPropertyOrDefault(ROUTER_OBJECT, objectInstance, MAIN_LCGRPCONFIG, mainGroupAddressConfig);
+		mainGroupAddressConfig = value & 0x03;
+		logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
+
+		value = getPropertyOrDefault(ROUTER_OBJECT, objectInstance, SUB_LCGRPCONFIG, subGroupAddressConfig);
+		subGroupAddressConfig = value & 0x03;
+		logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
 
 		// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
 		try {
-			server.getInterfaceObjectServer().setProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.PRIORITY_FIFO_ENABLED, 1, 1, new byte[] { 0 });
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
 		}
 		// init capability list of different routing features
@@ -672,11 +659,10 @@ public class KnxServerGateway implements Runnable
 		// other bits reserved
 		final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
 		try {
-			server.getInterfaceObjectServer().setProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, new byte[] { caps });
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
 		}
 	}
@@ -1107,7 +1093,7 @@ public class KnxServerGateway implements Runnable
 			incMsgTransmitted(false);
 			setNetworkState(false, false);
 		}
-		catch (KNXException | InterruptedException e) {
+		catch (KNXException | KnxPropertyException | InterruptedException e) {
 			logger.error("send to server-side failed for " + f.toString(), e);
 			if (e instanceof KNXTimeoutException)
 				setNetworkState(false, true);
@@ -1199,7 +1185,7 @@ public class KnxServerGateway implements Runnable
 		try {
 			return (int) toUnsignedInt(ios.getProperty(objectType, objectInstance, propertyId, 1, 1));
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			return defaultValue;
 		}
 	}
@@ -1213,8 +1199,7 @@ public class KnxServerGateway implements Runnable
 					objectInstance, PropertyAccess.PID.TABLE, 0, 1);
 			final int elems = (data[0] & 0xff) << 8 | data[1] & 0xff;
 
-			// not sure if this is some common behavior:
-			// if property exists but with zero length, allow every address
+			// not sure if this is some common behavior: if property exists with zero length, allow every address
 			if (elems == 0)
 				return true;
 
@@ -1227,7 +1212,7 @@ public class KnxServerGateway implements Runnable
 					return true;
 			return false;
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			// when in doubt, pass the message on...
 			return true;
 		}
@@ -1255,9 +1240,9 @@ public class KnxServerGateway implements Runnable
 					ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(),
 							f.getStartIndex(), elems, f.getPayload());
 			}
-			catch (final KNXPropertyException e) {
+			catch (final KnxPropertyException e) {
 				logger.info(e.getMessage());
-				data = new byte[] { (byte) e.getStatusCode() };
+				data = new byte[] { (byte) e.errorCode() };
 				elems = 0;
 			}
 			final int con = read ? CEMIDevMgmt.MC_PROPREAD_CON : CEMIDevMgmt.MC_PROPWRITE_CON;
@@ -1287,18 +1272,15 @@ public class KnxServerGateway implements Runnable
 	private void incMsgTransmitted(final boolean toKnxNetwork)
 	{
 		final int pid = toKnxNetwork ? PID.MSG_TRANSMIT_TO_KNX : PID.MSG_TRANSMIT_TO_IP;
+		// must be 4 byte unsigned
+		// getPropertyOrDefault casts to int, but we just increment and store so it doesn't matter
+		long transmit = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 0);
+		++transmit;
 		try {
-			// must be 4 byte unsigned
-			final byte[] data = server.getInterfaceObjectServer().getProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1);
-			long transmit = toUnsignedInt(data);
-			++transmit;
-			server.getInterfaceObjectServer().setProperty(
-					InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
 					bytesFromInt(transmit));
-
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.error("on increasing message transmit counter", e);
 		}
 	}
@@ -1307,26 +1289,17 @@ public class KnxServerGateway implements Runnable
 	private void incMsgQueueOverflow(final boolean toKnxNetwork)
 	{
 		final int pid = toKnxNetwork ? PID.QUEUE_OVERFLOW_TO_KNX : PID.QUEUE_OVERFLOW_TO_IP;
-		try {
-			// property element might not exist yet (was never set before)
-			int overflow = 0;
-			try {
-				// 2 byte unsigned
-				final byte[] data = server.getInterfaceObjectServer().getProperty(
-						InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1);
-				overflow = (int) toUnsignedInt(data);
-				if (overflow == 0xffff) {
-					logger.warn("queue overflow counter reached maximum, not incremented");
-					return;
-				}
-			}
-			catch (final KNXPropertyException e) {}
-
-			++overflow;
-			server.getInterfaceObjectServer().setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					pid, 1, 1, bytesFromWord(overflow));
+		int overflow = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 0);
+		if (overflow == 0xffff) {
+			logger.warn("queue overflow counter reached maximum of 0xffff, not incremented");
+			return;
 		}
-		catch (final KNXPropertyException e) {
+		++overflow;
+		try {
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
+					bytesFromWord(overflow));
+		}
+		catch (final KnxPropertyException e) {
 			logger.error("on increasing queue overflow counter", e);
 		}
 	}
@@ -1356,21 +1329,19 @@ public class KnxServerGateway implements Runnable
 	// if we can not transmit for 5 seconds, we assume some network fault
 	private void setNetworkState(final boolean knxNetwork, final boolean faulty)
 	{
+		// 1 byte bit field
+		int state = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 0);
 		// set the corresponding bit in device state field
+		// bit 0: KNX fault, bit 1: IP fault, others reserved
+		if (knxNetwork)
+			state = (faulty ? state | 1 : state & 0xfe);
+		else
+			state = (faulty ? state | 2 : state & 0xfd);
 		try {
-			// 1 byte bit field
-			final byte[] data = server.getInterfaceObjectServer().getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT,
-					objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1);
-			// bit 0: KNX fault, bit 1: IP fault, others reserved
-			if (knxNetwork)
-				data[0] = (byte) (faulty ? data[0] | 1 : data[0] & 0xfe);
-			else
-				data[0] = (byte) (faulty ? data[0] | 2 : data[0] & 0xfd);
-
-			server.getInterfaceObjectServer().setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.KNXNETIP_DEVICE_STATE, 1, 1, data);
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					PID.KNXNETIP_DEVICE_STATE, 1, 1, new byte[] { (byte) state });
 		}
-		catch (final KNXPropertyException e) {
+		catch (final KnxPropertyException e) {
 			logger.error("on modifying network fault in device state", e);
 		}
 	}

@@ -52,7 +52,6 @@ import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
-import tuwien.auto.calimero.device.ios.KNXPropertyException;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -96,7 +95,7 @@ public class KnxServerGatewayTest extends TestCase
 		gw = new KnxServerGateway("gateway", server, subnetConnectors);
 	}
 
-	private KNXnetIPServer setupServer() throws KNXPropertyException
+	private KNXnetIPServer setupServer()
 	{
 		final KNXnetIPServer s = new KNXnetIPServer();
 		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
@@ -116,9 +115,8 @@ public class KnxServerGatewayTest extends TestCase
 
 	/**
 	 * Test method for {@link KnxServerGateway#KnxServerGateway(java.lang.String, KNXnetIPServer, SubnetConnector[])}.
-	 * @throws KNXPropertyException
 	 */
-	public final void testKnxServerGateway() throws KNXPropertyException
+	public final void testKnxServerGateway()
 	{
 		/*final KnxServerGateway gw2 =*/ new KnxServerGateway("testGW", setupServer(), new SubnetConnector[] {});
 	}
@@ -127,9 +125,8 @@ public class KnxServerGatewayTest extends TestCase
 	 * Test method for {@link tuwien.auto.calimero.server.gateway.KnxServerGateway#run()}.
 	 *
 	 * @throws InterruptedException on interrupted thread
-	 * @throws KNXPropertyException
 	 */
-	public final void testRun() throws InterruptedException, KNXPropertyException
+	public final void testRun() throws InterruptedException
 	{
 		try {
 			final KNXnetIPServer s = setupServer();
@@ -178,10 +175,8 @@ public class KnxServerGatewayTest extends TestCase
 
 	/**
 	 * Test gateway group address lookup performance.
-	 *
-	 * @throws KNXPropertyException
 	 */
-	public final void testAddressLookupPerformance() throws KNXPropertyException
+	public final void testAddressLookupPerformance()
 	{
 		// load address table for group address filtering
 		for (int i = 1; i < 100; i++)
@@ -223,23 +218,18 @@ public class KnxServerGatewayTest extends TestCase
 	// lookup performance using IOS get property
 	private boolean inGroupAddressTable(final GroupAddress addr)
 	{
-		try {
-			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE, 0, 1);
-			final int elems = ((data[0] & 0xff) << 8) | data[1] & 0xff;
-			if (elems == 0)
-				return true;
-			final byte[] addrTable = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE,
-					1, elems);
-			final byte hi = (byte) (addr.getRawAddress() >> 8);
-			final byte lo = (byte) addr.getRawAddress();
-			for (int i = 0; i < addrTable.length; i += 2)
-				if (hi == addrTable[i] && lo == addrTable[i + 1])
-					return true;
-			return false;
-		}
-		catch (final KNXPropertyException e) {
+		final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE, 0, 1);
+		final int elems = ((data[0] & 0xff) << 8) | data[1] & 0xff;
+		if (elems == 0)
 			return true;
-		}
+		final byte[] addrTable = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT, 1, PropertyAccess.PID.TABLE, 1,
+				elems);
+		final byte hi = (byte) (addr.getRawAddress() >> 8);
+		final byte lo = (byte) addr.getRawAddress();
+		for (int i = 0; i < addrTable.length; i += 2)
+			if (hi == addrTable[i] && lo == addrTable[i + 1])
+				return true;
+		return false;
 	}
 
 	// lookup performance using local address set

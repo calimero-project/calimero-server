@@ -55,7 +55,7 @@ import java.util.List;
 import java.util.Objects;
 
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.device.ios.KNXPropertyException;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
@@ -215,10 +215,10 @@ final class DiscoveryService extends ServiceLooper
 					try {
 						final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
 						final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
-						server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc),
-								PID.MAC_ADDRESS, 1, 1, mac == null ? new byte[6] : mac);
+						server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS,
+								mac == null ? new byte[6] : mac);
 					}
-					catch (final SocketException | KNXPropertyException e) {}
+					catch (SocketException | KnxPropertyException e) {}
 
 					final DeviceDIB device = server.createDeviceDIB(sc);
 					final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(sc);
