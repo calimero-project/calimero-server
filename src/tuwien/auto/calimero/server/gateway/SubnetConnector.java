@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -97,7 +97,7 @@ public class SubnetConnector
 	long eventCounter;
 
 	/**
-	 * Creates a new subnet connector using a KNXnet/IP routing (KNX IP) subnet link.
+	 * Creates a new subnet connector using a KNXnet/IP Routing or KNX IP subnet link.
 	 *
 	 * @param container service container
 	 * @param routingNetif the network interface used for routing messages
@@ -135,7 +135,7 @@ public class SubnetConnector
 	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
 	 *
 	 * @param container service container
-	 * @param interfaceType the interface type, use on of "ip", "usb", or "ft12".
+	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
 	 *        connection will use for group address filtering

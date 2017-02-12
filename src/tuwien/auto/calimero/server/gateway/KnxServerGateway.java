@@ -1275,10 +1275,9 @@ public class KnxServerGateway implements Runnable
 		// must be 4 byte unsigned
 		// getPropertyOrDefault casts to int, but we just increment and store so it doesn't matter
 		long transmit = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 0);
-		++transmit;
 		try {
 			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
-					bytesFromInt(transmit));
+					bytesFromInt(++transmit));
 		}
 		catch (final KnxPropertyException e) {
 			logger.error("on increasing message transmit counter", e);

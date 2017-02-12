@@ -81,7 +81,7 @@ final class RoutingService extends ServiceLooper
 		@Override
 		public String getName()
 		{
-			return "KNXnet/IP routing service on " + ctrlEndpt.getAddress().getHostAddress();
+			return "KNXnet/IP routing service " + ctrlEndpt.getAddress().getHostAddress();
 		}
 
 		DatagramSocket getLocalDataSocket()

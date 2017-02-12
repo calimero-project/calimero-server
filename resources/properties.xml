@@ -155,7 +155,7 @@
             <usage>cEMI</usage>
         </property>
         <property pid="72" pidName="PID_MGT_DESCRIPTOR_01" name="Management Descriptor 1" pdt="26" rw="R" writeEnabled="0">
-            <usage>Descriptor for exteded device descriptor for mask version 0100 (so far only allowed for this mask). This property shall not be used for other masks.</usage>
+            <usage>Descriptor for extended device descriptor for mask version 0100 (so far only allowed for this mask). This property shall not be used for other masks.</usage>
         </property>
         <property pid="73" pidName="PID_PL110_PARAM" name="PL110 Parameters" pdt="17" rw="R/W" writeEnabled="1">
             <usage>Frequency setting, Indication of whether a repeater is present, Indication of whether the device is a repeater or not</usage>
@@ -167,7 +167,7 @@
             <usage>Settings for a RF BiBat Slave in which synchronous blocks it shall receive.</usage>
         </property>
         <property pid="76" pidName="PID_RANDOM_PAUSE_TABLE" name="BiBat Random Pause Table" pdt="2" rw="R/W" writeEnabled="&lt;tbd&gt;">
-            <usage>Randome pause table in a RF BiBat domain.</usage>
+            <usage>Random pause table in a RF BiBat domain.</usage>
         </property>
         <property pid="77" pidName="PID_RECEIVE_BLOCK_NR" name="BiBat Receive Block Number" pdt="2" rw="R" writeEnabled="0">
             <usage>Number or receive blocks supported by the RF BiBat slave.</usage>
@@ -356,7 +356,7 @@
             <usage>Medium types supported by the cEMI server</usage>
         </property>
         <property pid="52" pidName="PID_COMM_MODE" name="Communication Mode" pdt="53" dpt="20.1000" rw="R/W" writeEnabled="1">
-            <usage>cEMI server communicatin mode</usage>
+            <usage>cEMI server communication mode</usage>
         </property>
         <property pid="53" pidName="PID_MEDIUM_AVAILABILITY" name="Medium Availability" pdt="52" dpt="22.1000" rw="R" writeEnabled="0">
             <usage>Available media in the cEMI server</usage>
