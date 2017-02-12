@@ -770,7 +770,7 @@ public class KnxServerGateway implements Runnable
 				try {
 					send(svcContainer, c, fe.getFrame());
 				}
-				catch (KNXException | InterruptedException e) {
+				catch (final InterruptedException e) {
 					logger.error("failed to replay frame event", e);
 				}
 			});
@@ -881,13 +881,8 @@ public class KnxServerGateway implements Runnable
 				if (!(c instanceof KNXnetIPRouting)) {
 					try {
 						send(connector.getServiceContainer(), c, frame);
-						setNetworkState(false, false);
-						incMsgTransmitted(false);
 					}
-					catch (KNXConnectionClosedException | InterruptedException e) {}
-					catch (final KNXTimeoutException e) {
-						setNetworkState(false, true);
-					}
+					catch (final InterruptedException e) {}
 				}
 			}
 		}
@@ -1090,13 +1085,9 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 			}
-			incMsgTransmitted(false);
-			setNetworkState(false, false);
 		}
-		catch (KNXException | KnxPropertyException | InterruptedException e) {
+		catch (KnxPropertyException | InterruptedException e) {
 			logger.error("send to server-side failed for " + f.toString(), e);
-			if (e instanceof KNXTimeoutException)
-				setNetworkState(false, true);
 		}
 	}
 
@@ -1134,13 +1125,22 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
-		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
+		throws InterruptedException
 	{
 		applyRoutingFlowControl(c);
-		c.send(f, WaitForAck);
-		final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
-		if (buffer != null)
-			buffer.completeEvent(c, recordFrameEvent);
+		try {
+			c.send(f, WaitForAck);
+			setNetworkState(false, false);
+			incMsgTransmitted(false);
+
+			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
+			if (buffer != null)
+				buffer.completeEvent(c, recordFrameEvent);
+		}
+		catch (final KNXTimeoutException | KNXConnectionClosedException e) {
+			logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+			setNetworkState(false, true);
+		}
 	}
 
 	private void send(final KNXNetworkLink lnk, final CEMILData f)
