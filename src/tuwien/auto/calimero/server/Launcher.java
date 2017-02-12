@@ -36,6 +36,9 @@
 
 package tuwien.auto.calimero.server;
 
+import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static tuwien.auto.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -67,13 +70,14 @@ import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
-import tuwien.auto.calimero.mgmt.PropertyAccess;
+import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.gateway.KnxServerGateway;
 import tuwien.auto.calimero.server.gateway.SubnetConnector;
@@ -613,10 +617,26 @@ public class Launcher implements Runnable
 	private void setAdditionalIndividualAddresses(final InterfaceObjectServer ios, final int objectInstance,
 		final List<IndividualAddress> addresses) throws KnxPropertyException
 	{
-		for (int i = 0; i < addresses.size(); i++) {
+		final int objectIndex = objectIndex(KNXNETIP_PARAMETER_OBJECT, objectInstance);
+		final int size = addresses.size();
+		final Description d = new Description(objectIndex, KNXNETIP_PARAMETER_OBJECT, ADDITIONAL_INDIVIDUAL_ADDRESSES,
+				0, PropertyTypes.PDT_UNSIGNED_INT, true, size, size, 3, 3);
+		ios.setDescription(d, true);
+
+		for (int i = 0; i < size; i++) {
 			final IndividualAddress ia = addresses.get(i);
-			ios.setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1, ia.toByteArray());
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1,
+					ia.toByteArray());
 		}
+	}
+
+	private int objectIndex(final int objectType, final int objectInstance)
+	{
+		int instance = 0;
+		for (final InterfaceObject io : server.getInterfaceObjectServer().getInterfaceObjects()) {
+			if (io.getType() == objectType && ++instance == objectInstance)
+				return io.getIndex();
+		}
+		return -1;
 	}
 }
