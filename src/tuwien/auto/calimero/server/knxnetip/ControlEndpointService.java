@@ -47,6 +47,7 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -80,6 +81,7 @@ import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.util.CRD;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
+import tuwien.auto.calimero.knxnetip.util.KnxAddressesDIB;
 import tuwien.auto.calimero.knxnetip.util.ManufacturerDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRD;
@@ -173,7 +175,10 @@ final class ControlEndpointService extends ServiceLooper
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
 			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont);
 			final ManufacturerDIB mfr = createManufacturerDIB();
-			final DescriptionResponse description = new DescriptionResponse(device, svcFamilies, mfr);
+			final List<IndividualAddress> addresses = knxAddresses();
+			final DescriptionResponse description = addresses.isEmpty()
+					? new DescriptionResponse(device, svcFamilies, mfr)
+					: new DescriptionResponse(device, svcFamilies, new KnxAddressesDIB(addresses), mfr);
 
 			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, port, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
@@ -310,6 +315,21 @@ final class ControlEndpointService extends ServiceLooper
 			return false;
 		}
 		return true;
+	}
+
+	private List<IndividualAddress> knxAddresses()
+	{
+		final List<IndividualAddress> addresses = new ArrayList<>();
+		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
+				PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
+		try {
+			final ByteBuffer buffer = ByteBuffer.wrap(server.getInterfaceObjectServer().getProperty(
+					KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems));
+			while (buffer.hasRemaining())
+				addresses.add(new IndividualAddress(buffer.getShort() & 0xffff));
+		}
+		catch (final KnxPropertyException e) {}
+		return addresses;
 	}
 
 	private DatagramSocket createSocket()
