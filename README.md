@@ -107,7 +107,7 @@ On the terminal, the running server instance can be stopped by typing "stop".
 Elements and attributes of `server-config.xml`:
 
 * `<knxServer name="knx-server" friendlyName="My KNXnet/IP Server">` (required): the server ID (for logging etc.) and the KNXnet/IP friendly name (for discovery & self-description)
-* `<discovery listenNetIf="all" outgoingNetIf="all" activate="true"/>` (optional attributes): the network interfaces to listen to KNXnet/IP discovery requests, as well as the network interfaces to answers to requests, e.g., `"all"`, `"any"`, or `"lo,eth0,eth1"`. The attribute `activate` allows to disable KNXnet/IP discovery & self-description. If disabled, any received discovery or descriptions request will be ignored.
+* `<discovery listenNetIf="all" outgoingNetIf="all" activate="true"/>` (optional attributes): the network interfaces to listen for KNXnet/IP discovery requests, as well as the network interfaces to answer requests, e.g., `"all"`, `"any"`, or `"lo,eth0,eth1"`. The attribute `activate` allows to disable KNXnet/IP discovery & self-description. If disabled, any received discovery or descriptions request will be ignored.
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
 	- `routing`: serve KNXnet/IP routing connections (set `true`) or disable KNXnet/IP routing (set `false`)

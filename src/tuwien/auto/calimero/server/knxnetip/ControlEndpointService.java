@@ -197,10 +197,9 @@ final class ControlEndpointService extends ServiceLooper
 				status = ErrorCodes.VERSION_NOT_SUPPORTED;
 
 			final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
-			final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
-
 			byte[] buf = null;
 			boolean established = false;
+
 			if (status == ErrorCodes.NO_ERROR) {
 				final int channelId = assignChannelId();
 				if (channelId == 0)
@@ -208,6 +207,7 @@ final class ControlEndpointService extends ServiceLooper
 				else {
 					logger.info("{}: setup data endpoint (channel {}) for connection request from {}",
 							svcCont.getName(), channelId, ctrlEndpt);
+					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
@@ -284,7 +284,8 @@ final class ControlEndpointService extends ServiceLooper
 			}
 
 			if (status != ErrorCodes.NO_ERROR)
-				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
+				logger.warn("received invalid connection state request for channel {}: {}", csr.getChannelID(),
+						ErrorCodes.getErrorMessage(status));
 
 			// At this point, if we know about an error with the data connection,
 			// set status to ErrorCodes.DATA_CONNECTION; if we know about problems
