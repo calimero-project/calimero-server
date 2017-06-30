@@ -202,14 +202,20 @@ final class DiscoveryService extends ServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
-			for (final Iterator<LooperThread> i = server.controlEndpoints.iterator(); i.hasNext();) {
-				final LooperThread t = i.next();
+			for (final LooperThread t : server.controlEndpoints) {
 				final ControlEndpointService ces = (ControlEndpointService) t.getLooper();
 				final ServiceContainer sc = ces.getServiceContainer();
 				if (sc.isActivated()) {
 					// we create our own HPAI from the actual socket, since
 					// the service container might have opted for ephemeral port use
+					// it can happen that our socket got closed and we get null
 					final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
+					if (local == null) {
+						logger.warn("KNXnet/IP discovery unable to announce container '{}', "
+								+ "problem with local endpoint: socket bound={}, closed={}",
+								sc.getName(), ces.getSocket().isBound(), ces.getSocket().isClosed());
+						continue;
+					}
 					final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
 
 					try {
