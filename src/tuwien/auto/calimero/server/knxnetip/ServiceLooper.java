@@ -149,13 +149,16 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		final String type = logEndpointType == 1 ? "control" : logEndpointType == 2 ? "data" : "";
 		// if we once decided on NAT aware communication, we will stick to it,
 		// regardless whether subsequent HPAIs contain useful information
-		if (useNat)
+		if (useNat) {
 			addr = new InetSocketAddress(senderHost, senderPort);
+			if (logEndpointType != 0)
+				logger.debug("NAT aware: using {} endpoint {} for responses", type, addr);
+		}
 		else if (resIP.isAnyLocalAddress() || resPort == 0) {
 			addr = new InetSocketAddress(senderHost, senderPort);
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.info("NAT aware: using " + addr + " for client response " + type + " endpoint");
+				logger.debug("NAT aware: using {} endpoint {} for client response", type, addr);
 		}
 		else {
 			addr = new InetSocketAddress(resIP, resPort);
