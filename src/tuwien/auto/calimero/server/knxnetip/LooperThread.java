@@ -78,7 +78,7 @@ class LooperThread extends Thread
 				attempt = 0;
 				server.logger.info(super.getName() + " is up and running");
 				looper.run();
-				quit = maxRetries == 0;
+				quit |= maxRetries == 0;
 				cleanup(LogLevel.INFO, null);
 			}
 			catch (final RuntimeException e) {
