@@ -127,9 +127,7 @@ import tuwien.auto.calimero.server.knxnetip.ShutdownEvent;
  * received client messages.<br>
  * The gateway implements group address filtering using the KNX property
  * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#TABLE} in the interface object
- * {@link InterfaceObject#ADDRESSTABLE_OBJECT} in the Interface Object Server. Currently, the group
- * address filter table applies only for KNX messages in the direction from a KNX subnet to a server
- * side client.
+ * {@link InterfaceObject#ADDRESSTABLE_OBJECT} in the Interface Object Server.
  * <p>
  * Starting a gateway by invoking {@link #run()} is a blocking operation. Therefore, this class
  * implements {@link Runnable} to allow execution in its own thread.
@@ -292,17 +290,16 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer serviceContainer = connector.getServiceContainer();
 			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
 
-			AutoCloseable subnetLink = connector.getSubnetLink();
-			if (subnetLink instanceof Link)
-				subnetLink = ((Link<?>) subnetLink).target();
+			final AutoCloseable subnetLink = connector.getSubnetLink();
+			final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
 			try {
-				if (subnetLink instanceof VirtualLink)
+				if (rawLink instanceof VirtualLink)
 					;
-				else if (!networkMonitor && !(subnetLink instanceof KNXNetworkLink)) {
+				else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
 					closeLink(subnetLink);
 					connector.openNetworkLink();
 				}
-				else if (networkMonitor && !(subnetLink instanceof KNXNetworkMonitor)) {
+				else if (networkMonitor && !(rawLink instanceof KNXNetworkMonitor)) {
 					closeLink(subnetLink);
 					connector.openMonitorLink();
 				}
@@ -725,7 +722,6 @@ public class KnxServerGateway implements Runnable
 
 	/**
 	 * Returns the name of this server gateway.
-	 * <p>
 	 *
 	 * @return the gateway name as string
 	 */
@@ -975,8 +971,7 @@ public class KnxServerGateway implements Runnable
 			final GroupAddress d = (GroupAddress) f.getDestination();
 			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
 					&& !inGroupAddressTable(d, subnet.getGroupAddressTableObjectInstance())) {
-				logger.warn("destination {} not in {} group address table - discard {}", d,
-						subnet.getName(), f);
+				logger.warn("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
 				return;
 			}
 		}
