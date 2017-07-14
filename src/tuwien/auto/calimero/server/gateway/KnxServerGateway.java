@@ -710,16 +710,17 @@ public class KnxServerGateway implements Runnable
 	}
 
 	/**
-	 * Quits gateway.
-	 * <p>
-	 * A running KNXnet/IP server is not stopped.
+	 * Quits the gateway, and stops a running KNXnet/IP server.
 	 */
 	public void quit()
 	{
+		if (!trucking)
+			return;
 		trucking = false;
 		synchronized (this) {
 			notifyAll();
 		}
+		server.shutdown();
 	}
 
 	/**

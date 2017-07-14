@@ -512,7 +512,6 @@ public class Launcher implements Runnable
 	public void quit()
 	{
 		gw.quit();
-		server.shutdown();
 	}
 
 	/**
