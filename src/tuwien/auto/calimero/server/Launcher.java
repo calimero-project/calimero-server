@@ -299,7 +299,7 @@ public class Launcher implements Runnable
 					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
 						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
 						final Optional<String> ports = Optional.ofNullable(r.getAttributeValue(null, attrUdpPort));
-						final String range[] = ports.orElse("0-65535").split("-");
+						final String[] range = ports.orElse("0-65535").split("-");
 						disruptionBufferLowerPort = Integer.parseInt(range[0]);
 						disruptionBufferUpperPort = Integer.parseInt(range.length > 1 ? range[1] : range[0]);
 					}
@@ -555,7 +555,7 @@ public class Launcher implements Runnable
 		}
 	}
 
-	private void waitForTermination()
+	private static void waitForTermination()
 	{
 		System.out.println("type 'stop' to stop the gateway and shutdown the server");
 		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in));
@@ -572,7 +572,7 @@ public class Launcher implements Runnable
 
 	private enum RoutingConfig { Reserved, All, None, Table };
 
-	private void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
+	private static void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
 		final List<GroupAddress> filter) throws KnxPropertyException
 	{
 		// create byte array table
@@ -602,7 +602,7 @@ public class Launcher implements Runnable
 				new byte[] { (byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()) });
 	}
 
-	private void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
+	private static void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
 		final int interfaceType, final int instance)
 	{
 		long l = Arrays.asList(ios.getInterfaceObjects()).stream()

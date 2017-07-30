@@ -993,7 +993,7 @@ public class KnxServerGateway implements Runnable
 		return true;
 	}
 
-	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
+	private static boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
 	{
 		if (subnetMask == null)
 			return true;
@@ -1341,7 +1341,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private CEMI convertToBusmon(final CEMILData ldata, final long eventId, final SubnetConnector connector)
+	private static CEMI convertToBusmon(final CEMILData ldata, final long eventId, final SubnetConnector connector)
 	{
 		// maintain busmon frame sequence using the event id
 		if (eventId != connector.lastEventId) {

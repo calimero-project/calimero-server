@@ -248,7 +248,7 @@ final class DiscoveryService extends ServiceLooper
 		return false;
 	}
 
-	private void sendOnInterfaces(final DatagramPacket p) throws SocketException, IOException
+	private void sendOnInterfaces(final DatagramPacket p) throws IOException
 	{
 		if (!p.getAddress().isMulticastAddress() || outgoing == null) {
 			s.send(p);
@@ -271,11 +271,11 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	// some OS use a dedicated display name, others use the same as returned by getName, etc.
-	private String nameOf(final NetworkInterface nif)
+	private static String nameOf(final NetworkInterface nif)
 	{
 		final String name = nif.getName();
 		final String friendly = nif.getDisplayName();
-		if (friendly != null & !name.equals(friendly))
+		if (friendly != null && !name.equals(friendly))
 			return name + " (" + friendly + ")";
 		return name;
 	}

@@ -45,6 +45,7 @@ import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -298,15 +299,15 @@ public class KNXnetIPServer
 	 * @param localName name of this server as shown to the owner/user of this server
 	 * @param friendlyName a friendly, descriptive name for this server, consisting of ISO-8859-1
 	 *        characters only, with string length &lt; 30 characters, <code>friendlyName</code> might
-	 *        be null or of length 0 to use defaults
+	 *        be of length 0 to use defaults
 	 */
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
 		serverName = localName;
-		final byte[] nameData = friendlyName == null || friendlyName.length() == 0
-				? defFriendlyName : friendlyName.getBytes();
+		if (!Charset.forName("ISO-8859-1").newEncoder().canEncode(friendlyName))
+			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		try {
-			this.friendlyName = new String(nameData, "ISO-8859-1");
+			this.friendlyName = friendlyName.length() == 0 ? new String(defFriendlyName, "ISO-8859-1") : friendlyName;
 		}
 		catch (final UnsupportedEncodingException e) {
 			// ISO 8859-1 support is mandatory on every Java platform
@@ -795,7 +796,10 @@ public class KNXnetIPServer
 		//
 		// friendly name property entry is an array of 30 characters
 		final byte[] data = new byte[30];
-		System.arraycopy(friendlyName.getBytes(), 0, data, 0, friendlyName.length());
+		try {
+			System.arraycopy(friendlyName.getBytes("ISO-8859-1"), 0, data, 0, friendlyName.length());
+		}
+		catch (final UnsupportedEncodingException ignore) {}
 		ios.setProperty(knxObject, objectInstance, PID.FRIENDLY_NAME, 1, data.length, data);
 		setProperty(knxObject, objectInstance, PID.PROJECT_INSTALLATION_ID, bytesFromWord(defProjectInstallationId));
 		// server KNX device address, since we don't know about routing at this time

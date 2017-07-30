@@ -334,7 +334,7 @@ public class SubnetConnector
 		return gatoi;
 	}
 
-	private <T> T newLinkUsing(final String className, final String[] initArgs)
+	private static <T> T newLinkUsing(final String className, final String[] initArgs)
 	{
 		try {
 			@SuppressWarnings("unchecked")
