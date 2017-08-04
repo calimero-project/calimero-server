@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2017 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -127,9 +127,9 @@ public class VirtualLink extends AbstractLink
 				final FrameEvent e = new FrameEvent(this, f);
 				confirmation.fire(l -> l.confirmation(e));
 			}
-			// forward .ind as is, but convert req. to .ind
-			final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg
-					: (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg);
+			// forward .ind as is, but convert req. to .ind and also remove repeat flag
+			final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg : CEMIFactory.create(null, null,
+					(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg), false, false);
 			final FrameEvent e = new FrameEvent(this, f);
 			// if we are a device link sending to the uplink, send the .ind to all other device links of that uplink
 			if (isDeviceLink)
