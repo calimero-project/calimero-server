@@ -53,6 +53,8 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -186,6 +188,7 @@ final class ControlEndpointService extends ServiceLooper
 			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
+			useNat = false;
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			int status = ErrorCodes.NO_ERROR;
 
@@ -514,6 +517,8 @@ final class ControlEndpointService extends ServiceLooper
 		server.dataConnections.add(sh);
 		if (looperThread != null)
 			looperThread.start();
+		if (!svcCont.reuseControlEndpoint())
+			looperThreads.add(looperThread);
 
 		// we always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
@@ -623,6 +628,18 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		final List<ServerListener> l = server.listeners().listeners();
 		l.stream().forEach(e -> e.connectionEstablished(sc, conn));
+	}
+
+	// workaround to find the correct looper/connection when ETS sends to the wrong UDP port
+	// TODO make thread-safe
+	private static final Set<LooperThread> looperThreads = Collections.newSetFromMap(new WeakHashMap<>());
+
+	static LooperThread findConnectionLooper(final int channelId) {
+		for (final LooperThread t : looperThreads) {
+			if (((DataEndpointService) t.getLooper()).svcHandler.getChannelId() == channelId)
+				return t;
+		}
+		return null;
 	}
 
 	private DataEndpointServiceHandler findConnection(final int channelId)

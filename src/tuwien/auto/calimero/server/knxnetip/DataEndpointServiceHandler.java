@@ -174,13 +174,30 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		setState(OK);
 	}
 
+	void setSocket(final DatagramSocket socket) {
+		this.socket = socket;
+	}
+
 	boolean handleDataServiceType(final KNXnetIPHeader h, final byte[] data, final int offset)
 		throws KNXFormatException, IOException
 	{
 		final int svc = h.getServiceType();
 		final String type = tunnel ? "tunneling" : "device configuration";
-		if (svc == serviceRequest) {
+		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
+		if (svc == serviceRequest || configReq) {
 			final ServiceRequest req = getServiceRequest(h, data, offset);
+			if (tunnel && configReq) {
+				final int wrongChannel = req.getChannelID();
+				final int localPort = socket.getLocalPort();
+				logger.error("ETS 5 sends configuration requests for channel {} to wrong UDP port {} (channel {}), "
+						+ "try to find correct connection", wrongChannel, localPort, channelId);
+				final LooperThread looper = ControlEndpointService.findConnectionLooper(wrongChannel);
+				if (looper == null)
+					return false;
+				final DataEndpointService dataEndpointService = (DataEndpointService) looper.getLooper();
+				dataEndpointService.rebindSocket(localPort);
+				return dataEndpointService.svcHandler.handleDataServiceType(h, data, offset);
+			}
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 			final int seq = req.getSequenceNumber();

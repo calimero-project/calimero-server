@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 
 import tuwien.auto.calimero.CloseEvent;
@@ -97,6 +98,16 @@ final class DataEndpointService extends ServiceLooper
 		}
 	}
 
+	void rebindSocket(final int port) {
+		final DatagramSocket old = this.s;
+		final SocketAddress oldAddress = old.getLocalSocketAddress();
+		s = rebindSocketUsingPort(port);
+		svcHandler.setSocket(s);
+		reboundSocket = true;
+		old.close();
+		logger.info("{}: rebound socket {} to use UDP port {}", svcHandler.getName(), oldAddress, port);
+	}
+
 	private void setTimeout()
 	{
 		// don't allow timeout 0, otherwise socket will have infinite timeout
@@ -111,7 +122,24 @@ final class DataEndpointService extends ServiceLooper
 	private static DatagramSocket newSocketUsingIp(final DatagramSocket localCtrlEndpt)
 	{
 		try {
-			return new DatagramSocket(0, localCtrlEndpt.getLocalAddress());
+			final DatagramSocket s = new DatagramSocket(null);
+			s.setReuseAddress(true);
+			s.bind(new InetSocketAddress(localCtrlEndpt.getLocalAddress(), 0));
+			return s;
+		}
+		catch (final SocketException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	// does not close the current socket
+	private DatagramSocket rebindSocketUsingPort(final int port)
+	{
+		try {
+			final DatagramSocket rebind = new DatagramSocket(null);
+			rebind.setReuseAddress(true);
+			rebind.bind(new InetSocketAddress(s.getLocalAddress(), port));
+			return rebind;
 		}
 		catch (final SocketException e) {
 			throw new RuntimeException(e);
