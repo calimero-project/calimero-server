@@ -462,6 +462,7 @@ final class ControlEndpointService extends ServiceLooper
 			crd = new TunnelCRD(device);
 		}
 		else if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION) {
+			logger.info("setup device management connection with channel ID {}", channelId);
 			// At first, check if we are allowed to open mgmt connection at all; if
 			// server assigned its own device address, we have to reject the request
 			synchronized (usedKnxAddresses) {

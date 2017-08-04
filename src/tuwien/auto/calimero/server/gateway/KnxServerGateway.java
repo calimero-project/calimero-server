@@ -1018,7 +1018,7 @@ public class KnxServerGateway implements Runnable
 					if (!isNetworkLink(b))
 						break;
 					final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
-					logger.trace("dispatch to KNX subnet {} ({} in service container {})",
+					logger.trace("dispatch to KNX subnet {} ({} in service container '{}')",
 							subnet, link.getName(), b.getName());
 					// assuming a proper address assignment of area/line coupler
 					// addresses, this has to be the correct knx subnet link
