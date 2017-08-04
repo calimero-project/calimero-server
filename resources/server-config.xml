@@ -10,17 +10,21 @@
 	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
 		udpPort="3671" listenNetIf="eth0" reuseCtrlEP="true">
 		<knxAddress type="individual">7.1.1</knxAddress>
-		<disruptionBuffer expirationTimeout="30" udpPort="5555-5559" />
-		<!-- Specify the KNX subnet type, connecting the KNX network. Subnet connection type: one of 
-			{ "ip", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" } -->
-		<!-- KNX communication medium: one of { "tp1" (default), "pl110", "knxip", "rf" }  -->
+		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link 
+			using the specific client UDP port range (if caused by a disrupted connection). -->
+		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
+		
+		<!-- Specify one KNX subnet type, connecting the KNX network. The subnet connection type is one of 
+			{ "ip", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" }. 
+			The KNX communication medium is one of { "tp1" (default), "pl110", "knxip", "rf" }. 
+			In the follwing are some examples: -->
 		
 		<!-- <knxSubnet type="virtual">virtual-subnet</knxSubnet> -->
 		<!-- <knxSubnet type="ip">192.168.10.12:3676</knxSubnet> -->
 		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
 		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->
-		<!-- if USB interface identifier (here "siemens") is left empty, the first found KNX USB interface is used -->
-		<knxSubnet type="usb" medium="pl110" domainAddress="6f">siemens</knxSubnet>
+		<!-- if USB device identifier (here "siemens") is left empty, the first found KNX USB device is used -->
+		<knxSubnet type="usb" medium="tp1">siemens</knxSubnet>
 		<!-- <knxSubnet type="tpuart" medium="tp1">/dev/ttyACM0</knxSubnet> -->
 		<!-- <knxSubnet type="user-supplied" class="my.knx.NetworkLink">o1,i2|i4</knxSubnet> -->
 
@@ -34,7 +38,7 @@
 			<knxAddress type="group">2/1/0</knxAddress>
 			<knxAddress type="group">2/1/20</knxAddress>
 		</groupAddressFilter>
-		<!-- Additional KNX individual addresses assigned to KNXnet/IP connections (optional) -->
+		<!-- Additional KNX individual addresses assigned to client KNXnet/IP connections (optional) -->
 		<additionalAddresses>
 			<knxAddress type="individual">7.1.10</knxAddress>
 			<knxAddress type="individual">7.1.11</knxAddress>
