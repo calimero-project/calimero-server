@@ -736,7 +736,7 @@ public class KNXnetIPServer
 		// initialize interface device object properties
 
 		// max APDU length is in range [15 .. 254]
-		setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, new byte[] { 0, (byte) 254 });
+		setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, new byte[] { 0, (byte) 15 });
 		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = split(Settings.getLibraryVersion(), ". -");
