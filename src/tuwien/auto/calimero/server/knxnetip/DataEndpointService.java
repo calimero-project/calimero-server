@@ -98,14 +98,18 @@ final class DataEndpointService extends ServiceLooper
 		}
 	}
 
-	void rebindSocket(final int port) {
-		final DatagramSocket old = this.s;
+	void rebindSocket(final int port)
+	{
+		if (s.getLocalPort() == port || s.getLocalPort() == -1)
+			return;
+		final DatagramSocket old = s;
 		final SocketAddress oldAddress = old.getLocalSocketAddress();
 		s = rebindSocketUsingPort(port);
 		svcHandler.setSocket(s);
 		reboundSocket = true;
 		old.close();
-		logger.info("{}: rebound socket {} to use UDP port {}", svcHandler.getName(), oldAddress, port);
+		logger.warn("{} (channel {}): rebound socket {} to use UDP port {}", svcHandler.getName(),
+				svcHandler.getChannelId(), oldAddress, port);
 	}
 
 	private void setTimeout()

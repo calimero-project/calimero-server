@@ -183,21 +183,28 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	{
 		final int svc = h.getServiceType();
 		final String type = tunnel ? "tunneling" : "device configuration";
+
 		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
-		if (svc == serviceRequest || configReq) {
+		final boolean configAck = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_ACK;
+		if (tunnel && (configReq || configAck)) {
+			final int recvChannelId = configReq ? getServiceRequest(h, data, offset).getChannelID()
+					: new ServiceAck(svc, data, offset).getChannelID();
+			if (recvChannelId == channelId)
+				return false;
+			final int localPort = socket.getLocalPort();
+			logger.error("ETS 5 sends configuration requests for channel {} to wrong UDP port {} (channel {}), "
+					+ "try to find correct connection", recvChannelId, localPort, channelId);
+			final LooperThread looper = ControlEndpointService.findConnectionLooper(recvChannelId);
+			if (looper == null)
+				return false;
+			final DataEndpointService dataEndpointService = (DataEndpointService) looper.getLooper();
+			dataEndpointService.rebindSocket(localPort);
+			dataEndpointService.svcHandler.handleDataServiceType(h, data, offset);
+			return true;
+		}
+
+		if (svc == serviceRequest) {
 			final ServiceRequest req = getServiceRequest(h, data, offset);
-			if (tunnel && configReq) {
-				final int wrongChannel = req.getChannelID();
-				final int localPort = socket.getLocalPort();
-				logger.error("ETS 5 sends configuration requests for channel {} to wrong UDP port {} (channel {}), "
-						+ "try to find correct connection", wrongChannel, localPort, channelId);
-				final LooperThread looper = ControlEndpointService.findConnectionLooper(wrongChannel);
-				if (looper == null)
-					return false;
-				final DataEndpointService dataEndpointService = (DataEndpointService) looper.getLooper();
-				dataEndpointService.rebindSocket(localPort);
-				return dataEndpointService.svcHandler.handleDataServiceType(h, data, offset);
-			}
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 			final int seq = req.getSequenceNumber();
