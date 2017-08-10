@@ -72,8 +72,8 @@ junitPlatform {
 dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
-    implementation 'org.slf4j:slf4j-api:1.7.22'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.7.22'
+    implementation 'org.slf4j:slf4j-api:1.8.0-alpha2'
+    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-alpha2'
 
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
     testImplementation "org.junit.platform:junit-platform-runner:${junitPlatformVersion}"
