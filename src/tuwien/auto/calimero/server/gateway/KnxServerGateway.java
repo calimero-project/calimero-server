@@ -1154,11 +1154,14 @@ public class KnxServerGateway implements Runnable
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
 
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
+			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
-				ldata = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f);
+				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f),
+						false, true);
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
-				ldata = (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f);
+				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f),
+						false, false);
 			else
 				ldata = f;
 
