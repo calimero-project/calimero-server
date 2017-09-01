@@ -69,6 +69,7 @@ import tuwien.auto.calimero.link.KNXNetworkMonitorUsb;
 import tuwien.auto.calimero.link.LinkListener;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
@@ -231,8 +232,10 @@ public class SubnetConnector
 				throw new KNXException("open network link (KNXnet/IP routing): invalid multicast group " + linkArgs, e);
 			}
 		}
-		else if ("usb".equals(subnetType))
-			ts = () -> new KNXNetworkLinkUsb(linkArgs, settings);
+		else if ("usb".equals(subnetType)) {
+			final KNXMediumSettings adjustForTP1 = settings instanceof TPSettings ? TPSettings.TP1 : settings;
+			ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
+		}
 		else if ("ft12".equals(subnetType))
 			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
 		else if ("tpuart".equals(subnetType)) {

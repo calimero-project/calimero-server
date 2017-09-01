@@ -102,6 +102,7 @@ import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.KNXNetworkLinkTpuart;
+import tuwien.auto.calimero.link.KNXNetworkLinkUsb;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -1152,16 +1153,19 @@ public class KnxServerGateway implements Runnable
 			if (subnetLink instanceof Link)
 				subnetLink = ((Link<?>) subnetLink).target();
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
-
+			final boolean usb  = subnetLink instanceof KNXNetworkLinkUsb;
+			final IndividualAddress source = usb ? new IndividualAddress(0) : null;
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
-				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f),
-						false, true);
+				ldata = CEMIFactory.create(source, null,
+						(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f), false, true);
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
 				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f),
 						false, false);
+			else if (usb)
+				ldata = CEMIFactory.create(source, null, f, false);
 			else
 				ldata = f;
 
