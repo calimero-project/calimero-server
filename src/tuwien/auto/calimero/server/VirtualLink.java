@@ -106,6 +106,7 @@ public class VirtualLink extends AbstractLink
 	@Override
 	protected void onSend(final CEMILData msg, final boolean waitForCon)
 	{
+		logger.debug("send {}{}", (waitForCon ? "(wait for confirmation) " : ""), msg);
 		for (final VirtualLink l : deviceLinks)
 			send(msg, notifier.getListeners(), l);
 	}
