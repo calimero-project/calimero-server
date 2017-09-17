@@ -323,10 +323,11 @@ public class Launcher implements Runnable
 									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
+						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
 						if (routing)
-							sc = new RoutingServiceContainer(addr, netifName, hpai, s, reuse, monitor, routingMcast);
+							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast);
 						else
-							sc = new DefaultServiceContainer(addr, netifName, hpai, s, reuse, monitor);
+							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
