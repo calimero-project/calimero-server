@@ -1056,14 +1056,26 @@ public class KnxServerGateway implements Runnable
 		final ServiceContainer sc = subnetConnector.getServiceContainer();
 		try {
 			if (f.getDestination() instanceof IndividualAddress) {
+				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
+
 				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					send(sc, c, f);
 				}
+				else if (subnetConnector.getInterfaceType().equals("usb")
+						&& f.getDestination().equals(localInterface)) {
+					// workaround for usb interfaces: allow assigning additional addresses to client connections,
+					// even though we always have the same destination (i.e., the address of the usb interface)
+					for (final Map.Entry<IndividualAddress, KNXnetIPConnection> i : serverDataConnections.entrySet()) {
+						final IndividualAddress assignedAddress = i.getKey();
+						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, c);
+						send(sc, i.getValue(), CEMIFactory.create(null, assignedAddress, f, false));
+					}
+				}
 				else {
-					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} "
-							+ "to all server-side connections", f.getDestination(), f.getSource(), f.getDestination());
+					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} to all server-side"
+							+ " connections", f.getDestination(), f.getSource(), f.getDestination());
 					// create temporary array to not block concurrent access during iteration
 					for (final KNXnetIPConnection conn : serverConnections.toArray(new KNXnetIPConnection[0]))
 						send(sc, conn, f);
