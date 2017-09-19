@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.gateway;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
 
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -78,7 +79,9 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
+import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -108,8 +111,10 @@ import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
+import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
@@ -334,6 +339,14 @@ public class KnxServerGateway implements Runnable
 
 			final InetSocketAddress remote = connection.getRemoteAddress();
 			logger.info("established connection to remote " + remote);
+
+			try {
+				verifySubnetInterfaceAddress(svcContainer);
+			}
+			catch (KNXException | InterruptedException | RuntimeException e) {
+				logger.error("verifying subnet interface address", e);
+			}
+
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 			if (buffer == null)
 				return;
@@ -838,6 +851,13 @@ public class KnxServerGateway implements Runnable
 						return null;
 					});
 				}
+				//
+				if (f.getDestination() instanceof IndividualAddress) {
+					final KNXnetIPConnection conn = (KNXnetIPConnection) fe.getSource();
+					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
+					if (connector.isPresent() && localDeviceManagement(connector.get(), f))
+						return;
+				}
 				final CEMILData send = adjustHopCount(f);
 				if (send != null)
 					dispatchToSubnets(send);
@@ -1269,8 +1289,132 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
+	private Optional<SubnetConnector> connectorFor(final IndividualAddress dst) {
+		for (final SubnetConnector connector : connectors) {
+			final ServiceContainer c = connector.getServiceContainer();
+			if (matchesSubnet(dst, c.getMediumSettings().getDeviceAddress()))
+				return Optional.of(connector);
+		}
+		return Optional.empty();
+	}
+
+	// TODO support > 1 service containers with usb
+	private LocalDeviceManagementUsb ldmAdapter;
+
+	private LocalDeviceManagementUsb localDevMgmtAdapter(final SubnetConnector connector)
+		throws KNXException, InterruptedException
+	{
+		LocalDeviceManagementUsb adapter = ldmAdapter;
+		if (adapter != null && adapter.isOpen())
+			return adapter;
+		@SuppressWarnings("unchecked")
+		final KNXNetworkLink link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.getSubnetLink()).target();
+		if (link == null)
+			throw new KNXException("no open subnet link for " + connector.getName());
+		try {
+			final Field conn = link.getClass().getDeclaredField("conn");
+			conn.setAccessible(true);
+			final UsbConnection c = (UsbConnection) conn.get(link);
+			adapter = new LocalDeviceManagementUsb(c, __ -> ldmAdapter = null, false);
+			ldmAdapter = adapter;
+		}
+		catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+			e.printStackTrace();
+		}
+		return adapter;
+	}
+
+	private static final int PropertyDescRead = 0x03D8;
+	private static final int PropertyDescResponse = 0x03D9;
+	private static final int PropertyRead = 0x03D5;
+	private static final int PropertyResponse = 0x03D6;
+	private static final int PropertyWrite = 0x03D7;
+
+	// KNX USB cEMI only
+	private boolean localDeviceManagement(final SubnetConnector connector, final CEMILData ldata)
+	{
+		final IndividualAddress localInterface = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
+		if (connector.getInterfaceType().equals("usb") && ldata.getDestination().equals(localInterface)) {
+			final byte[] data = ldata.getPayload();
+			if (data.length < 2)
+				return false;
+			final int svc = DataUnitBuilder.getAPDUService(data);
+			if (svc == PropertyDescRead || svc == PropertyRead) {
+				final byte[] asdu = DataUnitBuilder.extractASDU(data);
+				final int objIndex = asdu[0] & 0xff;
+				final int pid = asdu[1] & 0xff;
+				final int elements = (asdu[2] & 0xff) >> 4;
+				int start = 0;
+				if (svc == 0x3d5)
+					start = (asdu[2] & 0xf) << 8 | asdu[3] & 0xff;
+
+				try {
+					final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
+					byte[] response;
+					if (svc == PropertyDescRead) {
+						final int propIndex = asdu[2] & 0xff;
+						try {
+							response = ldm.getDescription(objIndex, pid, propIndex);
+							response[response.length - 2] = 1;
+						}
+						catch (final KNXRemoteException pidNotFound) {
+							response = new byte[] { (byte) objIndex, (byte) pid, (byte) propIndex, (byte) 0, 0, 0, 0 };
+						}
+						logger.debug("Local-DM {} read property description {}|{}: {}", localInterface,
+								objIndex, pid, DataUnitBuilder.toHex(response, " "));
+					}
+					else {
+						final byte[] propData = ldm.getProperty(objIndex, pid, start, elements);
+						response = new byte[4 + propData.length];
+						logger.debug("Local-DM {} read property values {}|{} (start {}, {} elements): {}", localInterface,
+								objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
+						int i = 0;
+						response[i++] = (byte) objIndex;
+						response[i++] = (byte) pid;
+						response[i++] = (byte) ((elements << 4) | (start >> 8));
+						response[i++] = (byte) start;
+						for (final byte b : propData)
+							response[i++] = b;
+					}
+					final int svcResponse = svc == PropertyDescRead ? PropertyDescResponse : PropertyResponse;
+					final byte[] tpdu = DataUnitBuilder.createAPDU(svcResponse, response);
+					final CEMILData f = new CEMILDataEx(CEMILData.MC_LDATA_IND,
+							(IndividualAddress) ldata.getDestination(), ldata.getSource(), tpdu, Priority.LOW);
+					dispatchToServer(connector, f, 0);
+					return true;
+				}
+				catch (KNXException | InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return false;
+	}
+
 	// defaults to 1 for now
 	private final int objectInstance = 1;
+	private static final int deviceObject = 0;
+
+	// KNX USB cEMI only
+	private void verifySubnetInterfaceAddress(final ServiceContainer svcCont) throws KNXException, InterruptedException
+	{
+		final SubnetConnector connector = getSubnetConnector(svcCont.getName());
+		// TODO check for cEMI server
+		if (!connector.getInterfaceType().equals("usb"))
+			return;
+		final IndividualAddress configured = svcCont.getMediumSettings().getDeviceAddress();
+		final LocalDeviceManagementUsb adapter = localDevMgmtAdapter(connector);
+		final byte[] subnet = adapter.getProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1);
+		final byte[] device = adapter.getProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1);
+		final IndividualAddress current = new IndividualAddress(new byte[] { subnet[0], device[0] });
+		if (!current.equals(configured)) {
+			logger.warn("KNX address mismatch with USB interface: currently {}, configured {} -> assigning {}", current,
+					configured, configured);
+			final byte[] addr = configured.toByteArray();
+			adapter.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { addr[0] });
+			adapter.setProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { addr[1] });
+		}
+	}
 
 	private void incMsgTransmitted(final boolean toKnxNetwork)
 	{
