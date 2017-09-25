@@ -853,7 +853,6 @@ public class KnxServerGateway implements Runnable
 				}
 				//
 				if (f.getDestination() instanceof IndividualAddress) {
-					final KNXnetIPConnection conn = (KNXnetIPConnection) fe.getSource();
 					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
 					if (connector.isPresent() && localDeviceManagement(connector.get(), f))
 						return;
@@ -1058,20 +1057,31 @@ public class KnxServerGateway implements Runnable
 			if (f.getDestination() instanceof IndividualAddress) {
 				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
 
-				final KNXnetIPConnection c = findServerConnection((IndividualAddress) f.getDestination());
+				// 1. look for client tunneling connection with matching assigned address
+				KNXnetIPConnection c = serverDataConnections.get(f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					send(sc, c, f);
 				}
+				// 2. workaround for usb interfaces: allow assigning additional addresses to client connections,
+				// even though we always have the same destination (i.e., the address of the usb interface)
 				else if (subnetConnector.getInterfaceType().equals("usb")
 						&& f.getDestination().equals(localInterface)) {
-					// workaround for usb interfaces: allow assigning additional addresses to client connections,
-					// even though we always have the same destination (i.e., the address of the usb interface)
 					for (final Map.Entry<IndividualAddress, KNXnetIPConnection> i : serverDataConnections.entrySet()) {
 						final IndividualAddress assignedAddress = i.getKey();
-						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, c);
+						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, i.getValue());
 						send(sc, i.getValue(), CEMIFactory.create(null, assignedAddress, f, false));
 					}
+					// also dispatch via routing as-is
+					if ((c = findRoutingConnection().orElse(null)) != null) {
+						logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+						send(sc, c, f);
+					}
+				}
+				// 3. look for activated client-side routing
+				else if ((c = findRoutingConnection().orElse(null)) != null) {
+					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+					send(sc, c, f);
 				}
 				else {
 					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} to all server-side"
@@ -1120,15 +1130,9 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private KNXnetIPConnection findServerConnection(final IndividualAddress dst)
+	private Optional<KNXnetIPConnection> findRoutingConnection()
 	{
-		final KNXnetIPConnection c = serverDataConnections.get(dst);
-		if (c != null)
-			return c;
-		for (final KNXnetIPConnection e : serverConnections)
-			if (e instanceof KNXnetIPRouting)
-				return e;
-		return null;
+		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
 	}
 
 	// check whether we have to slow down or pause sending for routing flow control
