@@ -102,7 +102,7 @@ java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
 On the terminal, the running server instance can be stopped by typing "stop".
 
 
-### Launcher Configuration
+### Server Configuration
 
 Elements and attributes of `server-config.xml`:
 
