@@ -44,7 +44,6 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.internal.EventListeners;
@@ -83,7 +82,7 @@ public class VirtualLink extends AbstractLink
 	{
 		// we could allow this in theory, but not really needed
 		if (isDeviceLink)
-			throw new KNXIllegalStateException("don't create device link from device link");
+			throw new IllegalStateException("don't create device link from device link");
 
 		final KNXMediumSettings ms = getKNXMedium();
 		final KNXMediumSettings devSettings = KNXMediumSettings.create(ms.getMedium(), device);

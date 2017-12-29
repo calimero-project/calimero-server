@@ -65,7 +65,6 @@ import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
-import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
@@ -628,22 +627,15 @@ public class KNXnetIPServer
 	 * service, and the control endpoint services as determined by the added service containers are
 	 * started.<br>
 	 * If this server is already running, this method returns immediately.
-	 *
-	 * @throws KNXIllegalStateException on no service containers available in this server
 	 */
 	public synchronized void launch()
 	{
 		if (running)
 			return;
-		if (svcContainers.isEmpty())
-			throw new KNXIllegalStateException(serverName + " has no service containers added");
 		logger.info("launch KNXnet/IP server \'{}\'", getFriendlyName());
 		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
-		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = i.next();
-			startControlEndpoint(sc);
-		}
+		svcContainers.forEach(this::startControlEndpoint);
 		running = true;
 	}
 
@@ -784,7 +776,7 @@ public class KNXnetIPServer
 		throws KnxPropertyException
 	{
 		if (ios == null)
-			throw new KNXIllegalStateException("KNXnet/IP server has no IOS");
+			throw new IllegalStateException("KNXnet/IP server has no IOS");
 
 		// reset transmit counter to 0
 		// those two are 4 byte unsigned
@@ -902,7 +894,7 @@ public class KNXnetIPServer
 				return i + 1;
 			}
 		}
-		throw new KNXIllegalStateException("service container \"" + sc.getName() + "\" not found");
+		throw new IllegalStateException("service container \"" + sc.getName() + "\" not found");
 	}
 
 	// returns a property element value as integer, or the supplied default on error

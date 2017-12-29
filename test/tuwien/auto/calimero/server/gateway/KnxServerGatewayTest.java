@@ -47,7 +47,6 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.KNXIllegalStateException;
 import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
@@ -128,17 +127,14 @@ public class KnxServerGatewayTest extends TestCase
 	 */
 	public final void testRun() throws InterruptedException
 	{
-		try {
-			final KNXnetIPServer s = setupServer();
-			final KnxServerGateway gw2 = new KnxServerGateway("testGW", s, new SubnetConnector[] {});
-			gw2.run();
-			fail();
-		}
-		catch (final KNXIllegalStateException e) {
-			// ok no svc containers added
-		}
-
+		final KNXnetIPServer s = setupServer();
+		final KnxServerGateway gw2 = new KnxServerGateway("testGW", s, new SubnetConnector[] {});
 		Thread t;
+		(t = new Thread(gw2)).start();
+		Thread.sleep(1000);
+		assertTrue(t.isAlive());
+		gw2.quit();
+
 		(t = new Thread(gw)).start();
 		Thread.sleep(2000);
 		assertTrue(t.isAlive());
