@@ -44,6 +44,7 @@ import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -112,6 +113,10 @@ final class ControlEndpointService extends ServiceLooper
 		super(server, null, 512, 10000);
 		svcCont = sc;
 		s = createSocket();
+
+		final InetAddress addr = s.getLocalAddress();
+		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
+		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -354,6 +359,18 @@ final class ControlEndpointService extends ServiceLooper
 			logger.error("socket creation failed for {}:{}", ip, ep.getPort(), e);
 			throw wrappedException(e);
 		}
+	}
+
+	private byte[] subnetMaskOf(final InetAddress addr)
+	{
+		List<InterfaceAddress> addresses = Collections.emptyList();
+		try {
+			addresses = NetworkInterface.getByInetAddress(addr).getInterfaceAddresses();
+		}
+		catch (final SocketException ignore) {}
+		final int length = addresses.stream().filter(ia -> ia.getAddress().equals(addr))
+				.map(ia -> (int) ia.getNetworkPrefixLength()).findFirst().orElse(0);
+		return ByteBuffer.allocate(4).putInt((int) ((0xffffffffL >> length) ^ 0xffffffffL)).array();
 	}
 
 	private List<InetAddress> assignedIpAddresses() throws SocketException, UnknownHostException
