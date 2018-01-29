@@ -107,26 +107,62 @@ On the terminal, the running server instance can be stopped by typing "stop".
 Elements and attributes of `server-config.xml`:
 
 * `<knxServer name="knx-server" friendlyName="My KNXnet/IP Server">` (required): the server ID (for logging etc.) and the KNXnet/IP friendly name (for discovery & self-description)
+
+	- `name="knx-server"`: Attribute to specify the internal name of the server (mainly for logging, naming, debugging purposes)
+	- `friendlyName="My KNXnet/IP Server"`: Attribute to specify a custom name (max. 30 characters). Will be displayed in e.g. ETS-tool.
+
+* `<propertyDefinitions ref="resources/properties.xml" />` It is possible to provide additional KNX property definitions through this tag. Specify properties in a file, e.g. 'properties.xml', and use the `ref` attribute to specify the URI/path to this file. The predefined properties may be explored in a user friendly way when opening the Calimero GUI.
+
 * `<discovery listenNetIf="all" outgoingNetIf="all" activate="true"/>` (optional attributes): the network interfaces to listen for KNXnet/IP discovery requests, as well as the network interfaces to answer requests, e.g., `"all"`, `"any"`, or `"lo,eth0,eth1"`. The attribute `activate` allows to disable KNXnet/IP discovery & self-description. If disabled, any received discovery or descriptions request will be ignored.
+
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
-	- `routing`: serve KNXnet/IP routing connections (set `true`) or disable KNXnet/IP routing (set `false`)
+	
+	- `routing`: if `true` serve KNXnet/IP routing connections (the server KNX address defaults to 15.15.0), if `false` KNXnet/IP routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
-	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671"
-	-  `listenNetIf` (optional): network interface to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network interface
-	- `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections. If reuse is enabled, no list of additional KNX individual addresses is required (see below). Per standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint at most 1 connection can be established at a time to a service container.
+	
+	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
+	
+	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available network adapter is chosen depending on your OS network setup (localhost setting). 
+
+    - `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, i.e. no routing possible. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
+	
 
 * `<knxAddress type="individual">7.1.1</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
-* `<routingMcast>` (optional): the multicast group used by the service container with KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12. If the `routing` attribute is set to `false`, this setting has no effect 
+    - `type="individual"`: indicates a device address.
+    - `x.x.x`: Address of the service container if routing is disabled. Will be visible in e.g. ETS-tool.
+    
+* `<disruptionBuffer expirationTimeout="30" udpPort="5555-5559" />`: When `disruptionBuffer` is activated, missed KNX subnet frames due to a disrupted client link will be replayed when the client connection is reestablished.
+    - `expirationTimeout="30"`: Attribute allows to specify the time in seconds how long the server will keep frames before discarding them after a connection was disrupted.
+    - `udpPort="5555-5559"`: The disruption buffer is only available for clients which connect via the specified (client-side) UDP port range. All other clients are ignored.
+    
+* `<routingMcast>` (optional): the multicast group used by the service container for KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12. If the `routing` attribute is set to `false`, this setting has no effect 
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
-	- `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
-	- `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
-	- `listenNetIf` (KNX IP only): network interface for KNX IP communication
-	- `domainAddress` (open media only): domain address for power-line or RF transmission medium
-	- `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
+    - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
+      - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
+      - `knxip`: the KNX subnet is connected via a KNXnet/IP routing connection
+      - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
+      - `ft12`: use a FT1.2 protocol connection
+      - `tpuart`: use a TP-UART adapter to connect to a KNX TP1 network
+      - `virtual`: Run KNX subnet and enable the connection of virtual and real devices
+      - `emulate`: Emulates the behaviour of a KNX subnet. Datapoints may be specified in an accompanying `dataPointMap.xml`.
+      - `user-supplied`: Own programmed connections may be added here.
+    - `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
+	   - `tp1`: Twisted pair (transmission with 9600 Baud as specified in the KNX standard)
+      - `pl110`: use power-line to connect
+      - `knxip`: access via Ethernet
+      - `rf`: Wireless connection via 868 MHz
+    - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
+	  - `domainAddress` (open media only): domain address for power-line or RF transmission medium
+	  - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
+
+* `<datapoints ref="resources/datapointMap.xml" />`: External file to describe the KNX datapoints to be specified. Only required with subnet emulation (`type=emulate`).
+    - `ref`: relative path to xml-file
 
 * `<groupAddressFilter>`: Contains a (possibly empty) list of KNX group addresses, which represents the server group address filter applied to messages for that service container. An empty filter list does not filter any messages. Only messages with their group address in the filter list will be forwarded. If you specify a filter, you probably also want to add the broadcast address `0/0/0`. 
-* `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1. 
+
+* `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1.
+
 
 ### Configuration Examples for KNX subnets
 
@@ -156,4 +192,6 @@ Logging
 -------
 
 Calimero KNXnet/IP server uses the [Simple Logging Facade for Java (slf4j)](http://www.slf4j.org/). Bind any desired logging frameworks of your choice. The default gradle/maven dependency is the [Simple Logger](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html). It logs everything to standard output. The simple logger can be configured via the file `simplelogger.properties`, JVM system properties, or `java` command line options, e.g., `-Dorg.slf4j.simpleLogger.defaultLogLevel=warn`.
+
+
 
