@@ -9,16 +9,6 @@ the profile [compact1](http://www.oracle.com/technetwork/java/embedded/resources
 * Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
 * Emulate/virtualize a KNX network
 
-Download
---------
-
-~~~ sh
-# Either using git
-git clone https://github.com/calimero-project/calimero-server.git
-
-# Or using hub
-hub clone calimero-project/calimero-server
-~~~
 
 ### Dependencies
 
@@ -54,52 +44,33 @@ Supported Features
 How-to & Examples
 -----------------
 
-With one of the following commands, the server should print a message that it expects a configuration file and quit:
-
-#### Gradle
-
-    ./gradlew run
-
-#### Maven
-
-~~~ sh
-mvn exec:java
-~~~
-
-#### Java
-
-Make sure all required `jar` packages are available.
-
-~~~ sh
-# Either, assuming all jar dependencies are located in the current working directory
-java -cp "./*" tuwien.auto.calimero.server.Launcher
-
-# Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.7.22.jar:slf4j-simple-1.7.22.jar" tuwien.auto.calimero.server.Launcher
-~~~
-
-### Start Server with Configuration
+### Start Server
 
 *Before trying the examples below with a configuration, make sure the configuration is appropriate for your KNX setup!*
 
-Using Gradle
+On the terminal, a running server instance can be stopped by typing "stop".
+
+#### Using Gradle
 
     ./gradlew run -Dexec.args=resources/server-config.xml
 
-Using maven
+#### Using Maven
 
 ~~~ sh
 mvn exec:java -Dexec.args=resources/server-config.xml
 ~~~
 
-Using Java (make sure any referenced files in the folder `resources` are found, or copy them into the current working directory).
+#### Using Java
+
+Make sure all required `jar` packages are available, and any referenced files in the folder `resources` are found (e.g., copy them into the current working directory)
 
 ~~~ sh
-# Assumes all `jar` dependencies are located in the current working directory
+# Either, assuming all jar dependencies are located in the current working directory
 java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
-~~~
 
-On the terminal, the running server instance can be stopped by typing "stop".
+# Or, a minimal working example with explicit references to jars (adjust as required)
+java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
+~~~
 
 
 ### Server Configuration
@@ -117,14 +88,10 @@ Elements and attributes of `server-config.xml`:
 
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
-	
 	- `routing`: if `true` serve KNXnet/IP routing connections (the server KNX address defaults to 15.15.0), if `false` KNXnet/IP routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
-	
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
-	
 	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available network adapter is chosen depending on your OS network setup (localhost setting). 
-
     - `reuseCtrlEP`: reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, i.e. no routing possible. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
 	
 
@@ -140,12 +107,12 @@ Elements and attributes of `server-config.xml`:
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
-      - `knxip`: the KNX subnet is connected via a KNXnet/IP routing connection
+      - `knxip`: the KNX subnet is connected via KNX IP or KNXnet/IP routing
       - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
       - `ft12`: use a FT1.2 protocol connection
       - `tpuart`: use a TP-UART adapter to connect to a KNX TP1 network
       - `virtual`: Run KNX subnet and enable the connection of virtual and real devices
-      - `emulate`: Emulates the behaviour of a KNX subnet. Datapoints may be specified in an accompanying `dataPointMap.xml`.
+      - `emulate`: Emulates the behaviour of a KNX subnet. KNX datapoints may be specified in an accompanying datapoint XML file.
       - `user-supplied`: Own programmed connections may be added here.
     - `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
 	   - `tp1`: Twisted pair (transmission with 9600 Baud as specified in the KNX standard)
@@ -156,8 +123,8 @@ Elements and attributes of `server-config.xml`:
 	  - `domainAddress` (open media only): domain address for power-line or RF transmission medium
 	  - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
 
-* `<datapoints ref="resources/datapointMap.xml" />`: External file to describe the KNX datapoints to be specified. Only required with subnet emulation (`type=emulate`).
-    - `ref`: relative path to xml-file
+* `<datapoints ref="resources/datapointMap.xml" />` (only applies to subnet emulation, i.e., `type=emulate`): External file to describe the KNX datapoints to be used in the emulated network.
+    - `ref`: relative path to XML file
 
 * `<groupAddressFilter>`: Contains a (possibly empty) list of KNX group addresses, which represents the server group address filter applied to messages for that service container. An empty filter list does not filter any messages. Only messages with their group address in the filter list will be forwarded. If you specify a filter, you probably also want to add the broadcast address `0/0/0`. 
 
