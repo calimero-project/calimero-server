@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016 B. Malinowsky
+    Copyright (c) 2016, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ class ReplayBuffer<T extends FrameEvent>
 
 	private final long keepDisruptedConnection; // [ms]
 
-	public ReplayBuffer(final Duration expireDisruptedConnectionAfter)
+	ReplayBuffer(final Duration expireDisruptedConnectionAfter)
 	{
 		keepDisruptedConnection = expireDisruptedConnectionAfter.toMillis();
 	}

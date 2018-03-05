@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -615,7 +615,7 @@ public class KNXnetIPServer
 	{
 		if (array == null)
 			return "default";
-		final StringBuffer sb = new StringBuffer();
+		final StringBuilder sb = new StringBuilder();
 		Arrays.stream(array).forEach(ni -> sb.append(f.apply(ni)).append(sep));
 		return sb.toString();
 	}
@@ -945,7 +945,7 @@ public class KNXnetIPServer
 			name = new byte[30];
 			System.arraycopy(defFriendlyName, 0, name, 0, defFriendlyName.length);
 		}
-		final StringBuffer sb = new StringBuffer(30);
+		final StringBuilder sb = new StringBuilder(30);
 		for (int i = 0; i < name.length && name[i] > 0; ++i)
 			sb.append((char) (name[i] & 0xff));
 		final String friendly = sb.toString();
@@ -1152,14 +1152,12 @@ public class KNXnetIPServer
 		return tokens;
 	}
 
-	static int toInt(final byte[] data)
-	{
+	static int toInt(final byte[] data) {
 		if (data.length == 1)
 			return data[0] & 0xff;
 		if (data.length == 2)
-			return (data[0] & 0xff) << 8 | data[1] & 0xff;
-		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3]
-				& 0xff;
+			return (data[0] & 0xff) << 8 | (data[1] & 0xff);
+		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | (data[3] & 0xff);
 	}
 
 	private static byte[] bytesFromWord(final int word)

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -80,7 +80,7 @@ import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
  *
  * @author B. Malinowsky
  */
-public class SubnetConnector
+public final class SubnetConnector
 {
 	private final ServiceContainer sc;
 	private final String subnetType;
@@ -107,7 +107,7 @@ public class SubnetConnector
 	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
 	 * @return the new subnet connector
 	 */
-	public static final SubnetConnector newWithRoutingLink(final ServiceContainer container,
+	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs,
 		final int groupAddrTableInstance)
 	{
@@ -125,7 +125,7 @@ public class SubnetConnector
 	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
 	 * @return the new subnet connector
 	 */
-	public static final SubnetConnector newWithUserLink(final ServiceContainer container,
+	public static SubnetConnector newWithUserLink(final ServiceContainer container,
 		final String className, final String subnetArgs, final int groupAddrTableInstance)
 	{
 		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs,
@@ -142,7 +142,7 @@ public class SubnetConnector
 	 *        connection will use for group address filtering
 	 * @return the created subnet connector
 	 */
-	public static final SubnetConnector newWithInterfaceType(final ServiceContainer container,
+	public static SubnetConnector newWithInterfaceType(final ServiceContainer container,
 		final String interfaceType, final String subnetArgs, final int groupAddrTableInstance)
 	{
 		return new SubnetConnector(container, interfaceType, null, null, subnetArgs, groupAddrTableInstance);
@@ -158,7 +158,7 @@ public class SubnetConnector
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
-	public static final SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
+	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
 		final int groupAddrTableInstance, final Object... subnetArgs)
 	{
 		return new SubnetConnector(container, interfaceType, null, null, interfaceType, groupAddrTableInstance,
@@ -185,7 +185,7 @@ public class SubnetConnector
 	 *
 	 * @return the subnet connector name
 	 */
-	public final String getName()
+	public String getName()
 	{
 		return sc.getName();
 	}
@@ -195,7 +195,7 @@ public class SubnetConnector
 	 *
 	 * @return the service container
 	 */
-	public final ServiceContainer getServiceContainer()
+	public ServiceContainer getServiceContainer()
 	{
 		return sc;
 	}
@@ -207,7 +207,7 @@ public class SubnetConnector
 	 * @return a KNX network or monitor link representing the KNX subnet connection, or
 	 *         <code>null</code>
 	 */
-	public synchronized final AutoCloseable getSubnetLink()
+	public synchronized AutoCloseable getSubnetLink()
 	{
 		return subnetLink;
 	}
@@ -218,7 +218,7 @@ public class SubnetConnector
 		final TSupplier<KNXNetworkLink> ts;
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
-			final String[] args = linkArgs.split(":");
+			final String[] args = linkArgs.split(":", -1);
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
 			ts = () -> KNXNetworkLinkIP.newTunnelingLink(null, new InetSocketAddress(ip, port), false, settings);
@@ -286,11 +286,10 @@ public class SubnetConnector
 		final TSupplier<KNXNetworkMonitor> ts;
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
-			final String[] args = linkArgs.split(":");
+			final String[] args = linkArgs.split(":", -1);
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			ts = () -> new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false,
-					settings);
+			ts = () -> new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false, settings);
 		}
 		else if ("usb".equals(subnetType))
 			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
@@ -312,17 +311,17 @@ public class SubnetConnector
 		return link;
 	}
 
-	final String getInterfaceType()
+	String getInterfaceType()
 	{
 		return subnetType;
 	}
 
-	final String getLinkArguments()
+	String getLinkArguments()
 	{
 		return linkArgs;
 	}
 
-	final void setSubnetListener(final LinkListener subnetListener)
+	void setSubnetListener(final LinkListener subnetListener)
 	{
 		listener = subnetListener;
 		final AutoCloseable link = getSubnetLink();

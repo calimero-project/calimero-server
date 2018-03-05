@@ -47,6 +47,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -145,11 +146,11 @@ public class Launcher implements Runnable
 		public static final String attrReuseEP = "reuseCtrlEP";
 		/** */
 		public static final String attrNetworkMonitoring = "networkMonitoring";
-		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"] */
+		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"]. */
 		public static final String attrType = "type";
-		/** KNX subnet communication medium: { "tp1", "pl110", "knxip", "rf" } */
+		/** KNX subnet communication medium: { "tp1", "pl110", "knxip", "rf" }. */
 		public static final String attrMedium = "medium";
-		/** KNX subnet domain address for power-line and RF, as hexadecimal value string */
+		/** KNX subnet domain address for power-line and RF, as hexadecimal value string. */
 		public static final String attrDoA = "domainAddress";
 		/** */
 		public static final String attrRef = "ref";
@@ -299,7 +300,7 @@ public class Launcher implements Runnable
 					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
 						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
 						final Optional<String> ports = Optional.ofNullable(r.getAttributeValue(null, attrUdpPort));
-						final String[] range = ports.orElse("0-65535").split("-");
+						final String[] range = ports.orElse("0-65535").split("-", -1);
 						disruptionBufferLowerPort = Integer.parseInt(range[0]);
 						disruptionBufferUpperPort = Integer.parseInt(range.length > 1 ? range[1] : range[0]);
 					}
@@ -559,7 +560,7 @@ public class Launcher implements Runnable
 	private void waitForTermination()
 	{
 		System.out.println("type 'stop' to stop the gateway and shutdown the server");
-		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in));
+		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in, Charset.defaultCharset()));
 		try {
 			String line;
 			while ((line = r.readLine()) != null) {

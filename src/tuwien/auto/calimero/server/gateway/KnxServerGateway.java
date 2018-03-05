@@ -55,7 +55,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -301,8 +300,7 @@ public class KnxServerGateway implements Runnable
 			final AutoCloseable subnetLink = connector.getSubnetLink();
 			final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
 			try {
-				if (rawLink instanceof VirtualLink)
-					;
+				if (rawLink instanceof VirtualLink) { /* no-op */ }
 				else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
 					closeLink(subnetLink);
 					connector.openNetworkLink();
@@ -402,15 +400,13 @@ public class KnxServerGateway implements Runnable
 			}
 			else if (event == ServiceContainerEvent.ADDED_TO_SERVER) {
 				logger.error("adding service container at runtime not yet implemented");
-				// prevent Java unreachable code warning
-				if (event != 0)
-					return;
+
 				// the following is not working!
 				// XXX subnet link and group address table is missing!
 				// what is the best way to get them here?
-				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null, null, 1);
-				connectors.add(connector);
-				connector.setSubnetListener(new SubnetListener(connector.getName()));
+//				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null, null, 1);
+//				connectors.add(connector);
+//				connector.setSubnetListener(new SubnetListener(connector.getName()));
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
 				for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
@@ -509,8 +505,8 @@ public class KnxServerGateway implements Runnable
 	private final List<KNXnetIPConnection> serverConnections = Collections.synchronizedList(new ArrayList<>());
 
 	private final int maxEventQueueSize = 200;
-	private final List<FrameEvent> ipEvents = new LinkedList<>();
-	private final List<FrameEvent> subnetEvents = new LinkedList<>();
+	private final List<FrameEvent> ipEvents = new ArrayList<>();
+	private final List<FrameEvent> subnetEvents = new ArrayList<>();
 
 	// support replaying subnet events for disrupted tunneling connections
 	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
@@ -1126,7 +1122,8 @@ public class KnxServerGateway implements Runnable
 						send(sc, i.getValue(), CEMIFactory.create(null, assignedAddress, f, false));
 					}
 					// also dispatch via routing as-is
-					if ((c = findRoutingConnection().orElse(null)) != null) {
+					c = findRoutingConnection().orElse(null);
+					if (c != null) {
 						logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 						send(sc, c, f);
 					}
@@ -1299,7 +1296,7 @@ public class KnxServerGateway implements Runnable
 		try {
 			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT,
 					objectInstance, PropertyAccess.PID.TABLE, 0, 1);
-			final int elems = (data[0] & 0xff) << 8 | data[1] & 0xff;
+			final int elems = (data[0] & 0xff) << 8 | (data[1] & 0xff);
 
 			// not sure if this is some common behavior: if property exists with zero length, allow every address
 			if (elems == 0)
@@ -1407,7 +1404,7 @@ public class KnxServerGateway implements Runnable
 	private static final int PropertyDescResponse = 0x03D9;
 	private static final int PropertyRead = 0x03D5;
 	private static final int PropertyResponse = 0x03D6;
-	private static final int PropertyWrite = 0x03D7;
+//	private static final int PropertyWrite = 0x03D7;
 
 	// KNX USB cEMI only
 	private boolean localDeviceManagement(final SubnetConnector connector, final CEMILData ldata)
@@ -1425,7 +1422,7 @@ public class KnxServerGateway implements Runnable
 				final int elements = (asdu[2] & 0xff) >> 4;
 				int start = 0;
 				if (svc == 0x3d5)
-					start = (asdu[2] & 0xf) << 8 | asdu[3] & 0xff;
+					start = (asdu[2] & 0xf) << 8 | (asdu[3] & 0xff);
 
 				try {
 					final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
@@ -1607,7 +1604,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		final int extFrameFormatFlag = 0x80;
-		raw[0] &= ~extFrameFormatFlag; // clear bit to indicate ext. frame format
+		raw[0] = (byte) (raw[0] & ~extFrameFormatFlag); // clear bit to indicate ext. frame format
 		raw[raw.length - 1] = (byte) checksum(raw); // fcs
 
 		return CEMIBusMon.newWithSequenceNumber(seq, timestamp, true, raw);
@@ -1621,13 +1618,12 @@ public class KnxServerGateway implements Runnable
 		return ~cs;
 	}
 
-	private static long toUnsignedInt(final byte[] data)
-	{
+	private static long toUnsignedInt(final byte[] data) {
 		if (data.length == 1)
 			return (data[0] & 0xff);
 		if (data.length == 2)
-			return (data[0] & 0xff) << 8 | data[1] & 0xff;
-		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3] & 0xff;
+			return (long) (data[0] & 0xff) << 8 | (data[1] & 0xff);
+		return (long) (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | (data[3] & 0xff);
 	}
 
 	private static byte[] bytesFromInt(final long value)

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2017 B. Malinowsky
+    Copyright (c) 2016, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -143,7 +143,7 @@ final class DiscoveryService extends ServiceLooper
 		}
 		final List<NetworkInterface> nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
-		final StringBuffer found = new StringBuffer();
+		final StringBuilder found = new StringBuilder();
 		boolean joinedAny = false;
 		// we try to bind to all requested interfaces. Only if that completely fails, we throw
 		// the first caught exception
