@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import static java.lang.String.format;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
 
@@ -118,6 +119,7 @@ import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
+import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServerListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainerEvent;
@@ -514,6 +516,8 @@ public class KnxServerGateway implements Runnable
 	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
 	private final Map<KNXnetIPConnection, ServiceContainer> waitingForReplay = new ConcurrentHashMap<>();
 
+	private final Instant startTime;
+
 	private volatile boolean trucking;
 	private volatile boolean inReset;
 
@@ -631,6 +635,8 @@ public class KnxServerGateway implements Runnable
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
 		logger = LogService.getLogger("calimero.server.gateway." + name);
+		startTime = Instant.now();
+
 		dispatcher.setName(name + " subnet dispatcher");
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
@@ -758,6 +764,53 @@ public class KnxServerGateway implements Runnable
 	public final List<SubnetConnector> getSubnetConnectors()
 	{
 		return new ArrayList<>(connectors);
+	}
+
+	@Override
+	public String toString() {
+		return server.getFriendlyName() + " -- " + stat();
+	}
+
+	private String stat() {
+		final StringBuilder info = new StringBuilder();
+		info.append(format("start time %s (uptime %s)%n", startTime, Duration.between(startTime, Instant.now())));
+
+		int objInst = 0;
+		for (final SubnetConnector c : getSubnetConnectors()) {
+			objInst++;
+			info.append(format("service container %s%n", c.getName()));
+			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+			try {
+				if (c.getServiceContainer() instanceof RoutingServiceContainer) {
+					final RoutingServiceContainer rsc = (RoutingServiceContainer) c.getServiceContainer();
+					info.append(format("\trouting multicast %s netif %s%n",
+							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
+				}
+
+				final InetAddress ip = InetAddress.getByAddress(
+						ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objInst, PID.CURRENT_IP_ADDRESS, 1, 1));
+				final InetAddress mask = InetAddress.getByAddress(
+						ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objInst, PID.CURRENT_SUBNET_MASK, 1, 1));
+				info.append(format("\tserver IP %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
+						NetworkInterface.getByInetAddress(ip)));
+
+				@SuppressWarnings("unchecked")
+				final Link<AutoCloseable> link = (Link<AutoCloseable>) c.getSubnetLink();
+				final String subnet = Optional.ofNullable(link.target()).map(Object::toString).orElse("link connecting ...");
+				info.append(format("\tsubnet %s%n", subnet));
+
+				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
+				final long overflowKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_KNX).orElse(0L);
+				info.append(format("\tIP => KNX: sent %d, overflow %d [msgs]%n", toKnx, overflowKnx));
+				final long toIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_IP).orElse(0L);
+				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
+				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs]%n", toIP, overflowIP));
+			}
+			catch (final Exception e) {
+				logger.error("gathering stat for service container {}", c.getName(), e);
+			}
+		}
+		return info.toString();
 	}
 
 	private synchronized FrameEvent getSubnetEvent()
@@ -1214,6 +1267,16 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
 			logger.error("error sending to {} on subnet {}", f.getDestination(), lnk.getName(), e);
+		}
+	}
+
+	private Optional<Long> property(final int objectType, final int objectInstance, final int propertyId) {
+		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+		try {
+			return Optional.of(toUnsignedInt(ios.getProperty(objectType, objectInstance, propertyId, 1, 1)));
+		}
+		catch (final KnxPropertyException e) {
+			return Optional.empty();
 		}
 	}
 

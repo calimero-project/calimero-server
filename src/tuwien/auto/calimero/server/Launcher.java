@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -556,7 +556,7 @@ public class Launcher implements Runnable
 		}
 	}
 
-	private static void waitForTermination()
+	private void waitForTermination()
 	{
 		System.out.println("type 'stop' to stop the gateway and shutdown the server");
 		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in));
@@ -565,6 +565,8 @@ public class Launcher implements Runnable
 			while ((line = r.readLine()) != null) {
 				if (line.equals("stop"))
 					break;
+				if (line.equals("stat"))
+					System.out.println(gw);
 			}
 			System.out.println("request to stop server");
 		}
