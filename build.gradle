@@ -3,9 +3,6 @@ buildscript {
         mavenCentral()
         maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
     }
-    dependencies {
-        classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.0-SNAPSHOT'
-    }
 }
 
 repositories {
@@ -14,13 +11,11 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.0.0-SNAPSHOT'
-ext.junitPlatformVersion = '1.0.0-SNAPSHOT'
+ext.junitJupiterVersion = '5.1.0'
 
 apply plugin: 'java-library'
 apply plugin: 'maven'
 apply plugin: 'application'
-apply plugin: 'org.junit.platform.gradle.plugin'
 
 group = 'com.github.calimero'
 version = '2.4-SNAPSHOT'
@@ -65,19 +60,18 @@ jar {
 	}
 }
 
-junitPlatform {
-	details 'none' // 'tree'
+test {
+	useJUnitPlatform()
 }
 
 dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
-    implementation 'org.slf4j:slf4j-api:1.8.0-alpha2'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-alpha2'
+    implementation 'org.slf4j:slf4j-api:1.8.0-beta1'
+    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-beta1'
 
-    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
-    testImplementation "org.junit.platform:junit-platform-runner:${junitPlatformVersion}"
-    testRuntimeOnly 'junit:junit:4.12'
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:4.12.0-SNAPSHOT'
+	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+	testCompileOnly 'junit:junit:4.12'
+	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 }
