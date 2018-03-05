@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.gateway;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -267,7 +268,7 @@ class KnxServerGatewayTest
 				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), false);
 			}
 			catch (final KNXFormatException e) {
-				e.printStackTrace();
+				fail(e);
 			}
 		}
 
@@ -278,7 +279,7 @@ class KnxServerGatewayTest
 				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), true);
 			}
 			catch (final KNXFormatException e) {
-				e.printStackTrace();
+				fail(e);
 			}
 		}
 

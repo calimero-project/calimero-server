@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ import tuwien.auto.calimero.link.medium.RFSettings;
  *
  * @author B. Malinowsky
  */
-public class VirtualLink extends AbstractLink
+public class VirtualLink extends AbstractLink<AutoCloseable>
 {
 	private final List<VirtualLink> deviceLinks = new ArrayList<>();
 	private final boolean isDeviceLink;

@@ -62,8 +62,6 @@ import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
-import tuwien.auto.calimero.KNXException;
-import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -315,12 +313,7 @@ public class KNXnetIPServer
 		logger = LogService.getLogger("calimero.server." + getName());
 		listeners = new EventListeners<>(logger);
 
-		try {
-			initBasicServerProperties();
-		}
-		catch (final KNXException e) {
-			e.printStackTrace();
-		}
+		initBasicServerProperties();
 	}
 
 	/**
@@ -719,7 +712,7 @@ public class KNXnetIPServer
 		}
 	}
 
-	private void initBasicServerProperties() throws KNXFormatException, KnxPropertyException
+	private void initBasicServerProperties() throws KnxPropertyException
 	{
 		if (ios == null)
 			ios = new InterfaceObjectServer(false);

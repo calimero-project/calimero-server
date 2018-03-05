@@ -867,40 +867,21 @@ public class KnxServerGateway implements Runnable
 		final String s = fromServerSide ? "server-side " : "KNX subnet ";
 		final CEMI frame = fe.getFrame();
 
-		final boolean trace = logger.isTraceEnabled();
-		if (trace)
-			logger.trace(s + fe.getSource() + ": " + frame.toString());
+		logger.trace("{}{}: ", s, fe.getSource(), frame);
 
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
 			final CEMILData f = (CEMILData) frame;
 
-			if (trace)
-				logger.trace(f.getSource() + "->" + f.getDestination() + ": "
-						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
+			logger.trace("{}->{}: ", f.getSource(), f.getDestination(),
+					DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 
 			// we get L-data.ind if client uses routing protocol
 			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
-				// send confirmation on .req type
-				if (mc == CEMILData.MC_LDATA_REQ) {
-					CompletableFuture.runAsync(() -> {
-						try {
-							// TODO check for reasons to send negative L-Data.con
-							final boolean error = false;
-							logger.trace("send positive cEMI L_Data.con");
-							final KNXnetIPConnection c = (KNXnetIPConnection) fe.getSource();
-							c.send(createCon(f.getPayload(), f, error), WaitForAck);
-						}
-						catch (final Exception e) {
-							throw new CompletionException(e);
-						}
-					}).exceptionally(t -> {
-						logger.error("sending L_Data.con for {}",
-								DataUnitBuilder.decode(f.getPayload(), f.getDestination()), t.getCause());
-						return null;
-					});
-				}
-				//
+				// send confirmation only for .req type
+				if (mc == CEMILData.MC_LDATA_REQ)
+					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), f);
+
 				if (f.getDestination() instanceof IndividualAddress) {
 					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
 					if (connector.isPresent() && localDeviceManagement(connector.get(), f))
@@ -954,6 +935,25 @@ public class KnxServerGateway implements Runnable
 		}
 		else
 			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16) + " - ignored");
+	}
+
+	@SuppressWarnings("FutureReturnValueIgnored")
+	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
+		CompletableFuture.runAsync(() -> {
+			try {
+				// TODO check for reasons to send negative L-Data.con
+				final boolean error = false;
+				logger.trace("send positive cEMI L_Data.con");
+				c.send(createCon(f.getPayload(), f, error), WaitForAck);
+			}
+			catch (final Exception e) {
+				throw new CompletionException(e);
+			}
+		}).exceptionally(t -> {
+			logger.error("sending on {} failed: {} ({}->{} L_Data.con {})", c, t.getCause().getMessage(),
+					f.getSource(), f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
+			return null;
+		});
 	}
 
 	private static CEMI createCon(final byte[] data, final CEMILData original, final boolean error)
@@ -1395,7 +1395,7 @@ public class KnxServerGateway implements Runnable
 			ldmAdapter = adapter;
 		}
 		catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-			e.printStackTrace();
+			logger.error("accessing usb connection field while initializing local device management", e);
 		}
 		return adapter;
 	}
@@ -1460,7 +1460,7 @@ public class KnxServerGateway implements Runnable
 					return true;
 				}
 				catch (KNXException | InterruptedException e) {
-					e.printStackTrace();
+					logger.error("KNX USB local device management with {}", connector.getName(), e);
 				}
 			}
 		}

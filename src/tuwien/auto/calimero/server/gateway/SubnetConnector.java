@@ -336,6 +336,7 @@ public final class SubnetConnector
 		return gatoi;
 	}
 
+	@SuppressWarnings("TypeParameterUnusedInFormals")
 	private static <T> T newLinkUsing(final String className, final String[] initArgs)
 	{
 		try {
