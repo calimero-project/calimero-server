@@ -88,7 +88,6 @@ import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
-import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -867,20 +866,20 @@ public class KnxServerGateway implements Runnable
 		final String s = fromServerSide ? "server-side " : "KNX subnet ";
 		final CEMI frame = fe.getFrame();
 
-		logger.trace("{}{}: ", s, fe.getSource(), frame);
+		logger.trace("{}{}: {}", s, fe.getSource(), frame);
 
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
 			final CEMILData f = (CEMILData) frame;
 
-			logger.trace("{}->{}: ", f.getSource(), f.getDestination(),
+			logger.trace("{}->{}: {}", f.getSource(), f.getDestination(),
 					DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 
 			// we get L-data.ind if client uses routing protocol
 			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
 				// send confirmation only for .req type
 				if (mc == CEMILData.MC_LDATA_REQ)
-					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), f);
+					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), (CEMILData) CEMIFactory.copy(f));
 
 				if (f.getDestination() instanceof IndividualAddress) {
 					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
@@ -960,14 +959,17 @@ public class KnxServerGateway implements Runnable
 		throws KNXFormatException
 	{
 		if (original instanceof CEMILDataEx) {
-			final CEMILDataEx con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
-					original.getDestination(), data, original.getPriority(), error);
-			final List<AddInfo> l = ((CEMILDataEx) original).getAdditionalInfo();
-			for (final Iterator<AddInfo> i = l.iterator(); i.hasNext();) {
-				final CEMILDataEx.AddInfo info = i.next();
-				con.addAdditionalInfo(info.getType(), info.getInfo());
-			}
-			return con;
+			// since we don't use the error flag, simply always create positive .con using the cemi factory
+			return CEMIFactory.create(CEMILData.MC_LDATA_CON, null, original);
+
+//			final CEMILDataEx con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
+//					original.getDestination(), data, original.getPriority(), error);
+//			final List<AddInfo> l = ((CEMILDataEx) original).getAdditionalInfo();
+//			for (final Iterator<AddInfo> i = l.iterator(); i.hasNext();) {
+//				final CEMILDataEx.AddInfo info = i.next();
+//				con.addAdditionalInfo(info.getType(), info.getInfo());
+//			}
+//			return con;
 		}
 		return new CEMILData(CEMILData.MC_LDATA_CON, original.getSource(),
 				original.getDestination(), data, original.getPriority(), error);
