@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2017 B. Malinowsky
+    Copyright (c) 2016, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
@@ -363,13 +364,15 @@ final class ControlEndpointService extends ServiceLooper
 
 	private byte[] subnetMaskOf(final InetAddress addr)
 	{
-		List<InterfaceAddress> addresses = Collections.emptyList();
+		int length = 0;
 		try {
-			addresses = NetworkInterface.getByInetAddress(addr).getInterfaceAddresses();
+			final List<InterfaceAddress> addresses = Optional.ofNullable(NetworkInterface.getByInetAddress(addr))
+					.map(NetworkInterface::getInterfaceAddresses).orElse(Collections.emptyList());
+			length = addresses.stream().filter(ia -> ia.getAddress().equals(addr))
+					.map(ia -> (int) ia.getNetworkPrefixLength()).findFirst().orElse(0);
+
 		}
 		catch (final SocketException ignore) {}
-		final int length = addresses.stream().filter(ia -> ia.getAddress().equals(addr))
-				.map(ia -> (int) ia.getNetworkPrefixLength()).findFirst().orElse(0);
 		return ByteBuffer.allocate(4).putInt((int) ((0xffffffffL >> length) ^ 0xffffffffL)).array();
 	}
 
