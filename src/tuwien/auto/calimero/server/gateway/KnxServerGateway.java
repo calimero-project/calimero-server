@@ -73,6 +73,7 @@ import org.slf4j.Logger;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DataUnitBuilder;
+import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
@@ -343,7 +344,7 @@ public class KnxServerGateway implements Runnable
 				verifySubnetInterfaceAddress(svcContainer);
 			}
 			catch (KNXException | InterruptedException | RuntimeException e) {
-				logger.error("verifying subnet interface address", e);
+				logger.error("skip verifying subnet interface address", e);
 			}
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
@@ -373,13 +374,13 @@ public class KnxServerGateway implements Runnable
 
 			// update group address forwarding settings
 			if (pe.getPropertyId() == MAIN_LCGRPCONFIG) {
-				if (pe.getInterfaceObject().getType() == ROUTER_OBJECT) {
+				if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
 					mainGroupAddressConfig = pe.getNewData()[0] & 0x03;
 					logger.info("main-line group address config changed to " + mainGroupAddressConfig);
 				}
 			}
 			else if (pe.getPropertyId() == SUB_LCGRPCONFIG) {
-				if (pe.getInterfaceObject().getType() == ROUTER_OBJECT) {
+				if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
 					subGroupAddressConfig = pe.getNewData()[0] & 0x03;
 					logger.info("sub-line group address config changed to " + subGroupAddressConfig);
 				}
@@ -518,8 +519,6 @@ public class KnxServerGateway implements Runnable
 
 	// Frame forwarding based on KNX address (AN031)
 	// KNX properties to determine address routing and address filtering:
-	// located in the Router Object Interface Object (Object Type 6)
-	private static final int ROUTER_OBJECT = 6;
 	// properties for individual address forwarding
 //	private static final int MAIN_LCCONFIG = 52;
 //	private static final int SUB_LCCONFIG = 53;
@@ -631,8 +630,10 @@ public class KnxServerGateway implements Runnable
 		connectors.addAll(Arrays.asList(subnetConnectors));
 		logger = LogService.getLogger("calimero.server.gateway." + name);
 		startTime = Instant.now();
-
 		dispatcher.setName(name + " subnet dispatcher");
+
+		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+
 		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
 			final SubnetConnector b = i.next();
 			b.setSubnetListener(new SubnetListener(b.getName()));
@@ -644,20 +645,30 @@ public class KnxServerGateway implements Runnable
 						portRange[0], portRange[1], timeout.getSeconds());
 				subnetEventBuffers.put(sc, new ReplayBuffer<>(timeout));
 			}
+
+			// this only sets the actual interface's max. apdu if the subnet connection is already up and running
+			final byte[] data = new byte[] { 0, (byte) sc.getMediumSettings().maxApduLength() };
+			ios.setProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, 1, 1, data);
+			final int pidMaxRoutingApduLength = 58;
+			ios.setProperty(InterfaceObject.ROUTER_OBJECT, b.getGroupAddressTableObjectInstance(),
+					pidMaxRoutingApduLength, 1, 1, data);
+			logger.debug("set maximum APDU length to {}", sc.getMediumSettings().maxApduLength());
 		}
 
-		int value = getPropertyOrDefault(ROUTER_OBJECT, objectInstance, MAIN_LCGRPCONFIG, mainGroupAddressConfig);
+		// XXX should this go into loop above, because we need several router objects, one per subnet connector?
+		int value = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objectInstance, MAIN_LCGRPCONFIG, mainGroupAddressConfig);
 		mainGroupAddressConfig = value & 0x03;
 		logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
 
-		value = getPropertyOrDefault(ROUTER_OBJECT, objectInstance, SUB_LCGRPCONFIG, subGroupAddressConfig);
+		value = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objectInstance, SUB_LCGRPCONFIG, subGroupAddressConfig);
 		subGroupAddressConfig = value & 0x03;
 		logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
 
+
 		// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
 		try {
-			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.PRIORITY_FIFO_ENABLED, 1, 1, new byte[] { 0 });
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.PRIORITY_FIFO_ENABLED, 1, 1,
+					new byte[] { 0 });
 		}
 		catch (final KnxPropertyException e) {
 			logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
@@ -671,8 +682,8 @@ public class KnxServerGateway implements Runnable
 		// other bits reserved
 		final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
 		try {
-			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, new byte[] { caps });
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1,
+					new byte[] { caps });
 		}
 		catch (final KnxPropertyException e) {
 			logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
@@ -1378,6 +1389,7 @@ public class KnxServerGateway implements Runnable
 
 	// TODO support > 1 service containers with usb
 	private LocalDeviceManagementUsb ldmAdapter;
+	private DeviceDescriptor dd0;
 
 	private LocalDeviceManagementUsb localDevMgmtAdapter(final SubnetConnector connector)
 		throws KNXException, InterruptedException
@@ -1390,22 +1402,30 @@ public class KnxServerGateway implements Runnable
 		if (link == null)
 			throw new KNXException("no open subnet link for " + connector.getName());
 		try {
-			final Field conn = link.getClass().getDeclaredField("conn");
+			Class<?> clazz = link.getClass();
+			while (clazz != null && !clazz.getSimpleName().equals("AbstractLink"))
+				clazz = clazz.getSuperclass();
+			if (clazz == null)
+				throw new KNXException("unknown link implementation for initializing local device management");
+			final Field conn = clazz.getDeclaredField("conn");
 			conn.setAccessible(true);
 			final UsbConnection c = (UsbConnection) conn.get(link);
+			dd0 = c.deviceDescriptor();
 			adapter = new LocalDeviceManagementUsb(c, __ -> ldmAdapter = null, false);
 			ldmAdapter = adapter;
+			return adapter;
 		}
 		catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-			logger.error("accessing usb connection field while initializing local device management", e);
+			throw new KNXException("accessing usb connection field while initializing local device management", e);
 		}
-		return adapter;
 	}
 
 	private static final int PropertyDescRead = 0x03D8;
 	private static final int PropertyDescResponse = 0x03D9;
 	private static final int PropertyRead = 0x03D5;
 	private static final int PropertyResponse = 0x03D6;
+	private static final int DeviceDescRead = 0x0300;
+	private static final int DeviceDescRes = 0x0340;
 //	private static final int PropertyWrite = 0x03D7;
 
 	// KNX USB cEMI only
@@ -1414,20 +1434,39 @@ public class KnxServerGateway implements Runnable
 		final IndividualAddress localInterface = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
 		if (connector.getInterfaceType().equals("usb") && ldata.getDestination().equals(localInterface)) {
 			final byte[] data = ldata.getPayload();
+			logger.debug("request for address {}, use USB Local-DM", localInterface);
 			if (data.length < 2)
-				return false;
+				return true;
 			final int svc = DataUnitBuilder.getAPDUService(data);
-			if (svc == PropertyDescRead || svc == PropertyRead) {
-				final byte[] asdu = DataUnitBuilder.extractASDU(data);
-				final int objIndex = asdu[0] & 0xff;
-				final int pid = asdu[1] & 0xff;
-				final int elements = (asdu[2] & 0xff) >> 4;
-				int start = 0;
-				if (svc == 0x3d5)
-					start = (asdu[2] & 0xf) << 8 | (asdu[3] & 0xff);
+			try {
+				// if TL connected mode, send TL ack
+				final int dataConnected = 0x40;
+				if ((data[0] & dataConnected) == dataConnected) {
+					final int rcvSeq = (data[0] >> 2) & 0x0f;
+					final CEMILData ack = new CEMILDataEx(CEMILData.MC_LDATA_IND,
+							(IndividualAddress) ldata.getDestination(), ldata.getSource(),
+							new byte[] { (byte) (0xc2 | rcvSeq << 2) }, Priority.SYSTEM);
+					dispatchToServer(connector, ack, 0);
+				}
 
-				try {
-					final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
+				final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
+				if (svc == DeviceDescRead) {
+					final byte[] tpdu = DataUnitBuilder.createAPDU(DeviceDescRes, dd0.toByteArray());
+					tpdu[0] |= data[0];
+					final CEMILData f = new CEMILDataEx(CEMILData.MC_LDATA_IND,
+							(IndividualAddress) ldata.getDestination(), ldata.getSource(), tpdu, Priority.LOW);
+					dispatchToServer(connector, f, 0);
+					return true;
+				}
+				else if (svc == PropertyDescRead || svc == PropertyRead) {
+					final byte[] asdu = DataUnitBuilder.extractASDU(data);
+					final int objIndex = asdu[0] & 0xff;
+					final int pid = asdu[1] & 0xff;
+					final int elements = (asdu[2] & 0xff) >> 4;
+					int start = 0;
+					if (svc == PropertyRead)
+						start = (asdu[2] & 0xf) << 8 | (asdu[3] & 0xff);
+
 					byte[] response;
 					if (svc == PropertyDescRead) {
 						final int propIndex = asdu[2] & 0xff;
@@ -1438,14 +1477,14 @@ public class KnxServerGateway implements Runnable
 						catch (final KNXRemoteException pidNotFound) {
 							response = new byte[] { (byte) objIndex, (byte) pid, (byte) propIndex, (byte) 0, 0, 0, 0 };
 						}
-						logger.debug("Local-DM {} read property description {}|{}: {}", localInterface,
-								objIndex, pid, DataUnitBuilder.toHex(response, " "));
+						logger.debug("Local-DM {} read property description {}|{}: {}", localInterface, objIndex, pid,
+								DataUnitBuilder.toHex(response, " "));
 					}
 					else {
 						final byte[] propData = ldm.getProperty(objIndex, pid, start, elements);
 						response = new byte[4 + propData.length];
-						logger.debug("Local-DM {} read property values {}|{} (start {}, {} elements): {}", localInterface,
-								objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
+						logger.debug("Local-DM {} read property values {}|{} (start {}, {} elements): {}",
+								localInterface, objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
 						int i = 0;
 						response[i++] = (byte) objIndex;
 						response[i++] = (byte) pid;
@@ -1461,9 +1500,9 @@ public class KnxServerGateway implements Runnable
 					dispatchToServer(connector, f, 0);
 					return true;
 				}
-				catch (KNXException | InterruptedException e) {
-					logger.error("KNX USB local device management with {}", connector.getName(), e);
-				}
+			}
+			catch (KNXException | InterruptedException e) {
+				logger.error("KNX USB local device management with {}", connector.getName(), e);
 			}
 		}
 		return false;
@@ -1481,16 +1520,16 @@ public class KnxServerGateway implements Runnable
 		if (!connector.getInterfaceType().equals("usb"))
 			return;
 		final IndividualAddress configured = svcCont.getMediumSettings().getDeviceAddress();
-		final LocalDeviceManagementUsb adapter = localDevMgmtAdapter(connector);
-		final byte[] subnet = adapter.getProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1);
-		final byte[] device = adapter.getProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1);
+		final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
+		final byte[] subnet = ldm.getProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1);
+		final byte[] device = ldm.getProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1);
 		final IndividualAddress current = new IndividualAddress(new byte[] { subnet[0], device[0] });
 		if (!current.equals(configured)) {
 			logger.warn("KNX address mismatch with USB interface: currently {}, configured {} -> assigning {}", current,
 					configured, configured);
 			final byte[] addr = configured.toByteArray();
-			adapter.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { addr[0] });
-			adapter.setProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { addr[1] });
+			ldm.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { addr[0] });
+			ldm.setProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { addr[1] });
 		}
 	}
 
