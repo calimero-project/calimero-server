@@ -455,20 +455,25 @@ public class Launcher implements Runnable
 		logger.info("KNXnet/IP discovery network interfaces: listen on [{}], send on [{}]", netIfListen, netIfOutgoing);
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
-			logger.info("Service container '{}': ", sc.getName());
-
 			String mcast = "disabled";
 			if ((sc instanceof RoutingServiceContainer))
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
-			logger.info("    listen on {}, KNXnet/IP routing {}", sc.networkInterface(), mcast);
-
 			final String type = xml.subnetTypes.get(i);
-			logger.info("    " + type + " connection: " + sc.getMediumSettings());
+			String filter = "";
 			if (xml.groupAddressFilters.containsKey(sc))
-				logger.info("    Group address filter " + xml.groupAddressFilters.get(sc));
+				filter = "\n\tGroup address filter " + xml.groupAddressFilters.get(sc);
+			String datapoints = "";
 			if (xml.subnetDatapoints.containsKey(sc))
-				logger.info("    Datapoints "
-						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints());
+				datapoints = "\n\tDatapoints "
+						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints();
+
+			// @formatter:off
+			final String info = String.format("Service container '%s': %n"
+					+ "\tlisten on %s, KNXnet/IP routing %s%n"
+					+ "\t%s connection: %s%s%s",
+					sc.getName(), sc.networkInterface(), mcast, type, sc.getMediumSettings(), filter, datapoints);
+			// @formatter:on
+			logger.info(info);
 		}
 	}
 
