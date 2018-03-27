@@ -358,8 +358,10 @@ public class KNXnetIPServer
 				logger.warn("service container \"" + sc.getName() + "\" already exists in server");
 				return false;
 			}
-			// add new KNXnet/IP parameter object for this service container
 			final InterfaceObjectServer io = getInterfaceObjectServer();
+			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0,
+					(byte) sc.getMediumSettings().getMedium());
+			// add new KNXnet/IP parameter object for this service container
 			io.addInterfaceObject(knxObject);
 			final InterfaceObject[] objects = io.getInterfaceObjects();
 			svcContToIfObj.put(sc, objects[objects.length - 1]);
@@ -761,7 +763,7 @@ public class KNXnetIPServer
 		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
 
 		// set default medium to TP1 (Bit 1 set)
-		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, new byte[] { 0, 2 });
+//		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, new byte[] { 0, 2 });
 	}
 
 	// precondition: we have an IOS instance
@@ -922,7 +924,7 @@ public class KNXnetIPServer
 		}
 	}
 
-	void setProperty(final int objectType, final int objectInstance, final int propertyId, final byte[] data)
+	void setProperty(final int objectType, final int objectInstance, final int propertyId, final byte... data)
 	{
 		ios.setProperty(objectType, objectInstance, propertyId, 1, 1, data);
 	}
