@@ -190,6 +190,7 @@ public class Launcher implements Runnable
 			final Map<String, String> m = new HashMap<>();
 			put(m, r, XmlConfiguration.attrName);
 			put(m, r, XmlConfiguration.attrFriendly);
+			logger = LoggerFactory.getLogger("calimero.server." + r.getAttributeValue(null, XmlConfiguration.attrName));
 
 			while (r.next() != XmlReader.END_DOCUMENT) {
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
@@ -401,7 +402,7 @@ public class Launcher implements Runnable
 		}
 	}
 
-	private static final Logger logger = LoggerFactory.getLogger("calimero.server");
+	private static Logger logger = LoggerFactory.getLogger("calimero.server");
 
 	private final KNXnetIPServer server;
 	private KnxServerGateway gw;
@@ -464,7 +465,7 @@ public class Launcher implements Runnable
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
 			final String type = xml.subnetTypes.get(i);
 			String filter = "";
-			if (xml.groupAddressFilters.containsKey(sc))
+			if (xml.groupAddressFilters.containsKey(sc) && !xml.groupAddressFilters.get(sc).isEmpty())
 				filter = "\n\tGroup address filter " + xml.groupAddressFilters.get(sc);
 			String datapoints = "";
 			if (xml.subnetDatapoints.containsKey(sc))

@@ -101,7 +101,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 				return;
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source.getAddress(), source.getPort())) {
 				final int svc = h.getServiceType();
-				logger.info("received unknown frame with service type 0x{} - ignored", Integer.toHexString(svc));
+				logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
 			}
 		}
 		catch (final KNXFormatException e) {
