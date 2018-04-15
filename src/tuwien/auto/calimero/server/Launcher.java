@@ -65,6 +65,7 @@ import org.slf4j.LoggerFactory;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
@@ -279,7 +280,7 @@ public class Launcher implements Runnable
 								subnetDoA[i] = (byte) l;
 						}
 
-						if (subnetType.equals("knxip"))
+						if (subnetType.equals("knxip") || subnetType.equals("ip"))
 							subnetKnxipNetif = getNetIf(r);
 						else if (subnetType.equals("user-supplied"))
 							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
@@ -381,17 +382,20 @@ public class Launcher implements Runnable
 
 		private static NetworkInterface getNetIf(final XmlReader r)
 		{
-			final String attr = r.getAttributeValue(null, XmlConfiguration.attrListenNetIf);
+			String attr = r.getAttributeValue(null, XmlConfiguration.attrListenNetIf);
+			if (attr == null)
+				attr = r.getAttributeValue(null, "netif");
 			if (attr != null && !"any".equals(attr)) {
 				try {
 					final NetworkInterface netIf = NetworkInterface.getByName(attr);
 					if (netIf != null)
 						return netIf;
-					logger.warn("network interface " + attr + " not found, using system default");
 				}
 				catch (final SocketException se) {
-					logger.error("while searching for network interface " + attr, se);
+					logger.error("while searching for network interface '{}'", attr, se);
 				}
+				throw new KNXIllegalArgumentException(
+						"no network interface found with the specified name '" + attr + "'");
 			}
 			return null;
 		}
@@ -538,16 +542,20 @@ public class Launcher implements Runnable
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
+			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
 
 			if ("knxip".equals(subnetType))
-				connector = SubnetConnector.newWithRoutingLink(sc, xml.subnetNetIf.get(sc), subnetArgs, 1);
+				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs, 1);
 			else if ("user-supplied".equals(subnetType))
 				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, 1);
 			else if ("emulate".equals(subnetType))
 				connector = SubnetConnector.newCustom(sc, "emulate", 1, xml.subnetDatapoints.get(sc));
-			else
-				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
+			else {
+				final String args = Optional.ofNullable(netif).map(NetworkInterface::getName)
+						.map(name -> name + "|" + subnetArgs).orElse(subnetArgs);
+				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, args, 1);
+			}
 
 			logger.info("connect to " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());

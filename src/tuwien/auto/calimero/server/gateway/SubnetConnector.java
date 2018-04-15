@@ -39,9 +39,11 @@ package tuwien.auto.calimero.server.gateway;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import tuwien.auto.calimero.IndividualAddress;
@@ -142,10 +144,19 @@ public final class SubnetConnector
 	 *        connection will use for group address filtering
 	 * @return the created subnet connector
 	 */
-	public static SubnetConnector newWithInterfaceType(final ServiceContainer container,
-		final String interfaceType, final String subnetArgs, final int groupAddrTableInstance)
+	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
+		final String subnetArgs, final int groupAddrTableInstance)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, subnetArgs, groupAddrTableInstance);
+		// extract local netif (optional prefix for IP)
+		final String[] split = subnetArgs.split("\\|", -1);
+		final String args = split.length > 1 ? split[1] : subnetArgs;
+		try {
+			final NetworkInterface netif = split.length > 1 ? NetworkInterface.getByName(split[0]) : null;
+			return new SubnetConnector(container, interfaceType, netif, null, args, groupAddrTableInstance);
+		}
+		catch (final SocketException e) {
+			throw new KNXIllegalArgumentException("error accessing network interface " + split[0], e);
+		}
 	}
 
 	/**
@@ -219,9 +230,13 @@ public final class SubnetConnector
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
 			final String[] args = linkArgs.split(":", -1);
+			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.getInetAddresses().nextElement())
+					.orElse(null);
+			final InetSocketAddress local = new InetSocketAddress(ia, 0);
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			ts = () -> KNXNetworkLinkIP.newTunnelingLink(null, new InetSocketAddress(ip, port), false, settings);
+			final boolean useNat = false;
+			ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, new InetSocketAddress(ip, port), useNat, settings);
 		}
 		else if ("knxip".equals(subnetType)) {
 			try {
