@@ -178,6 +178,7 @@ public class Launcher implements Runnable
 		// list of group addresses used in the group address filter of the KNXnet/IP server
 		private final Map<ServiceContainer, List<GroupAddress>> groupAddressFilters = new HashMap<>();
 		private final Map<ServiceContainer, List<IndividualAddress>> additionalAddresses = new HashMap<>();
+		private final Map<ServiceContainer, Boolean> tunnelingWithNat = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -239,6 +240,7 @@ public class Launcher implements Runnable
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
+			boolean useNat = false;
 			String subnetLinkClass = null;
 			DatapointModel<Datapoint> datapoints = null;
 			List<GroupAddress> filter = Collections.emptyList();
@@ -281,7 +283,12 @@ public class Launcher implements Runnable
 								subnetDoA[i] = (byte) l;
 						}
 
-						if (subnetType.equals("knxip") || subnetType.equals("ip"))
+						if (subnetType.equals("ip")) {
+							subnetKnxipNetif = getNetIf(r);
+							final String attr = r.getAttributeValue(null, "useNat");
+							useNat = attr != null && Boolean.parseBoolean(attr);
+						}
+						else if (subnetType.equals("knxip"))
 							subnetKnxipNetif = getNetIf(r);
 						else if (subnetType.equals("user-supplied"))
 							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
@@ -343,6 +350,7 @@ public class Launcher implements Runnable
 						subnetLinkClasses.put(sc, subnetLinkClass);
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
+						tunnelingWithNat.put(sc, useNat);
 						return;
 					}
 				}
@@ -548,15 +556,14 @@ public class Launcher implements Runnable
 
 			if ("knxip".equals(subnetType))
 				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs, 1);
+			else if ("ip".equals(subnetType))
+				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs, 1);
 			else if ("user-supplied".equals(subnetType))
 				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, 1);
 			else if ("emulate".equals(subnetType))
 				connector = SubnetConnector.newCustom(sc, "emulate", 1, xml.subnetDatapoints.get(sc));
-			else {
-				final String args = Optional.ofNullable(netif).map(NetworkInterface::getName)
-						.map(name -> name + "|" + subnetArgs).orElse(subnetArgs);
-				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, args, 1);
-			}
+			else
+				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
 
 			logger.info("connect to " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());

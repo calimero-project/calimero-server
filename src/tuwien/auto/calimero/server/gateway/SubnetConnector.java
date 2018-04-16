@@ -39,7 +39,6 @@ package tuwien.auto.calimero.server.gateway;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
@@ -118,6 +117,23 @@ public final class SubnetConnector
 	}
 
 	/**
+	 * Creates a new subnet connector with KNXnet/IP Tunneling as subnet link.
+	 *
+	 * @param container service container
+	 * @param netif the network interface used for the tunneling connection
+	 * @param useNat use network address translation (NAT)
+	 * @param subnetArgs the arguments to create the KNX link
+	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
+	 *        connection will use for group address filtering
+	 * @return the new subnet connector
+	 */
+	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
+		final boolean useNat, final String subnetArgs, final int groupAddrTableInstance)
+	{
+		return new SubnetConnector(container, "ip", netif, null, subnetArgs, groupAddrTableInstance, useNat);
+	}
+
+	/**
 	 * Creates a new subnet connector using a user-supplied subnet link.
 	 *
 	 * @param container service container
@@ -147,16 +163,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
 		final String subnetArgs, final int groupAddrTableInstance)
 	{
-		// extract local netif (optional prefix for IP)
-		final String[] split = subnetArgs.split("\\|", -1);
-		final String args = split.length > 1 ? split[1] : subnetArgs;
-		try {
-			final NetworkInterface netif = split.length > 1 ? NetworkInterface.getByName(split[0]) : null;
-			return new SubnetConnector(container, interfaceType, netif, null, args, groupAddrTableInstance);
-		}
-		catch (final SocketException e) {
-			throw new KNXIllegalArgumentException("error accessing network interface " + split[0], e);
-		}
+		return new SubnetConnector(container, interfaceType, null, null, subnetArgs, groupAddrTableInstance);
 	}
 
 	/**
@@ -235,7 +242,7 @@ public final class SubnetConnector
 			final InetSocketAddress local = new InetSocketAddress(ia, 0);
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			final boolean useNat = false;
+			final boolean useNat = (Boolean) this.args[0];
 			ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, new InetSocketAddress(ip, port), useNat, settings);
 		}
 		else if ("knxip".equals(subnetType)) {
