@@ -119,9 +119,11 @@ Elements and attributes of `server-config.xml`:
       - `pl110`: use power-line to connect
       - `knxip`: access via Ethernet
       - `rf`: Wireless connection via 868 MHz
+    - `netif` (tunneling only, optional): server network interface for tunneling to KNX subnet
+    - `useNat` (tunneling only, optional): use network address translation (NAT)
     - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
-	  - `domainAddress` (open media only): domain address for power-line or RF transmission medium
-	  - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
+    - `domainAddress` (open media only): domain address for power-line or RF transmission medium
+    - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
 
 * `<datapoints ref="resources/datapointMap.xml" />` (only applies to subnet emulation, i.e., `type=emulate`): External file to describe the KNX datapoints to be used in the emulated network.
     - `ref`: relative path to XML file
