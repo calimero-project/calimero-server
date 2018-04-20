@@ -36,11 +36,14 @@
 
 package tuwien.auto.calimero.server.gateway;
 
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -236,10 +239,13 @@ public final class SubnetConnector
 		final TSupplier<KNXNetworkLink> ts;
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
-			final String[] args = linkArgs.split(":", -1);
-			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.getInetAddresses().nextElement())
-					.orElse(null);
+			// find IPv4 address for local socket address
+			final List<InetAddress> l = Optional.ofNullable(netif).map(ni -> Collections.list(ni.getInetAddresses()))
+					.orElse(new ArrayList<>());
+			final InetAddress ia = l.stream().filter(Inet4Address.class::isInstance).findFirst().orElse(null);
 			final InetSocketAddress local = new InetSocketAddress(ia, 0);
+
+			final String[] args = linkArgs.split(":", -1);
 			final String ip = args[0];
 			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
 			final boolean useNat = (Boolean) this.args[0];
