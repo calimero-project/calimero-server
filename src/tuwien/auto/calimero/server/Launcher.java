@@ -554,16 +554,17 @@ public class Launcher implements Runnable
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
 
+			final int groupAddrTable = i + 1;
 			if ("knxip".equals(subnetType))
-				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs, 1);
+				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs, groupAddrTable);
 			else if ("ip".equals(subnetType))
-				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs, 1);
+				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs, groupAddrTable);
 			else if ("user-supplied".equals(subnetType))
-				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, 1);
+				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, groupAddrTable);
 			else if ("emulate".equals(subnetType))
-				connector = SubnetConnector.newCustom(sc, "emulate", 1, xml.subnetDatapoints.get(sc));
+				connector = SubnetConnector.newCustom(sc, "emulate", groupAddrTable, xml.subnetDatapoints.get(sc));
 			else
-				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, 1);
+				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, groupAddrTable);
 
 			logger.info("connect to " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());
@@ -572,9 +573,9 @@ public class Launcher implements Runnable
 
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			if (xml.additionalAddresses.containsKey(sc))
-				setAdditionalIndividualAddresses(ios, i + 1, xml.additionalAddresses.get(sc));
+				setAdditionalIndividualAddresses(ios, groupAddrTable, xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
-				setGroupAddressFilter(ios, i + 1, xml.groupAddressFilters.get(sc));
+				setGroupAddressFilter(ios, groupAddrTable, xml.groupAddressFilters.get(sc));
 		}
 	}
 
