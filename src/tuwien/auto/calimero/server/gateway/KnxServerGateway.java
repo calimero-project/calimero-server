@@ -1273,7 +1273,7 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KNXTimeoutException e) {
 			setNetworkState(true, true);
-			logger.warn("timeout sending to {}: {}", f.getDestination(), e);
+			logger.warn("timeout sending to {}: {}", f.getDestination(), e.getMessage());
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
 			logger.error("error sending to {} on subnet {}", f.getDestination(), lnk.getName(), e);
