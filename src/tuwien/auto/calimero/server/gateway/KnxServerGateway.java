@@ -89,6 +89,7 @@ import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
+import tuwien.auto.calimero.cemi.CEMILDataEx.AddInfo;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -1267,6 +1268,12 @@ public class KnxServerGateway implements Runnable
 				ldata = CEMIFactory.create(source, null, f, false);
 			else
 				ldata = f;
+
+			// make sure we remove any additional info for tpuarts, its useless
+			if (subnetLink instanceof KNXNetworkLinkTpuart && ldata instanceof CEMILDataEx) {
+				for (final AddInfo addInfo : ((CEMILDataEx) ldata).getAdditionalInfo())
+					((CEMILDataEx) ldata).removeAdditionalInfo(addInfo.getType());
+			}
 
 			lnk.send(ldata, true);
 			setNetworkState(true, false);
