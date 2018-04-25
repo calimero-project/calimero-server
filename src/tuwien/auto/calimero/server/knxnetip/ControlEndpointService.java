@@ -109,6 +109,8 @@ final class ControlEndpointService extends ServiceLooper
 	private final BitSet channelIds = new BitSet(MAX_CHANNEL_ID);
 	private int lastChannelId;
 
+	private final SecureSession secure;
+
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
 		super(server, null, 512, 10000);
@@ -118,6 +120,8 @@ final class ControlEndpointService extends ServiceLooper
 		final InetAddress addr = s.getLocalAddress();
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
+
+		secure = new SecureSession(this);
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -311,6 +315,9 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
 			logger.warn("received connection state response - ignored");
+		else if (PacketHelper.isKnxSecure(h)) {
+			secure.acceptService(h, data, offset, src, port);
+		}
 		else {
 			DataEndpointServiceHandler sh = null;
 			try {
