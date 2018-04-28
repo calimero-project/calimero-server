@@ -313,8 +313,11 @@ class SecureSession {
 		if (addr != null) {
 			try {
 				final NetworkInterface netif = NetworkInterface.getByInetAddress(addr);
-				if (netif != null)
-					return Arrays.copyOf(netif.getHardwareAddress(), 6);
+				if (netif != null) {
+					final byte[] hardwareAddress = netif.getHardwareAddress();
+					if (hardwareAddress != null)
+						return Arrays.copyOf(hardwareAddress, 6);
+				}
 			}
 			catch (final SocketException e) {}
 		}

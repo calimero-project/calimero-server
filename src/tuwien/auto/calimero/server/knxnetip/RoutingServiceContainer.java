@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
+import java.util.Optional;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -55,6 +56,8 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 public class RoutingServiceContainer extends DefaultServiceContainer
 {
 	private final InetAddress mcast;
+	private final byte[] secureGroupKey;
+	private final int latency;
 
 	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
@@ -73,14 +76,36 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
 		final InetAddress routingMulticast)
 	{
+		this(name, netif, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring, routingMulticast, null, 0);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * Creates a new service container configuration equal to
+	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, boolean, InetAddress)} with
+	 * options for knx secure routing.
+	 */
+	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
+		final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey,
+		final int latencyTolerance) {
 		super(name, netif, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring);
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
 			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
+		this.secureGroupKey = secureGroupKey;
+		this.latency = latencyTolerance;
 	}
 
 	public final InetAddress routingMulticastAddress()
 	{
 		return mcast;
+	}
+
+	Optional<byte[]> secureGroupKey() {
+		return Optional.ofNullable(secureGroupKey).map(byte[]::clone);
+	}
+
+	int latencyTolerance() {
+		return latency;
 	}
 }

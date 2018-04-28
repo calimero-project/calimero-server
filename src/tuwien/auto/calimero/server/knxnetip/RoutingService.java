@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2017 B. Malinowsky
+    Copyright (c) 2016, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@ import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
+import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingLostMessage;
@@ -56,7 +57,7 @@ final class RoutingService extends ServiceLooper
 {
 	private boolean closing;
 
-	private final class RoutingServiceHandler extends KNXnetIPRouting
+	private class RoutingServiceHandler extends KNXnetIPRouting
 	{
 		private RoutingServiceHandler(final String netIf, final InetAddress mcGroup, final boolean enableLoopback)
 		{
@@ -114,14 +115,42 @@ final class RoutingService extends ServiceLooper
 	final RoutingServiceHandler r;
 	private final ServiceContainer svcCont;
 
-	RoutingService(final KNXnetIPServer server, final ServiceContainer sc, final InetAddress mcGroup,
+
+	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final InetAddress mcGroup,
 		final boolean enableLoopback)
 	{
 		super(server, null, false, 512, 0);
 		svcCont = sc;
-		r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback);
+
+		final KNXnetIPRouting inst;
+		if (sc.secureGroupKey().isPresent()) {
+			try {
+				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
+				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, sc.secureGroupKey().get());
+				r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback) {
+					@Override
+					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
+						// NYI sending routing lost message
+						logger.warn("NYI sending routing lost message");
+					}
+
+					@Override
+					public String getName() {
+						return inst.getName();
+					}
+				};
+			}
+			catch (SocketException | KNXException e) {
+				throw wrappedException(e);
+			}
+		}
+		else {
+			r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback);
+			inst = r;
+		}
+
 		s = r.getLocalDataSocket();
-		fireRoutingServiceStarted(svcCont, r);
+		fireRoutingServiceStarted(svcCont, inst);
 	}
 
 	ServiceContainer getServiceContainer()
