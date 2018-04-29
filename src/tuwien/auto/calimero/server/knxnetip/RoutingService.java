@@ -126,7 +126,7 @@ final class RoutingService extends ServiceLooper
 		if (sc.secureGroupKey().isPresent()) {
 			try {
 				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
-				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, sc.secureGroupKey().get());
+				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, sc.secureGroupKey().get(), sc.latencyTolerance());
 				r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback) {
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
@@ -137,6 +137,13 @@ final class RoutingService extends ServiceLooper
 					@Override
 					public String getName() {
 						return inst.getName();
+					}
+
+					@Override
+					protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t) {
+						closing = true;
+						RoutingService.this.quit();
+						inst.close();
 					}
 				};
 			}
