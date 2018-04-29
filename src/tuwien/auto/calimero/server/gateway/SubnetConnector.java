@@ -48,16 +48,22 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
+import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.datapoint.Datapoint;
+import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
+import tuwien.auto.calimero.dptxlator.DPTXlator;
+import tuwien.auto.calimero.dptxlator.TranslatorTypes;
 import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.TSupplier;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -294,7 +300,19 @@ public final class SubnetConnector
 			config.setFilter(f, f);
 			config.activate(true);
 			// necessary to get .ind/.con notification for the buffer
-			vl.createDeviceLink(new IndividualAddress(0));
+			final IndividualAddress device = new IndividualAddress(0);
+			vl.createDeviceLink(device);
+
+			if (config.getDatapointModel() instanceof DatapointMap<?>) {
+				// init all emulated datapoints with their default value
+				for (final Datapoint dp : ((DatapointMap<?>) config.getDatapointModel()).getDatapoints()) {
+					final DPTXlator t = TranslatorTypes.createTranslator(dp.getDPT());
+					final byte[] tpdu = t.getTypeSize() == 0 ? DataUnitBuilder.createLengthOptimizedAPDU(0x80, t.getData())
+							: DataUnitBuilder.createAPDU(0x80, t.getData());
+					final CEMILData msg = new CEMILData(CEMILData.MC_LDATA_REQ, device, dp.getMainAddress(), tpdu, Priority.LOW);
+					config.getBufferedLink().send(msg, true);
+				}
+			}
 
 			ts = () -> config.getBufferedLink();
 		}
