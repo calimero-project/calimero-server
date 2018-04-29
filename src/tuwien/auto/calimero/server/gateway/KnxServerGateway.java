@@ -916,12 +916,10 @@ public class KnxServerGateway implements Runnable
 				dispatchToOtherSubnets(send, connector);
 			}
 			else {
-				final String type = mc == CEMILData.MC_LDATA_CON ? ".con" : " msg code 0x" + Integer.toString(mc, 16);
-				logger.warn(s + " L-data" + type + " [" + DataUnitBuilder.toHex(f.toByteArray(), "") + "] - ignored");
+				logger.warn("{}{} - ignored", s, f);
 			}
 		}
-		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ
-				|| mc == CEMIDevMgmt.MC_RESET_REQ)
+		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ || mc == CEMIDevMgmt.MC_RESET_REQ)
 			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame);
 		else if (frame instanceof CEMIBusMon) {
 			if (fromServerSide) {
