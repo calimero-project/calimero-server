@@ -41,12 +41,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.IndividualAddress;
@@ -320,7 +320,7 @@ public final class SubnetConnector
 			throw new KNXException("network link: unknown KNX subnet specifier " + subnetType);
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
-				.reconnectWait(10, TimeUnit.SECONDS).maxConnectAttempts(Connector.NoMaxAttempts);
+				.reconnectDelay(Duration.ofSeconds(10)).maxConnectAttempts(Connector.NoMaxAttempts);
 		final KNXNetworkLink link = c.newLink(ts);
 		setSubnetLink(link);
 		return link;
@@ -351,7 +351,7 @@ public final class SubnetConnector
 			throw new KNXException("monitor link: unknown KNX subnet specifier " + subnetType);
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
-				.reconnectWait(10, TimeUnit.SECONDS).maxConnectAttempts(Connector.NoMaxAttempts);
+				.reconnectDelay(Duration.ofSeconds(10)).maxConnectAttempts(Connector.NoMaxAttempts);
 		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
