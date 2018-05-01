@@ -153,9 +153,10 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		final InetAddress ip = ((InetSocketAddress) s.getLocalSocketAddress()).getAddress();
 		try {
-			if (!assignedIpAddresses().contains(ip)) {
-				logger.error("{} control endpoint: interface {} updated its IP address (formerly {})",
-						svcCont.getName(), svcCont.networkInterface(), ip.getHostAddress());
+			final List<InetAddress> addresses = assignedIpAddresses();
+			if (!addresses.contains(ip)) {
+				logger.warn("{} control endpoint: interface {} updated its IP address from {} to {}",
+						svcCont.getName(), svcCont.networkInterface(), ip.getHostAddress(), addresses);
 				quit();
 			}
 		}
@@ -353,7 +354,9 @@ final class ControlEndpointService extends ServiceLooper
 				s.setReuseAddress(true);
 			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
-			logger.debug("{} control endpoint: created socket on {}", svcCont.getName(), s.getLocalSocketAddress());
+			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
+			logger.debug("{} control endpoint: socket bound to {}:{}", svcCont.getName(),
+					boundTo.getAddress().getHostAddress(), boundTo.getPort());
 			return s;
 		}
 		catch (SocketException | UnknownHostException e) {
