@@ -18,10 +18,10 @@ apply plugin: 'maven'
 apply plugin: 'application'
 
 group = 'com.github.calimero'
-version = '2.4-SNAPSHOT'
+version = '2.5-SNAPSHOT'
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+sourceCompatibility = 9
+targetCompatibility = 9
 
 mainClassName = 'tuwien.auto.calimero.server.Launcher'
 
