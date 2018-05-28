@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server;
 
+import static java.util.Optional.ofNullable;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
 
@@ -48,6 +49,9 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -185,8 +189,7 @@ public class Launcher implements Runnable
 			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
 
 			if (r.nextTag() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.knxServer))
-				throw new KNXMLException(
-						"no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
+				throw new KNXMLException("no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
 
 			final Map<String, String> m = new HashMap<>();
 			put(m, r, XmlConfiguration.attrName);
@@ -228,8 +231,7 @@ public class Launcher implements Runnable
 			final boolean activate = attrActivate == null || Boolean.parseBoolean(attrActivate);
 			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
 			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
-			final boolean monitor = Boolean
-					.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
+			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface netif = getNetIf(r);
 
@@ -240,6 +242,8 @@ public class Launcher implements Runnable
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
+			byte[] groupKey = null;
+			int latencyTolerance = 1000; // ms
 			boolean useNat = false;
 			String subnetLinkClass = null;
 			DatapointModel<Datapoint> datapoints = null;
@@ -298,6 +302,29 @@ public class Launcher implements Runnable
 						filter = readGroupAddressFilter(r);
 					else if (name.equals(XmlConfiguration.addAddresses))
 						indAddressPool = readAdditionalAddresses(r);
+					else if (name.equals("routing")) {
+						try {
+							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
+								final Path file = ofNullable(r.getAttributeValue(null, "keyFile"))
+										.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get)
+										.orElseThrow(() -> new KNXMLException("secure group communication requires a key file", r));
+								groupKey = Files.lines(file).map(XmlConfiguration::fromHex).findFirst()
+										.orElseThrow(() -> new KNXMLException("no group key found"));
+								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)
+										.orElse(1000);
+							}
+							routingMcast = InetAddress.getByName(r.getElementText());
+						}
+						catch (final UnknownHostException uhe) {
+							throw new KNXMLException(uhe.getMessage(), r);
+						}
+						catch (final IOException e) {
+							throw new KNXMLException("no key file '" + e.getMessage() + "'", r);
+						}
+						catch (final NumberFormatException e) {
+							throw new KNXMLException("invalid latency tolerance", r);
+						}
+					}
 					else if (name.equals(XmlConfiguration.routingMcast)) {
 						try {
 							routingMcast = InetAddress.getByName(r.getElementText());
@@ -308,7 +335,7 @@ public class Launcher implements Runnable
 					}
 					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
 						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
-						final Optional<String> ports = Optional.ofNullable(r.getAttributeValue(null, attrUdpPort));
+						final Optional<String> ports = ofNullable(r.getAttributeValue(null, attrUdpPort));
 						final String[] range = ports.orElse("0-65535").split("-", -1);
 						disruptionBufferLowerPort = Integer.parseInt(range[0]);
 						disruptionBufferUpperPort = Integer.parseInt(range.length > 1 ? range[1] : range[0]);
@@ -334,8 +361,12 @@ public class Launcher implements Runnable
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
-						if (routing)
-							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast);
+						if (routing) {
+							if (groupKey != null)
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast, groupKey, latencyTolerance);
+							else
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast);
+						}
 						else
 							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
@@ -355,6 +386,14 @@ public class Launcher implements Runnable
 					}
 				}
 			}
+		}
+
+		private static byte[] fromHex(final String hex) {
+			final int len = hex.length();
+			final byte[] data = new byte[len / 2];
+			for (int i = 0; i < len; i += 2)
+				data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i + 1), 16));
+			return data;
 		}
 
 		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r)

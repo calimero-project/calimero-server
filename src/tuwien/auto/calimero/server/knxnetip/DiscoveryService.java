@@ -244,6 +244,8 @@ final class DiscoveryService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG
 				|| svc == KNXnetIPHeader.ROUTING_BUSY)
 			return true;
+		else if (PacketHelper.isKnxSecure(h))
+			return true;
 		// other requests are rejected with error
 		return false;
 	}

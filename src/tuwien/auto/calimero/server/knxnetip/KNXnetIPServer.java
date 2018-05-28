@@ -62,6 +62,7 @@ import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
+import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -69,6 +70,8 @@ import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
+import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
+import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
@@ -77,6 +80,7 @@ import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
+import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 /**
@@ -372,6 +376,11 @@ public class KNXnetIPServer
 			}
 			catch (final KnxPropertyException e) {
 				logger.error("initializing KNXnet/IP parameter object of service container '{}'", sc.getName(), e);
+			}
+			if (sc instanceof RoutingServiceContainer) {
+				final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
+				if (rsc.secureGroupKey().isPresent())
+					addSecurityObject(rsc);
 			}
 			synchronized (this) {
 				if (running)
@@ -812,7 +821,13 @@ public class KNXnetIPServer
 		//
 
 		// if service container doesn't support routing, don't show it in device capabilities
-		final int deviceCaps = endpoint instanceof RoutingServiceContainer ? defDeviceCaps : defDeviceCaps - 4;
+		int deviceCaps;
+		if (endpoint instanceof RoutingServiceContainer) {
+			final RoutingServiceContainer rsc = (RoutingServiceContainer) endpoint;
+			deviceCaps = rsc.secureGroupKey().isPresent() ? defDeviceCaps + 64 : defDeviceCaps;
+		}
+		else
+			deviceCaps = defDeviceCaps - 4;
 		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(deviceCaps));
 
 		//
@@ -879,6 +894,25 @@ public class KNXnetIPServer
 		else if (!routingSupported && device.getRawAddress() == 0)
 			setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS,
 					svcContainers.get(svcContainers.size() - 1).getMediumSettings().getDeviceAddress().toByteArray());
+	}
+
+	// NYI ensure security object is read-only
+	private void addSecurityObject(final RoutingServiceContainer sc) {
+		final int iot = InterfaceObject.SECURITY_OBJECT;
+		final int pidLatencyTolerance = 55;
+
+		final InterfaceObjectServer io = getInterfaceObjectServer();
+		io.addInterfaceObject(iot);
+		try {
+			// DPT 7.002
+			final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
+			t.setTimePeriod(sc.latencyTolerance());
+			io.setDescription(new Description(0, iot, pidLatencyTolerance, 0, PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
+			setProperty(iot, objectInstance, pidLatencyTolerance, t.getData());
+		}
+		catch (final KNXFormatException e) {
+			e.printStackTrace();
+		}
 	}
 
 	int objectInstance(final ServiceContainer sc)
@@ -973,13 +1007,13 @@ public class KNXnetIPServer
 		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT,
 			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING,
 			ServiceFamiliesDIB.REMOTE_LOGGING, ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS,
-			ServiceFamiliesDIB.OBJECT_SERVER };
+			ServiceFamiliesDIB.OBJECT_SERVER, 9 };
 
 		final int[] tmp = new int[services.length + 1];
 		// now unconditionally add service family 'core'
 		tmp[0] = ServiceFamiliesDIB.CORE;
 		int count = 1;
-		for (int i = 0; i < 6; ++i)
+		for (int i = 0; i < services.length; ++i)
 			if ((caps >> i & 0x1) == 1)
 				tmp[count++] = services[i];
 
