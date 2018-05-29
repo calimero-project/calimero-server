@@ -59,7 +59,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -231,7 +230,7 @@ public class KnxServerGateway implements Runnable
 			if (!update)
 				return;
 
-			final double rand = new Random().nextDouble();
+			final double rand = Math.random();
 			final long randomWait = Math.round(rand * routingBusyCounter.get() * randomWaitScale.toMillis());
 
 			// invariant on instants: throttle >= pause sending >= current wait
