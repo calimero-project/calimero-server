@@ -61,7 +61,6 @@ import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
-import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
 import tuwien.auto.calimero.link.Connector;
@@ -84,9 +83,8 @@ import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
 /**
- * Contains information necessary to connect a server-side service container to a KNX subnet. A
- * gateway uses subnet connectors to lookup associations of service containers and KNX subnets. It
- * provides information for, e.g., message filtering based on group address tables.
+ * Contains information necessary to connect a server-side service container to a KNX subnet. A gateway uses subnet
+ * connectors to lookup associations of service containers and KNX subnets as well as subnet link management.
  *
  * @author B. Malinowsky
  */
@@ -97,7 +95,6 @@ public final class SubnetConnector
 	private final String linkArgs;
 	private final NetworkInterface netif;
 	private final String className;
-	private final int gatoi;
 	private final Object[] args;
 
 	private AutoCloseable subnetLink;
@@ -113,16 +110,12 @@ public final class SubnetConnector
 	 * @param container service container
 	 * @param routingNetif the network interface used for routing messages
 	 * @param subnetArgs the arguments to create the KNX IP link
-	 * @param groupAddrTableInstance instance of the server group address table in the
-	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
-		final NetworkInterface routingNetif, final String subnetArgs,
-		final int groupAddrTableInstance)
+		final NetworkInterface routingNetif, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "knxip", routingNetif, null, subnetArgs,
-				groupAddrTableInstance);
+		return new SubnetConnector(container, "knxip", routingNetif, null, subnetArgs);
 	}
 
 	/**
@@ -132,14 +125,12 @@ public final class SubnetConnector
 	 * @param netif the network interface used for the tunneling connection
 	 * @param useNat use network address translation (NAT)
 	 * @param subnetArgs the arguments to create the KNX link
-	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
-	 *        connection will use for group address filtering
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
-		final boolean useNat, final String subnetArgs, final int groupAddrTableInstance)
+		final boolean useNat, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "ip", netif, null, subnetArgs, groupAddrTableInstance, useNat);
+		return new SubnetConnector(container, "ip", netif, null, subnetArgs, useNat);
 	}
 
 	/**
@@ -148,15 +139,12 @@ public final class SubnetConnector
 	 * @param container service container
 	 * @param className the class name of to the user subnet link
 	 * @param subnetArgs the arguments to create the subnet link
-	 * @param groupAddrTableInstance instance of the server group address table in the
-	 *        {@link InterfaceObjectServer} the connection will use for group address filtering
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithUserLink(final ServiceContainer container,
-		final String className, final String subnetArgs, final int groupAddrTableInstance)
+		final String className, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs,
-				groupAddrTableInstance);
+		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs);
 	}
 
 	/**
@@ -165,14 +153,12 @@ public final class SubnetConnector
 	 * @param container service container
 	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
 	 * @param subnetArgs the arguments to create the subnet link
-	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
-	 *        connection will use for group address filtering
 	 * @return the created subnet connector
 	 */
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
-		final String subnetArgs, final int groupAddrTableInstance)
+		final String subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, subnetArgs, groupAddrTableInstance);
+		return new SubnetConnector(container, interfaceType, null, null, subnetArgs);
 	}
 
 	/**
@@ -180,28 +166,23 @@ public final class SubnetConnector
 	 *
 	 * @param container service container
 	 * @param interfaceType the interface type
-	 * @param groupAddrTableInstance instance of the server group address table in the {@link InterfaceObjectServer} the
-	 *        connection will use for group address filtering
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
 	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
-		final int groupAddrTableInstance, final Object... subnetArgs)
+		final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, interfaceType, groupAddrTableInstance,
-				subnetArgs);
+		return new SubnetConnector(container, interfaceType, null, null, interfaceType, subnetArgs);
 	}
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType,
-		final NetworkInterface routingNetif, final String className, final String subnetArgs,
-		final int groupAddrTableInstance, final Object... args)
+		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
 	{
 		sc = container;
 		subnetType = interfaceType;
 		netif = routingNetif;
 		this.className = className;
 		linkArgs = subnetArgs;
-		gatoi = groupAddrTableInstance;
 		this.args = args;
 	}
 
@@ -375,11 +356,6 @@ public final class SubnetConnector
 			((KNXNetworkLink) link).addLinkListener((NetworkLinkListener) listener);
 		if (link instanceof KNXNetworkMonitor)
 			((KNXNetworkMonitor) link).addMonitorListener(listener);
-	}
-
-	int getGroupAddressTableObjectInstance()
-	{
-		return gatoi;
 	}
 
 	@SuppressWarnings("TypeParameterUnusedInFormals")

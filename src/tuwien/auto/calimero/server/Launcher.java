@@ -556,23 +556,23 @@ public class Launcher implements Runnable
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
 
-			final int groupAddrTable = i + 1;
 			if ("knxip".equals(subnetType))
-				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs, groupAddrTable);
+				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
 			else if ("ip".equals(subnetType))
-				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs, groupAddrTable);
+				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs);
 			else if ("user-supplied".equals(subnetType))
-				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs, groupAddrTable);
+				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs);
 			else if ("emulate".equals(subnetType))
-				connector = SubnetConnector.newCustom(sc, "emulate", groupAddrTable, xml.subnetDatapoints.get(sc));
+				connector = SubnetConnector.newCustom(sc, "emulate", xml.subnetDatapoints.get(sc));
 			else
-				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs, groupAddrTable);
+				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
 
 			logger.info("connect to " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
 			server.addServiceContainer(sc);
 
+			final int groupAddrTable = i + 1;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			if (xml.additionalAddresses.containsKey(sc))
 				setAdditionalIndividualAddresses(ios, groupAddrTable, xml.additionalAddresses.get(sc));
