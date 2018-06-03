@@ -88,7 +88,7 @@ Elements and attributes of `server-config.xml`:
 
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
-	- `routing`: if `true` serve KNXnet/IP routing connections (the server KNX address defaults to 15.15.0), if `false` KNXnet/IP routing is disabled
+	- `routing`: if `true` serve KNXnet/IP routing connections, if `false` KNXnet/IP routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
 	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available network adapter is chosen depending on your OS network setup (localhost setting). 

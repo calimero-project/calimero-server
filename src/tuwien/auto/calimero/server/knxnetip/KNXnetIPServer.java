@@ -39,7 +39,6 @@ package tuwien.auto.calimero.server.knxnetip;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
@@ -165,10 +164,6 @@ public class KNXnetIPServer
 		defRoutingMulticast = a;
 	}
 
-	// PID.MAC_ADDRESS
-	// we set the actual MAC address per service container when we have the socket information
-	private static final byte[] defMacAddress = new byte[6];
-
 	// Values used for service families DIB
 
 	// PID.KNXNETIP_DEVICE_CAPABILITIES
@@ -291,22 +286,16 @@ public class KNXnetIPServer
 	 * </ul>
 	 *
 	 * @param localName name of this server as shown to the owner/user of this server
-	 * @param friendlyName a friendly, descriptive name for this server, consisting of ISO-8859-1
-	 *        characters only, with string length &lt; 30 characters, <code>friendlyName</code> might
-	 *        be of length 0 to use defaults
+	 * @param friendlyName a friendly, descriptive name used for discovery and description, consisting of
+	 *        ISO-8859-1 characters only, with string length &lt; 30 characters, <code>friendlyName</code> might be of
+	 *        length 0
 	 */
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
 		serverName = localName;
 		if (!Charset.forName("ISO-8859-1").newEncoder().canEncode(friendlyName))
 			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
-		try {
-			this.friendlyName = friendlyName.length() == 0 ? new String(defFriendlyName, "ISO-8859-1") : friendlyName;
-		}
-		catch (final UnsupportedEncodingException e) {
-			// ISO 8859-1 support is mandatory on every Java platform
-			throw new Error("missing ISO 8859-1 charset, " + e.getMessage());
-		}
+		this.friendlyName = friendlyName;
 		logger = LogService.getLogger("calimero.server." + getName());
 		listeners = new EventListeners<>(logger);
 
@@ -747,11 +736,11 @@ public class KNXnetIPServer
 		setProperty(DEVICE_OBJECT, objectInstance, PID.PROGMODE, new byte[] { defDeviceStatus });
 		setProperty(DEVICE_OBJECT, objectInstance, PID.SERIAL_NUMBER, defSerialNumber);
 		// server KNX device address, since we don't know about routing at this time
-		// address is always 0.0.0; might be updated later or by routing configuration
-		final byte[] device = new IndividualAddress(0).toByteArray();
+		// address is always 15.15.0; might be updated later or by routing configuration
+		final byte[] device = defKnxAddress.toByteArray();
 		// equal to PID.KNX_INDIVIDUAL_ADDRESS
-		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, new byte[] { device[0] });
-		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, new byte[] { device[1] });
+		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
+		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
 
 		//
 		// set properties used in manufacturer data DIB for discovery self description
@@ -779,17 +768,12 @@ public class KNXnetIPServer
 		// set properties used in device DIB for search response during discovery
 		//
 		// friendly name property entry is an array of 30 characters
-		final byte[] data = new byte[30];
-		try {
-			System.arraycopy(friendlyName.getBytes("ISO-8859-1"), 0, data, 0, friendlyName.length());
-		}
-		catch (final UnsupportedEncodingException ignore) {}
+		final byte[] data = Arrays.copyOf(friendlyName.getBytes(Charset.forName("ISO-8859-1")), 30);
 		ios.setProperty(knxObject, objectInstance, PID.FRIENDLY_NAME, 1, data.length, data);
 		setProperty(knxObject, objectInstance, PID.PROJECT_INSTALLATION_ID, bytesFromWord(defProjectInstallationId));
-		// server KNX device address, since we don't know about routing at this time
-		// address is always 0.0.0, but is updated in setRoutingConfiguration
-		setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, new IndividualAddress(0).toByteArray());
-		setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, defMacAddress);
+		final byte[] addr = endpoint.getMediumSettings().getDeviceAddress().toByteArray();
+		setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, addr);
+		setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, new byte[6]);
 
 		// routing stuff
 		if (endpoint instanceof RoutingServiceContainer)
@@ -854,28 +838,12 @@ public class KNXnetIPServer
 					CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
 		}
 		setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, mcast.getAddress());
-
-		matchRoutingServerDeviceAddress(objectInstance, true);
 	}
 
 	private void resetRoutingConfiguration(final int objectInstance)
 	{
 		setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS,
 				new byte[4]);
-		matchRoutingServerDeviceAddress(objectInstance, false);
-	}
-
-	private void matchRoutingServerDeviceAddress(final int objectInstance, final boolean routingSupported)
-	{
-		final KNXAddress device = new IndividualAddress(
-				ios.getProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, 1, 1));
-		if (routingSupported && device.getRawAddress() == 0)
-			setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, defKnxAddress.toByteArray());
-		else if (!routingSupported && device.equals(defKnxAddress))
-			setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, new IndividualAddress(0).toByteArray());
-		else if (!routingSupported && device.getRawAddress() == 0)
-			setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS,
-					svcContainers.get(svcContainers.size() - 1).getMediumSettings().getDeviceAddress().toByteArray());
 	}
 
 	int objectInstance(final ServiceContainer sc)
@@ -955,7 +923,7 @@ public class KNXnetIPServer
 					.getByAddress(ios.getProperty(knxObject, objectInstance(sc), PID.ROUTING_MULTICAST_ADDRESS, 1, 1));
 		}
 		catch (UnknownHostException | KnxPropertyException e) {}
-		final byte[] macAddress = getProperty(knxObject, objectInstance(sc), PID.MAC_ADDRESS, defMacAddress);
+		final byte[] macAddress = getProperty(knxObject, objectInstance(sc), PID.MAC_ADDRESS, new byte[6]);
 
 		return new DeviceDIB(friendly, deviceStatus, projectInstallationId, sc.getMediumSettings().getMedium(),
 				knxAddress, serialNumber, mcast, macAddress);
