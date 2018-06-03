@@ -52,6 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -477,8 +478,13 @@ final class ControlEndpointService extends ServiceLooper
 			}
 
 			device = assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress());
-			if (device == null)
+			if (device == null) {
+				final List<IndividualAddress> list = additionalAddresses();
+				if (new HashSet<>(list).size() != list.size())
+					return errorResponse(0x25, endpoint);
+
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
+			}
 			final boolean isServerAddress = device.equals(serverAddress());
 			logger.info("assign {} address {} to channel {}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
@@ -563,31 +569,36 @@ final class ControlEndpointService extends ServiceLooper
 		return new ConnectResponse(status);
 	}
 
-	// null return means no address available
-	private IndividualAddress assignDeviceAddress(final IndividualAddress forSubnet)
-	{
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		// we assign our own KNX server device address iff:
-		// - no unused additional addresses are available
-		// - we don't run KNXnet/IP routing
+	private List<IndividualAddress> additionalAddresses() {
+		final int oi = objectInstance();
+		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, oi, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
+		final List<IndividualAddress> list = new ArrayList<>();
 		try {
-			final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
-			for (int i = 0; i < elems; ++i) {
-				final byte[] data = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-						PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1);
-				final IndividualAddress addr = new IndividualAddress(data);
-				if (matchesSubnet(addr, forSubnet))
-					if (checkAndSetDeviceAddress(addr, false))
-						return addr;
-			}
+			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, oi,
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
+			final ByteBuffer buf = ByteBuffer.wrap(data);
+			for (int i = 0; i < elems; ++i)
+				list.add(new IndividualAddress(buf.getShort() & 0xffff));
 		}
 		catch (final KnxPropertyException e) {
 			logger.warn(e.getMessage());
 		}
+		return list;
+	}
+
+	// null return means no address available
+	private IndividualAddress assignDeviceAddress(final IndividualAddress forSubnet)
+	{
+		for (final IndividualAddress addr : additionalAddresses()) {
+			if (matchesSubnet(addr, forSubnet) && checkAndSetDeviceAddress(addr, false))
+				return addr;
+		}
 		// there are no free addresses, or no additional address at all
 		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
 
+		// we assign our own KNX server device address iff:
+		// - no unused additional addresses are available
+		// - we don't run KNXnet/IP routing
 		if (svcCont instanceof RoutingServiceContainer) {
 			logger.warn("KNXnet/IP routing active, cannot assign server device address {}", serverAddress());
 			return null;
