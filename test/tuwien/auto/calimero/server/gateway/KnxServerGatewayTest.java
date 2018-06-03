@@ -96,7 +96,7 @@ class KnxServerGatewayTest
 
 	private KNXnetIPServer setupServer()
 	{
-		final KNXnetIPServer s = new KNXnetIPServer();
+		final KNXnetIPServer s = new KNXnetIPServer("test", "friendly server name");
 		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
 		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, MAIN_LCGRPCONFIG, 1, 1, new byte[] {0});
@@ -176,7 +176,7 @@ class KnxServerGatewayTest
 			table[idx++] = (byte) (ga.getRawAddress() >> 8);
 			table[idx++] = (byte) ga.getRawAddress();
 		}
-		final KNXnetIPServer server = new KNXnetIPServer();
+		final KNXnetIPServer server = new KNXnetIPServer("calimero-server", "");
 		ios = server.getInterfaceObjectServer();
 		// create interface object and set the address table object property
 		ios.addInterfaceObject(InterfaceObject.ADDRESSTABLE_OBJECT);
