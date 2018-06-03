@@ -233,19 +233,32 @@ public class KNXnetIPServer
 	private final EventListeners<ServerListener> listeners;
 
 	/**
-	 * Creates a new KNXnet/IP server instance.
+	 * @deprecated Use {@link #KNXnetIPServer(String, String)}
+	 */
+	@Deprecated
+	public KNXnetIPServer() {
+		this("calimero-server", "");
+	}
+
+	/**
+	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
 	 * <p>
-	 * During construction, the server creates its own Interface Object Server (IOS) and adds KNX
-	 * properties with default values. Subsequent property changes can be done by calling
-	 * {@link #getInterfaceObjectServer()}. Be aware that KNX properties added might change between
-	 * implementations, as might their default property values. Added KNX properties with their
-	 * initialized value in this implementation:
+	 * The <code>localName</code> argument is user-chosen to locally identify the server instance and also used for
+	 * local naming purposes, e.g., the logger name.<br>
+	 * The <code>friendlyName</code> argument is stored in the KNX property
+	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object Server during
+	 * initialization. It identifies the server instance to clients of this server, and is used, e.g., in responses
+	 * during server discovery.<br>
+	 * During construction, the server creates its own Interface Object Server (IOS) and adds KNX properties with
+	 * default values. Subsequent property changes can be done by calling {@link #getInterfaceObjectServer()}. Be aware
+	 * that KNX properties added might change between implementations, as might their default property values. KNX
+	 * properties are initialized as follows in this implementation:
 	 * <ul>
 	 * <li>Device Object:
 	 * <ul>
 	 * <li>PID.MAX_APDULENGTH: 15</li>
-	 * <li>PID.DESCRIPTION: 'J', '2', 'M', 'E', ' ', 'K', 'N', 'X', 'n', 'e', 't', '/', 'I', 'P',
-	 * ' ', 's', 'e', 'r', 'v', 'e', 'r'</li>
+	 * <li>PID.DESCRIPTION: 'J', '2', 'M', 'E', ' ', 'K', 'N', 'X', 'n', 'e', 't', '/', 'I', 'P', ' ', 's', 'e', 'r',
+	 * 'v', 'e', 'r'</li>
 	 * <li>PID.VERSION: Settings.getLibraryVersion()</li>
 	 * <li>PID.FIRMWARE_REVISION: 1</li>
 	 * <li>PID.SUBNET_ADDR: subnet address of PID.KNX_INDIVIDUAL_ADDRESS value</li>
@@ -260,10 +273,10 @@ public class KNXnetIPServer
 	 * <li>PID.SERIAL_NUMBER: 0</li>
 	 * <li>PID.KNX_INDIVIDUAL_ADDRESS: 0.0.0</li>
 	 * <li>PID.ROUTING_MULTICAST_ADDRESS : {@link KNXnetIPRouting#DEFAULT_MULTICAST}</li>
-	 * <li>PID.MAC_ADDRESS: default local host network interface MAC address or 0</li>
-	 * <li>PID.CURRENT_IP_ADDRESS: default local host IP</li>
+	 * <li>PID.MAC_ADDRESS: 0</li>
+	 * <li>PID.CURRENT_IP_ADDRESS: control endpoint IP address</li>
 	 * <li>PID.SYSTEM_SETUP_MULTICAST_ADDRESS: {@link Discoverer#SEARCH_MULTICAST}</li>
-	 * <li>PID.KNXNETIP_DEVICE_CAPABILITIES: 7 (Device Management, Tunneling, Routing)</li>
+	 * <li>PID.KNXNETIP_DEVICE_CAPABILITIES: Device Management, Tunneling (and Routing if enabled)</li>
 	 * <li>PID.MANUFACTURER_ID: 0</li>
 	 * <li>PID.MANUFACTURER_DATA: 'b', 'm', '2', '0', '1', '1', ' ', ' ' ' '</li>
 	 * <li>PID.KNXNETIP_ROUTING_CAPABILITIES: 0</li>
@@ -276,22 +289,6 @@ public class KNXnetIPServer
 	 * </ul>
 	 * </li>
 	 * </ul>
-	 */
-	public KNXnetIPServer()
-	{
-		this("calimero-server", "");
-	}
-
-	/**
-	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
-	 * <p>
-	 * The <code>localName</code> argument is user-chosen to locally identify the server instance
-	 * and also used for local naming purposes, e.g., the logger name.<br>
-	 * The <code>friendlyName</code> argument is stored in the KNX property
-	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object
-	 * Server during initialization. It identifies the server instance to clients of this server,
-	 * and is used, e.g., in responses during server discovery.<br>
-	 * See also {@link #KNXnetIPServer()} for a list of KNX properties initialized by this server.
 	 *
 	 * @param localName name of this server as shown to the owner/user of this server
 	 * @param friendlyName a friendly, descriptive name for this server, consisting of ISO-8859-1
@@ -323,7 +320,7 @@ public class KNXnetIPServer
 	 * The assigned server name is stored in the KNX property
 	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object
 	 * Server during initialization.<br>
-	 * See {@link #KNXnetIPServer()} for a list of initialized KNX properties.
+	 * See {@link #KNXnetIPServer(String, String)} for a list of initialized KNX properties.
 	 *
 	 * @param serverName both the local and friendly name of this server instance, see
 	 *        {@link #KNXnetIPServer(String, String)}
