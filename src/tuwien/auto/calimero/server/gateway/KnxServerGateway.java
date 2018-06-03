@@ -512,13 +512,10 @@ public class KnxServerGateway implements Runnable
 	// MAIN_LCGRPCONFIG/SUB_LCGRPCONFIG bits:
 	// Bits 0-1: address handling for addresses <= 0x6fff
 	// Bits 2-3: address handling for addresses >= 0x7000
-	// Values 0-1:
+	// Values:
 	// 0 = not used, 1 = route all frames (repeater) (default for addresses >= 0x7000),
 	// 2 = block all, 3 = use filter table (default for addresses <= 0x6fff)
-	// forwarding settings to main line for addresses <= 0x6fff
-	private static final int MAIN_LCGRPCONFIG = 54;
-	// forwarding settings to sub line for addresses <= 0x6fff
-	private static final int SUB_LCGRPCONFIG = 55;
+
 
 	private final Thread dispatcher = new Thread() {
 		// threshold for multicasting routing busy msg is 10 incoming routing indications
@@ -997,12 +994,7 @@ public class KnxServerGateway implements Runnable
 		else {
 			final int raw = f.getDestination().getRawAddress();
 			for (final SubnetConnector subnet : connectors) {
-				// get forwarding settings for group destination address
-				final int objinst = objectInstance(subnet);
-				final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, SUB_LCGRPCONFIG, 3);
-				final int subGroupAddressConfig = value & 0x03;
-
-				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude) && !(raw <= 0x6fff && subGroupAddressConfig == 2))
+				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
 					dispatchToSubnet(subnet, f, raw);
 				else
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
@@ -1019,10 +1011,15 @@ public class KnxServerGateway implements Runnable
 	{
 		final int objinst = objectInstance(subnet);
 		if (rawAddress <= 0x6fff) {
-			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, SUB_LCGRPCONFIG, 3);
+			// get forwarding settings for group destination address
+			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.MAIN_LCGROUPCONFIG, 3);
 			final int subGroupAddressConfig = value & 0x03;
+			if (subGroupAddressConfig == 2) {
+				logger.debug("no frames shall be routed to subnet {} - discard {}", subnet.getName(), f);
+				return;
+			}
 			final GroupAddress d = (GroupAddress) f.getDestination();
-			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3) && !inGroupAddressTable(d, objinst)) {
+			if (subGroupAddressConfig == 3 && !inGroupAddressTable(d, objinst)) {
 				logger.warn("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
 				return;
 			}
@@ -1130,13 +1127,14 @@ public class KnxServerGateway implements Runnable
 				if (raw <= 0x6fff) {
 					final int objinst = objectInstance(subnet);
 					// check if forwarding requests us to block all frames
-					final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, MAIN_LCGRPCONFIG, 3);
+					final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.SUB_LCGROUPCONFIG, 3);
 					final int mainGroupAddressConfig = value & 0x03;
-					if (mainGroupAddressConfig == 2)
+					if (mainGroupAddressConfig == 2) {
+						logger.debug("no frames shall be routed from subnet {} - discard {}", subnet.getName(), f);
 						return;
+					}
 					// check if forwarding requests us to use the filter table
-					if ((mainGroupAddressConfig == 0 || mainGroupAddressConfig == 3)
-							&& !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
+					if (mainGroupAddressConfig == 3 && !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
 						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
