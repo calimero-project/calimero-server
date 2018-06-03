@@ -231,6 +231,8 @@ public class Launcher implements Runnable
 			final boolean activate = attrActivate == null || Boolean.parseBoolean(attrActivate);
 			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
 			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
+			if (routing && reuse)
+				throw new KNXIllegalArgumentException("with routing activated, reusing control endpoint is not allowed");
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface netif = getNetIf(r);
@@ -363,9 +365,9 @@ public class Launcher implements Runnable
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
 						if (routing) {
 							if (groupKey != null)
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast, groupKey, latencyTolerance);
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast, groupKey, latencyTolerance);
 							else
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, routingMcast);
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast);
 						}
 						else
 							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);

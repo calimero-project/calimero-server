@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import java.net.InetAddress;
 import java.util.Optional;
 
+import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -60,6 +61,26 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	private final int latency;
 
 	/**
+	 * @deprecated Use {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, InetAddress)}.
+	 * @param name see {@link DefaultServiceContainer}
+	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
+	 *        <code>"any"</code> to use system default
+	 * @param controlEndpoint see {@link DefaultServiceContainer}
+	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
+	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
+	 * @param reuseCtrlEndpt not used
+	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
+	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 */
+	@Deprecated
+	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+		final InetAddress routingMulticast)
+	{
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, 0);
+	}
+
+	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
 	 *
 	 * @param name see {@link DefaultServiceContainer}
@@ -67,28 +88,41 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 *        <code>"any"</code> to use system default
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
-	 * @param reuseCtrlEndpt see {@link DefaultServiceContainer}
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring,
 		final InetAddress routingMulticast)
 	{
-		this(name, netif, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring, routingMulticast, null, 0);
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, 0);
 	}
 
 	/**
-	 * {@inheritDoc}
 	 * Creates a new service container configuration equal to
-	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, boolean, InetAddress)} with
+	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, InetAddress)} with
 	 * options for knx secure routing.
+	 *
+	 * @param name see {@link DefaultServiceContainer}
+	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
+	 *        <code>"any"</code> to use system default
+	 * @param controlEndpoint see {@link DefaultServiceContainer}
+	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
+	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
+	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
+	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 * @param secureGroupKey KNX IP Secure group key (backbone key), <code>groupKey.length == 16</code>
+	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
+	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey,
-		final int latencyTolerance) {
-		super(name, netif, controlEndpoint, subnet, reuseCtrlEndpt, allowNetworkMonitoring);
+		final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey, final int latencyTolerance) {
+		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring);
+		final IndividualAddress addr = subnet.getDeviceAddress();
+		if (addr.getDevice() != 0)
+			throw new KNXIllegalArgumentException(
+					"KNXnet/IP router requires coupler/backbone individual address x.y.0 (not " + addr + ")");
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
 			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
