@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.gateway;
 
 import static java.lang.String.format;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static tuwien.auto.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
 
 import java.lang.reflect.Field;
@@ -370,20 +371,6 @@ public class KnxServerGateway implements Runnable
 
 			if (pe.getNewData().length == 0)
 				return;
-
-			// update group address forwarding settings
-			if (pe.getPropertyId() == MAIN_LCGRPCONFIG) {
-				if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
-					mainGroupAddressConfig = pe.getNewData()[0] & 0x03;
-					logger.info("main-line group address config changed to " + mainGroupAddressConfig);
-				}
-			}
-			else if (pe.getPropertyId() == SUB_LCGRPCONFIG) {
-				if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
-					subGroupAddressConfig = pe.getNewData()[0] & 0x03;
-					logger.info("sub-line group address config changed to " + subGroupAddressConfig);
-				}
-			}
 		}
 
 		@Override
@@ -528,13 +515,10 @@ public class KnxServerGateway implements Runnable
 	// Values 0-1:
 	// 0 = not used, 1 = route all frames (repeater) (default for addresses >= 0x7000),
 	// 2 = block all, 3 = use filter table (default for addresses <= 0x6fff)
-	private static final int MAIN_LCGRPCONFIG = 54;
-	private static final int SUB_LCGRPCONFIG = 55;
-
 	// forwarding settings to main line for addresses <= 0x6fff
-	private int mainGroupAddressConfig = 3;
+	private static final int MAIN_LCGRPCONFIG = 54;
 	// forwarding settings to sub line for addresses <= 0x6fff
-	private int subGroupAddressConfig = 3;
+	private static final int SUB_LCGRPCONFIG = 55;
 
 	private final Thread dispatcher = new Thread() {
 		// threshold for multicasting routing busy msg is 10 incoming routing indications
@@ -633,10 +617,12 @@ public class KnxServerGateway implements Runnable
 
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 
-		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
-			final SubnetConnector b = i.next();
-			b.setSubnetListener(new SubnetListener(b.getName()));
-			final ServiceContainer sc = b.getServiceContainer();
+		int objinst = 0;
+		for (final SubnetConnector connector : connectors) {
+			objinst++;
+
+			connector.setSubnetListener(new SubnetListener(connector.getName()));
+			final ServiceContainer sc = connector.getServiceContainer();
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
 			if (!timeout.isZero()) {
 				final int[] portRange = ((DefaultServiceContainer) sc).disruptionBufferPortRange();
@@ -648,44 +634,32 @@ public class KnxServerGateway implements Runnable
 			// this only sets the actual interface's max. apdu if the subnet connection is already up and running
 			final byte[] data = new byte[] { 0, (byte) sc.getMediumSettings().maxApduLength() };
 			ios.setProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, 1, 1, data);
+
 			final int pidMaxRoutingApduLength = 58;
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, b.getGroupAddressTableObjectInstance(),
-					pidMaxRoutingApduLength, 1, 1, data);
+			ios.setProperty(ROUTER_OBJECT, objinst, pidMaxRoutingApduLength, 1, 1, data);
 			logger.debug("set maximum APDU length to {}", sc.getMediumSettings().maxApduLength());
-		}
 
-		// XXX should this go into loop above, because we need several router objects, one per subnet connector?
-		int value = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objectInstance, MAIN_LCGRPCONFIG, mainGroupAddressConfig);
-		mainGroupAddressConfig = value & 0x03;
-		logger.info("main-line group address forward setting set to " + mainGroupAddressConfig);
-
-		value = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objectInstance, SUB_LCGRPCONFIG, subGroupAddressConfig);
-		subGroupAddressConfig = value & 0x03;
-		logger.info("sub-line group address forward setting set to " + subGroupAddressConfig);
-
-
-		// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
-		try {
-			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.PRIORITY_FIFO_ENABLED, 1, 1,
-					new byte[] { 0 });
-		}
-		catch (final KnxPropertyException e) {
-			logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
-		}
-		// init capability list of different routing features
-		// bit field: bit 0: Queue overflow counter available
-		// 1: Transmitted message counter available
-		// 2: Support of priority/FIFO message queues
-		// 3: Multiple KNX installations supported
-		// 4: Group address mapping supported
-		// other bits reserved
-		final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
-		try {
-			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1,
-					new byte[] { caps });
-		}
-		catch (final KnxPropertyException e) {
-			logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
+			// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
+			try {
+				ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.PRIORITY_FIFO_ENABLED, 1, 1, (byte) 0);
+			}
+			catch (final KnxPropertyException e) {
+				logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
+			}
+			// init capability list of different routing features
+			// bit field: bit 0: Queue overflow counter available
+			// 1: Transmitted message counter available
+			// 2: Support of priority/FIFO message queues
+			// 3: Multiple KNX installations supported
+			// 4: Group address mapping supported
+			// other bits reserved
+			final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
+			try {
+				ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, caps);
+			}
+			catch (final KnxPropertyException e) {
+				logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
+			}
 		}
 	}
 
@@ -1023,14 +997,14 @@ public class KnxServerGateway implements Runnable
 				send(lnk, f);
 		}
 		else {
-			// group destination address, check forwarding settings
 			final int raw = f.getDestination().getRawAddress();
-			if (raw <= 0x6fff && subGroupAddressConfig == 2)
-				return;
+			for (final SubnetConnector subnet : connectors) {
+				// get forwarding settings for group destination address
+				final int objinst = objectInstance(subnet);
+				final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, SUB_LCGRPCONFIG, 3);
+				final int subGroupAddressConfig = value & 0x03;
 
-			for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
-				final SubnetConnector subnet = i.next();
-				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
+				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude) && !(raw <= 0x6fff && subGroupAddressConfig == 2))
 					dispatchToSubnet(subnet, f, raw);
 				else
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
@@ -1046,10 +1020,12 @@ public class KnxServerGateway implements Runnable
 
 	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f, final int rawAddress)
 	{
+		final int objinst = objectInstance(subnet);
 		if (rawAddress <= 0x6fff) {
+			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, SUB_LCGRPCONFIG, 3);
+			final int subGroupAddressConfig = value & 0x03;
 			final GroupAddress d = (GroupAddress) f.getDestination();
-			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3)
-					&& !inGroupAddressTable(d, subnet.getGroupAddressTableObjectInstance())) {
+			if ((subGroupAddressConfig == 0 || subGroupAddressConfig == 3) && !inGroupAddressTable(d, objinst)) {
 				logger.warn("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
 				return;
 			}
@@ -1109,9 +1085,9 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
-	private void dispatchToServer(final SubnetConnector subnetConnector, final CEMILData f, final long eventId)
+	private void dispatchToServer(final SubnetConnector subnet, final CEMILData f, final long eventId)
 	{
-		final ServiceContainer sc = subnetConnector.getServiceContainer();
+		final ServiceContainer sc = subnet.getServiceContainer();
 		try {
 			if (f.getDestination() instanceof IndividualAddress) {
 				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
@@ -1124,7 +1100,7 @@ public class KnxServerGateway implements Runnable
 				}
 				// 2. workaround for usb interfaces: allow assigning additional addresses to client connections,
 				// even though we always have the same destination (i.e., the address of the usb interface)
-				else if (subnetConnector.getInterfaceType().equals("usb")
+				else if (subnet.getInterfaceType().equals("usb")
 						&& f.getDestination().equals(localInterface)) {
 					for (final Map.Entry<IndividualAddress, KNXnetIPConnection> i : serverDataConnections.entrySet()) {
 						final IndividualAddress assignedAddress = i.getKey();
@@ -1155,13 +1131,15 @@ public class KnxServerGateway implements Runnable
 				// group destination address
 				final int raw = f.getDestination().getRawAddress();
 				if (raw <= 0x6fff) {
+					final int objinst = objectInstance(subnet);
 					// check if forwarding requests us to block all frames
+					final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, MAIN_LCGRPCONFIG, 3);
+					final int mainGroupAddressConfig = value & 0x03;
 					if (mainGroupAddressConfig == 2)
 						return;
 					// check if forwarding requests us to use the filter table
-					final int gatObjInst = subnetConnector.getGroupAddressTableObjectInstance();
 					if ((mainGroupAddressConfig == 0 || mainGroupAddressConfig == 3)
-							&& !inGroupAddressTable((GroupAddress) f.getDestination(), gatObjInst)) {
+							&& !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
 						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
@@ -1173,7 +1151,7 @@ public class KnxServerGateway implements Runnable
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
 					final boolean monitoring = c.getName().toLowerCase().contains("monitor");
-					final CEMI send = monitoring ? convertToBusmon(f, eventId, subnetConnector) : f;
+					final CEMI send = monitoring ? convertToBusmon(f, eventId, subnet) : f;
 					try {
 						send(sc, c, send);
 					}
@@ -1386,6 +1364,10 @@ public class KnxServerGateway implements Runnable
 				return Optional.of(connector);
 		}
 		return Optional.empty();
+	}
+
+	private int objectInstance(final SubnetConnector connector) {
+		return connectors.indexOf(connector) + 1;
 	}
 
 	// TODO support > 1 service containers with usb
