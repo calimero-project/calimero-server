@@ -1508,8 +1508,8 @@ public class KnxServerGateway implements Runnable
 			logger.warn("KNX address mismatch with USB interface: currently {}, configured {} -> assigning {}", current,
 					configured, configured);
 			final byte[] addr = configured.toByteArray();
-			ldm.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, new byte[] { addr[0] });
-			ldm.setProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, new byte[] { addr[1] });
+			ldm.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, addr[0]);
+			ldm.setProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1, addr[1]);
 		}
 	}
 

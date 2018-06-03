@@ -370,7 +370,7 @@ public final class SubnetConnector
 		}
 		catch (final ReflectiveOperationException | RuntimeException e) {
 			// ClassNotFoundException, InstantiationException, IllegalAccessException,
-			// InvocationTargetException, // ClassCastException, IllegalArgumentException,
+			// InvocationTargetException, ClassCastException, IllegalArgumentException,
 			// SecurityException
 			throw new KNXIllegalArgumentException("error loading link resource " + className, e);
 		}
