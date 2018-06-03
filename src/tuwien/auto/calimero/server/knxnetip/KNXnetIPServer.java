@@ -51,7 +51,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -60,7 +59,6 @@ import org.slf4j.Logger;
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -613,7 +611,7 @@ public class KNXnetIPServer
 	{
 		if (running)
 			return;
-		logger.info("launch KNXnet/IP server \'{}\'", getFriendlyName());
+		logger.info("launch KNXnet/IP server (v{}) \'{}\'", Settings.getLibraryVersion(), getFriendlyName());
 		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
 		svcContainers.forEach(this::startControlEndpoint);
@@ -712,13 +710,13 @@ public class KNXnetIPServer
 		setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, new byte[] { 0, (byte) 15 });
 		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
-		final String[] sver = split(Settings.getLibraryVersion(), ". -");
+		final String[] sver = Settings.getLibraryVersion().split("\\.| |-", 0);
 		int last = 0;
 		try {
 			last = sver.length > 2 ? Integer.parseInt(sver[2]) : 0;
 		}
 		catch (final NumberFormatException e) {}
-		final int ver = Integer.parseInt(sver[0]) << 12 | Integer.parseInt(sver[1]) << 6 | last;
+		final int ver = Integer.parseInt(sver[0]) << 8 | Integer.parseInt(sver[1]) << 4 | last;
 		setProperty(DEVICE_OBJECT, objectInstance, PID.VERSION, new byte[] { (byte) (ver >>> 8), (byte) (ver & 0xff) });
 
 		// revision counting is not aligned with library version for now
@@ -1101,15 +1099,6 @@ public class KNXnetIPServer
 	{
 		final ShutdownEvent se = new ShutdownEvent(this, CloseEvent.USER_REQUEST, "user shutdown");
 		listeners.fire(l -> l.onShutdown(se));
-	}
-
-	private static String[] split(final String text, final String delim)
-	{
-		final StringTokenizer st = new StringTokenizer(text, delim);
-		final String[] tokens = new String[st.countTokens()];
-		for (int i = 0; i < tokens.length; ++i)
-			tokens[i] = st.nextToken();
-		return tokens;
 	}
 
 	static int toInt(final byte[] data) {
