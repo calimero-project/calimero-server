@@ -977,10 +977,8 @@ public class KnxServerGateway implements Runnable
 			if (f.getDestination().getRawAddress() == 0xffff) {
 				logger.trace("default individual address, dispatch to all active KNX subnets");
 				for (final SubnetConnector subnet : connectors) {
-					if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet)) {
-						send((KNXNetworkLink) subnet.getSubnetLink(), f);
-						incMsgTransmitted(true);
-					}
+					if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet))
+						send(subnet, f);
 				}
 				return;
 			}
@@ -994,7 +992,7 @@ public class KnxServerGateway implements Runnable
 			if (exclude != null && lnk.equals(exclude.getSubnetLink()))
 				logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			else
-				send(lnk, f);
+				connectorFor((IndividualAddress) f.getDestination()).ifPresent(subnet -> send(subnet, f));
 		}
 		else {
 			final int raw = f.getDestination().getRawAddress();
@@ -1010,7 +1008,6 @@ public class KnxServerGateway implements Runnable
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			}
 		}
-		incMsgTransmitted(true);
 	}
 
 	private void dispatchToSubnets(final CEMILData f)
@@ -1031,7 +1028,7 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		if (isNetworkLink(subnet))
-			send((KNXNetworkLink) subnet.getSubnetLink(), f);
+			send(subnet, f);
 	}
 
 	// ensure we have a network link open (and no monitor link)
@@ -1202,7 +1199,7 @@ public class KnxServerGateway implements Runnable
 		try {
 			c.send(f, WaitForAck);
 			setNetworkState(false, false);
-			incMsgTransmitted(false);
+			incMsgTransmitted(objectInstance(getSubnetConnector(svcContainer.getName())), false);
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 			if (buffer != null)
@@ -1214,8 +1211,9 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void send(final KNXNetworkLink lnk, final CEMILData f)
+	private void send(final SubnetConnector subnet, final CEMILData f)
 	{
+		final KNXNetworkLink link = (KNXNetworkLink) subnet.getSubnetLink();
 		try {
 			final CEMILData ldata;
 			final int mc = f.getMessageCode();
@@ -1223,7 +1221,7 @@ public class KnxServerGateway implements Runnable
 			// we have to adjust a possible routing .ind from server-side to .req,
 			// or vice versa a .req to .ind if we use KNXnet/IP routing on the KNX subnet
 			// ??? HACK: do we use routing on the KNX subnet
-			AutoCloseable subnetLink = lnk;
+			AutoCloseable subnetLink = link;
 			if (subnetLink instanceof Link)
 				subnetLink = ((Link<?>) subnetLink).target();
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
@@ -1247,15 +1245,16 @@ public class KnxServerGateway implements Runnable
 			if (subnetLink instanceof KNXNetworkLinkTpuart && ldata instanceof CEMILDataEx)
 				((CEMILDataEx) ldata).additionalInfo().clear();
 
-			lnk.send(ldata, true);
+			link.send(ldata, true);
 			setNetworkState(true, false);
+			incMsgTransmitted(objectInstance(subnet), true);
 		}
 		catch (final KNXTimeoutException e) {
 			setNetworkState(true, true);
 			logger.warn("timeout sending to {}: {}", f.getDestination(), e.getMessage());
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
-			logger.error("error sending to {} on subnet {}", f.getDestination(), lnk.getName(), e);
+			logger.error("error sending to {} on subnet {}", f.getDestination(), link.getName(), e);
 		}
 	}
 
@@ -1516,14 +1515,14 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void incMsgTransmitted(final boolean toKnxNetwork)
+	private void incMsgTransmitted(final int objinst, final boolean toKnxNetwork)
 	{
 		final int pid = toKnxNetwork ? PID.MSG_TRANSMIT_TO_KNX : PID.MSG_TRANSMIT_TO_IP;
 		// must be 4 byte unsigned
 		// getPropertyOrDefault casts to int, but we just increment and store so it doesn't matter
-		long transmit = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 0);
+		long transmit = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objinst, pid, 0);
 		try {
-			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
+			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, pid, 1, 1,
 					bytesFromInt(++transmit));
 		}
 		catch (final KnxPropertyException e) {
