@@ -800,7 +800,7 @@ public class KNXnetIPServer
 		//
 
 		// if service container doesn't support routing, don't show it in device capabilities
-		int deviceCaps;
+		final int deviceCaps;
 		if (endpoint instanceof RoutingServiceContainer) {
 			final RoutingServiceContainer rsc = (RoutingServiceContainer) endpoint;
 			deviceCaps = rsc.secureGroupKey().isPresent() ? defDeviceCaps + 64 : defDeviceCaps;

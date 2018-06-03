@@ -572,7 +572,8 @@ public class Launcher implements Runnable
 	 */
 	public void quit()
 	{
-		gw.quit();
+		if (gw != null)
+			gw.quit();
 	}
 
 	/**
@@ -606,7 +607,7 @@ public class Launcher implements Runnable
 			else
 				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
 
-			logger.info("connect to " + subnetArgs);
+			logger.info("setup subnet " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
 			server.addServiceContainer(sc);
@@ -663,10 +664,10 @@ public class Launcher implements Runnable
 		// group address filter table or not
 		final RoutingConfig route = table.length > 0 ? RoutingConfig.Table : RoutingConfig.All;
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
-				new byte[] { (byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()) });
-		// we currently don't check the group address filter table for subnetworks
+				(byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()));
+		// by default, we don't check the group address filter table for group frames from subnetworks
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCGROUPCONFIG, 1, 1,
-				new byte[] { (byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()) });
+				(byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()));
 	}
 
 	private static void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,

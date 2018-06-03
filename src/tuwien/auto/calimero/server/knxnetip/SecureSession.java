@@ -199,7 +199,7 @@ class SecureSession {
 		// TODO keys
 		final byte[] serverPublicKey = new byte[keyLength];
 		final byte[] clientPublicKey = new byte[keyLength];
-		final byte[] xor = xor(serverPublicKey , 0, clientPublicKey, 0, keyLength);
+		final byte[] xor = xor(serverPublicKey, 0, clientPublicKey, 0, keyLength);
 		final byte[] verifyAgainst = cbcMacSimple(xor, 0, keyLength);
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
