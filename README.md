@@ -1,13 +1,13 @@
 Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
 =========================
 
-A KNXnet/IP server for Java SE Embedded 8 (or Java SE 8). The minimum required runtime environment is 
-the profile [compact1](http://www.oracle.com/technetwork/java/embedded/resources/tech/compact-profiles-overview-2157132.html).
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is Java SE 9 (module _java.base_).
 
-* Run your own KNXnet/IP server in software (no KNXnet/IP hardware required)
+* No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
 * Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
 * Emulate/virtualize a KNX network
+* Secure your KNX IP network traffic
 
 
 ### Dependencies
@@ -16,16 +16,17 @@ The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `
 
 _Optional_ dependencies, required for communication over serial ports:
 
-* Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library already present on your platform. 
-* For KNX USB or RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
+* Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
+* For KNX USB or KNX RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
 
 Supported Features
 ------------------
 
-### Client-side KNXnet/IP
+### Client-side KNXnet/IP & KNX IP Secure
 * Discovery and self-description
 * Tunneling
 * Routing
+* Secure routing (experimental)
 * Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are realized by converting cEMI L-Data to cEMI bus monitor messages)
 * Local device management
 
@@ -69,7 +70,7 @@ Make sure all required `jar` packages are available, and any referenced files in
 java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.4-SNAPSHOT.jar:calimero-core-2.4-SNAPSHOT.jar:calimero-device-2.4-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-2.5-SNAPSHOT.jar:calimero-core-2.5-SNAPSHOT.jar:calimero-device-2.5-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
 ~~~
 
 
@@ -88,22 +89,24 @@ Elements and attributes of `server-config.xml`:
 
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
-	- `routing`: if `true` serve KNXnet/IP routing connections, if `false` KNXnet/IP routing is disabled
+	- `routing`: if `true` activate KNX IP routing, if `false` routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
 	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available network adapter is chosen depending on your OS network setup (localhost setting). 
     - `reuseCtrlEP` (optional): reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, `false` by default. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
-	
 
-* `<knxAddress type="individual">7.1.1</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
+* `<knxAddress type="individual">7.1.0</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
     - `type="individual"`: indicates a device address.
-    - `x.x.x`: Address of the service container if routing is disabled. Will be visible in e.g. ETS-tool.
-    
+    - `x.y.z`: Address of the service container, will be visible in e.g. ETS-tool. If routing is activated, requires a coupler/backbone address (`x.y.0` or `x.0.0`).
 * `<disruptionBuffer expirationTimeout="30" udpPort="5555-5559" />`: When `disruptionBuffer` is activated, missed KNX subnet frames due to a disrupted client link will be replayed when the client connection is reestablished.
     - `expirationTimeout="30"`: Attribute allows to specify the time in seconds how long the server will keep frames before discarding them after a connection was disrupted.
     - `udpPort="5555-5559"`: The disruption buffer is only available for clients which connect via the specified (client-side) UDP port range. All other clients are ignored.
-    
-* `<routingMcast>` (optional): the multicast group used by the service container for KNXnet/IP routing, defaults to the IP multicast address 224.0.23.12. If the `routing` attribute is set to `false`, this setting has no effect 
+
+* `<routing>224.0.23.12</routing>` (optional): the multicast setup used by the service container for KNX IP (Secure) routing, defaults to the IP multicast address 224.0.23.12. (If the `routing` attribute of the service container is set to `false`, this setting has no effect.)  
+Required attributes for secure routing:
+    - `secure="true"`: `true` activates KNX IP Secure, `false` defaults to KNXnet/IP Routing
+    - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
+    - `keyFile="~/.knx/keyfile"`: path to keyfile containing the KNX IP Secure group key
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
