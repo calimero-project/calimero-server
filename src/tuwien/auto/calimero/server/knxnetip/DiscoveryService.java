@@ -216,7 +216,7 @@ final class DiscoveryService extends ServiceLooper
 								sc.getName(), ces.getSocket().isBound(), ces.getSocket().isClosed());
 						continue;
 					}
-					final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
+					final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), useNat ? null : local);
 
 					try {
 						final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
