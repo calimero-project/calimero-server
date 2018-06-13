@@ -8,8 +8,8 @@
 
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
 	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
-		udpPort="3671" listenNetIf="enp5s0" reuseCtrlEP="false">
-		<knxAddress type="individual">7.1.1</knxAddress>
+		udpPort="3671" listenNetIf="enp5s0">
+		<knxAddress type="individual">7.1.0</knxAddress>
 		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link 
 			using the specific client UDP port range (if caused by a disrupted connection). -->
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
