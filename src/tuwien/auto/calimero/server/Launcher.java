@@ -463,8 +463,13 @@ public class Launcher implements Runnable
 
 	/**
 	 * Main entry routine for starting the KNX server gateway.
+	 * <p>
+	 * Supported options:
+	 * <ul>
+	 * <li>--no-stdin &nbsp; do not use STDIN, useful for running in detached mode</li>
+	 * </ul>
 	 *
-	 * @param args the file name or URI to the KNX server XML configuration
+	 * @param args server options, followed by the file name or URI to the KNX server XML configuration
 	 */
 	public static void main(final String[] args)
 	{
@@ -472,13 +477,15 @@ public class Launcher implements Runnable
 			logger.info("supply file name/URI for the KNX server configuration");
 			return;
 		}
+		final String configUri = args[args.length - 1];
 		try {
-			final Launcher sr = new Launcher(args[0]);
-			sr.terminal = true;
+			final Launcher sr = new Launcher(configUri);
+			final boolean detached = "--no-stdin".equals(args[0]);
+			sr.terminal = !detached;
 			sr.run();
 		}
 		catch (final KNXException e) {
-			logger.error("loading configuration from " + args[0], e);
+			logger.error("loading configuration from " + configUri, e);
 		}
 	}
 
