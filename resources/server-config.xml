@@ -8,8 +8,8 @@
 
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
 	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
-		udpPort="3671" listenNetIf="enp5s0" reuseCtrlEP="false">
-		<knxAddress type="individual">7.1.1</knxAddress>
+		udpPort="3671" listenNetIf="enp5s0">
+		<knxAddress type="individual">7.1.0</knxAddress>
 		<!-- latency specifies the time window for accepting secure multicasts, 
 			depends on max. end-to-end network latency (usually [500 .. 5000] ms) -->
 <!-- 		<routing secure="true" latencyTolerance="1000" keyFile="~/.knx/keyfile">224.0.23.12</routing> -->
