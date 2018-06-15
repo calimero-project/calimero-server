@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
+import java.time.Duration;
 import java.util.Optional;
 
 import tuwien.auto.calimero.IndividualAddress;
@@ -58,7 +59,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 {
 	private final InetAddress mcast;
 	private final byte[] secureGroupKey;
-	private final int latency;
+	private final Duration latency;
 
 	/**
 	 * @deprecated Use {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, InetAddress)}.
@@ -77,7 +78,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
 		final InetAddress routingMulticast)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, 0);
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, Duration.ofMillis(0));
 	}
 
 	/**
@@ -96,7 +97,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring,
 		final InetAddress routingMulticast)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, 0);
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, Duration.ofMillis(0));
 	}
 
 	/**
@@ -117,7 +118,8 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey, final int latencyTolerance) {
+		final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey,
+		final Duration latencyTolerance) {
 		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring);
 		final IndividualAddress addr = subnet.getDeviceAddress();
 		if (addr.getDevice() != 0)
@@ -139,7 +141,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		return Optional.ofNullable(secureGroupKey).map(byte[]::clone);
 	}
 
-	int latencyTolerance() {
+	Duration latencyTolerance() {
 		return latency;
 	}
 }

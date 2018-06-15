@@ -869,7 +869,7 @@ public class KNXnetIPServer
 		try {
 			// DPT 7.002
 			final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
-			t.setTimePeriod(sc.latencyTolerance());
+			t.setTimePeriod(sc.latencyTolerance().toMillis());
 			io.setDescription(new Description(0, iot, pidLatencyTolerance, 0, PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
 			setProperty(iot, objectInstance, pidLatencyTolerance, t.getData());
 		}
