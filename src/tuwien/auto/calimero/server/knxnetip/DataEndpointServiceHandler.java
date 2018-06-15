@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -194,12 +195,11 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			final int localPort = socket.getLocalPort();
 			logger.error("ETS 5 sends configuration requests for channel {} to wrong UDP port {} (channel {}), "
 					+ "try to find correct connection", recvChannelId, localPort, channelId);
-			final LooperThread looper = ControlEndpointService.findConnectionLooper(recvChannelId);
-			if (looper == null)
-				return false;
-			final DataEndpointService dataEndpointService = (DataEndpointService) looper.getLooper();
-			dataEndpointService.rebindSocket(localPort);
-			dataEndpointService.svcHandler.handleDataServiceType(h, data, offset);
+			final Optional<DataEndpointService> dataEndpointService = ControlEndpointService.findDataEndpoint(recvChannelId);
+			if (dataEndpointService.isPresent()) {
+				dataEndpointService.get().rebindSocket(localPort);
+				dataEndpointService.get().svcHandler.handleDataServiceType(h, data, offset);
+			}
 			return true;
 		}
 

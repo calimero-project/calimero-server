@@ -53,6 +53,7 @@ import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -190,7 +191,6 @@ final class DiscoveryService extends ServiceLooper
 			// protocol version should result in a host protocol type error.
 			// But since there is no status field in the search response,
 			// we log and ignore such requests.
-
 			if (!checkVersion(h))
 				return true;
 			final SearchRequest sr = new SearchRequest(data, offset);
@@ -203,37 +203,9 @@ final class DiscoveryService extends ServiceLooper
 			useNat = false;
 			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
 			for (final LooperThread t : server.controlEndpoints) {
-				final ControlEndpointService ces = (ControlEndpointService) t.getLooper();
-				final ServiceContainer sc = ces.getServiceContainer();
-				if (sc.isActivated()) {
-					// we create our own HPAI from the actual socket, since
-					// the service container might have opted for ephemeral port use
-					// it can happen that our socket got closed and we get null
-					final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
-					if (local == null) {
-						logger.warn("KNXnet/IP discovery unable to announce container '{}', "
-								+ "problem with local endpoint: socket bound={}, closed={}",
-								sc.getName(), ces.getSocket().isBound(), ces.getSocket().isClosed());
-						continue;
-					}
-					final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), useNat ? null : local);
-
-					try {
-						final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
-						final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
-						server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS,
-								mac == null ? new byte[6] : mac);
-					}
-					catch (SocketException | KnxPropertyException e) {}
-
-					final DeviceDIB device = server.createDeviceDIB(sc);
-					final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(sc);
-					final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device, svcFamilies));
-					final DatagramPacket p = new DatagramPacket(buf, buf.length, addr);
-					logger.trace("sending search response with container '" + sc.getName() + "' to " + addr);
-					sendOnInterfaces(p);
-					logger.info("KNXnet/IP discovery: identify as '{}' to {}", device.getName(), addr);
-				}
+				final Optional<ControlEndpointService> looper = t.looper().map(ControlEndpointService.class::cast);
+				if (looper.isPresent())
+					sendSearchResponse(addr, looper.get());
 			}
 			return true;
 		}
@@ -241,13 +213,43 @@ final class DiscoveryService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.SEARCH_RES)
 			return true;
 		// also ignore routing messages
-		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG
-				|| svc == KNXnetIPHeader.ROUTING_BUSY)
+		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG || svc == KNXnetIPHeader.ROUTING_BUSY)
 			return true;
 		else if (PacketHelper.isKnxSecure(h))
 			return true;
 		// other requests are rejected with error
 		return false;
+	}
+
+	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces) throws IOException {
+		final ServiceContainer sc = ces.getServiceContainer();
+		if (sc.isActivated()) {
+			// we create our own HPAI from the actual socket, since
+			// the service container might have opted for ephemeral port use
+			// it can happen that our socket got closed and we get null
+			final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
+			if (local == null) {
+				logger.warn("KNXnet/IP discovery unable to announce container '{}', problem with local endpoint: "
+						+ "socket bound={}, closed={}", sc.getName(), ces.getSocket().isBound(), ces.getSocket().isClosed());
+				return;
+			}
+
+			final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), useNat ? null : local);
+			try {
+				final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
+				final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
+				server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS, mac == null ? new byte[6] : mac);
+			}
+			catch (SocketException | KnxPropertyException e) {}
+
+			final DeviceDIB device = server.createDeviceDIB(sc);
+			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(sc);
+			final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device, svcFamilies));
+			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
+			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);
+			sendOnInterfaces(p);
+			logger.info("KNXnet/IP discovery: identify as '{}' to {}", device.getName(), dst);
+		}
 	}
 
 	private void sendOnInterfaces(final DatagramPacket p) throws IOException

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2017 B. Malinowsky
+    Copyright (c) 2016, 2018 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import tuwien.auto.calimero.log.LogService;
@@ -101,25 +102,17 @@ class LooperThread extends Thread
 		}
 	}
 
-	/**
-	 * @return the looper object, or <code>null</code> if looper creation failed
-	 */
-	synchronized ServiceLooper getLooper()
-	{
-		return looper;
+	synchronized Optional<ServiceLooper> looper() {
+		return Optional.ofNullable(looper);
 	}
 
 	void quit()
 	{
 		quit = true;
 		interrupt();
-		// we also call quit() for looper, since interrupt will get ignored on non-interruptible sockets
-		final ServiceLooper l = getLooper();
-		if (l != null)
-			l.quit();
-		else
-			// only call cleanup if l is null, otherwise cleanup is called in run()
-			cleanup(LogLevel.INFO, null);
+		// we quit the looper, because interrupts are ignored on non-interruptible sockets
+		// only call cleanup if there is no looper, otherwise cleanup is called in run()
+		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(LogLevel.INFO, null));
 	}
 
 	void cleanup(final LogLevel level, final Throwable t)

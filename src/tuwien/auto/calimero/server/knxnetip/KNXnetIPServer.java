@@ -51,7 +51,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -684,26 +686,24 @@ public class KNXnetIPServer
 	private void onPropertyValueChanged(final PropertyEvent pe)
 	{
 		if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
+			final byte[] data = pe.getNewData();
+			final int lost = toInt(data);
+			if (lost == 0)
+				return;
 			final ServiceContainer sc = findContainer(pe.getInterfaceObject());
 			// multicast routing lost message
-			final LooperThread t = findRoutingLooperThread(sc);
-			if (t == null)
-				return;
-			try {
-				final byte[] data = pe.getNewData();
-				final int lost = toInt(data);
-				if (lost == 0)
-					return;
-				final int oi = objectInstance(findContainer(pe.getInterfaceObject()));
-				final int state = getProperty(KNXNETIP_PARAMETER_OBJECT, oi, PID.KNXNETIP_DEVICE_STATE,
-						1, 0);
+			findRoutingLooperThread(sc).flatMap(t -> t.looper()).ifPresent(l -> sendRoutingLostMessage(l, sc, lost));
+		}
+	}
 
-				final RoutingService svc = (RoutingService) t.getLooper();
-				svc.sendRoutingLostMessage(lost, state);
-			}
-			catch (final KNXConnectionClosedException e) {
-				logger.error("sending routing lost message notification", e);
-			}
+	private void sendRoutingLostMessage(final ServiceLooper svc, final ServiceContainer sc, final int lost) {
+		final int oi = objectInstance(sc);
+		final int state = getProperty(KNXNETIP_PARAMETER_OBJECT, oi, PID.KNXNETIP_DEVICE_STATE, 1, 0);
+		try {
+			((RoutingService) svc).sendRoutingLostMessage(lost, state);
+		}
+		catch (final KNXConnectionClosedException e) {
+			logger.error("sending routing lost message notification", e);
 		}
 	}
 
@@ -1022,19 +1022,15 @@ public class KNXnetIPServer
 
 	private void stopControlEndpoint(final ServiceContainer sc)
 	{
-		LooperThread remove = null;
 		for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
 			final LooperThread t = i.next();
-			final ControlEndpointService ces = (ControlEndpointService) t.getLooper();
-			if (ces.getServiceContainer() == sc) {
+			if (t.looper().filter(l -> ((ControlEndpointService) l).getServiceContainer() == sc).isPresent()) {
 				t.quit();
-				remove = t;
+				i.remove();
 				break;
 			}
 		}
-		controlEndpoints.remove(remove);
-		if (sc instanceof RoutingServiceContainer)
-			stopRoutingService(sc);
+		findRoutingLooperThread(sc).ifPresent(this::stopRoutingService);
 	}
 
 	private void startRoutingService(final RoutingServiceContainer sc)
@@ -1046,24 +1042,16 @@ public class KNXnetIPServer
 		t.start();
 	}
 
-	private void stopRoutingService(final ServiceContainer sc)
+	private void stopRoutingService(final LooperThread t)
 	{
-		final LooperThread t = findRoutingLooperThread(sc);
-		if (t == null)
-			return;
 		t.quit();
 		routingEndpoints.remove(t);
 	}
 
-	private LooperThread findRoutingLooperThread(final ServiceContainer sc)
+	private Optional<LooperThread> findRoutingLooperThread(final ServiceContainer sc)
 	{
-		for (final Iterator<LooperThread> i = routingEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = i.next();
-			final RoutingService svc = (RoutingService) t.getLooper();
-			if (svc.getServiceContainer() == sc)
-				return t;
-		}
-		return null;
+		final Predicate<ServiceLooper> belongsToSvcCont = svc -> ((RoutingService) svc).getServiceContainer() == sc;
+		return routingEndpoints.stream().filter(ep -> ep.looper().filter(belongsToSvcCont).isPresent()).findFirst();
 	}
 
 	private ServiceContainer findContainer(final String svcContName)

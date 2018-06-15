@@ -676,12 +676,13 @@ final class ControlEndpointService extends ServiceLooper
 	// TODO make thread-safe
 	private static final Set<LooperThread> looperThreads = Collections.newSetFromMap(new WeakHashMap<>());
 
-	static LooperThread findConnectionLooper(final int channelId) {
+	static Optional<DataEndpointService> findDataEndpoint(final int channelId) {
 		for (final LooperThread t : looperThreads) {
-			if (((DataEndpointService) t.getLooper()).svcHandler.getChannelId() == channelId)
-				return t;
+			final Optional<DataEndpointService> looper = t.looper().map(DataEndpointService.class::cast);
+			if (looper.isPresent() && looper.get().svcHandler.getChannelId() == channelId)
+				return looper;
 		}
-		return null;
+		return Optional.empty();
 	}
 
 	private DataEndpointServiceHandler findConnection(final int channelId)
