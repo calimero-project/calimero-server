@@ -266,7 +266,7 @@ final class ControlEndpointService extends ServiceLooper
 				logger.error("communication failure", e);
 			}
 			finally {
-				((DataEndpointServiceHandler) conn).cleanup(CloseEvent.CLIENT_REQUEST, "client request", LogLevel.INFO,
+				((DataEndpointServiceHandler) conn).cleanup(CloseEvent.CLIENT_REQUEST, "client request", LogLevel.DEBUG,
 						null);
 			}
 		}

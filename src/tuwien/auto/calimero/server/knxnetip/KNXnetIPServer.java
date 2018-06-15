@@ -297,6 +297,7 @@ public class KNXnetIPServer
 		logger = LogService.getLogger("calimero.server." + getName());
 		listeners = new EventListeners<>(logger);
 
+		logger.info("Calimero KNXnet/IP server (v{}) \'{}\'", Settings.getLibraryVersion(), friendlyName);
 		initBasicServerProperties();
 	}
 
@@ -611,9 +612,8 @@ public class KNXnetIPServer
 	{
 		if (running)
 			return;
-		logger.info("launch KNXnet/IP server (v{}) \'{}\'", Settings.getLibraryVersion(), getFriendlyName());
-		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 
+		startDiscoveryService(outgoingIf, discoveryIfs, 9);
 		svcContainers.forEach(this::startControlEndpoint);
 		running = true;
 	}
