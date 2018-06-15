@@ -272,9 +272,9 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void connectionClosed(final CloseEvent e)
 		{
-			logger.debug("remove {} ({})", name, e.getReason());
 			serverConnections.remove(e.getSource());
 			serverDataConnections.remove(addr);
+			logger.debug("removed connection {} ({})", name, e.getReason());
 			if (e.getInitiator() == CloseEvent.CLIENT_REQUEST) {
 				final KNXnetIPConnection c = (KNXnetIPConnection) e.getSource();
 				subnetEventBuffers.computeIfPresent(sc, (sc, rb) -> { rb.remove(c); return rb; });
@@ -336,9 +336,7 @@ public class KnxServerGateway implements Runnable
 		public void connectionEstablished(final ServiceContainer svcContainer, final KNXnetIPConnection connection)
 		{
 			serverConnections.add(connection);
-
-			final InetSocketAddress remote = connection.getRemoteAddress();
-			logger.info("established connection to remote " + remote);
+			logger.debug("established connection {}", connection);
 
 			try {
 				verifySubnetInterfaceAddress(svcContainer);
@@ -351,6 +349,7 @@ public class KnxServerGateway implements Runnable
 			if (buffer == null)
 				return;
 			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
+			final InetSocketAddress remote = connection.getRemoteAddress();
 			final int port = remote.getPort();
 			if (port >= portRange[0] && port <= portRange[1]) {
 				buffer.add(connection);
@@ -1020,7 +1019,7 @@ public class KnxServerGateway implements Runnable
 			}
 			final GroupAddress d = (GroupAddress) f.getDestination();
 			if (subGroupAddressConfig == 3 && !inGroupAddressTable(d, objinst)) {
-				logger.warn("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
+				logger.info("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
 				return;
 			}
 		}
