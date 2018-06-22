@@ -114,7 +114,7 @@ final class RoutingService extends ServiceLooper
 
 	final RoutingServiceHandler r;
 	private final ServiceContainer svcCont;
-
+	private final boolean secure;
 
 	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final InetAddress mcGroup,
 		final boolean enableLoopback)
@@ -123,7 +123,8 @@ final class RoutingService extends ServiceLooper
 		svcCont = sc;
 
 		final KNXnetIPRouting inst;
-		if (sc.secureGroupKey().isPresent()) {
+		secure = sc.secureGroupKey().isPresent();
+		if (secure) {
 			try {
 				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
 				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, sc.secureGroupKey().get(), sc.latencyTolerance());
@@ -169,6 +170,8 @@ final class RoutingService extends ServiceLooper
 	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
 		final int port) throws KNXFormatException, IOException
 	{
+		if (secure)
+			return true;
 		return r.handleServiceType(h, data, offset, src, port);
 	}
 
