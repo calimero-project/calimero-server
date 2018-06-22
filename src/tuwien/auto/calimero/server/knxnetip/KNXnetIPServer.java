@@ -77,6 +77,8 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.Description;
@@ -350,8 +352,11 @@ public class KNXnetIPServer
 				return false;
 			}
 			final InterfaceObjectServer io = getInterfaceObjectServer();
-			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0,
-					(byte) sc.getMediumSettings().getMedium());
+			final int medium = sc.getMediumSettings().getMedium();
+			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
+			if (medium == KNXMediumSettings.MEDIUM_PL110)
+				setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS, ((PLSettings) sc.getMediumSettings()).getDomainAddress());
+
 			// add new KNXnet/IP parameter object for this service container
 			io.addInterfaceObject(knxObject);
 			final InterfaceObject[] objects = io.getInterfaceObjects();
@@ -389,8 +394,6 @@ public class KNXnetIPServer
 	 */
 	public final void removeServiceContainer(final ServiceContainer sc)
 	{
-		if (sc == null)
-			return;
 		synchronized (svcContainers) {
 			// stop service, if we are already launched
 			synchronized (this) {
@@ -407,7 +410,6 @@ public class KNXnetIPServer
 
 	/**
 	 * Returns all service containers currently hosted by this server.
-	 * <p>
 	 *
 	 * @return a new ServiceContainer array holding the service containers with the array size equal
 	 *         to the number of service containers (i.e., can be an empty array)
@@ -541,7 +543,6 @@ public class KNXnetIPServer
 
 	/**
 	 * Sets or modifies KNXnet/IP server behavior.
-	 * <p>
 	 *
 	 * @param optionKey the server option key to identify the option to set or modify
 	 * @param value the corresponding option value, possibly replacing any previously set value
@@ -733,9 +734,6 @@ public class KNXnetIPServer
 
 		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_DESCRIPTOR, DeviceDescriptor.DD0.TYPE_091A.toByteArray());
 
-		// requested by ETS during its interface discovery
-		setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS, new byte[] { 0x0, 0x0 });
-
 		//
 		// set properties used in device DIB for search response during discovery
 		//
@@ -754,9 +752,6 @@ public class KNXnetIPServer
 		//
 		setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_ID, bytesFromWord(defMfrId));
 		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
-
-		// set default medium to TP1 (Bit 1 set)
-//		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance, PID.MEDIUM_TYPE, new byte[] { 0, 2 });
 	}
 
 	// precondition: we have an IOS instance
@@ -855,18 +850,22 @@ public class KNXnetIPServer
 
 	private void resetRoutingConfiguration(final int objectInstance)
 	{
-		setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS,
-				new byte[4]);
+		setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, new byte[4]);
 	}
 
 	// NYI ensure security object is read-only
 	private void addSecurityObject(final RoutingServiceContainer sc) {
 		final int iot = InterfaceObject.SECURITY_OBJECT;
+		final int pidSecuredServices = 54;
 		final int pidLatencyTolerance = 55;
 
 		final InterfaceObjectServer io = getInterfaceObjectServer();
 		io.addInterfaceObject(iot);
 		try {
+			io.setDescription(new Description(0, iot, pidSecuredServices, 0, PropertyTypes.PDT_BITSET16, false, 1, 1, 3, 0), true);
+			// enforce only secure communication for routing, use (2 + 4) for tunneling & routing
+			setProperty(iot, objectInstance, pidSecuredServices, (byte) 0, (byte) (4));
+
 			// DPT 7.002
 			final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
 			t.setTimePeriod(sc.latencyTolerance().toMillis());

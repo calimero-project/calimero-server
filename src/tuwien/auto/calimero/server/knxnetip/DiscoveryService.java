@@ -47,6 +47,8 @@ import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -55,16 +57,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import tuwien.auto.calimero.DeviceDescriptor.DD0;
+import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchResponse;
+import tuwien.auto.calimero.knxnetip.util.AdditionalDeviceDib;
+import tuwien.auto.calimero.knxnetip.util.DIB;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 final class DiscoveryService extends ServiceLooper
@@ -186,14 +194,14 @@ final class DiscoveryService extends ServiceLooper
 		final int port) throws KNXFormatException, IOException
 	{
 		final int svc = h.getServiceType();
-		if (svc == KNXnetIPHeader.SEARCH_REQ) {
+		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
 			// A request for TCP communication or a request using an unsupported
 			// protocol version should result in a host protocol type error.
 			// But since there is no status field in the search response,
 			// we log and ignore such requests.
 			if (!checkVersion(h))
 				return true;
-			final SearchRequest sr = new SearchRequest(data, offset);
+			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			if (sr.getEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
 				logger.warn("search requests have protocol support for UDP/IP only");
 				return true;
@@ -205,12 +213,12 @@ final class DiscoveryService extends ServiceLooper
 			for (final LooperThread t : server.controlEndpoints) {
 				final Optional<ControlEndpointService> looper = t.looper().map(ControlEndpointService.class::cast);
 				if (looper.isPresent())
-					sendSearchResponse(addr, looper.get());
+					sendSearchResponse(addr, looper.get(), sr.requestedDibs());
 			}
 			return true;
 		}
 		// we can safely ignore search responses and avoid a warning being logged
-		else if (svc == KNXnetIPHeader.SEARCH_RES)
+		else if (svc == KNXnetIPHeader.SEARCH_RES || svc == KNXnetIPHeader.SearchResponse)
 			return true;
 		// also ignore routing messages
 		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG || svc == KNXnetIPHeader.ROUTING_BUSY)
@@ -221,7 +229,8 @@ final class DiscoveryService extends ServiceLooper
 		return false;
 	}
 
-	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces) throws IOException {
+	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final List<Integer> dibCodes)
+		throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
 			// we create our own HPAI from the actual socket, since
@@ -242,14 +251,73 @@ final class DiscoveryService extends ServiceLooper
 			}
 			catch (SocketException | KnxPropertyException e) {}
 
-			final DeviceDIB device = server.createDeviceDIB(sc);
-			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(sc);
-			final byte[] buf = PacketHelper.toPacket(new SearchResponse(hpai, device, svcFamilies));
+			final List<DIB> dibs = new ArrayList<>();
+			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
+			if (dibCodes.isEmpty() || dibCodes.contains(DIB.DEVICE_INFO))
+				dibs.add(deviceDib);
+			if (dibCodes.isEmpty() || dibCodes.contains(DIB.SUPP_SVC_FAMILIES))
+				dibs.add(server.createServiceFamiliesDIB(sc));
+			if (dibCodes.contains(DIB.AdditionalDeviceInfo))
+				dibs.add(createAdditionalDeviceDib(sc));
+			if (dibCodes.contains(DIB.SecureServiceFamilies))
+				dibs.add(createSecureServiceFamiliesDib(sc));
+			if (dibCodes.contains(DIB.Tunneling))
+				dibs.add(createTunnelingDib(sc));
+
+			final byte[] buf = PacketHelper.toPacket(new SearchResponse(dibCodes.size() > 0, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);
 			sendOnInterfaces(p);
-			logger.info("KNXnet/IP discovery: identify as '{}' to {}", device.getName(), dst);
+			logger.info("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
 		}
+	}
+
+	private ServiceFamiliesDIB createSecureServiceFamiliesDib(final ServiceContainer sc) {
+		final int pidSecuredServices = 54;
+		final int caps = server.getProperty(InterfaceObject.SECURITY_OBJECT, objectInstance(sc), pidSecuredServices, 1, 0);
+		// service family 'core' is skipped here since not used in capabilities bitset
+		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT, ServiceFamiliesDIB.TUNNELING,
+			ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING, ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS,
+			ServiceFamiliesDIB.OBJECT_SERVER };
+
+		final int[] tmp = new int[services.length];
+		int count = 0;
+		for (int i = 0; i < services.length; ++i)
+			if ((caps >> i & 0x1) == 1)
+				tmp[count++] = services[i];
+
+		final int[] supported = Arrays.copyOfRange(tmp, 0, count);
+		final int[] versions = new int[count];
+		Arrays.fill(versions, 1);
+		return ServiceFamiliesDIB.newSecureServiceFamilies(supported, versions);
+	}
+
+	private TunnelingDib createTunnelingDib(final ServiceContainer sc) {
+		final List<IndividualAddress> addresses = additionalAddresses(sc);
+		final int[] info = new int[addresses.size()];
+		Arrays.fill(info, 1); // ???
+		return new TunnelingDib(addresses, info);
+	}
+
+	private List<IndividualAddress> additionalAddresses(final ServiceContainer sc) {
+		final int oi = objectInstance(sc);
+		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, oi, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
+		final List<IndividualAddress> list = new ArrayList<>();
+		try {
+			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, oi,
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
+			final ByteBuffer buf = ByteBuffer.wrap(data);
+			for (int i = 0; i < elems; ++i)
+				list.add(new IndividualAddress(buf.getShort() & 0xffff));
+		}
+		catch (final KnxPropertyException e) {
+			logger.warn(e.getMessage());
+		}
+		return list;
+	}
+
+	private AdditionalDeviceDib createAdditionalDeviceDib(final ServiceContainer sc) {
+		return new AdditionalDeviceDib(0, sc.getMediumSettings().maxApduLength(), DD0.TYPE_091A);
 	}
 
 	private void sendOnInterfaces(final DatagramPacket p) throws IOException
