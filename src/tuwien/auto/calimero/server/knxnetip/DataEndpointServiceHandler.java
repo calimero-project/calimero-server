@@ -46,6 +46,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import tuwien.auto.calimero.CloseEvent;
+import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
@@ -70,7 +71,7 @@ import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
 /**
- * Server-side implementation of KNXnet/IP tunneling and device management protocol.
+ * Server-side implementation of KNX IP (secure) tunneling and device management protocol.
  *
  * @author B. Malinowsky
  */
@@ -95,9 +96,13 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	// updated on every correctly received message
 	private long lastMsgTimestamp;
 
+	private final SecureSession sessions;
+	private final int sessionId;
+
 	DataEndpointServiceHandler(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final boolean tunneling, final boolean busmonitor, final boolean useNAT,
+		final SecureSession sessions, final int sessionId,
 		final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed,
 		final Consumer<DataEndpointServiceHandler> resetRequest)
 	{
@@ -116,6 +121,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		dataEndpt = remoteDataEndpt;
 
 		useNat = useNAT;
+		this.sessions = sessions;
+		this.sessionId = sessionId;
 		this.connectionClosed = connectionClosed;
 		this.resetRequest = resetRequest;
 
@@ -132,13 +139,32 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	}
 
 	@Override
+	protected void send(final byte[] packet, final InetSocketAddress dst) throws IOException {
+		byte[] buf = packet;
+		if (sessionId > 0) {
+			final long seq = sessions.sessions.get(sessionId).sendSeq.get();
+			buf = sessions.newSecurePacket(sessionId, packet);
+			final int msgTag = 0;
+			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
+		}
+
+		final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
+		if (dst.equals(dataEndpt))
+			socket.send(p);
+		else
+			ctrlSocket.send(p);
+	}
+
+	@Override
 	public String getName()
 	{
+		final String lock = new String(Character.toChars(0x1F512));
+		final String prefix = "KNX IP " + (sessionId > 0 ? lock + " " : "");
 		if (tunnel && monitor)
-			return "KNXnet/IP Monitor " + super.getName();
+			return prefix + "Monitor " + super.getName();
 		if (tunnel)
-			return "KNXnet/IP Tunneling " + super.getName();
-		return "KNXnet/IP DevMgmt " + super.getName();
+			return prefix + "Tunneling " + super.getName();
+		return prefix + "DevMgmt " + super.getName();
 	}
 
 	@Override
@@ -179,11 +205,21 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		this.socket = socket;
 	}
 
-	boolean handleDataServiceType(final KNXnetIPHeader h, final byte[] data, final int offset)
-		throws KNXFormatException, IOException
+	boolean handleDataServiceType(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException
 	{
+		if (sessionId == 0)
+			return acceptDataService(h, data, offset);
+
+		if (!PacketHelper.isKnxSecure(h)) {
+			logger.warn("received non-secure packet {} - discard {}", h, DataUnitBuilder.toHex(data, " "));
+			return true;
+		}
+		sessions.acceptService(h, data, offset, dataEndpt.getAddress(), dataEndpt.getPort(), this);
+		return true;
+	}
+
+	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
-		final String type = tunnel ? "tunneling" : "device configuration";
 
 		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
 		final boolean configAck = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_ACK;
@@ -198,11 +234,12 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			final Optional<DataEndpointService> dataEndpointService = ControlEndpointService.findDataEndpoint(recvChannelId);
 			if (dataEndpointService.isPresent()) {
 				dataEndpointService.get().rebindSocket(localPort);
-				dataEndpointService.get().svcHandler.handleDataServiceType(h, data, offset);
+				dataEndpointService.get().svcHandler.acceptDataService(h, data, offset);
 			}
 			return true;
 		}
 
+		final String type = tunnel ? "tunneling" : "device configuration";
 		if (svc == serviceRequest) {
 			final ServiceRequest req = getServiceRequest(h, data, offset);
 			if (!checkChannelId(req.getChannelID(), "request"))
@@ -211,16 +248,14 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
-				final DatagramPacket p = new DatagramPacket(buf, buf.length, dataEndpt);
-				socket.send(p);
+				send(buf, dataEndpt);
 				if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
 					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
 					return true;
 				}
 			}
 			else
-				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv()
-						+ " - ignored");
+				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
 
 			if (seq == getSeqRcv()) {
 				incSeqRcv();
@@ -242,8 +277,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				return true;
 
 			if (res.getSequenceNumber() != getSeqSend())
-				logger.warn("received " + type + " acknowledgment with wrong send-sequence "
-						+ res.getSequenceNumber() + ", expected " + getSeqSend() + " - ignored");
+				logger.warn("received " + type + " acknowledgment with wrong send-sequence " + res.getSequenceNumber() + ", expected "
+						+ getSeqSend() + " - ignored");
 			else {
 				if (!checkVersion(h)) {
 					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
@@ -255,8 +290,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
 				if (logger.isTraceEnabled())
-					logger.trace("received service ack {} from " + ctrlEndpt
-							+ " (channel " + channelId + ")", res.getSequenceNumber());
+					logger.trace("received service ack {} from " + ctrlEndpt + " (channel " + channelId + ")", res.getSequenceNumber());
 				if (internalState == ACK_ERROR)
 					logger.warn("received service acknowledgment status " + res.getStatusString());
 			}
@@ -274,16 +308,14 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				logger.trace("data endpoint received connection state request from " + dataEndpt + " for channel "
-						+ csr.getChannelID());
+				logger.trace("data endpoint received connection state request from " + dataEndpt + " for channel " + csr.getChannelID());
 				updateLastMsgTimestamp();
 			}
 			else
 				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
-			ctrlSocket.send(p);
+			send(buf, ctrlEndpt);
 		}
 		else
 			return false;

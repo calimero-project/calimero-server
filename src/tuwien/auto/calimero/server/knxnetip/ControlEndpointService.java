@@ -110,19 +110,25 @@ final class ControlEndpointService extends ServiceLooper
 	private final BitSet channelIds = new BitSet(MAX_CHANNEL_ID);
 	private int lastChannelId;
 
-	private final SecureSession secure;
+	private final SecureSession sessions;
+	private final boolean secureOnly;
+	private boolean secureSvcInProgress;
 
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
 		super(server, null, 512, 10000);
 		svcCont = sc;
 		s = createSocket();
+		sessions = new SecureSession(this);
 
 		final InetAddress addr = s.getLocalAddress();
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
 
-		secure = new SecureSession(this);
+		final int pidSecuredServices = 54;
+		final int securedServices = server.getProperty(InterfaceObject.SECURITY_OBJECT, objectInstance(), pidSecuredServices, 1, 0);
+		secureOnly = (securedServices & 2) == 2;
+		logger.info("secure services for mgmt/tunneling connections: {}", secureOnly ? "required" : "optional");
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -166,6 +172,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 		catch (final IOException e) {}
+		sessions.closeDormantSessions();
 	}
 
 	ServiceContainer getServiceContainer()
@@ -199,7 +206,34 @@ final class ControlEndpointService extends ServiceLooper
 			s.send(new DatagramPacket(buf, buf.length, responseAddress));
 			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
 		}
-		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
+		else if (PacketHelper.isKnxSecure(h)) {
+			try {
+				secureSvcInProgress = true;
+				sessions.acceptService(h, data, offset, src, port, this);
+			}
+			finally {
+				secureSvcInProgress = false;
+			}
+		}
+		else if (secureOnly) {
+			logger.warn("reject {}, secure service required", h);
+			if (svc == KNXnetIPHeader.CONNECT_REQ) {
+				final ConnectRequest req = new ConnectRequest(data, offset);
+				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
+				final byte[] buf = PacketHelper.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
+				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
+			}
+		}
+		else
+			return acceptControlService(0, h, data, offset, src, port);
+		return true;
+	}
+
+	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
+		final int port) throws KNXFormatException, IOException
+	{
+		final int svc = h.getServiceType();
+		if (svc == KNXnetIPHeader.CONNECT_REQ) {
 			useNat = false;
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			int status = ErrorCodes.NO_ERROR;
@@ -215,8 +249,8 @@ final class ControlEndpointService extends ServiceLooper
 			byte[] buf = null;
 			boolean established = false;
 
+			final int channelId = assignChannelId();
 			if (status == ErrorCodes.NO_ERROR) {
-				final int channelId = assignChannelId();
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
@@ -233,8 +267,7 @@ final class ControlEndpointService extends ServiceLooper
 			if (buf == null)
 				buf = PacketHelper.toPacket(errorResponse(status, ctrlEndpt.toString()));
 
-			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt);
-			s.send(p);
+			send(sessionId, channelId, buf, ctrlEndpt);
 			if (established)
 				connectionEstablished(svcCont, server.dataConnections.get(server.dataConnections.size() - 1));
 		}
@@ -262,9 +295,8 @@ final class ControlEndpointService extends ServiceLooper
 						+ ", not recommended");
 			}
 			final byte[] buf = PacketHelper.toPacket(new DisconnectResponse(channelId, ErrorCodes.NO_ERROR));
-			final DatagramPacket p = new DatagramPacket(buf, buf.length, ctrlEndpt.getAddress(), ctrlEndpt.getPort());
 			try {
-				s.send(p);
+				send(sessionId, channelId, buf, ctrlEndpt);
 			}
 			catch (final IOException e) {
 				logger.error("communication failure", e);
@@ -311,15 +343,10 @@ final class ControlEndpointService extends ServiceLooper
 			// status = ErrorCodes.KNX_CONNECTION;
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			final DatagramPacket p = new DatagramPacket(buf, buf.length,
-					createResponseAddress(csr.getControlEndpoint(), src, port, 0));
-			s.send(p);
+			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, port, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
 			logger.warn("received connection state response - ignored");
-		else if (PacketHelper.isKnxSecure(h)) {
-			secure.acceptService(h, data, offset, src, port);
-		}
 		else {
 			DataEndpointServiceHandler sh = null;
 			try {
@@ -334,6 +361,18 @@ final class ControlEndpointService extends ServiceLooper
 			return false;
 		}
 		return true;
+	}
+
+	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {
+		byte[] buf = packet;
+		if (sessionId > 0) {
+			final long seq = sessions.sessions.get(sessionId).sendSeq.getAndIncrement();
+			final int msgTag = 0;
+			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
+			logger.info("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
+		}
+
+		s.send(new DatagramPacket(buf, buf.length, dst));
 	}
 
 	private List<IndividualAddress> knxAddresses()
@@ -433,7 +472,16 @@ final class ControlEndpointService extends ServiceLooper
 		IndividualAddress device = null;
 		CRD crd = null;
 
+		int sessionId = 0;
 		final int connType = req.getCRI().getConnectionType();
+		if (secureSvcInProgress) {
+			sessionId = sessions.registerConnection(connType, ctrlEndpt, channelId);
+			if (sessionId == 0) {
+				logger.error("no valid secure session for connection request from {}", ctrlEndpt);
+				return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
+			}
+		}
+
 		if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
 
 			final TunnelingLayer knxLayer;
@@ -523,7 +571,7 @@ final class ControlEndpointService extends ServiceLooper
 		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
 			sh = new DataEndpointServiceHandler(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
-					busmonitor, useNat, this::connectionClosed, this::resetRequest);
+					busmonitor, useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
 			try {
@@ -531,7 +579,7 @@ final class ControlEndpointService extends ServiceLooper
 
 				final BiConsumer<DataEndpointServiceHandler, IndividualAddress> bc = (h, a) -> svcLoop.quit();
 				sh = new DataEndpointServiceHandler(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
-						tunnel, busmonitor, useNat, bc.andThen(this::connectionClosed),
+						tunnel, busmonitor, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
 						((DataEndpointService) svcLoop)::resetRequest);
 				((DataEndpointService) svcLoop).svcHandler = sh;
 
@@ -572,8 +620,9 @@ final class ControlEndpointService extends ServiceLooper
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)
 	{
-		logger.warn("no data endpoint for remote endpoint " + endpoint + ", " + ErrorCodes.getErrorMessage(status));
-		return new ConnectResponse(status);
+		final ConnectResponse res = new ConnectResponse(status);
+		logger.warn("no data endpoint for remote endpoint {}, {}", endpoint, res.getStatusString());
+		return res;
 	}
 
 	private List<IndividualAddress> additionalAddresses() {
