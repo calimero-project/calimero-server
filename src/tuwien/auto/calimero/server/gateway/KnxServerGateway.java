@@ -1341,7 +1341,7 @@ public class KnxServerGateway implements Runnable
 				c.send(dm, WaitForAck);
 			}
 			catch (KNXException | InterruptedException e) {
-				logger.error("send failed", e);
+				logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
@@ -1413,15 +1413,16 @@ public class KnxServerGateway implements Runnable
 		final IndividualAddress localInterface = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
 		if (connector.getInterfaceType().equals("usb") && ldata.getDestination().equals(localInterface)) {
 			final byte[] data = ldata.getPayload();
-			logger.debug("request for address {}, use USB Local-DM", localInterface);
+			logger.debug("request for {}, use USB Local-DM", localInterface);
 			if (data.length < 2)
 				return true;
 			final int svc = DataUnitBuilder.getAPDUService(data);
 			try {
-				// if TL connected mode, send TL ack
-				final int dataConnected = 0x40;
-				if ((data[0] & dataConnected) == dataConnected) {
-					final int rcvSeq = (data[0] >> 2) & 0x0f;
+				// in TL connected-oriented mode, send TL ack
+				final int dataConnectedTsdu = 0x40;
+				final int rcvSeq = (data[0] >> 2) & 0x0f;
+				final boolean connected = (data[0] & dataConnectedTsdu) == dataConnectedTsdu;
+				if (connected) {
 					final CEMILData ack = new CEMILDataEx(CEMILData.MC_LDATA_IND,
 							(IndividualAddress) ldata.getDestination(), ldata.getSource(),
 							new byte[] { (byte) (0xc2 | rcvSeq << 2) }, Priority.SYSTEM);
@@ -1460,20 +1461,27 @@ public class KnxServerGateway implements Runnable
 								DataUnitBuilder.toHex(response, " "));
 					}
 					else {
-						final byte[] propData = ldm.getProperty(objIndex, pid, start, elements);
-						response = new byte[4 + propData.length];
-						logger.debug("Local-DM {} read property values {}|{} (start {}, {} elements): {}",
-								localInterface, objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
-						int i = 0;
-						response[i++] = (byte) objIndex;
-						response[i++] = (byte) pid;
-						response[i++] = (byte) ((elements << 4) | (start >> 8));
-						response[i++] = (byte) start;
-						for (final byte b : propData)
-							response[i++] = b;
+						try {
+							final byte[] propData = ldm.getProperty(objIndex, pid, start, elements);
+							response = new byte[4 + propData.length];
+							int i = 0;
+							response[i++] = (byte) objIndex;
+							response[i++] = (byte) pid;
+							response[i++] = (byte) ((elements << 4) | (start >> 8));
+							response[i++] = (byte) start;
+							for (final byte b : propData)
+								response[i++] = b;
+							logger.debug("Local-DM {} read property values {}|{} (start {}, {} elements): {}",
+									localInterface, objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
+						}
+						catch (final KNXRemoteException e) {
+							response = new byte[] { (byte) objIndex, (byte) pid, (byte) (start >> 8), (byte) start };
+						}
 					}
 					final int svcResponse = svc == PropertyDescRead ? PropertyDescResponse : PropertyResponse;
 					final byte[] tpdu = DataUnitBuilder.createAPDU(svcResponse, response);
+					if (connected)
+						tpdu[0] |= dataConnectedTsdu | (rcvSeq << 2);
 					final CEMILData f = new CEMILDataEx(CEMILData.MC_LDATA_IND,
 							(IndividualAddress) ldata.getDestination(), ldata.getSource(), tpdu, Priority.LOW);
 					dispatchToServer(connector, f, 0);
@@ -1581,7 +1589,7 @@ public class KnxServerGateway implements Runnable
 			state = (faulty ? state | 2 : state & 0xfd);
 		try {
 			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.KNXNETIP_DEVICE_STATE, 1, 1, new byte[] { (byte) state });
+					PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) state);
 		}
 		catch (final KnxPropertyException e) {
 			logger.error("on modifying network fault in device state", e);
