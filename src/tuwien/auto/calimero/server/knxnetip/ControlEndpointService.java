@@ -206,7 +206,7 @@ final class ControlEndpointService extends ServiceLooper
 			s.send(new DatagramPacket(buf, buf.length, responseAddress));
 			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
 		}
-		else if (PacketHelper.isKnxSecure(h)) {
+		else if (h.isSecure()) {
 			try {
 				secureSvcInProgress = true;
 				sessions.acceptService(h, data, offset, src, port, this);

@@ -210,7 +210,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		if (sessionId == 0)
 			return acceptDataService(h, data, offset);
 
-		if (!PacketHelper.isKnxSecure(h)) {
+		if (!h.isSecure()) {
 			logger.warn("received non-secure packet {} - discard {}", h, DataUnitBuilder.toHex(data, " "));
 			return true;
 		}
