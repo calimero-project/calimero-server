@@ -209,7 +209,7 @@ final class ControlEndpointService extends ServiceLooper
 		else if (h.isSecure()) {
 			try {
 				secureSvcInProgress = true;
-				sessions.acceptService(h, data, offset, src, port, this);
+				return sessions.acceptService(h, data, offset, src, port, this);
 			}
 			finally {
 				secureSvcInProgress = false;

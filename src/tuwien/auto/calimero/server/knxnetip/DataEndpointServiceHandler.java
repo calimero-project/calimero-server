@@ -214,8 +214,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			logger.warn("received non-secure packet {} - discard {}", h, DataUnitBuilder.toHex(data, " "));
 			return true;
 		}
-		sessions.acceptService(h, data, offset, dataEndpt.getAddress(), dataEndpt.getPort(), this);
-		return true;
+		return sessions.acceptService(h, data, offset, dataEndpt.getAddress(), dataEndpt.getPort(), this);
 	}
 
 	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {

@@ -123,7 +123,7 @@ class SecureSession {
 		deviceAuthKey = createSecretKey(new byte[16]);
 	}
 
-	void acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
+	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
 		final int port, final Object svcHandler) throws KNXFormatException, IOException {
 
 		int sessionId = 0;
@@ -132,13 +132,14 @@ class SecureSession {
 				final ByteBuffer res = establishSession(new InetSocketAddress(src, port), h, data, offset);
 				socket.send(new DatagramPacket(res.array(), res.position(), src, port));
 				logger.trace("currently open sessions: {}", sessions.keySet());
+				return true;
 			}
-			else if (h.getServiceType() == SecureSvc) {
+			if (h.getServiceType() == SecureSvc) {
 				sessionId = ((data[offset] & 0xff) << 8) | (data[offset + 1] & 0xff);
 				final Session session = sessions.get(sessionId);
 				if (session == null) {
 					logger.warn("invalid secure session ID {}", sessionId);
-					return;
+					return false;
 				}
 				final Key secretKey = session.secretKey;
 				final Object[] fields = SecureConnection.unwrap(h, data, offset, secretKey);
@@ -179,17 +180,20 @@ class SecureSession {
 						if (svcHeader.getServiceType() == KNXnetIPHeader.CONNECT_REQ) {
 							connections.put(new InetSocketAddress(src, port), sessionId);
 						}
-						((ControlEndpointService) svcHandler).acceptControlService(sessionId, svcHeader, knxipPacket, start, src, port);
+						final ControlEndpointService ces = (ControlEndpointService) svcHandler;
+						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, src, port);
 					}
 					else
-						((DataEndpointServiceHandler) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
+						return ((DataEndpointServiceHandler) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
 				}
+				return true;
 			}
 		}
 		catch (final KnxSecureException e) {
 			logger.error("error processing {}, {}", h, e.getMessage());
 			sendStatusInfo(sessionId, 0, Unauthorized, src, port);
 		}
+		return false;
 	}
 
 	// temporary
