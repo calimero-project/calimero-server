@@ -104,7 +104,7 @@ class SecureSession {
 		final Key secretKey;
 		final AtomicLong sendSeq = new AtomicLong();
 		long lastUpdate = System.nanoTime() / 1_000_000;
-		private int authContext;
+		private int userId;
 
 		Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
 			this.client = client;
@@ -159,7 +159,7 @@ class SecureSession {
 					int status = AuthSuccess;
 					try {
 						sessionAuth(session, knxipPacket, 6);
-						logger.debug("client {} authorized for session {} context {}", session.client, sessionId, session.authContext);
+						logger.debug("client {} authorized for session {} with user ID {}", session.client, sessionId, session.userId);
 					}
 					catch (final KnxSecureException e) {
 						logger.info("secure session {}: {}", sessionId, e.getMessage());
@@ -201,8 +201,8 @@ class SecureSession {
 
 	int registerConnection(final int connType, final InetSocketAddress ctrlEndpt, final int channelId) {
 		final int sid = connections.getOrDefault(ctrlEndpt, 0);
-		// only session with auth context 1 has proper access level for management access
-		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).authContext > 1)
+		// only session with user id 1 has proper access level for management access
+		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).userId > 1)
 			return 0;
 		return sid;
 	}
@@ -243,7 +243,7 @@ class SecureSession {
 
 	private void sessionAuth(final Session session, final byte[] data, final int offset) {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, data.length - offset);
-		final int authContext = buffer.getShort() & 0xffff;
+		final int userId = buffer.getShort() & 0xffff;
 		final byte[] mac = new byte[macSize];
 		buffer.get(mac);
 
@@ -254,14 +254,14 @@ class SecureSession {
 		final byte[] verifyAgainst = cbcMacSimple(xor, 0, keyLength);
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
-			logger.warn("not yet implemented: we don't verify session.auth (authentication context {})", authContext);
+			logger.warn("not yet implemented: we don't verify session.auth (user ID {})", userId);
 //			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x38), " ");
 //			throw new KnxSecureException("authentication failed for session auth " + packet);
 		}
 
-		if (authContext < 1 || authContext > 0x7F)
-			throw new KnxSecureException("authorization context out of range [1..127]");
-		session.authContext = authContext;
+		if (userId < 1 || userId > 0x7F)
+			throw new KnxSecureException("user ID " + userId + " out of range [1..127]");
+		session.userId = userId;
 	}
 
 	private void sendStatusInfo(final int sessionId, final long seq, final int status, final InetAddress remote, final int port) {
