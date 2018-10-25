@@ -38,6 +38,9 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
 
+import org.slf4j.LoggerFactory;
+
+import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -94,6 +97,10 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		final InetAddress routingMulticast)
 	{
 		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring);
+		final IndividualAddress addr = subnet.getDeviceAddress();
+		if (addr.getDevice() != 0)
+			LoggerFactory.getLogger("calimero.server").error(
+					"KNXnet/IP router requires coupler/backbone individual address x.y.0 (not " + addr + ")");
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
 			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
