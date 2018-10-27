@@ -237,8 +237,8 @@ final class DiscoveryService extends ServiceLooper
 			}
 			return true;
 		}
-		// we can safely ignore search responses and avoid a warning being logged
-		else if (svc == KNXnetIPHeader.SEARCH_RES)
+		// we can safely ignore other search requests and responses and avoid a warning being logged
+		else if (svc == KNXnetIPHeader.SEARCH_RES || svc == KNXnetIPHeader.SearchRequest || svc == KNXnetIPHeader.SearchResponse)
 			return true;
 		// also ignore routing messages
 		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG
