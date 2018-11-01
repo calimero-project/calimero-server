@@ -12,7 +12,7 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.2.0'
+ext.junitJupiterVersion = '5.3.1'
 
 apply plugin: 'java-library'
 apply plugin: 'maven'
@@ -77,5 +77,5 @@ dependencies {
 	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 	
 	// knx secure
-	implementation 'org.bouncycastle:bcprov-jdk15on:1.59'
+	implementation 'org.bouncycastle:bcprov-jdk15on:1.60'
 }
