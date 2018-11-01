@@ -753,7 +753,7 @@ public class KnxServerGateway implements Runnable
 		int objInst = 0;
 		for (final SubnetConnector c : getSubnetConnectors()) {
 			objInst++;
-			info.append(format("service container %s%n", c.getName()));
+			info.append(format("service container '%s'%n", c.getName()));
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			try {
 				if (c.getServiceContainer() instanceof RoutingServiceContainer) {
@@ -780,6 +780,8 @@ public class KnxServerGateway implements Runnable
 				final long toIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_IP).orElse(0L);
 				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
 				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs]%n", toIP, overflowIP));
+
+				serverDataConnections.forEach((addr, client) -> info.append(format("\t%s: %s%n", addr, client)));
 			}
 			catch (final Exception e) {
 				logger.error("gathering stat for service container {}", c.getName(), e);

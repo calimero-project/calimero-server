@@ -650,7 +650,7 @@ final class ControlEndpointService extends ServiceLooper
 				return addr;
 		}
 		// there are no free addresses, or no additional address at all
-		logger.warn("no additional individual addresses available that matches subnet " + forSubnet);
+		logger.warn("no additional individual addresses available that match subnet " + forSubnet);
 
 		// we assign our own KNX server device address iff:
 		// - no unused additional addresses are available
