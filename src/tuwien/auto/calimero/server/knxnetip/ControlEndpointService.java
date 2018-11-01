@@ -708,6 +708,12 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
+	boolean addressInUse(final IndividualAddress addr) {
+		synchronized (usedKnxAddresses) {
+			return usedKnxAddresses.contains(addr);
+		}
+	}
+
 	private boolean acceptConnection(final ServiceContainer sc, final KNXnetIPConnection conn,
 		final IndividualAddress addr, final boolean busmonitor)
 	{

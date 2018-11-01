@@ -262,7 +262,7 @@ final class DiscoveryService extends ServiceLooper
 			if (dibCodes.contains(DIB.SecureServiceFamilies))
 				dibs.add(createSecureServiceFamiliesDib(sc));
 			if (dibCodes.contains(DIB.Tunneling))
-				dibs.add(createTunnelingDib(sc));
+				dibs.add(createTunnelingDib(ces));
 
 			final byte[] buf = PacketHelper.toPacket(new SearchResponse(dibCodes.size() > 0, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
@@ -292,11 +292,16 @@ final class DiscoveryService extends ServiceLooper
 		return ServiceFamiliesDIB.newSecureServiceFamilies(supported, versions);
 	}
 
-	private TunnelingDib createTunnelingDib(final ServiceContainer sc) {
-		final List<IndividualAddress> addresses = additionalAddresses(sc);
-		final int[] info = new int[addresses.size()];
-		Arrays.fill(info, 1); // ???
-		return new TunnelingDib(addresses, info);
+	private TunnelingDib createTunnelingDib(final ControlEndpointService ces) {
+		final List<IndividualAddress> addresses = additionalAddresses(ces.getServiceContainer());
+		final int[] status = new int[addresses.size()];
+
+		for (int i = 0; i < addresses.size(); i++) {
+			final IndividualAddress addr = addresses.get(i);
+			final boolean inuse = ces.addressInUse(addr);
+			status[i] = 4 | (inuse ? 0 : 1);
+		}
+		return new TunnelingDib(addresses, status);
 	}
 
 	private List<IndividualAddress> additionalAddresses(final ServiceContainer sc) {
@@ -317,7 +322,9 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	private AdditionalDeviceDib createAdditionalDeviceDib(final ServiceContainer sc) {
-		return new AdditionalDeviceDib(0, sc.getMediumSettings().maxApduLength(), DD0.TYPE_091A);
+		final int oi = objectInstance(sc);
+		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT,  oi, PID.MEDIUM_STATUS, 1, 0);
+		return new AdditionalDeviceDib(status, sc.getMediumSettings().maxApduLength(), DD0.TYPE_091A);
 	}
 
 	private void sendOnInterfaces(final DatagramPacket p) throws IOException
