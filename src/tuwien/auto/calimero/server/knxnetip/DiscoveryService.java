@@ -243,7 +243,7 @@ final class DiscoveryService extends ServiceLooper
 				return;
 			}
 
-			final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), useNat ? null : local);
+			final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
 			try {
 				final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
 				final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
