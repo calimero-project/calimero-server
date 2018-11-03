@@ -330,17 +330,11 @@ final class ControlEndpointService extends ServiceLooper
 				}
 			}
 
-			if (status != ErrorCodes.NO_ERROR)
+			if (status == ErrorCodes.NO_ERROR)
+				status = subnetStatus();
+			else
 				logger.warn("received invalid connection state request for channel {}: {}", csr.getChannelID(),
 						ErrorCodes.getErrorMessage(status));
-
-			// At this point, if we know about an error with the data connection,
-			// set status to ErrorCodes.DATA_CONNECTION; if we know about problems
-			// with the KNX subnet, set status to ErrorCodes.KNX_CONNECTION.
-			// if (some connection error)
-			// status = ErrorCodes.DATA_CONNECTION;
-			// if (some subnet problem)
-			// status = ErrorCodes.KNX_CONNECTION;
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
 			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, port, 0));
@@ -361,6 +355,11 @@ final class ControlEndpointService extends ServiceLooper
 			return false;
 		}
 		return true;
+	}
+
+	int subnetStatus() {
+		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT, objectInstance(), PID.MEDIUM_STATUS, 1, 0);
+		return status == 0 ? ErrorCodes.NO_ERROR : ErrorCodes.KNX_CONNECTION;
 	}
 
 	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {

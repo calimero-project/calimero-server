@@ -449,12 +449,14 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void confirmation(final FrameEvent e)
-		{}
+		public void confirmation(final FrameEvent e) {
+			subnetConnected(true);
+		}
 
 		@Override
 		public void indication(final FrameEvent e)
 		{
+			subnetConnected(true);
 			synchronized (KnxServerGateway.this) {
 				if (subnetEvents.size() < maxEventQueueSize) {
 					// In the dispatching to server side, we rely on having the
@@ -474,7 +476,12 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void linkClosed(final CloseEvent e)
 		{
+			subnetConnected(false);
 			logger.info("KNX subnet link closed (" + e.getReason() + ")");
+		}
+
+		private void subnetConnected(final boolean connected) {
+			setNetworkState(objectInstance(scid), true, !connected);
 		}
 	}
 
@@ -1195,10 +1202,11 @@ public class KnxServerGateway implements Runnable
 		throws InterruptedException
 	{
 		applyRoutingFlowControl(c);
+		final int oi = objectInstance(svcContainer.getName());
 		try {
 			c.send(f, WaitForAck);
-			setNetworkState(false, false);
-			incMsgTransmitted(objectInstance(getSubnetConnector(svcContainer.getName())), false);
+			setNetworkState(oi, false, false);
+			incMsgTransmitted(oi, false);
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 			if (buffer != null)
@@ -1206,13 +1214,14 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KNXTimeoutException | KNXConnectionClosedException e) {
 			logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
-			setNetworkState(false, true);
+			setNetworkState(oi, false, true);
 		}
 	}
 
 	private void send(final SubnetConnector subnet, final CEMILData f)
 	{
 		final KNXNetworkLink link = (KNXNetworkLink) subnet.getSubnetLink();
+		final int oi = objectInstance(subnet);
 		try {
 			final CEMILData ldata;
 			final int mc = f.getMessageCode();
@@ -1224,17 +1233,15 @@ public class KnxServerGateway implements Runnable
 			if (subnetLink instanceof Link)
 				subnetLink = ((Link<?>) subnetLink).target();
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
-			final boolean usb  = subnetLink instanceof KNXNetworkLinkUsb;
+			final boolean usb = subnetLink instanceof KNXNetworkLinkUsb;
 			final IndividualAddress source = usb ? new IndividualAddress(0) : null;
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
-				ldata = CEMIFactory.create(source, null,
-						(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f), false, true);
+				ldata = CEMIFactory.create(source, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f), false, true);
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
-				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f),
-						false, false);
+				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
 			else if (usb)
 				ldata = CEMIFactory.create(source, null, f, false);
 			else
@@ -1245,11 +1252,11 @@ public class KnxServerGateway implements Runnable
 				((CEMILDataEx) ldata).additionalInfo().clear();
 
 			link.send(ldata, true);
-			setNetworkState(true, false);
-			incMsgTransmitted(objectInstance(subnet), true);
+			setNetworkState(oi, true, false);
+			incMsgTransmitted(oi, true);
 		}
 		catch (final KNXTimeoutException e) {
-			setNetworkState(true, true);
+			setNetworkState(oi, true, true);
 			logger.warn("timeout sending to {}: {}", f.getDestination(), e.getMessage());
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
@@ -1277,6 +1284,10 @@ public class KnxServerGateway implements Runnable
 		catch (final KnxPropertyException e) {
 			return defaultValue;
 		}
+	}
+
+	private void setProperty(final int objectType, final int objectInstance, final int propertyId, final byte... data) {
+		server.getInterfaceObjectServer().setProperty(objectType, objectInstance, propertyId, 1, 1, data);
 	}
 
 	// implements KNX group address filtering using IOS addresstable object
@@ -1366,6 +1377,13 @@ public class KnxServerGateway implements Runnable
 
 	private int objectInstance(final SubnetConnector connector) {
 		return connectors.indexOf(connector) + 1;
+	}
+
+	private int objectInstance(final String id) {
+		for (int i = 0; i < connectors.size(); i++)
+			if (connectors.get(i).getName().equals(id))
+				return i + 1;
+		throw new RuntimeException("no subnet connector with ID '" + id + "'");
 	}
 
 	// TODO support > 1 service containers with usb
@@ -1579,7 +1597,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	// if we can not transmit for 5 seconds, we assume some network fault
-	private void setNetworkState(final boolean knxNetwork, final boolean faulty)
+	private void setNetworkState(final int objectInstance, final boolean knxNetwork, final boolean faulty)
 	{
 		// 1 byte bit field
 		int state = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 0);
@@ -1592,6 +1610,7 @@ public class KnxServerGateway implements Runnable
 		try {
 			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) state);
+			setProperty(ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, (byte) (faulty ? 1 : 0));
 		}
 		catch (final KnxPropertyException e) {
 			logger.error("on modifying network fault in device state", e);

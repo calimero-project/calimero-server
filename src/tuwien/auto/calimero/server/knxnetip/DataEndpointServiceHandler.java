@@ -41,6 +41,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -309,6 +311,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			if (status == ErrorCodes.NO_ERROR) {
 				logger.trace("data endpoint received connection state request from " + dataEndpt + " for channel " + csr.getChannelID());
 				updateLastMsgTimestamp();
+				status = subnetStatus();
 			}
 			else
 				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
@@ -319,6 +322,20 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		else
 			return false;
 		return true;
+	}
+
+	private int subnetStatus() {
+		final List<LooperThread> threads = ControlEndpointService.findDataEndpoint(channelId).map(ep -> ep.server.controlEndpoints)
+				.orElse(Collections.emptyList());
+		for (final LooperThread t : threads) {
+			final Optional<ServiceLooper> looper = t.looper();
+			if (looper.isPresent()) {
+				final ControlEndpointService ces = (ControlEndpointService) looper.get();
+				if (ces.addressInUse(device))
+					return ces.subnetStatus();
+			}
+		}
+		return ErrorCodes.KNX_CONNECTION;
 	}
 
 	void updateLastMsgTimestamp()

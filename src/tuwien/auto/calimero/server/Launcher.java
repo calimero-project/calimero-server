@@ -599,11 +599,20 @@ public class Launcher implements Runnable
 	{
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
+			server.addServiceContainer(sc);
+
+			final int objectInstance = i + 1;
+			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+			ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
+			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
+
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
+			logger.info("setup {} subnet '{}'", subnetType, subnetArgs);
+
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
-
 			if ("knxip".equals(subnetType))
 				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
 			else if ("ip".equals(subnetType))
@@ -614,18 +623,13 @@ public class Launcher implements Runnable
 				connector = SubnetConnector.newCustom(sc, "emulate", xml.subnetDatapoints.get(sc));
 			else
 				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
-
-			logger.info("setup subnet " + subnetArgs);
 			linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
-			server.addServiceContainer(sc);
 
-			final int groupAddrTable = i + 1;
-			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			if (xml.additionalAddresses.containsKey(sc))
-				setAdditionalIndividualAddresses(ios, groupAddrTable, xml.additionalAddresses.get(sc));
+				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
-				setGroupAddressFilter(ios, groupAddrTable, xml.groupAddressFilters.get(sc));
+				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
 		}
 	}
 
