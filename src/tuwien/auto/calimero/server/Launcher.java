@@ -609,7 +609,8 @@ public class Launcher implements Runnable
 
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
-			logger.info("setup {} subnet '{}'", subnetType, subnetArgs);
+			final String activated = sc.isActivated() ? "" : " [not activated]";
+			logger.info("setup {} subnet '{}'{}", subnetType, subnetArgs, activated);
 
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
@@ -623,7 +624,9 @@ public class Launcher implements Runnable
 				connector = SubnetConnector.newCustom(sc, "emulate", xml.subnetDatapoints.get(sc));
 			else
 				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
-			linksToClose.add(connector.openNetworkLink());
+
+			if (sc.isActivated())
+				linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
 
 			if (xml.additionalAddresses.containsKey(sc))
