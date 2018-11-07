@@ -978,6 +978,8 @@ public class KNXnetIPServer
 
 	private void startControlEndpoint(final ServiceContainer sc)
 	{
+		if (!sc.isActivated())
+			return;
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
 		final LooperThread t = new LooperThread(this, serverName + " control endpoint " + sc.getName(), 9, builder);
 		controlEndpoints.add(t);

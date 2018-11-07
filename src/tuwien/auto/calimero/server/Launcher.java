@@ -561,6 +561,9 @@ public class Launcher implements Runnable
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
+			final String activated = sc.isActivated() ? "" : " [not activated]";
+			logger.info("setup {} subnet '{}'{}", subnetType, subnetArgs, activated);
+
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
 
@@ -575,8 +578,8 @@ public class Launcher implements Runnable
 			else
 				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
 
-			logger.info("setup subnet " + subnetArgs);
-			linksToClose.add(connector.openNetworkLink());
+			if (sc.isActivated())
+				linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
 			server.addServiceContainer(sc);
 
