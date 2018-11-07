@@ -106,7 +106,7 @@ Elements and attributes of `server-config.xml`:
 Required attributes for secure routing:
     - `secure="true"`: `true` activates KNX IP Secure, `false` defaults to KNXnet/IP Routing
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
-    - `keyFile="~/.knx/keyfile"`: path to keyfile containing the KNX IP Secure group key
+    - `keyfile="~/.knx/keyfile"`: path to keyfile containing the KNX IP Secure group (or backbone) key
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection

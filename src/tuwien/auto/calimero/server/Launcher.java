@@ -307,9 +307,9 @@ public class Launcher implements Runnable
 					else if (name.equals("routing")) {
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
-								final Path file = ofNullable(r.getAttributeValue(null, "keyFile"))
+								final Path file = ofNullable(r.getAttributeValue(null, "keyfile"))
 										.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get)
-										.orElseThrow(() -> new KNXMLException("secure group communication requires a key file", r));
+										.orElseThrow(() -> new KNXMLException("secure group communication requires 'keyfile' attribute", r));
 								groupKey = Files.lines(file).map(XmlConfiguration::fromHex).findFirst()
 										.orElseThrow(() -> new KNXMLException("no group key found"));
 								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)

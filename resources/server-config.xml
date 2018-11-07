@@ -12,7 +12,7 @@
 		<knxAddress type="individual">7.1.0</knxAddress>
 		<!-- latency specifies the time window for accepting secure multicasts, 
 			depends on max. end-to-end network latency (usually [500 .. 5000] ms) -->
-<!-- 		<routing secure="true" latencyTolerance="1000" keyFile="~/.knx/keyfile">224.0.23.12</routing> -->
+<!-- 		<routing secure="true" latencyTolerance="1000" keyfile="~/.knx/keyfile">224.0.23.12</routing> -->
 		<routing secure="false">224.0.23.12</routing>
 		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link 
 			using the specific client UDP port range (if caused by a disrupted connection). -->
