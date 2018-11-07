@@ -233,13 +233,6 @@ public class KNXnetIPServer
 
 	private final EventListeners<ServerListener> listeners;
 
-	/**
-	 * @deprecated Use {@link #KNXnetIPServer(String, String)}
-	 */
-	@Deprecated
-	public KNXnetIPServer() {
-		this("calimero-server", "");
-	}
 
 	/**
 	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
