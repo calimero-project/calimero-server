@@ -39,6 +39,11 @@ package tuwien.auto.calimero.server.knxnetip;
 import static tuwien.auto.calimero.DataUnitBuilder.toHex;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -48,10 +53,17 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.Key;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.KeySpec;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
@@ -59,6 +71,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -78,7 +91,8 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 class SecureSession {
 
 	static {
-		Security.addProvider(new BouncyCastleProvider());
+		if (Runtime.version().version().get(0) < 11)
+			Security.addProvider(new BouncyCastleProvider());
 	}
 
 	private static final int SecureSvc = 0x0950;
@@ -215,17 +229,38 @@ class SecureSession {
 	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data, final int offset) {
 
 		final byte[] clientKey = Arrays.copyOfRange(data, offset + 8, h.getTotalLength());
-		final byte[] privateKey = new byte[keyLength];
-		final byte[] publicKey = new byte[keyLength];
-		generateKeyPair(privateKey, publicKey);
-		final byte[] sessionKey = sessionKey(keyAgreement(privateKey, clientKey));
-		final Key secretKey = createSecretKey(sessionKey);
+		final byte[] publicKey;
+		final byte[] sharedSecret;
+
+		if (Runtime.version().version().get(0) < 11) {
+			final byte[] privateKey = new byte[keyLength];
+			publicKey = new byte[keyLength];
+			generateKeyPair(privateKey, publicKey);
+			sharedSecret = keyAgreement(privateKey, clientKey);
+		}
+		else {
+			try {
+				final KeyPair keyPair = generateKeyPair();
+				// we're compiling for java 9
+//				final BigInteger u = ((XECPublicKey) public1).getU();
+				final MethodHandle bind = MethodHandles.lookup().bind(keyPair.getPublic(), "getU", MethodType.methodType(BigInteger.class));
+				final BigInteger u = (BigInteger) bind.invoke();
+				publicKey = u.toByteArray();
+				reverse(publicKey);
+
+				sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
+			}
+			catch (final Throwable e) {
+				throw new KnxSecureException("error creating secure session keys for " + remote, e);
+			}
+		}
+
+		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
 
 		final int sessionId = newSessionId();
 		if (sessionId != 0)
 			sessions.put(sessionId, new Session(sessionId, remote, secretKey));
 		logger.debug("establish secure session {} for {}", sessionId, remote);
-		logger.trace("*** security sensitive information! using session key {} ***", toHex(sessionKey, ""));
 
 		return sessionResponse(sessionId, publicKey, clientKey);
 	}
@@ -370,10 +405,40 @@ class SecureSession {
 		X25519.scalarMultBase(privateKey, 0, publicKey, 0);
 	}
 
+	// use java SunEC provider
+	private static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
+		final KeyPairGenerator gen = KeyPairGenerator.getInstance("X25519");
+		return gen.generateKeyPair();
+	}
+
 	private static byte[] keyAgreement(final byte[] privateKey, final byte[] spk) {
 		final byte[] sharedSecret = new byte[keyLength];
 		X25519.scalarMult(privateKey, 0, spk, 0, sharedSecret, 0);
 		return sharedSecret;
+	}
+
+	// use java SunEC provider
+	// we're compiling for java 9, so reflectively access X25519 stuff
+	private static byte[] keyAgreement(final PrivateKey privateKey, final byte[] spk) throws GeneralSecurityException {
+		final byte[] reversed = spk.clone();
+		reverse(reversed);
+//		final KeySpec spec = new XECPublicKeySpec(NamedParameterSpec.X25519, new BigInteger(1, reversed));
+		final KeySpec spec;
+		try {
+			final AlgorithmParameterSpec params = (AlgorithmParameterSpec) constructor("java.security.spec.NamedParameterSpec",
+					String.class).newInstance("X25519");
+			spec = (KeySpec) constructor("java.security.spec.XECPublicKeySpec", AlgorithmParameterSpec.class, BigInteger.class)
+					.newInstance(params, new BigInteger(1, reversed));
+		}
+		catch (IllegalArgumentException | ReflectiveOperationException e) {
+			throw new KnxSecureException("creating key spec for client public key", e);
+		}
+
+		final PublicKey pubKey = KeyFactory.getInstance("X25519").generatePublic(spec);
+		final KeyAgreement ka = KeyAgreement.getInstance("X25519");
+		ka.init(privateKey);
+		ka.doPhase(pubKey, true);
+		return ka.generateSecret();
 	}
 
 	private static byte[] sessionKey(final byte[] sharedSecret) {
@@ -428,5 +493,20 @@ class SecureSession {
 		for (int i = 0; i < len; i++)
 			res[i] = (byte) (a[i + offsetA] ^ b[i + offsetB]);
 		return res;
+	}
+
+	private static void reverse(final byte[] array) {
+		for (int i = 0; i < array.length / 2; i++) {
+			final byte b = array[i];
+			array[i] = array[array.length - 1 - i];
+			array[array.length - 1 - i] = b;
+		}
+	}
+
+	private static Constructor<?> constructor(final String className, final Class<?>... parameterTypes)
+		throws ReflectiveOperationException {
+		final Class<?> clazz = Class.forName(className);
+		final Constructor<?> constructor = clazz.getConstructor(parameterTypes);
+		return constructor;
 	}
 }
