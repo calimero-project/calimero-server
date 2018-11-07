@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
+import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
@@ -561,6 +562,61 @@ public class KNXnetIPServer
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
 	}
 
+	// XXX limit r/w access to secure property
+	public void configSecure(final ServiceContainer sc, final Map<String, byte[]> keys) {
+		int secureServices = 0;
+		final boolean secureDevMgmt = false;
+		if (secureDevMgmt)
+			secureServices |= 1;
+
+		final int objectInstance = objectInstance(sc);
+		final int objIndex = svcContToIfObj.get(sc).getIndex();
+		// if we setup secure unicast services, we need at least device authentication
+		if (keys.containsKey("deviceAuth")) {
+			secureServices |= 2;
+
+			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
+					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
+			setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, SecureSession.pidDeviceAuth, keys.get("deviceAuth"));
+
+			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			for (int user = 1; keys.containsKey("user." + user); user++) {
+				final byte[] userPwdHash = keys.get("user." + user);
+				baos.write(userPwdHash.length == 0 ? SecureSession.emptyPwdHash : userPwdHash, 0, 16);
+			}
+			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidUserPwdHashes, 0,
+					PropertyTypes.PDT_GENERIC_16, false, 2, 127, 0, 0), true);
+			final byte[] userPwdHashes = baos.toByteArray();
+			final int users = userPwdHashes.length / 16;
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
+		}
+
+		RoutingServiceContainer rsc = null;
+		if (sc instanceof RoutingServiceContainer) {
+			rsc = (RoutingServiceContainer) sc;
+			if (rsc.secureGroupKey().isPresent())
+				secureServices |= 4;
+		}
+
+		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
+				PropertyTypes.PDT_BITSET16, false, 1, 1, 3, 0), true);
+		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secureServices);
+
+		if (rsc != null && rsc.secureGroupKey().isPresent()) {
+			try {
+				// DPT 7.002
+				final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
+				t.setTimePeriod(rsc.latencyTolerance().toMillis());
+				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidLatencyTolerance, 0,
+						PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
+				setProperty(knxObject, objectInstance, SecureSession.pidLatencyTolerance, t.getData());
+			}
+			catch (final KNXFormatException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+
 	private NetworkInterface[] parseNetworkInterfaces(final String optionKey, final String value)
 	{
 		if (value == null)
@@ -849,25 +905,9 @@ public class KNXnetIPServer
 	// NYI ensure security object is read-only
 	private void addSecurityObject(final RoutingServiceContainer sc) {
 		final int iot = InterfaceObject.SECURITY_OBJECT;
-		final int pidSecuredServices = 54;
-		final int pidLatencyTolerance = 55;
 
 		final InterfaceObjectServer io = getInterfaceObjectServer();
 		io.addInterfaceObject(iot);
-		try {
-			io.setDescription(new Description(0, iot, pidSecuredServices, 0, PropertyTypes.PDT_BITSET16, false, 1, 1, 3, 0), true);
-			// enforce only secure communication for routing, use (2 + 4) for tunneling & routing
-			setProperty(iot, objectInstance, pidSecuredServices, (byte) 0, (byte) (4));
-
-			// DPT 7.002
-			final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
-			t.setTimePeriod(sc.latencyTolerance().toMillis());
-			io.setDescription(new Description(0, iot, pidLatencyTolerance, 0, PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
-			setProperty(iot, objectInstance, pidLatencyTolerance, t.getData());
-		}
-		catch (final KNXFormatException e) {
-			e.printStackTrace();
-		}
 	}
 
 	int objectInstance(final ServiceContainer sc)

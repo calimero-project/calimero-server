@@ -82,6 +82,9 @@ import org.slf4j.LoggerFactory;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.KnxSecureException;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
@@ -113,6 +116,13 @@ class SecureSession {
 	static final int pidSecuredServices = 94;
 	static final int pidLatencyTolerance = 95;
 	static final int pidSyncLatencyTolerance = 96;
+
+	static final byte[] emptyPwdHash = { (byte) 0xe9, (byte) 0xc3, 0x04, (byte) 0xb9, 0x14, (byte) 0xa3, 0x51, 0x75, (byte) 0xfd,
+		0x7d, 0x1c, 0x67, 0x3a, (byte) 0xb5, 0x2f, (byte) 0xe1 };
+
+	private final InterfaceObjectServer ios;
+	private final int objectInstance;
+
 	private final byte[] sno;
 	private final Key deviceAuthKey;
 
@@ -124,6 +134,8 @@ class SecureSession {
 		final AtomicLong sendSeq = new AtomicLong();
 		long lastUpdate = System.nanoTime() / 1_000_000;
 		private int userId;
+		byte[] serverKey;
+		byte[] clientKey;
 
 		Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
 			this.client = client;
@@ -138,8 +150,10 @@ class SecureSession {
 		final String lock = new String(Character.toChars(0x1F512));
 		final String name = ctrlEndpoint.getServiceContainer().getName();
 		logger = LoggerFactory.getLogger("calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
+		ios = ctrlEndpoint.server.getInterfaceObjectServer();
+		objectInstance = ctrlEndpoint.server.objectInstance(ctrlEndpoint.getServiceContainer());
 		sno = deriveSerialNumber(ctrlEndpoint.getSocket().getLocalAddress());
-		deviceAuthKey = createSecretKey(new byte[16]);
+		deviceAuthKey = deviceAuthKey();
 	}
 
 	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
@@ -208,7 +222,7 @@ class SecureSession {
 				return true;
 			}
 		}
-		catch (final KnxSecureException e) {
+		catch (KnxSecureException | KnxPropertyException e) {
 			logger.error("error processing {}, {}", h, e.getMessage());
 			sendStatusInfo(sessionId, 0, Unauthorized, src, port);
 		}
@@ -258,8 +272,10 @@ class SecureSession {
 		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
 
 		final int sessionId = newSessionId();
-		if (sessionId != 0)
-			sessions.put(sessionId, new Session(sessionId, remote, secretKey));
+		final Session session = new Session(sessionId, remote, secretKey);
+		session.serverKey = publicKey;
+		session.clientKey = clientKey;
+		sessions.put(sessionId, session);
 		logger.debug("establish secure session {} for {}", sessionId, remote);
 
 		return sessionResponse(sessionId, publicKey, clientKey);
@@ -273,34 +289,49 @@ class SecureSession {
 		if (sessionId == 0)
 			return buf;
 
+		final int msgLen = buf.position() + keyLength;
+		final ByteBuffer macInput = ByteBuffer.allocate(16 + 2 + msgLen);
+		macInput.put(new byte[16]);
+		macInput.put((byte) 0);
+		macInput.put((byte) msgLen);
+		macInput.put(buf.array(), 0, buf.position());
+		macInput.put(xor(publicKey, 0, clientPublicKey, 0, keyLength));
+		final byte[] mac = cbcMacSimple(deviceAuthKey, macInput.array(), 0, macInput.capacity());
+		encrypt(mac, deviceAuthKey);
+
 		buf.put(publicKey);
-		final byte[] xor = xor(publicKey, 0, clientPublicKey, 0, keyLength);
-		final byte[] mac = cbcMacSimple(xor, 0, xor.length);
-		encrypt(mac, sessions.get(sessionId).secretKey);
 		buf.put(mac);
 		return buf;
 	}
 
+	// TODO user-Level access should not allow mgmt connections (user id > 1)
+	// TODO check if user 1 is already in use
 	private void sessionAuth(final Session session, final byte[] data, final int offset) {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, data.length - offset);
 		final int userId = buffer.getShort() & 0xffff;
+		if (userId < 1 || userId > 0x7F)
+			throw new KnxSecureException("user ID " + userId + " out of range [1..127]");
+
 		final byte[] mac = new byte[macSize];
 		buffer.get(mac);
 
-		// TODO keys
-		final byte[] serverPublicKey = new byte[keyLength];
-		final byte[] clientPublicKey = new byte[keyLength];
-		final byte[] xor = xor(serverPublicKey, 0, clientPublicKey, 0, keyLength);
-		final byte[] verifyAgainst = cbcMacSimple(xor, 0, keyLength);
+		final int msgLen = 6 + 2 + keyLength;
+		final ByteBuffer macInput = ByteBuffer.allocate(16 + 2 + msgLen);
+		macInput.put(new byte[16]);
+		macInput.put((byte) 0);
+		macInput.put((byte) msgLen);
+		macInput.put(data, 0, 6 + 2);
+		macInput.put(xor(session.serverKey, 0, session.clientKey, 0, keyLength));
+		final Key userPwdHash = userPwdHash(userId);
+		final byte[] verifyAgainst = cbcMacSimple(userPwdHash, macInput.array(), 0, macInput.capacity());
+		encrypt(verifyAgainst, userPwdHash);
+
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
-			logger.warn("not yet implemented: we don't verify session.auth (user ID {})", userId);
-//			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x38), " ");
-//			throw new KnxSecureException("authentication failed for session auth " + packet);
+			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x18), " ");
+			throw new KnxSecureException("authentication failed for user ID " + session.userId + ", auth " + packet);
 		}
 
-		if (userId < 1 || userId > 0x7F)
-			throw new KnxSecureException("user ID " + userId + " out of range [1..127]");
 		session.userId = userId;
 	}
 
@@ -367,6 +398,21 @@ class SecureSession {
 		sessions.remove(sessionId);
 	}
 
+	private Key deviceAuthKey() {
+		try {
+			return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pidDeviceAuth, 1, 1));
+		}
+		catch (final KnxPropertyException e) {
+			final byte[] key = new byte[16];
+			new SecureRandom().nextBytes(key);
+			return createSecretKey(key);
+		}
+	}
+
+	private Key userPwdHash(final int userId) {
+		return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pidUserPwdHashes, userId, 1));
+	}
+
 	byte[] newSecurePacket(final int sessionId, final long seq, final int msgTag, final byte[] knxipPacket) {
 		final Key secretKey = sessions.get(sessionId).secretKey;
 		return SecureConnection.newSecurePacket(sessionId, seq, sno, msgTag, knxipPacket, secretKey);
@@ -382,15 +428,14 @@ class SecureSession {
 		SecureConnection.encrypt(mac, 0, secretKey, securityInfo(new byte[16], 0, 0xff00));
 	}
 
-	private byte[] cbcMacSimple(final byte[] data, final int offset, final int length) {
+	private byte[] cbcMacSimple(final Key secretKey, final byte[] data, final int offset, final int length) {
 		final byte[] log = Arrays.copyOfRange(data, offset, offset + length);
 		logger.trace("authenticating (length {}): {}", length, toHex(log, " "));
 
 		try {
 			final Cipher cipher = Cipher.getInstance("AES/CBC/ZeroBytePadding");
 			final IvParameterSpec ivSpec = new IvParameterSpec(new byte[16]);
-			cipher.init(Cipher.ENCRYPT_MODE, deviceAuthKey, ivSpec);
-
+			cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
 			final byte[] result = cipher.doFinal(data, offset, length);
 			final byte[] mac = Arrays.copyOfRange(result, result.length - macSize, result.length);
 			return mac;

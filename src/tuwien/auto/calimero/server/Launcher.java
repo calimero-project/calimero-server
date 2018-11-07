@@ -183,6 +183,8 @@ public class Launcher implements Runnable
 		private final Map<ServiceContainer, List<GroupAddress>> groupAddressFilters = new HashMap<>();
 		private final Map<ServiceContainer, List<IndividualAddress>> additionalAddresses = new HashMap<>();
 		private final Map<ServiceContainer, Boolean> tunnelingWithNat = new HashMap<>();
+		private final Map<ServiceContainer, Map<String, byte[]>> keyfiles = new HashMap<>();
+
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -254,6 +256,7 @@ public class Launcher implements Runnable
 			String expirationTimeout = "0";
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
+			Path keyfile = null;
 
 			try {
 				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
@@ -307,13 +310,13 @@ public class Launcher implements Runnable
 					else if (name.equals("routing")) {
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
-								final Path file = ofNullable(r.getAttributeValue(null, "keyfile"))
+								keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
 										.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get)
 										.orElseThrow(() -> new KNXMLException("secure group communication requires 'keyfile' attribute", r));
-								groupKey = Files.lines(file).map(XmlConfiguration::fromHex).findFirst()
+								groupKey = Files.lines(keyfile).map(XmlConfiguration::fromHex).findFirst()
 										.orElseThrow(() -> new KNXMLException("no group key found"));
 								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)
-										.orElse(1000);
+										.orElse(2000);
 							}
 							routingMcast = InetAddress.getByName(r.getElementText());
 						}
@@ -385,6 +388,20 @@ public class Launcher implements Runnable
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						tunnelingWithNat.put(sc, useNat);
+
+						if (keyfile != null) {
+							try {
+								final Map<String, byte[]> keys = Files.lines(keyfile)
+										.filter(l -> l.contains("=") && Character.isLetter(l.charAt(0)))
+										.collect(Collectors.toMap(
+												l -> l.substring(0, l.indexOf('=')).trim(),
+												l -> fromHex(l.substring(l.indexOf('=') + 1).trim())));
+								keyfiles.put(sc, keys);
+							}
+							catch (final IOException e) {
+								throw new KNXMLException("reading key file '" + keyfile + "'", e);
+							}
+						}
 						return;
 					}
 				}
@@ -606,6 +623,8 @@ public class Launcher implements Runnable
 			ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
 			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
+
+			server.configSecure(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()));
 
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
