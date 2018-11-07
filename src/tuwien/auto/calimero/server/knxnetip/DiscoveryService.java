@@ -273,8 +273,7 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	private ServiceFamiliesDIB createSecureServiceFamiliesDib(final ServiceContainer sc) {
-		final int pidSecuredServices = 54;
-		final int caps = server.getProperty(InterfaceObject.SECURITY_OBJECT, objectInstance(sc), pidSecuredServices, 1, 0);
+		final int caps = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), SecureSession.pidSecuredServices, 1, 0);
 		// service family 'core' is skipped here since not used in capabilities bitset
 		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT, ServiceFamiliesDIB.TUNNELING,
 			ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING, ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS,

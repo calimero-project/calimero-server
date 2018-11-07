@@ -125,10 +125,11 @@ final class ControlEndpointService extends ServiceLooper
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
 
-		final int pidSecuredServices = 54;
-		final int securedServices = server.getProperty(InterfaceObject.SECURITY_OBJECT, objectInstance(), pidSecuredServices, 1, 0);
+		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), SecureSession.pidSecuredServices, 1, 0);
 		secureOnly = (securedServices & 2) == 2;
-		logger.info("secure services for mgmt/tunneling connections: {}", secureOnly ? "required" : "optional");
+		final String mgmt = (securedServices & 1) == 1 ? "required" : "optional";
+		final String tunneling = (securedServices & 2) == 2 ? "required" : "optional";
+		logger.info("secure services for '{}' mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)

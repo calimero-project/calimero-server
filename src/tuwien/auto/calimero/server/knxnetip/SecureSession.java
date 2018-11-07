@@ -82,10 +82,10 @@ class SecureSession {
 	}
 
 	private static final int SecureSvc = 0x0950;
-	private static final int SessionReq = 0x0951;
-	private static final int SessionRes = 0x0952;
-	private static final int SessionAuth = 0x0953;
-	private static final int SessionStatus = 0x0954;
+	private static final int SessionReq = 0x0951; // 1. client -> server
+	private static final int SessionRes = 0x0952; // 2. server -> client
+	private static final int SessionAuth = 0x0953; // 3. client -> server
+	private static final int SessionStatus = 0x0954; // 4. server -> client
 
 
 	private static final int macSize = 16; // [bytes]
@@ -94,6 +94,11 @@ class SecureSession {
 	private final DatagramSocket socket;
 	private final Logger logger;
 
+	static final int pidDeviceAuth = 92; // PDT generic 16
+	static final int pidUserPwdHashes = 93; // PDT generic 16
+	static final int pidSecuredServices = 94;
+	static final int pidLatencyTolerance = 95;
+	static final int pidSyncLatencyTolerance = 96;
 	private final byte[] sno;
 	private final Key deviceAuthKey;
 
