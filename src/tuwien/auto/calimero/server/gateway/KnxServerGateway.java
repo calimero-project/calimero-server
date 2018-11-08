@@ -1004,7 +1004,7 @@ public class KnxServerGateway implements Runnable
 			for (final SubnetConnector subnet : connectors) {
 				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
 					dispatchToSubnet(subnet, f, raw);
-				else
+				else if (exclude != null)
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			}
 		}
