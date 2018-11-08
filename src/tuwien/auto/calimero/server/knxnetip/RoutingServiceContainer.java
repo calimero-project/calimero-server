@@ -137,7 +137,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		return mcast;
 	}
 
-	Optional<byte[]> secureGroupKey() {
+	public final Optional<byte[]> secureGroupKey() {
 		return Optional.ofNullable(secureGroupKey).map(byte[]::clone);
 	}
 

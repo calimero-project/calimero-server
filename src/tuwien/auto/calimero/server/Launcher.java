@@ -535,8 +535,11 @@ public class Launcher implements Runnable
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			String mcast = "disabled";
-			if ((sc instanceof RoutingServiceContainer))
+			String secure = "";
+			if ((sc instanceof RoutingServiceContainer)) {
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
+				secure = ((RoutingServiceContainer) sc).secureGroupKey().isPresent() ? new String(Character.toChars(0x1F512)) + " " : "";
+			}
 			final String type = xml.subnetTypes.get(i);
 			String filter = "";
 			if (xml.groupAddressFilters.containsKey(sc) && !xml.groupAddressFilters.get(sc).isEmpty())
@@ -548,9 +551,9 @@ public class Launcher implements Runnable
 
 			// @formatter:off
 			final String info = String.format("Service container '%s': %n"
-					+ "\tlisten on %s, KNXnet/IP routing %s%n"
+					+ "\tlisten on %s, KNXnet/IP %srouting %s%n"
 					+ "\t%s connection: %s%s%s",
-					sc.getName(), sc.networkInterface(), mcast, type, sc.getMediumSettings(), filter, datapoints);
+					sc.getName(), sc.networkInterface(), secure, mcast, type, sc.getMediumSettings(), filter, datapoints);
 			// @formatter:on
 			logger.info(info);
 		}
