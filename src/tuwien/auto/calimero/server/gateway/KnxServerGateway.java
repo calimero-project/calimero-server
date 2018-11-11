@@ -640,7 +640,7 @@ public class KnxServerGateway implements Runnable
 
 			final int pidMaxRoutingApduLength = 58;
 			ios.setProperty(ROUTER_OBJECT, objinst, pidMaxRoutingApduLength, 1, 1, data);
-			logger.debug("set maximum APDU length to {}", sc.getMediumSettings().maxApduLength());
+			logger.debug("set maximum APDU length of '{}' to {}", sc.getName(), sc.getMediumSettings().maxApduLength());
 
 			// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
 			try {

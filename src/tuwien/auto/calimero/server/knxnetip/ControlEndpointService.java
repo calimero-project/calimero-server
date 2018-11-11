@@ -129,7 +129,7 @@ final class ControlEndpointService extends ServiceLooper
 		secureOnly = (securedServices & 2) == 2;
 		final String mgmt = (securedServices & 1) == 1 ? "required" : "optional";
 		final String tunneling = (securedServices & 2) == 2 ? "required" : "optional";
-		logger.info("secure services for '{}' mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
+		logger.info("control endpoint '{}' secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -402,7 +402,7 @@ final class ControlEndpointService extends ServiceLooper
 			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
-			logger.debug("{} control endpoint: socket bound to {}:{}", svcCont.getName(),
+			logger.debug("control endpoint '{}' socket bound to {}:{}", svcCont.getName(),
 					boundTo.getAddress().getHostAddress(), boundTo.getPort());
 			return s;
 		}

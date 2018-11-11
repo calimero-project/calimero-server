@@ -171,8 +171,8 @@ class SecureSession {
 				sessionId = ((data[offset] & 0xff) << 8) | (data[offset + 1] & 0xff);
 				final Session session = sessions.get(sessionId);
 				if (session == null) {
-					logger.warn("invalid secure session ID {}", sessionId);
-					return false;
+					logger.warn("reject secure service with invalid session ID {}", sessionId);
+					return true;
 				}
 				final Key secretKey = session.secretKey;
 				final Object[] fields = SecureConnection.unwrap(h, data, offset, secretKey);
