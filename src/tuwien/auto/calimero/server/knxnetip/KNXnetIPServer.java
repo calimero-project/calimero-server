@@ -71,6 +71,7 @@ import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
+import tuwien.auto.calimero.dptxlator.DPTXlator8BitUnsigned;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.Discoverer;
@@ -357,17 +358,8 @@ public class KNXnetIPServer
 			svcContToIfObj.put(sc, objects[objects.length - 1]);
 			// init the parameter object
 			svcContainers.add(sc);
-			try {
-				initKNXnetIpParameterObject(svcContainers.size(), sc);
-			}
-			catch (final KnxPropertyException e) {
-				logger.error("initializing KNXnet/IP parameter object of service container '{}'", sc.getName(), e);
-			}
-			if (sc instanceof RoutingServiceContainer) {
-				final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
-				if (rsc.secureGroupKey().isPresent())
-					addSecurityObject(rsc);
-			}
+			initKNXnetIpParameterObject(svcContainers.size(), sc);
+
 			synchronized (this) {
 				if (running)
 					startControlEndpoint(sc);
@@ -562,8 +554,7 @@ public class KNXnetIPServer
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
 	}
 
-	// XXX limit r/w access to secure property
-	public void configSecure(final ServiceContainer sc, final Map<String, byte[]> keys) {
+	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys) {
 		int secureServices = 0;
 		final boolean secureDevMgmt = false;
 		if (secureDevMgmt)
@@ -604,12 +595,23 @@ public class KNXnetIPServer
 
 		if (rsc != null && rsc.secureGroupKey().isPresent()) {
 			try {
+				final int pidGroupKey = 91;
+				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0,
+						PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
+				setProperty(knxObject, objectInstance, pidGroupKey, rsc.secureGroupKey().get());
+
 				// DPT 7.002
 				final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
 				t.setTimePeriod(rsc.latencyTolerance().toMillis());
 				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidLatencyTolerance, 0,
 						PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
 				setProperty(knxObject, objectInstance, SecureSession.pidLatencyTolerance, t.getData());
+
+				final DPTXlator8BitUnsigned scaling = new DPTXlator8BitUnsigned(DPTXlator8BitUnsigned.DPT_SCALING);
+				scaling.setValue(10);
+				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSyncLatencyTolerance, 0, PropertyTypes.PDT_SCALING,
+						false, 1, 1, 3, 0), true);
+				setProperty(knxObject, objectInstance, SecureSession.pidSyncLatencyTolerance, scaling.getData());
 			}
 			catch (final KNXFormatException e) {
 				throw new RuntimeException(e);
@@ -900,14 +902,6 @@ public class KNXnetIPServer
 	private void resetRoutingConfiguration(final int objectInstance)
 	{
 		setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, new byte[4]);
-	}
-
-	// NYI ensure security object is read-only
-	private void addSecurityObject(final RoutingServiceContainer sc) {
-		final int iot = InterfaceObject.SECURITY_OBJECT;
-
-		final InterfaceObjectServer io = getInterfaceObjectServer();
-		io.addInterfaceObject(iot);
 	}
 
 	int objectInstance(final ServiceContainer sc)

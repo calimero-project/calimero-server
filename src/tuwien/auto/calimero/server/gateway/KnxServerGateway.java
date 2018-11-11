@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1318,31 +1319,73 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
+	// @formatter:off
+	private enum AccessPermission { Read, Write, SecureRead, SecureWrite }
+
+	private static final Map<Integer, EnumSet<AccessPermission>> knxipSecureProperties = Map.of(
+					91, EnumSet.of(AccessPermission.SecureWrite),
+					92, EnumSet.of(AccessPermission.SecureWrite),
+					93, EnumSet.of(AccessPermission.SecureWrite),
+					94, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
+					95, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
+					96, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
+					97, EnumSet.of(AccessPermission.SecureWrite));
+	// @formatter:on
+
+	private boolean checkSecurityPermissions(final int ot, final int pid, final boolean read, final boolean secureConn) {
+		if (ot != InterfaceObject.KNXNETIP_PARAMETER_OBJECT)
+			return true;
+		if (!knxipSecureProperties.containsKey(pid))
+			return true;
+
+		final EnumSet<AccessPermission> ap = knxipSecureProperties.get(pid);
+		final String type = read ? "read" : "write";
+		logger.debug("check access permission '{}' for secure property {}|{} {}", type, ot, pid, ap);
+
+		final boolean write = !read;
+		if (read && ap.contains(AccessPermission.Read))
+			return true;
+		if (write && ap.contains(AccessPermission.Write))
+			return true;
+		if (secureConn && read && ap.contains(AccessPermission.SecureRead))
+			return true;
+		if (secureConn && write && ap.contains(AccessPermission.SecureWrite))
+			return true;
+		final String secure = secureConn ? "secure" : "non-secure";
+		logger.info("deny {} '{}' access to secure property {}|{}", secure, type, ot, pid);
+		return false;
+	}
+
 	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f)
 	{
 		final int mc = f.getMessageCode();
 		if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ) {
 			final boolean read = mc == CEMIDevMgmt.MC_PROPREAD_REQ;
-			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			byte[] data = null;
 			int elems = f.getElementCount();
-			try {
-				if (read) {
-					data = ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(),
-							f.getStartIndex(), elems);
-					// play it safe and set error code if property data was not found
-					if (data == null) {
-						data = new byte[] { CEMIDevMgmt.ErrorCodes.VOID_DP };
-						elems = 0;
+
+			if (checkSecurityPermissions(f.getObjectType(), f.getPID(), mc == CEMIDevMgmt.MC_PROPREAD_REQ, false)) {
+				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+				try {
+					if (read) {
+						data = ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems);
+						// play it safe and set error code if property data was not found
+						if (data == null) {
+							data = new byte[] { CEMIDevMgmt.ErrorCodes.VOID_DP };
+							elems = 0;
+						}
 					}
+					else
+						ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, f.getPayload());
 				}
-				else
-					ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(),
-							f.getStartIndex(), elems, f.getPayload());
+				catch (final KnxPropertyException e) {
+					logger.info(e.getMessage());
+					data = new byte[] { (byte) e.errorCode() };
+					elems = 0;
+				}
 			}
-			catch (final KnxPropertyException e) {
-				logger.info(e.getMessage());
-				data = new byte[] { (byte) e.errorCode() };
+			else {
+				data = new byte[] { (byte) CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR };
 				elems = 0;
 			}
 			final int con = read ? CEMIDevMgmt.MC_PROPREAD_CON : CEMIDevMgmt.MC_PROPWRITE_CON;

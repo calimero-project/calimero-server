@@ -628,7 +628,7 @@ public class Launcher implements Runnable
 			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
-			server.configSecure(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()));
+			server.configureSecurity(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()));
 
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
