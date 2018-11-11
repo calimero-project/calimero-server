@@ -477,6 +477,7 @@ public class Launcher implements Runnable
 		logger.info("KNXnet/IP discovery network interfaces: listen on [{}], send on [{}]", netIfListen, netIfOutgoing);
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
+			final String activated = sc.isActivated() ? "" : " [not activated]";
 			String mcast = "disabled";
 			if ((sc instanceof RoutingServiceContainer))
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
@@ -490,10 +491,10 @@ public class Launcher implements Runnable
 						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints();
 
 			// @formatter:off
-			final String info = String.format("Service container '%s': %n"
+			final String info = String.format("Service container '%s'%s:%n"
 					+ "\tlisten on %s, KNXnet/IP routing %s%n"
 					+ "\t%s connection: %s%s%s",
-					sc.getName(), sc.networkInterface(), mcast, type, sc.getMediumSettings(), filter, datapoints);
+					sc.getName(), activated, sc.networkInterface(), mcast, type, sc.getMediumSettings(), filter, datapoints);
 			// @formatter:on
 			logger.info(info);
 		}
