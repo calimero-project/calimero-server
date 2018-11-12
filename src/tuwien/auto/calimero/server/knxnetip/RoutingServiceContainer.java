@@ -38,7 +38,6 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.net.InetAddress;
 import java.time.Duration;
-import java.util.Optional;
 
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
@@ -58,7 +57,6 @@ import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 public class RoutingServiceContainer extends DefaultServiceContainer
 {
 	private final InetAddress mcast;
-	private final byte[] secureGroupKey;
 	private final Duration latency;
 
 	/**
@@ -128,17 +126,12 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		if (!KNXnetIPRouting.isValidRoutingMulticast(routingMulticast))
 			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
-		this.secureGroupKey = secureGroupKey;
 		this.latency = latencyTolerance;
 	}
 
 	public final InetAddress routingMulticastAddress()
 	{
 		return mcast;
-	}
-
-	public final Optional<byte[]> secureGroupKey() {
-		return Optional.ofNullable(secureGroupKey).map(byte[]::clone);
 	}
 
 	Duration latencyTolerance() {

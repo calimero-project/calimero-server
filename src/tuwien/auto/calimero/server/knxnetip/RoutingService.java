@@ -44,6 +44,7 @@ import java.net.SocketException;
 
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
@@ -122,12 +123,16 @@ final class RoutingService extends ServiceLooper
 		super(server, null, false, 512, 0);
 		svcCont = sc;
 
+		final int pidGroupKey = 91;
+		final int oi = server.objectInstance(sc);
+		final byte[] groupKey = server.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, oi, pidGroupKey, new byte[0]);
+		secure = groupKey.length == 16;
+
 		final KNXnetIPRouting inst;
-		secure = sc.secureGroupKey().isPresent();
 		if (secure) {
 			try {
 				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
-				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, sc.secureGroupKey().get(), sc.latencyTolerance());
+				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
 				r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback) {
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {

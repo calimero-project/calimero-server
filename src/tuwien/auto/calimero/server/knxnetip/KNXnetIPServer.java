@@ -556,19 +556,16 @@ public class KNXnetIPServer
 
 	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys) {
 		int secureServices = 0;
-		final boolean secureDevMgmt = false;
-		if (secureDevMgmt)
-			secureServices |= 1;
 
 		final int objectInstance = objectInstance(sc);
 		final int objIndex = svcContToIfObj.get(sc).getIndex();
 		// if we setup secure unicast services, we need at least device authentication
-		if (keys.containsKey("deviceAuth")) {
-			secureServices |= 2;
+		if (keys.containsKey("device.key")) {
+			secureServices |= (1 + 2); // dev mgmt & tunneling
 
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
-			setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, SecureSession.pidDeviceAuth, keys.get("deviceAuth"));
+			setProperty(knxObject, objectInstance, SecureSession.pidDeviceAuth, keys.get("device.key"));
 
 			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			for (int user = 1; keys.containsKey("user." + user); user++) {
@@ -579,30 +576,33 @@ public class KNXnetIPServer
 					PropertyTypes.PDT_GENERIC_16, false, 2, 127, 0, 0), true);
 			final byte[] userPwdHashes = baos.toByteArray();
 			final int users = userPwdHashes.length / 16;
-			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
+			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
 		}
 
-		RoutingServiceContainer rsc = null;
-		if (sc instanceof RoutingServiceContainer) {
-			rsc = (RoutingServiceContainer) sc;
-			if (rsc.secureGroupKey().isPresent())
-				secureServices |= 4;
+		final byte[] groupKey = keys.get("group.key");
+		if (sc instanceof RoutingServiceContainer && groupKey != null)
+			secureServices |= 4;
+
+		if (secureServices != 0) {
+			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(defDeviceCaps));
+			caps[1] |= 64;
+			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
 		}
 
 		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
 				PropertyTypes.PDT_BITSET16, false, 1, 1, 3, 0), true);
 		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secureServices);
 
-		if (rsc != null && rsc.secureGroupKey().isPresent()) {
+		if (sc instanceof RoutingServiceContainer && groupKey != null) {
 			try {
 				final int pidGroupKey = 91;
-				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0,
-						PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
-				setProperty(knxObject, objectInstance, pidGroupKey, rsc.secureGroupKey().get());
+				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0, PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0),
+						true);
+				setProperty(knxObject, objectInstance, pidGroupKey, groupKey);
 
 				// DPT 7.002
 				final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
-				t.setTimePeriod(rsc.latencyTolerance().toMillis());
+				t.setTimePeriod(((RoutingServiceContainer) sc).latencyTolerance().toMillis());
 				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidLatencyTolerance, 0,
 						PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
 				setProperty(knxObject, objectInstance, SecureSession.pidLatencyTolerance, t.getData());
@@ -846,12 +846,8 @@ public class KNXnetIPServer
 		//
 
 		// if service container doesn't support routing, don't show it in device capabilities
-		final int deviceCaps;
-		if (endpoint instanceof RoutingServiceContainer) {
-			final RoutingServiceContainer rsc = (RoutingServiceContainer) endpoint;
-			deviceCaps = rsc.secureGroupKey().isPresent() ? defDeviceCaps + 64 : defDeviceCaps;
-		}
-		else
+		int deviceCaps = defDeviceCaps;
+		if (!(endpoint instanceof RoutingServiceContainer))
 			deviceCaps = defDeviceCaps - 4;
 		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(deviceCaps));
 

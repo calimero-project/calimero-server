@@ -246,7 +246,6 @@ public class Launcher implements Runnable
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = null;
-			byte[] groupKey = null;
 			int latencyTolerance = 1000; // ms
 			boolean useNat = false;
 			String subnetLinkClass = null;
@@ -257,6 +256,7 @@ public class Launcher implements Runnable
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
 			Path keyfile = null;
+			boolean secure = false;
 
 			try {
 				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
@@ -310,11 +310,10 @@ public class Launcher implements Runnable
 					else if (name.equals("routing")) {
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
+								secure = true;
 								keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
 										.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get)
 										.orElseThrow(() -> new KNXMLException("secure group communication requires 'keyfile' attribute", r));
-								groupKey = Files.lines(keyfile).map(XmlConfiguration::fromHex).findFirst()
-										.orElseThrow(() -> new KNXMLException("no group key found"));
 								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)
 										.orElse(2000);
 							}
@@ -322,9 +321,6 @@ public class Launcher implements Runnable
 						}
 						catch (final UnknownHostException uhe) {
 							throw new KNXMLException(uhe.getMessage(), r);
-						}
-						catch (final IOException e) {
-							throw new KNXMLException("no key file '" + e.getMessage() + "'", r);
 						}
 						catch (final NumberFormatException e) {
 							throw new KNXMLException("invalid latency tolerance", r);
@@ -367,8 +363,8 @@ public class Launcher implements Runnable
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
 						if (routing) {
-							if (groupKey != null)
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast, groupKey,
+							if (secure)
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast, null,
 										Duration.ofMillis(latencyTolerance));
 							else
 								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast);
@@ -393,8 +389,7 @@ public class Launcher implements Runnable
 							try {
 								final Map<String, byte[]> keys = Files.lines(keyfile)
 										.filter(l -> l.contains("=") && Character.isLetter(l.charAt(0)))
-										.collect(Collectors.toMap(
-												l -> l.substring(0, l.indexOf('=')).trim(),
+										.collect(Collectors.toMap(l -> l.substring(0, l.indexOf('=')).trim(),
 												l -> fromHex(l.substring(l.indexOf('=') + 1).trim())));
 								keyfiles.put(sc, keys);
 							}
@@ -539,7 +534,8 @@ public class Launcher implements Runnable
 			String secure = "";
 			if ((sc instanceof RoutingServiceContainer)) {
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
-				secure = ((RoutingServiceContainer) sc).secureGroupKey().isPresent() ? new String(Character.toChars(0x1F512)) + " " : "";
+				secure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).containsKey("group.key")
+						? new String(Character.toChars(0x1F512)) + " " : "";
 			}
 			final String type = xml.subnetTypes.get(i);
 			String filter = "";
