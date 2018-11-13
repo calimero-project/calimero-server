@@ -23,10 +23,11 @@ Supported Features
 ------------------
 
 ### Client-side KNXnet/IP & KNX IP Secure
+For running KNX IP Secure, a keyfile is required (see [section below](#knx-ip-secure)).
+
 * Discovery and self-description
 * Tunneling
 * Routing
-* Secure routing (experimental)
 * Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are realized by converting cEMI L-Data to cEMI bus monitor messages)
 * Local device management
 
@@ -153,6 +154,27 @@ Required attributes for secure routing:
 * Provide a KNXnet/IP server for a KNX RF USB connection, using the USB vendor:product ID
 
 	`<knxSubnet type="usb" medium="rf" domainAddress="000000004b01">0409:005a</knxSubnet>`
+
+### KNX IP Secure 
+Running the server with KNX IP Secure requires a keyfile, which contains 
+
+* a _group key_ if the server should use KNX IP Secure multicast communication
+* a _device key_ and _user keys_ if the server should use KNX IP Secure unicast communication (tunneling on link-layer and busmonitor-layer, device management)
+
+Example file (note, the layout might still change):
+
+```
+// group key is a 16 byte hex value 
+group.key=BEEF5A1ADBEEF5A1ADBEEF5A1ADBEEF5
+// device key is a 16 byte hex value
+device.key=0102030405060708090a0b0c0d0e0f10
+// for unicast, specify at least user 1 & 2 (max. 127), user 1 is used for management access
+// device key is a 16 byte hex value, or empty
+user.1=
+user.2=d6da71bd89f7e8426250fe5657da900c
+user.3=
+user.4=
+```
 
 ### Launcher Code
 
