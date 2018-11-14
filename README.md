@@ -1,18 +1,18 @@
 Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
 =========================
 
-A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is Java SE 9 (module _java.base_).
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is Java SE 9 (module _java.base_), recommended is Java SE 11.
 
 * No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
+* Secure your client-side KNX IP network traffic
 * Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
 * Emulate/virtualize a KNX network
-* Secure your KNX IP network traffic
 
 
 ### Dependencies
 
-The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`.
+The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`. KNX IP Secure requires [Bouncy Castle](https://www.bouncycastle.org) (as long as Calimero targets Java 9).
 
 _Optional_ dependencies, required for communication over serial ports:
 
@@ -93,7 +93,7 @@ Elements and attributes of `server-config.xml`:
 	- `routing`: if `true` activate KNX IP routing, if `false` routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
-	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available network adapter is chosen depending on your OS network setup (localhost setting). 
+	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available (non-loopback) network adapter is chosen depending on your OS network setup (or localhost setting). 
     - `reuseCtrlEP` (optional): reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, `false` by default. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
 
 * `<knxAddress type="individual">7.1.0</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
@@ -161,7 +161,7 @@ Running the server with KNX IP Secure requires a keyfile, which contains
 * a _group key_ if the server should use KNX IP Secure multicast communication
 * a _device key_ and _user keys_ if the server should use KNX IP Secure unicast communication (tunneling on link-layer and busmonitor-layer, device management)
 
-Example file (note, the layout might still change):
+Example keyfile (note, the layout might still change):
 
 ```
 // group key is a 16 byte hex value 
