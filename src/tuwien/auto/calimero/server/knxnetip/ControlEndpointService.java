@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
+import static java.util.stream.Collectors.toList;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
 import java.io.IOException;
@@ -59,7 +60,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.IndividualAddress;
@@ -399,14 +399,17 @@ final class ControlEndpointService extends ServiceLooper
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 			if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
-			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
+			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address)
+					.filter(a -> !a.isLoopbackAddress())
+					.findFirst()
+					.orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
 			logger.debug("control endpoint '{}' socket bound to {}:{}", svcCont.getName(),
 					boundTo.getAddress().getHostAddress(), boundTo.getPort());
 			return s;
 		}
-		catch (SocketException | UnknownHostException e) {
+		catch (final SocketException e) {
 			logger.error("socket creation failed for {}:{}", ip, ep.getPort(), e);
 			throw wrappedException(e);
 		}
@@ -426,12 +429,19 @@ final class ControlEndpointService extends ServiceLooper
 		return ByteBuffer.allocate(4).putInt((int) ((0xffffffffL >> length) ^ 0xffffffffL)).array();
 	}
 
-	private List<InetAddress> assignedIpAddresses() throws SocketException, UnknownHostException
-	{
+	private List<InetAddress> assignedIpAddresses() throws SocketException {
 		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
-		final List<InetAddress> list = netif != null ? Collections.list(netif.getInetAddresses())
-				: Collections.singletonList(localHost());
-		return list;
+		if (netif != null)
+			return netif.inetAddresses().collect(toList());
+
+		try {
+			final InetAddress localHost = localHost();
+			if (!localHost.isLoopbackAddress())
+				return List.of(localHost);
+		}
+		catch (final UnknownHostException ignore) {}
+
+		return NetworkInterface.networkInterfaces().flatMap(NetworkInterface::inetAddresses).collect(toList());
 	}
 
 	private InetAddress localHost() throws UnknownHostException
@@ -506,7 +516,7 @@ final class ControlEndpointService extends ServiceLooper
 				// allow tunneling on busmonitor.
 				final List<DataEndpointServiceHandler> active = server.dataConnections.stream()
 						.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
-						.filter(h -> !h.isMonitor()).collect(Collectors.toList());
+						.filter(h -> !h.isMonitor()).collect(toList());
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
 							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
@@ -615,7 +625,7 @@ final class ControlEndpointService extends ServiceLooper
 	private List<DataEndpointServiceHandler> activeMonitorConnections()
 	{
 		return server.dataConnections.stream().filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
-				.filter(DataEndpointServiceHandler::isMonitor).collect(Collectors.toList());
+				.filter(DataEndpointServiceHandler::isMonitor).collect(toList());
 	}
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)
