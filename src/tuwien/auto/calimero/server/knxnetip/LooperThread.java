@@ -67,7 +67,7 @@ class LooperThread extends Thread
 		final int inc = maxRetries == -1 ? 0 : 1;
 		int attempt = 0;
 		while (!quit) {
-			if (attempt > maxRetries) {
+			if (maxRetries != -1 && attempt > maxRetries) {
 				quit = true;
 				break;
 			}
