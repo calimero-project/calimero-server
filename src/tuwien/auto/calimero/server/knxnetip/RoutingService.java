@@ -42,8 +42,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 
+import tuwien.auto.calimero.CloseEvent;
+import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.KNXListener;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -64,7 +67,7 @@ final class RoutingService extends ServiceLooper
 		{
 			super(mcGroup);
 			try {
-				init(NetworkInterface.getByName(netIf), enableLoopback, false);
+				init(networkInterface(), enableLoopback, false);
 				logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 			}
 			catch (SocketException | KNXException e) {
@@ -131,8 +134,7 @@ final class RoutingService extends ServiceLooper
 		final KNXnetIPRouting inst;
 		if (secure) {
 			try {
-				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
-				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
+				inst = (KNXnetIPRouting) SecureConnection.newRouting(networkInterface(), mcGroup, groupKey, sc.latencyTolerance());
 				r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback) {
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
@@ -148,10 +150,18 @@ final class RoutingService extends ServiceLooper
 					@Override
 					protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t) {
 						closing = true;
-						RoutingService.this.quit();
 						inst.close();
+						super.close(initiator, reason, level, t);
 					}
 				};
+				// add listener to inst after r got initialized
+				inst.addConnectionListener(new KNXListener() {
+					@Override
+					public void frameReceived(final FrameEvent e) {}
+
+					@Override
+					public void connectionClosed(final CloseEvent e) { r.close(); }
+				});
 			}
 			catch (SocketException | KNXException e) {
 				throw wrappedException(e);
@@ -164,6 +174,16 @@ final class RoutingService extends ServiceLooper
 
 		s = r.getLocalDataSocket();
 		fireRoutingServiceStarted(svcCont, inst);
+	}
+
+	private NetworkInterface networkInterface() throws SocketException {
+		final String name = svcCont.networkInterface();
+		if ("any".equals(name))
+			return null;
+		final NetworkInterface netif = NetworkInterface.getByName(name);
+		if (netif == null)
+			throw new RuntimeException("no network interface with the specified name '" + name + "'");
+		return netif;
 	}
 
 	ServiceContainer getServiceContainer()
@@ -196,8 +216,7 @@ final class RoutingService extends ServiceLooper
 
 	private void fireRoutingServiceStarted(final ServiceContainer sc, final KNXnetIPRouting r)
 	{
-		final ServiceContainerEvent sce = new ServiceContainerEvent(server, ServiceContainerEvent.ROUTING_SVC_STARTED,
-				sc, r);
+		final ServiceContainerEvent sce = new ServiceContainerEvent(server, ServiceContainerEvent.ROUTING_SVC_STARTED, sc, r);
 		server.fireOnServiceContainerChange(sce);
 	}
 }
