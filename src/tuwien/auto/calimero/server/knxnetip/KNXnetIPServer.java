@@ -539,7 +539,7 @@ public class KNXnetIPServer
 			runDiscovery = Boolean.valueOf(value).booleanValue();
 			stopDiscoveryService();
 			if (runDiscovery && running)
-				startDiscoveryService(outgoingIf, discoveryIfs, 9);
+				startDiscoveryService(outgoingIf, discoveryIfs, -1);
 		}
 		else if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
 			multicastLoopback = Boolean.valueOf(value).booleanValue();
@@ -676,7 +676,7 @@ public class KNXnetIPServer
 		if (running)
 			return;
 
-		startDiscoveryService(outgoingIf, discoveryIfs, 9);
+		startDiscoveryService(outgoingIf, discoveryIfs, -1);
 		svcContainers.forEach(this::startControlEndpoint);
 		running = true;
 	}
@@ -1037,7 +1037,7 @@ public class KNXnetIPServer
 		if (!sc.isActivated())
 			return;
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
-		final LooperThread t = new LooperThread(this, serverName + " control endpoint " + sc.getName(), 9, builder);
+		final LooperThread t = new LooperThread(this, serverName + " control endpoint " + sc.getName(), -1, builder);
 		controlEndpoints.add(t);
 		t.start();
 		if (sc instanceof RoutingServiceContainer)
@@ -1060,7 +1060,7 @@ public class KNXnetIPServer
 	private void startRoutingService(final RoutingServiceContainer sc)
 	{
 		final InetAddress mcast = sc.routingMulticastAddress();
-		final LooperThread t = new LooperThread(this, serverName + " routing service " + mcast.getHostAddress(), 9,
+		final LooperThread t = new LooperThread(this, serverName + " routing service " + mcast.getHostAddress(), -1,
 				() -> new RoutingService(this, sc, mcast, multicastLoopback));
 		routingEndpoints.add(t);
 		t.start();
