@@ -597,8 +597,7 @@ public class Launcher implements Runnable
 	 */
 	public void quit()
 	{
-		if (gw != null)
-			gw.quit();
+		server.shutdown();
 	}
 
 	/**
