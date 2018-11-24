@@ -300,7 +300,8 @@ final class DiscoveryService extends ServiceLooper
 			final boolean inuse = ces.addressInUse(addr);
 			status[i] = 4 | (inuse ? 0 : 1);
 		}
-		return new TunnelingDib(addresses, status);
+		final int maxApduLength = ces.getServiceContainer().getMediumSettings().maxApduLength();
+		return new TunnelingDib((short) maxApduLength, addresses, status);
 	}
 
 	private List<IndividualAddress> additionalAddresses(final ServiceContainer sc) {
