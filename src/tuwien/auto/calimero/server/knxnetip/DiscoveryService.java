@@ -268,7 +268,7 @@ final class DiscoveryService extends ServiceLooper
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);
 			sendOnInterfaces(p);
-			logger.info("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
+			logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
 		}
 	}
 

@@ -147,7 +147,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			final long seq = sessions.sessions.get(sessionId).sendSeq.get();
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
+			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, dst, DataUnitBuilder.toHex(buf, " "));
 		}
 
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);

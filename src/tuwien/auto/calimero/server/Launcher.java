@@ -534,7 +534,7 @@ public class Launcher implements Runnable
 			String secure = "";
 			if ((sc instanceof RoutingServiceContainer)) {
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
-				secure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).containsKey("group.key")
+				secure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).getOrDefault("group.key", new byte[0]).length == 16
 						? new String(Character.toChars(0x1F512)) + " " : "";
 			}
 			final String type = xml.subnetTypes.get(i);

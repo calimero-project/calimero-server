@@ -343,7 +343,7 @@ public class KnxServerGateway implements Runnable
 				verifySubnetInterfaceAddress(svcContainer);
 			}
 			catch (KNXException | InterruptedException | RuntimeException e) {
-				logger.error("skip verifying subnet interface address", e);
+				logger.error("skip verifying knx address of '{}' subnet interface", svcContainer.getName(), e);
 			}
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);

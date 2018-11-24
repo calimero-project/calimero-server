@@ -185,7 +185,7 @@ class SecureSession {
 				final KNXnetIPHeader svcHeader = new KNXnetIPHeader(knxipPacket, 0);
 				logger.debug("received session {} seq {} (S/N {} tag {}) {}: {}", sid, seq, sno, tag, svcHeader,
 						toHex(knxipPacket, " "));
-				final long lastValidPacket = System.nanoTime() / 1000_000L;
+				final long lastValidPacket = System.nanoTime() / 1_000_000L;
 				session.lastUpdate = lastValidPacket;
 
 				if (svcHeader.getServiceType() == SessionAuth) {
@@ -225,6 +225,7 @@ class SecureSession {
 		catch (KnxSecureException | KnxPropertyException e) {
 			logger.error("error processing {}, {}", h, e.getMessage());
 			sendStatusInfo(sessionId, 0, Unauthorized, src, port);
+			return true;
 		}
 		return false;
 	}
@@ -235,8 +236,10 @@ class SecureSession {
 	int registerConnection(final int connType, final InetSocketAddress ctrlEndpt, final int channelId) {
 		final int sid = connections.getOrDefault(ctrlEndpt, 0);
 		// only session with user id 1 has proper access level for management access
-		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).userId > 1)
+		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).userId > 1) {
+			logger.warn("refuse management connection to user {}", sessions.get(sid).userId);
 			return 0;
+		}
 		return sid;
 	}
 
