@@ -129,6 +129,9 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		this.resetRequest = resetRequest;
 
 		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+
+		if (sessionId > 0)
+			sessions.addConnection(sessionId, remoteCtrlEndpt);
 		setState(OK);
 	}
 
@@ -182,8 +185,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	}
 
 	@Override
-	protected void cleanup(final int initiator, final String reason, final LogLevel level, final Throwable t)
-	{
+	protected void cleanup(final int initiator, final String reason, final LogLevel level, final Throwable t) {
 		// we want close/shutdown be called only once
 		synchronized (this) {
 			if (shutdown)
@@ -194,6 +196,9 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason, t);
 		connectionClosed.accept(this, device);
 		super.cleanup(initiator, reason, level, t);
+
+		if (sessionId > 0)
+			sessions.removeConnection(sessionId);
 	}
 
 	void init(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt)

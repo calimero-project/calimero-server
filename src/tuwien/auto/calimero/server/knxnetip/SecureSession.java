@@ -128,16 +128,19 @@ class SecureSession {
 
 	private static AtomicLong sessionCounter = new AtomicLong();
 
-	static class Session {
-		private final InetSocketAddress client;
-		final Key secretKey;
+	static final class Session {
 		final AtomicLong sendSeq = new AtomicLong();
-		long lastUpdate = System.nanoTime() / 1_000_000;
-		private int userId;
+
+		private final AtomicLong connectionCount = new AtomicLong();
+		private final InetSocketAddress client;
+		private final Key secretKey;
+
+		volatile long lastUpdate = System.nanoTime() / 1_000_000;
 		byte[] serverKey;
 		byte[] clientKey;
+		private int userId;
 
-		Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
+		private Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
 			this.client = client;
 			this.secretKey = secretKey;
 		}
@@ -241,6 +244,22 @@ class SecureSession {
 			return 0;
 		}
 		return sid;
+	}
+
+	void addConnection(final int sessionId, final InetSocketAddress remoteCtrlEp) {
+		final Session session = sessions.get(sessionId);
+		if (session != null) {
+			connections.remove(remoteCtrlEp);
+			session.connectionCount.incrementAndGet();
+		}
+	}
+
+	void removeConnection(final int sessionId) {
+		final Session session = sessions.get(sessionId);
+		if (session != null && session.connectionCount.decrementAndGet() <= 0) {
+			logger.debug("remove secure session {}", sessionId);
+			sessions.remove(sessionId);
+		}
 	}
 
 	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data, final int offset) {
