@@ -495,8 +495,9 @@ final class ControlEndpointService extends ServiceLooper
 		if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
 
 			final TunnelingLayer knxLayer;
+			final TunnelCRI cri = (TunnelCRI) req.getCRI();
 			try {
-				knxLayer = TunnelingLayer.from(((TunnelCRI) req.getCRI()).getKNXLayer());
+				knxLayer = cri.tunnelingLayer();
 			}
 			catch (final KNXIllegalArgumentException e) {
 				return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
@@ -541,8 +542,9 @@ final class ControlEndpointService extends ServiceLooper
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 			}
+			device = cri.tunnelingAddress().filter(this::checkSetRequestedTunnelingAddress)
+					.orElseGet(() -> assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress()));
 
-			device = assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress());
 			if (device == null) {
 				final List<IndividualAddress> list = additionalAddresses();
 				if (new HashSet<>(list).size() != list.size())
@@ -650,6 +652,10 @@ final class ControlEndpointService extends ServiceLooper
 			logger.warn(e.getMessage());
 		}
 		return list;
+	}
+
+	private boolean checkSetRequestedTunnelingAddress(final IndividualAddress addr) {
+		return additionalAddresses().contains(addr) && checkAndSetDeviceAddress(addr, addr.equals(serverAddress()));
 	}
 
 	// null return means no address available
