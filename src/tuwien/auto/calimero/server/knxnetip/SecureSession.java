@@ -159,14 +159,14 @@ class SecureSession {
 		deviceAuthKey = deviceAuthKey();
 	}
 
-	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port, final Object svcHandler) throws KNXFormatException, IOException {
+	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress remote,
+		final Object svcHandler) throws KNXFormatException, IOException {
 
 		int sessionId = 0;
 		try {
 			if (h.getServiceType() == SessionReq) {
-				final ByteBuffer res = establishSession(new InetSocketAddress(src, port), h, data, offset);
-				socket.send(new DatagramPacket(res.array(), res.position(), src, port));
+				final ByteBuffer res = establishSession(remote, h, data, offset);
+				send(res.array(), remote);
 				logger.trace("currently open sessions: {}", sessions.keySet());
 				return true;
 			}
@@ -201,7 +201,7 @@ class SecureSession {
 						logger.info("secure session {}: {}", sessionId, e.getMessage());
 						status = AuthFailed;
 					}
-					sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), status, src, port);
+					sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), status, remote);
 					if (status == AuthFailed)
 						sessions.remove(sessionId);
 				}
@@ -214,10 +214,10 @@ class SecureSession {
 					final int start = svcHeader.getStructLength();
 					if (svcHandler instanceof ControlEndpointService) {
 						if (svcHeader.getServiceType() == KNXnetIPHeader.CONNECT_REQ) {
-							connections.put(new InetSocketAddress(src, port), sessionId);
+							connections.put(remote, sessionId);
 						}
 						final ControlEndpointService ces = (ControlEndpointService) svcHandler;
-						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, src, port);
+						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote.getAddress(), remote.getPort());
 					}
 					else
 						return ((DataEndpointServiceHandler) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
@@ -227,7 +227,7 @@ class SecureSession {
 		}
 		catch (KnxSecureException | KnxPropertyException e) {
 			logger.error("error processing {}, {}", h, e.getMessage());
-			sendStatusInfo(sessionId, 0, Unauthorized, src, port);
+			sendStatusInfo(sessionId, 0, Unauthorized, remote);
 			return true;
 		}
 		return false;
@@ -260,6 +260,11 @@ class SecureSession {
 			logger.debug("remove secure session {}", sessionId);
 			sessions.remove(sessionId);
 		}
+	}
+
+	private void send(final byte[] data, final InetSocketAddress address) throws IOException {
+		if (!TcpLooper.send(data, address))
+			socket.send(new DatagramPacket(data, data.length, address));
 	}
 
 	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data, final int offset) {
@@ -357,13 +362,13 @@ class SecureSession {
 		session.userId = userId;
 	}
 
-	private void sendStatusInfo(final int sessionId, final long seq, final int status, final InetAddress remote, final int port) {
+	private void sendStatusInfo(final int sessionId, final long seq, final int status, final InetSocketAddress address) {
 		try {
 			final byte[] packet = statusInfo(sessionId, seq, status);
-			socket.send(new DatagramPacket(packet, packet.length, remote, port));
+			send(packet, address);
 		}
 		catch (IOException | RuntimeException e) {
-			logger.error("sending session {} status {} to {}:{}", sessionId, statusMsg(status), remote, port, e);
+			logger.error("sending session {} status {} to {}", sessionId, statusMsg(status), address, e);
 		}
 	}
 
@@ -416,7 +421,7 @@ class SecureSession {
 
 	private void sessionTimeout(final int sessionId, final Session session) {
 		final long seq = session.sendSeq.getAndIncrement();
-		sendStatusInfo(sessionId, (int) seq, Timeout, session.client.getAddress(), session.client.getPort());
+		sendStatusInfo(sessionId, (int) seq, Timeout, session.client);
 		sessions.remove(sessionId);
 	}
 

@@ -130,6 +130,10 @@ final class ControlEndpointService extends ServiceLooper
 		final String mgmt = (securedServices & 1) == 1 ? "required" : "optional";
 		final String tunneling = (securedServices & 2) == 2 ? "required" : "optional";
 		logger.info("control endpoint '{}' secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
+
+		final boolean tcp = true;
+		if (tcp)
+			TcpLooper.start(this);
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -210,7 +214,7 @@ final class ControlEndpointService extends ServiceLooper
 		else if (h.isSecure()) {
 			try {
 				secureSvcInProgress = true;
-				return sessions.acceptService(h, data, offset, src, port, this);
+				return sessions.acceptService(h, data, offset, new InetSocketAddress(src, port), this);
 			}
 			finally {
 				secureSvcInProgress = false;
@@ -239,11 +243,12 @@ final class ControlEndpointService extends ServiceLooper
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			int status = ErrorCodes.NO_ERROR;
 
-			if (req.getDataEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
-				logger.warn("connect request: only connection support for UDP/IP");
-				status = ErrorCodes.HOST_PROTOCOL_TYPE;
-			}
-			else if (!checkVersion(h))
+//			if (req.getDataEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
+//				logger.warn("connect request: only connection support for UDP/IP");
+//				status = ErrorCodes.HOST_PROTOCOL_TYPE;
+//			}
+//			else
+			if (!checkVersion(h))
 				status = ErrorCodes.VERSION_NOT_SUPPORTED;
 
 			final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
@@ -317,8 +322,8 @@ final class ControlEndpointService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
-				status = ErrorCodes.HOST_PROTOCOL_TYPE;
+//			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
+//				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
 				final KNXnetIPConnection c = findConnection(csr.getChannelID());
@@ -372,7 +377,8 @@ final class ControlEndpointService extends ServiceLooper
 			logger.info("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
 		}
 
-		s.send(new DatagramPacket(buf, buf.length, dst));
+		if (!TcpLooper.send(buf, dst))
+			s.send(new DatagramPacket(buf, buf.length, dst));
 	}
 
 	private List<IndividualAddress> knxAddresses()

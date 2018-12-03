@@ -140,7 +140,12 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
 		checkFrameType(frame);
-		super.send(frame, mode);
+		if (TcpLooper.connections.containsKey(dataEndpt)) {
+			super.send(frame, BlockingMode.NonBlocking);
+			setStateNotify(OK);
+		}
+		else
+			super.send(frame, mode);
 	}
 
 	@Override
@@ -153,6 +158,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, dst, DataUnitBuilder.toHex(buf, " "));
 		}
 
+		if (TcpLooper.send(buf, dst))
+			return;
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 		if (dst.equals(dataEndpt))
 			socket.send(p);
@@ -197,6 +204,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		connectionClosed.accept(this, device);
 		super.cleanup(initiator, reason, level, t);
 
+		TcpLooper.connections.remove(dataEndpt);
+
 		if (sessionId > 0)
 			sessions.removeConnection(sessionId);
 	}
@@ -217,11 +226,14 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		if (sessionId == 0)
 			return acceptDataService(h, data, offset);
 
+		if (TcpLooper.connections.containsKey(dataEndpt))
+			return acceptDataService(h, data, offset);
+
 		if (!h.isSecure()) {
 			logger.warn("received non-secure packet {} - discard {}", h, DataUnitBuilder.toHex(data, " "));
 			return true;
 		}
-		return sessions.acceptService(h, data, offset, dataEndpt.getAddress(), dataEndpt.getPort(), this);
+		return sessions.acceptService(h, data, offset, dataEndpt, this);
 	}
 
 	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {

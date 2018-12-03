@@ -247,44 +247,7 @@ public class KNXnetIPServer
 	 * during server discovery.<br>
 	 * During construction, the server creates its own Interface Object Server (IOS) and adds KNX properties with
 	 * default values. Subsequent property changes can be done by calling {@link #getInterfaceObjectServer()}. Be aware
-	 * that KNX properties added might change between implementations, as might their default property values. KNX
-	 * properties are initialized as follows in this implementation:
-	 * <ul>
-	 * <li>Device Object:
-	 * <ul>
-	 * <li>PID.MAX_APDULENGTH: 15</li>
-	 * <li>PID.DESCRIPTION: 'J', '2', 'M', 'E', ' ', 'K', 'N', 'X', 'n', 'e', 't', '/', 'I', 'P', ' ', 's', 'e', 'r',
-	 * 'v', 'e', 'r'</li>
-	 * <li>PID.VERSION: Settings.getLibraryVersion()</li>
-	 * <li>PID.FIRMWARE_REVISION: 1</li>
-	 * <li>PID.SUBNET_ADDR: subnet address of PID.KNX_INDIVIDUAL_ADDRESS value</li>
-	 * <li>PID.DEVICE_ADDR: device address of PID.KNX_INDIVIDUAL_ADDRESS value</li>
-	 * </ul>
-	 * </li>
-	 * <li>KNXnet/IP Parameter Object:
-	 * <ul>
-	 * <li>PID.FRIENDLY_NAME: {@link #getFriendlyName()}</li>
-	 * <li>PID.PROGMODE: 0</li>
-	 * <li>PID.PROJECT_INSTALLATION_ID: 0</li>
-	 * <li>PID.SERIAL_NUMBER: 0</li>
-	 * <li>PID.KNX_INDIVIDUAL_ADDRESS: 0.0.0</li>
-	 * <li>PID.ROUTING_MULTICAST_ADDRESS : {@link KNXnetIPRouting#DEFAULT_MULTICAST}</li>
-	 * <li>PID.MAC_ADDRESS: 0</li>
-	 * <li>PID.CURRENT_IP_ADDRESS: control endpoint IP address</li>
-	 * <li>PID.SYSTEM_SETUP_MULTICAST_ADDRESS: {@link Discoverer#SEARCH_MULTICAST}</li>
-	 * <li>PID.KNXNETIP_DEVICE_CAPABILITIES: Device Management, Tunneling (and Routing if enabled)</li>
-	 * <li>PID.MANUFACTURER_ID: 0</li>
-	 * <li>PID.MANUFACTURER_DATA: 'b', 'm', '2', '0', '1', '1', ' ', ' ' ' '</li>
-	 * <li>PID.KNXNETIP_ROUTING_CAPABILITIES: 0</li>
-	 * <li>PID.KNXNETIP_DEVICE_STATE: 0</li>
-	 * <li>PID.IP_CAPABILITIES: 0</li>
-	 * <li>PID.IP_ASSIGNMENT_METHOD: 1</li>
-	 * <li>PID.CURRENT_IP_ASSIGNMENT_METHOD: 1</li>
-	 * <li>PID.MSG_TRANSMIT_TO_IP: 0</li>
-	 * <li>PID.MSG_TRANSMIT_TO_KNX: 0</li>
-	 * </ul>
-	 * </li>
-	 * </ul>
+	 * that KNX properties added might change between implementations, as might their default property values.
 	 *
 	 * @param localName name of this server as shown to the owner/user of this server
 	 * @param friendlyName a friendly, descriptive name used for discovery and description, consisting of
