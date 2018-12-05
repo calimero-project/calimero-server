@@ -227,7 +227,8 @@ class SecureSession {
 		}
 		catch (KnxSecureException | KnxPropertyException e) {
 			logger.error("error processing {}, {}", h, e.getMessage());
-			sendStatusInfo(sessionId, 0, Unauthorized, remote);
+			if (sessionId > 0)
+				sendStatusInfo(sessionId, 0, Unauthorized, remote);
 			return true;
 		}
 		return false;
