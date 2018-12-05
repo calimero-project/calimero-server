@@ -72,6 +72,8 @@ import tuwien.auto.calimero.knxnetip.util.DIB;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.Srp;
+import tuwien.auto.calimero.knxnetip.util.Srp.Type;
 import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
@@ -207,13 +209,31 @@ final class DiscoveryService extends ServiceLooper
 				return true;
 			}
 
+			byte[] macFilter = {};
+			byte[] requestedServices = {}; // NYI
+			byte[] requestedDibs = { DIB.DEVICE_INFO, DIB.SUPP_SVC_FAMILIES };
+			for (final Srp srp : sr.searchParameters()) {
+				final Type type = srp.getType();
+				if (type == Srp.Type.SelectByProgrammingMode) {
+					final int progmode = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.PROGMODE, 1, 0);
+					if (progmode == 0)
+						return true;
+				}
+				else if (type == Srp.Type.SelectByMacAddress)
+					macFilter = srp.getData();
+				else if (type == Srp.Type.SelectByService)
+					requestedServices = srp.getData();
+				else if (type == Srp.Type.RequestDibs)
+					requestedDibs = srp.getData();
+			}
+
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
 			for (final LooperThread t : server.controlEndpoints) {
 				final Optional<ControlEndpointService> looper = t.looper().map(ControlEndpointService.class::cast);
 				if (looper.isPresent())
-					sendSearchResponse(addr, looper.get(), sr.requestedDibs());
+					sendSearchResponse(addr, looper.get(), svc == KNXnetIPHeader.SearchRequest, macFilter, requestedDibs);
 			}
 			return true;
 		}
@@ -229,8 +249,8 @@ final class DiscoveryService extends ServiceLooper
 		return false;
 	}
 
-	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final List<Integer> dibCodes)
-		throws IOException {
+	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final boolean ext, final byte[] macFilter,
+		final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
 			// we create our own HPAI from the actual socket, since
@@ -248,28 +268,42 @@ final class DiscoveryService extends ServiceLooper
 				final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
 				final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
 				server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS, mac == null ? new byte[6] : mac);
+
+				// skip response if we have a mac filter set which does not match our mac
+				if (macFilter.length > 0 && !macFilter.equals(mac))
+					return;
 			}
 			catch (SocketException | KnxPropertyException e) {}
 
 			final List<DIB> dibs = new ArrayList<>();
-			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
-			if (dibCodes.isEmpty() || dibCodes.contains(DIB.DEVICE_INFO))
-				dibs.add(deviceDib);
-			if (dibCodes.isEmpty() || dibCodes.contains(DIB.SUPP_SVC_FAMILIES))
-				dibs.add(server.createServiceFamiliesDIB(sc));
-			if (dibCodes.contains(DIB.AdditionalDeviceInfo))
-				dibs.add(createAdditionalDeviceDib(sc));
-			if (dibCodes.contains(DIB.SecureServiceFamilies))
-				dibs.add(createSecureServiceFamiliesDib(sc));
-			if (dibCodes.contains(DIB.Tunneling))
-				dibs.add(createTunnelingDib(ces));
+			Arrays.sort(requestedDibs);
+			for (final byte dibType : requestedDibs)
+				createDib(dibType & 0xff, ces, dibs);
 
-			final byte[] buf = PacketHelper.toPacket(new SearchResponse(dibCodes.size() > 0, hpai, dibs));
+			final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);
 			sendOnInterfaces(p);
+			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
 			logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
 		}
+	}
+
+	private boolean createDib(final int dibType, final ControlEndpointService ces, final List<DIB> dibs) {
+		final ServiceContainer sc = ces.getServiceContainer();
+		switch (dibType) {
+		case DIB.DEVICE_INFO:
+			return dibs.add(server.createDeviceDIB(sc));
+		case DIB.SUPP_SVC_FAMILIES:
+			return dibs.add(server.createServiceFamiliesDIB(sc));
+		case DIB.AdditionalDeviceInfo:
+			return dibs.add(createAdditionalDeviceDib(sc));
+		case DIB.SecureServiceFamilies:
+			return dibs.add(createSecureServiceFamiliesDib(sc));
+		case DIB.Tunneling:
+			return dibs.add(createTunnelingDib(ces));
+		}
+		return false;
 	}
 
 	private ServiceFamiliesDIB createSecureServiceFamiliesDib(final ServiceContainer sc) {
