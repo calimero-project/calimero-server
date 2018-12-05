@@ -41,6 +41,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +69,9 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceAck;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
+import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature;
+import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.InterfaceFeature;
+import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.Result;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
@@ -289,6 +293,33 @@ final class DataEndpointServiceHandler extends ConnectionBase
 					checkNotifyConfigurationCEMI(cemi);
 			}
 		}
+		else if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
+			final TunnelingFeature req = TunnelingFeature.from(svc, ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength()));
+			if (!checkChannelId(req.channelId(), "request"))
+				return true;
+			final int seq = req.sequenceNumber();
+			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
+				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
+				send(buf, dataEndpt);
+				if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
+					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
+					return true;
+				}
+			}
+			else
+				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
+
+			if (seq == getSeqRcv()) {
+				incSeqRcv();
+				updateLastMsgTimestamp();
+
+				logger.debug("received {}", req);
+				final TunnelingFeature res = responseForFeature(h, ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength()));
+				logger.debug("respond with {}", res);
+				send(PacketHelper.toPacket(res), dataEndpt);
+			}
+		}
 		else if (svc == serviceAck) {
 			final ServiceAck res = new ServiceAck(svc, data, offset);
 			if (!checkChannelId(res.getChannelID(), "acknowledgment"))
@@ -339,6 +370,46 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		else
 			return false;
 		return true;
+	}
+
+	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
+		final int svc = h.getServiceType();
+		final TunnelingFeature req = TunnelingFeature.from(svc, buffer);
+
+		// TODO get currently set server property values for feature value
+		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
+			switch (req.featureId()) {
+			case SupportedEmiTypes:
+				return responseForFeature(req, (byte) 0, (byte) 0);
+			case IndividualAddress:
+				return responseForFeature(req, device.toByteArray());
+			case MaxApduLength:
+				return responseForFeature(req, (byte) 0, (byte) 15);
+			case DeviceDescriptorType0:
+				return responseForFeature(req, (byte) 0x09, (byte) 0x1A);
+			case ConnectionStatus:
+				return responseForFeature(req, (byte) 1);
+			case Manufacturer:
+				return responseForFeature(req, (byte) 0, (byte) 0);
+			case ActiveEmiType:
+				return responseForFeature(req, (byte) 0);
+			case EnableFeatureInfoService:
+				return responseForFeature(req, (byte) 0);
+			}
+		}
+		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
+			if (req.featureId() == InterfaceFeature.EnableFeatureInfoService)
+				return responseForFeature(req, req.featureValue().get());
+
+			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AccessReadOnly);
+		}
+
+		logger.warn("not implemented: {} {}", Integer.toHexString(svc), req);
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.InvalidCommand);
+	}
+
+	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.Success, featureValue);
 	}
 
 	private int subnetStatus() {
