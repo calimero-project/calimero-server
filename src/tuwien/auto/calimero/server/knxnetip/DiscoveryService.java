@@ -300,7 +300,7 @@ final class DiscoveryService extends ServiceLooper
 			return dibs.add(createAdditionalDeviceDib(sc));
 		case DIB.SecureServiceFamilies:
 			return dibs.add(createSecureServiceFamiliesDib(sc));
-		case DIB.Tunneling:
+		case DIB.TunnelingInfo:
 			return dibs.add(createTunnelingDib(ces));
 		}
 		return false;
