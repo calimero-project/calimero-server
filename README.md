@@ -1,11 +1,11 @@
 Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
 =========================
 
-A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is Java SE 9 (module _java.base_), recommended is Java SE 11.
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://jdk.java.net/11/) (_java.base_).
 
 * No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
-* Secure your client-side KNX IP network traffic
+* Use KNX IP Secure to secure your client-side KNX IP network traffic
 * Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
 * Emulate/virtualize a KNX network
 
@@ -23,7 +23,7 @@ Supported Features
 ------------------
 
 ### Client-side KNXnet/IP & KNX IP Secure
-For running KNX IP Secure, a keyfile is required (see [section below](#knx-ip-secure)).
+For running KNX IP Secure, a keyfile is required, see [section below](#knx-ip-secure).
 
 * Discovery and self-description
 * Tunneling
@@ -168,8 +168,8 @@ Example keyfile (note, the layout might still change):
 group.key=BEEF5A1ADBEEF5A1ADBEEF5A1ADBEEF5
 // device key is a 16 byte hex value
 device.key=0102030405060708090a0b0c0d0e0f10
-// for unicast, specify at least user 1 & 2 (max. 127), user 1 is used for management access
-// device key is a 16 byte hex value, or empty
+// for secure unicast, specify at least user 1 & 2 (max. 127); user 1 is used for management access
+// user key is a 16 byte hex value (empty key means default setup key)
 user.1=
 user.2=d6da71bd89f7e8426250fe5657da900c
 user.3=
