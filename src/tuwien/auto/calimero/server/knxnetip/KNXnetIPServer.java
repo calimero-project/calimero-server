@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -103,8 +103,7 @@ import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
  * properties, allowing the server to run properly. A user can access the IOS by calling
  * {@link #getInterfaceObjectServer()} to query or modify KNXnet/IP server properties, or
  * replace the IOS with another one by calling
- * {@link #setInterfaceObjectServer(InterfaceObjectServer)}.<br>
- * See the server constructor for the minimum set of default settings the IOS is initialized with.
+ * {@link #setInterfaceObjectServer(InterfaceObjectServer)}.
  * Different services will update certain KNX properties in the IOS during runtime.
  * <p>
  * Note, that if data required by the server is not available in the IOS (e.g., due to deletion of
@@ -202,6 +201,7 @@ public class KNXnetIPServer
 	final Logger logger;
 
 	private boolean running;
+	private boolean inShutdown;
 
 	// Discovery and description
 
@@ -654,22 +654,20 @@ public class KNXnetIPServer
 	 */
 	public synchronized void shutdown()
 	{
-		if (!running)
+		if (!running || inShutdown)
 			return;
+		inShutdown = true;
 		fireShutdown();
 
 		stopDiscoveryService();
 
-		for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = i.next();
-			t.quit();
-		}
+		controlEndpoints.forEach(LooperThread::quit);
 		controlEndpoints.clear();
-		for (final Iterator<LooperThread> i = routingEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = i.next();
-			t.quit();
-		}
+
+		routingEndpoints.forEach(LooperThread::quit);
 		routingEndpoints.clear();
+
+		inShutdown = false;
 		running = false;
 	}
 
