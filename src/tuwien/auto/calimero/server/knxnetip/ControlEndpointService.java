@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -594,7 +594,10 @@ final class ControlEndpointService extends ServiceLooper
 				return addr;
 		}
 		// there are no free addresses, or no additional address at all
-		logger.warn("no additional individual addresses available that match subnet " + forSubnet);
+		if (!svcCont.reuseControlEndpoint()) {
+			logger.warn("no additional individual addresses available that match subnet " + forSubnet);
+			return null;
+		}
 
 		// we assign our own KNX server device address iff:
 		// - no unused additional addresses are available
