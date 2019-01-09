@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -268,7 +268,7 @@ public final class SubnetConnector
 		}
 		else if ("emulate".equals(subnetType)) {
 			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
-			final VirtualLink vl = new VirtualLink(linkArgs, settings);
+			final VirtualLink vl = new VirtualLink(sc.getName(), settings);
 			final Configuration config = nb.addConfiguration(vl);
 			config.setQueryBufferOnly(false);
 
