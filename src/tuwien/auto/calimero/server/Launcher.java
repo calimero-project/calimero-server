@@ -443,7 +443,7 @@ public class Launcher implements Runnable
 			final Launcher sr = new Launcher(configUri);
 			final boolean detached = "--no-stdin".equals(args[0]);
 			sr.terminal = !detached;
-			Runtime.getRuntime().addShutdownHook(new Thread(sr::quit));
+			Runtime.getRuntime().addShutdownHook(new Thread(sr::quit, sr.server.getName() + " shutdown"));
 			sr.run();
 		}
 		catch (final KNXException e) {
