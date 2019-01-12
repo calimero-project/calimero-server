@@ -238,6 +238,8 @@ public class Launcher implements Runnable
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface netif = getNetIf(r);
+			Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
+					.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get).orElse(null);
 
 			String addr = "";
 			String subnetType = "";
@@ -255,7 +257,6 @@ public class Launcher implements Runnable
 			String expirationTimeout = "0";
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
-			Path keyfile = null;
 			boolean secure = false;
 
 			try {
@@ -311,9 +312,14 @@ public class Launcher implements Runnable
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
 								secure = true;
-								keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
-										.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get)
-										.orElseThrow(() -> new KNXMLException("secure group communication requires 'keyfile' attribute", r));
+								if (keyfile == null) {
+									keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
+											.map(v -> v.replaceFirst("^~", System.getProperty("user.home")))
+											.map(Paths::get)
+											.orElseThrow(() -> new KNXMLException(
+													"secure group communication requires 'keyfile' attribute", r));
+									logger.warn("server configuration: move attribute 'keyfile' from <routing> to <serviceContainer>");
+								}
 								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)
 										.orElse(2000);
 							}
