@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -91,6 +91,9 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		}
 	}
 
+	private static final int SecureWrapper = 0x0950;
+	private static final int SecureGroupSync = 0x0955;
+
 	@Override
 	public void onReceive(final InetSocketAddress source, final byte[] data, final int offset, final int length)
 		throws IOException
@@ -101,7 +104,10 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 				return;
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source.getAddress(), source.getPort())) {
 				final int svc = h.getServiceType();
-				logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
+				if (svc == SecureGroupSync || svc == SecureWrapper)
+					return;
+				logger.info("received packet from {} with unknown service type 0x{} - ignored", source,
+						Integer.toHexString(svc));
 			}
 		}
 		catch (final KNXFormatException e) {
