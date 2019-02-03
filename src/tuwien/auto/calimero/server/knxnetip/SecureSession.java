@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018 B. Malinowsky
+    Copyright (c) 2018, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,6 +67,7 @@ import java.security.spec.KeySpec;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -263,6 +264,14 @@ class SecureSession {
 		}
 	}
 
+	boolean anyMatch(final InetSocketAddress remoteEndpoint) {
+		for (final Entry<Integer, Session> entry : sessions.entrySet()) {
+			if (entry.getValue().client.equals(remoteEndpoint))
+				return true;
+		}
+		return false;
+	}
+
 	private void send(final byte[] data, final InetSocketAddress address) throws IOException {
 		if (!TcpLooper.send(data, address))
 			socket.send(new DatagramPacket(data, data.length, address));
@@ -424,6 +433,7 @@ class SecureSession {
 		final long seq = session.sendSeq.getAndIncrement();
 		sendStatusInfo(sessionId, (int) seq, Timeout, session.client);
 		sessions.remove(sessionId);
+		TcpLooper.lastSessionTimedOut(session.client);
 	}
 
 	private Key deviceAuthKey() {

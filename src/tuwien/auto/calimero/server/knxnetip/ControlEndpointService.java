@@ -120,7 +120,7 @@ final class ControlEndpointService extends ServiceLooper
 	private final BitSet channelIds = new BitSet(MAX_CHANNEL_ID);
 	private int lastChannelId;
 
-	private final SecureSession sessions;
+	final SecureSession sessions;
 	private final boolean secureOnly;
 	private boolean secureSvcInProgress;
 
@@ -918,6 +918,10 @@ final class ControlEndpointService extends ServiceLooper
 				return c;
 		}
 		return null;
+	}
+
+	boolean anyMatchDataConnection(final InetSocketAddress remoteEndpoint) {
+		return server.anyMatchDataConnection(this, remoteEndpoint);
 	}
 
 	private int assignChannelId()

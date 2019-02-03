@@ -1084,6 +1084,21 @@ public class KNXnetIPServer
 		}
 	}
 
+	boolean anyMatchDataConnection(final ControlEndpointService ces, final InetSocketAddress remoteEndpoint) {
+		final SocketAddress ctrl = ces.getSocket().getLocalSocketAddress();
+		if (ctrl == null)
+			return false;
+		final DataEndpointServiceHandler[] handlerList = dataConnections.toArray(new DataEndpointServiceHandler[0]);
+		for (int i = 0; i < handlerList.length; i++) {
+			final DataEndpointServiceHandler h = handlerList[i];
+			if (ctrl.equals(h.getCtrlSocketAddress())) {
+				if (remoteEndpoint.equals(h.getRemoteAddress()))
+					return true;
+			}
+		}
+		return false;
+	}
+
 	final EventListeners<ServerListener> listeners()
 	{
 		return listeners;

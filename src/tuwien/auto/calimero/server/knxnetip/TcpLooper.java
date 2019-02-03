@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018 B. Malinowsky
+    Copyright (c) 2018, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,8 +43,8 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketAddress;
-import java.util.Map;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,11 +57,13 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
 
 final class TcpLooper implements Runnable, AutoCloseable {
 
+	private static final Duration inactiveConnectionTimeout = Duration.ofSeconds(10);
+
 	private final ControlEndpointService ctrlEndpoint;
-	private final Socket socket;
+	final Socket socket;
 	private final Logger logger;
 
-	static final Map<SocketAddress, TcpLooper> connections = new ConcurrentHashMap<>();
+	static final ConcurrentHashMap<InetSocketAddress, TcpLooper> connections = new ConcurrentHashMap<>();
 
 	private static final ExecutorService pool = Executors.newCachedThreadPool(r -> {
 		final Thread t = new Thread(r);
@@ -79,26 +81,6 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		pool.execute(tcpEndpoint(ctrlEndpoint));
 	}
 
-	private static Runnable tcpEndpoint(final ControlEndpointService ces) {
-		return () -> {
-			final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
-			Thread.currentThread().setName(name);
-
-			final HPAI endpoint = ces.getServiceContainer().getControlEndpoint();
-			try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
-				while (true) {
-					final Socket conn = s.accept();
-					final TcpLooper looper = new TcpLooper(ces, conn);
-					connections.put(looper.socket.getRemoteSocketAddress(), looper);
-					pool.execute(looper);
-				}
-			}
-			catch (final IOException e) {
-				ces.logger.error("socket error in TCP control endpoint", e);
-			}
-		};
-	}
-
 	static boolean send(final byte[] buf, final InetSocketAddress address) throws IOException {
 		final TcpLooper looper = connections.get(address);
 		if (looper == null)
@@ -108,21 +90,79 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		return true;
 	}
 
+	private static Runnable tcpEndpoint(final ControlEndpointService ces) {
+		return () -> {
+			final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
+			Thread.currentThread().setName(name);
+
+			final HPAI endpoint = ces.getServiceContainer().getControlEndpoint();
+			try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
+				ces.logger.info("{} is up and running", name);
+				while (true) {
+					final Socket conn = s.accept();
+					final TcpLooper looper = new TcpLooper(ces, conn);
+					connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
+					pool.execute(looper);
+				}
+			}
+			catch (final InterruptedIOException e) {
+				ces.logger.info("TCP control endpoint interrupted", e);
+				Thread.currentThread().interrupt();
+			}
+			catch (final IOException e) {
+				ces.logger.error("socket error in TCP control endpoint", e);
+			}
+		};
+	}
+
+	static void lastSessionTimedOut(final InetSocketAddress remote) {
+		final TcpLooper looper = connections.get(remote);
+		if (looper != null && !looper.ctrlEndpoint.anyMatchDataConnection(remote))
+			looper.close("last active secure session timed out");
+	}
+
+	static void lastConnectionTimedOut(final InetSocketAddress remote) {
+		final TcpLooper looper = connections.get(remote);
+		if (looper != null && !looper.ctrlEndpoint.sessions.anyMatch(remote))
+			looper.close("last active client connection timed out");
+	}
+
+	private boolean inactive() {
+		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
+		if (!ctrlEndpoint.sessions.anyMatch(remote) && !ctrlEndpoint.anyMatchDataConnection(remote))
+			return true;
+		return false;
+	}
+
 	@Override
 	public void run() {
-		final String name = ctrlEndpoint.server.getName() + " data endpoint " + socket.getRemoteSocketAddress() + " (tcp)";
+		final String name = ctrlEndpoint.server.getName() + " " + ctrlEndpoint.getServiceContainer().getName()
+				+ " tcp connection " + socket.getRemoteSocketAddress();
 		Thread.currentThread().setName(name);
 
 		try (InputStream in = socket.getInputStream()) {
-			final byte[] data = new byte[512];
-			int offset = 0;
-			while (!socket.isClosed()) {
-				final int read = in.read(data, offset, data.length - offset);
-				if (read == -1)
-					break;
-				offset += read;
+			logger.info("accepted {}", name);
 
-				if (offset > 6) {
+			final int rcvBufferSize = 512;
+			final byte[] data = new byte[rcvBufferSize];
+			int offset = 0;
+
+			socket.setSoTimeout((int) inactiveConnectionTimeout.toMillis());
+			while (!socket.isClosed()) {
+				try {
+					final int read = in.read(data, offset, data.length - offset);
+					if (read == -1)
+						return;
+					offset += read;
+				}
+				catch (final SocketTimeoutException e1) {
+					if (inactive()) {
+						close("no active secure session or client connection");
+						return;
+					}
+				}
+
+				if (offset >= 6) {
 					try {
 						final KNXnetIPHeader h = new KNXnetIPHeader(data, 0);
 						if (sanitize(h, offset)) {
@@ -130,9 +170,16 @@ final class TcpLooper implements Runnable, AutoCloseable {
 							offset = 0;
 							onReceive(h, data, h.getStructLength(), length);
 						}
+						// skip bodies which do not fit into rcv buffer
+						else if (h.getTotalLength() > rcvBufferSize) {
+							int skip = h.getTotalLength() - offset;
+							while (skip-- > 0 && in.read() != -1);
+							offset = 0;
+						}
 					}
 					catch (final KNXFormatException e) {
 						logger.warn("received invalid frame", e);
+						break;
 					}
 				}
 			}
@@ -141,7 +188,8 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			Thread.currentThread().interrupt();
 		}
 		catch (IOException | RuntimeException e) {
-			logger.error("close connection to {}", socket.getRemoteSocketAddress(), e);
+			if (!socket.isClosed())
+				logger.error("tcp connection error to {}", socket.getRemoteSocketAddress(), e);
 		}
 		finally {
 			close();
@@ -156,13 +204,19 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			out.flush();
 		}
 		catch (final IOException e) {
-			socket.close();
+			close("I/O error: " + e.getMessage());
 			throw e;
 		}
 	}
 
 	@Override
 	public void close() {
+		close("");
+	}
+
+	private void close(final String reason) {
+		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
+		logger.info("close tcp connection to {}{}", socket.getRemoteSocketAddress(), suffix);
 		try {
 			socket.close();
 		}
@@ -175,7 +229,8 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
 		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote.getAddress(), remote.getPort())) {
 			final int svc = h.getServiceType();
-			logger.info("received packet from {} with unknown service type 0x{} - ignored", remote, Integer.toHexString(svc));
+			logger.info("received packet from {} with unknown service type 0x{} - ignored", remote,
+					Integer.toHexString(svc));
 		}
 	}
 
