@@ -21,8 +21,8 @@ apply plugin: 'application'
 group = 'com.github.calimero'
 version = '2.5-SNAPSHOT'
 
-sourceCompatibility = 9
-targetCompatibility = 9
+sourceCompatibility = 11
+targetCompatibility = 11
 
 mainClassName = 'tuwien.auto.calimero.server.Launcher'
 
