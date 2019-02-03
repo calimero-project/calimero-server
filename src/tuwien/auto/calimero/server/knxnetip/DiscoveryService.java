@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,7 +47,6 @@ import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,9 +55,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
-import tuwien.auto.calimero.DeviceDescriptor.DD0;
-import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -67,14 +66,12 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchResponse;
-import tuwien.auto.calimero.knxnetip.util.AdditionalDeviceDib;
 import tuwien.auto.calimero.knxnetip.util.DIB;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.knxnetip.util.Srp;
 import tuwien.auto.calimero.knxnetip.util.Srp.Type;
-import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 final class DiscoveryService extends ServiceLooper
@@ -199,19 +196,20 @@ final class DiscoveryService extends ServiceLooper
 		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
 			// A request for TCP communication or a request using an unsupported
 			// protocol version should result in a host protocol type error.
-			// But since there is no status field in the search response,
-			// we log and ignore such requests.
+			// But since there is no status field in the search response, we log and ignore such requests.
 			if (!checkVersion(h))
 				return true;
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			if (sr.getEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
-				logger.warn("search requests have protocol support for UDP/IP only");
+				logger.warn("search requests to a discovery endpoint are only supported for UDP/IP");
 				return true;
 			}
 
+			final boolean ext = svc == KNXnetIPHeader.SearchRequest;
+
 			byte[] macFilter = {};
-			byte[] requestedServices = {}; // NYI
-			byte[] requestedDibs = { DIB.DEVICE_INFO, DIB.SUPP_SVC_FAMILIES };
+			byte[] requestedServices = {};
+			byte[] requestedDibs = { DIB.DEVICE_INFO, ext ? DIB.AdditionalDeviceInfo : (byte) 0, DIB.SUPP_SVC_FAMILIES };
 			for (final Srp srp : sr.searchParameters()) {
 				final Type type = srp.getType();
 				if (type == Srp.Type.SelectByProgrammingMode) {
@@ -225,6 +223,8 @@ final class DiscoveryService extends ServiceLooper
 					requestedServices = srp.getData();
 				else if (type == Srp.Type.RequestDibs)
 					requestedDibs = srp.getData();
+				else  if (srp.isMandatory())
+					return true;
 			}
 
 			// for discovery, we do not remember previous NAT decisions
@@ -233,7 +233,7 @@ final class DiscoveryService extends ServiceLooper
 			for (final LooperThread t : server.controlEndpoints) {
 				final Optional<ControlEndpointService> looper = t.looper().map(ControlEndpointService.class::cast);
 				if (looper.isPresent())
-					sendSearchResponse(addr, looper.get(), svc == KNXnetIPHeader.SearchRequest, macFilter, requestedDibs);
+					sendSearchResponse(addr, looper.get(), ext, macFilter, requestedServices, requestedDibs);
 			}
 			return true;
 		}
@@ -249,8 +249,8 @@ final class DiscoveryService extends ServiceLooper
 		return false;
 	}
 
-	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final boolean ext, final byte[] macFilter,
-		final byte[] requestedDibs) throws IOException {
+	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final boolean ext,
+		final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
 			// we create our own HPAI from the actual socket, since
@@ -263,7 +263,7 @@ final class DiscoveryService extends ServiceLooper
 				return;
 			}
 
-			final HPAI hpai = new HPAI(sc.getControlEndpoint().getHostProtocol(), local);
+			final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
 			try {
 				final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
 				final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
@@ -275,10 +275,22 @@ final class DiscoveryService extends ServiceLooper
 			}
 			catch (SocketException | KnxPropertyException e) {}
 
-			final List<DIB> dibs = new ArrayList<>();
-			Arrays.sort(requestedDibs);
+			if (requestedServices.length > 0) {
+				final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(sc, ext);
+				// skip response if we have a service request which we don't support
+				for (int i = 0; i < requestedServices.length; i++) {
+					final int familyId = requestedServices[i] & 0xff;
+					final int version = requestedServices[i + 1] & 0xff;
+					if (families.getVersion(familyId) < version)
+						return;
+				}
+			}
+
+			final Set<Integer> set = new TreeSet<>();
 			for (final byte dibType : requestedDibs)
-				createDib(dibType & 0xff, ces, dibs);
+				set.add(dibType & 0xff);
+			final List<DIB> dibs = new ArrayList<>();
+			set.forEach(dibType -> ces.createDib(dibType, dibs, ext));
 
 			final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
@@ -287,78 +299,6 @@ final class DiscoveryService extends ServiceLooper
 			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
 			logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
 		}
-	}
-
-	private boolean createDib(final int dibType, final ControlEndpointService ces, final List<DIB> dibs) {
-		final ServiceContainer sc = ces.getServiceContainer();
-		switch (dibType) {
-		case DIB.DEVICE_INFO:
-			return dibs.add(server.createDeviceDIB(sc));
-		case DIB.SUPP_SVC_FAMILIES:
-			return dibs.add(server.createServiceFamiliesDIB(sc));
-		case DIB.AdditionalDeviceInfo:
-			return dibs.add(createAdditionalDeviceDib(sc));
-		case DIB.SecureServiceFamilies:
-			return dibs.add(createSecureServiceFamiliesDib(sc));
-		case DIB.TunnelingInfo:
-			return dibs.add(createTunnelingDib(ces));
-		}
-		return false;
-	}
-
-	private ServiceFamiliesDIB createSecureServiceFamiliesDib(final ServiceContainer sc) {
-		final int caps = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), SecureSession.pidSecuredServices, 1, 0);
-		// service family 'core' is skipped here since not used in capabilities bitset
-		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT, ServiceFamiliesDIB.TUNNELING,
-			ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING, ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS,
-			ServiceFamiliesDIB.OBJECT_SERVER };
-
-		final int[] tmp = new int[services.length];
-		int count = 0;
-		for (int i = 0; i < services.length; ++i)
-			if ((caps >> i & 0x1) == 1)
-				tmp[count++] = services[i];
-
-		final int[] supported = Arrays.copyOfRange(tmp, 0, count);
-		final int[] versions = new int[count];
-		Arrays.fill(versions, 1);
-		return ServiceFamiliesDIB.newSecureServiceFamilies(supported, versions);
-	}
-
-	private TunnelingDib createTunnelingDib(final ControlEndpointService ces) {
-		final List<IndividualAddress> addresses = additionalAddresses(ces.getServiceContainer());
-		final int[] status = new int[addresses.size()];
-
-		for (int i = 0; i < addresses.size(); i++) {
-			final IndividualAddress addr = addresses.get(i);
-			final boolean inuse = ces.addressInUse(addr);
-			status[i] = 4 | (inuse ? 0 : 1);
-		}
-		final int maxApduLength = ces.getServiceContainer().getMediumSettings().maxApduLength();
-		return new TunnelingDib((short) maxApduLength, addresses, status);
-	}
-
-	private List<IndividualAddress> additionalAddresses(final ServiceContainer sc) {
-		final int oi = objectInstance(sc);
-		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, oi, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
-		final List<IndividualAddress> list = new ArrayList<>();
-		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, oi,
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
-			final ByteBuffer buf = ByteBuffer.wrap(data);
-			for (int i = 0; i < elems; ++i)
-				list.add(new IndividualAddress(buf.getShort() & 0xffff));
-		}
-		catch (final KnxPropertyException e) {
-			logger.warn(e.getMessage());
-		}
-		return list;
-	}
-
-	private AdditionalDeviceDib createAdditionalDeviceDib(final ServiceContainer sc) {
-		final int oi = objectInstance(sc);
-		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT,  oi, PID.MEDIUM_STATUS, 1, 0);
-		return new AdditionalDeviceDib(status, sc.getMediumSettings().maxApduLength(), DD0.TYPE_091A);
 	}
 
 	private void sendOnInterfaces(final DatagramPacket p) throws IOException

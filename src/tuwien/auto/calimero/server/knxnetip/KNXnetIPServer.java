@@ -41,6 +41,7 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
@@ -944,7 +945,7 @@ public class KNXnetIPServer
 				knxAddress, serialNumber, mcast, macAddress);
 	}
 
-	ServiceFamiliesDIB createServiceFamiliesDIB(final ServiceContainer sc)
+	ServiceFamiliesDIB createServiceFamiliesDIB(final ServiceContainer sc, final boolean extended)
 	{
 		// we get a 2 byte value
 		final int caps = getProperty(knxObject, objectInstance(sc), PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
@@ -959,9 +960,13 @@ public class KNXnetIPServer
 		// now unconditionally add service family 'core'
 		tmp[0] = ServiceFamiliesDIB.CORE;
 		int count = 1;
-		for (int i = 0; i < services.length; ++i)
+		for (int i = 0; i < services.length; ++i) {
+			final int familyId = services[i];
+			if (!extended && familyId > ServiceFamiliesDIB.OBJECT_SERVER)
+				break;
 			if ((caps >> i & 0x1) == 1)
-				tmp[count++] = services[i];
+				tmp[count++] = familyId;
+		}
 
 		final int[] supported = new int[count];
 		final int[] versions = new int[count];
@@ -969,6 +974,7 @@ public class KNXnetIPServer
 			supported[i] = tmp[i];
 			versions[i] = 1;
 		}
+		versions[0] = 2;
 		return new ServiceFamiliesDIB(supported, versions);
 	}
 
