@@ -157,6 +157,12 @@ final class ControlEndpointService extends ServiceLooper
 			synchronized (usedKnxAddresses) {
 				--activeMgmtConnections;
 			}
+
+		final long now = System.currentTimeMillis();
+		final boolean timeout = (now - h.getLastMsgTimestamp()) >= 120_000;
+		if (timeout && !anyMatchDataConnection(h.getRemoteAddress())) {
+			TcpLooper.lastConnectionTimedOut(h.getRemoteAddress());
+		}
 	}
 
 	void resetRequest(final DataEndpointServiceHandler h)
@@ -322,7 +328,7 @@ final class ControlEndpointService extends ServiceLooper
 			final DisconnectRequest dr = new DisconnectRequest(data, offset);
 			// find connection based on channel id
 			final int channelId = dr.getChannelID();
-			final KNXnetIPConnection conn = findConnection(channelId);
+			final DataEndpointServiceHandler conn = findConnection(channelId);
 
 			// requests with wrong channel ID are ignored (conforming to spec)
 			if (conn == null) {
@@ -339,6 +345,9 @@ final class ControlEndpointService extends ServiceLooper
 				logger.warn("disconnect request: sender control endpoint changed from " + ctrlEndpt + " to " + src
 						+ ", not recommended");
 			}
+
+			conn.updateLastMsgTimestamp();
+
 			final byte[] buf = PacketHelper.toPacket(new DisconnectResponse(channelId, ErrorCodes.NO_ERROR));
 			try {
 				send(sessionId, channelId, buf, ctrlEndpt);
@@ -347,8 +356,7 @@ final class ControlEndpointService extends ServiceLooper
 				logger.error("communication failure", e);
 			}
 			finally {
-				((DataEndpointServiceHandler) conn).cleanup(CloseEvent.CLIENT_REQUEST, "client request", LogLevel.DEBUG,
-						null);
+				conn.cleanup(CloseEvent.CLIENT_REQUEST, "client request", LogLevel.DEBUG, null);
 			}
 		}
 		else if (svc == KNXnetIPHeader.DISCONNECT_RES) {

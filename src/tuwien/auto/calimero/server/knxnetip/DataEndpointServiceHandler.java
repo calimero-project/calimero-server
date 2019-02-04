@@ -142,6 +142,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 		if (sessionId > 0)
 			sessions.addConnection(sessionId, remoteCtrlEndpt);
+
+		updateLastMsgTimestamp();
 		setState(OK);
 	}
 
@@ -213,8 +215,6 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason, t);
 		connectionClosed.accept(this, device);
 		super.cleanup(initiator, reason, level, t);
-
-		TcpLooper.connections.remove(dataEndpt);
 
 		if (sessionId > 0)
 			sessions.removeConnection(sessionId);
