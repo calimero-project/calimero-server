@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -50,6 +50,7 @@ import java.util.function.Consumer;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DataUnitBuilder;
+import tuwien.auto.calimero.DeviceDescriptor.DD0;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
@@ -59,6 +60,7 @@ import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
+import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
@@ -75,6 +77,7 @@ import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.Result;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
+import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 /**
  * Server-side implementation of KNX IP (secure) tunneling and device management protocol.
@@ -104,6 +107,9 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 	private final SecureSession sessions;
 	private final int sessionId;
+
+	// if enabled by client, notify client about changes of connection status and tunneling address
+	private boolean featureInfoServiceEnabled;
 
 	DataEndpointServiceHandler(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
@@ -262,10 +268,11 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		}
 
 		final String type = tunnel ? "tunneling" : "device configuration";
-		if (svc == serviceRequest) {
+		if (svc == serviceRequest || svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
 			final ServiceRequest req = getServiceRequest(h, data, offset);
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
+
 			final int seq = req.getSequenceNumber();
 			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
@@ -283,6 +290,11 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				incSeqRcv();
 				updateLastMsgTimestamp();
 
+				if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
+					respondToFeature(h, data, offset, svc);
+					return true;
+				}
+
 				final CEMI cemi = req.getCEMI();
 				// leave if we are working with an empty (broken) service request
 				if (cemi == null)
@@ -291,33 +303,6 @@ final class DataEndpointServiceHandler extends ConnectionBase
 					checkNotifyTunnelingCEMI(cemi);
 				else
 					checkNotifyConfigurationCEMI(cemi);
-			}
-		}
-		else if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			final TunnelingFeature req = TunnelingFeature.from(svc, ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength()));
-			if (!checkChannelId(req.channelId(), "request"))
-				return true;
-			final int seq = req.sequenceNumber();
-			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
-				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
-				send(buf, dataEndpt);
-				if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
-					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
-					return true;
-				}
-			}
-			else
-				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
-
-			if (seq == getSeqRcv()) {
-				incSeqRcv();
-				updateLastMsgTimestamp();
-
-				logger.debug("received {}", req);
-				final TunnelingFeature res = responseForFeature(h, ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength()));
-				logger.debug("respond with {}", res);
-				send(PacketHelper.toPacket(res), dataEndpt);
 			}
 		}
 		else if (svc == serviceAck) {
@@ -372,40 +357,62 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		return true;
 	}
 
+	private void respondToFeature(final KNXnetIPHeader h, final byte[] data, final int offset, final int svc)
+		throws KNXFormatException, IOException {
+		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
+		final TunnelingFeature res = responseForFeature(h, buffer);
+		logger.debug("respond with {}", res);
+		send(PacketHelper.toPacket(res), dataEndpt);
+	}
+
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
 		final int svc = h.getServiceType();
 		final TunnelingFeature req = TunnelingFeature.from(svc, buffer);
+		logger.debug("received {}", req);
 
-		// TODO get currently set server property values for feature value
 		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
 			switch (req.featureId()) {
 			case SupportedEmiTypes:
-				return responseForFeature(req, (byte) 0, (byte) 0);
+				return responseForFeature(req, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)
 			case IndividualAddress:
 				return responseForFeature(req, device.toByteArray());
 			case MaxApduLength:
-				return responseForFeature(req, (byte) 0, (byte) 15);
+				return responseForFeature(req, (byte) 0, (byte) maxApduLength());
 			case DeviceDescriptorType0:
-				return responseForFeature(req, (byte) 0x09, (byte) 0x1A);
+				return responseForFeature(req, DD0.TYPE_091A.toByteArray());
 			case ConnectionStatus:
-				return responseForFeature(req, (byte) 1);
+				return responseForFeature(req, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
 			case Manufacturer:
 				return responseForFeature(req, (byte) 0, (byte) 0);
 			case ActiveEmiType:
-				return responseForFeature(req, (byte) 0);
+				return responseForFeature(req, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
 			case EnableFeatureInfoService:
-				return responseForFeature(req, (byte) 0);
+				return responseForFeature(req, (byte) (featureInfoServiceEnabled ? 1 : 0));
 			}
 		}
 		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			if (req.featureId() == InterfaceFeature.EnableFeatureInfoService)
-				return responseForFeature(req, req.featureValue().get());
+			final byte[] value = req.featureValue().get();
+			// write access only permitted if connection is not secured
+			if (req.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
+				final IndividualAddress ia = new IndividualAddress(value);
+				if (!device.equals(ia)) {
+					if (serverAddress().equals(ia) || additionalAddresses().contains(ia))
+						return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.DataVoid, value);
+					// NYI update tunneling address
+				}
+				// TODO check if we need to send feature info service
+				return responseForFeature(req, value);
+			}
+			if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
+				featureInfoServiceEnabled = value[0] == 1;
+				return responseForFeature(req, value);
+			}
 
-			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AccessReadOnly);
+			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AccessReadOnly, value);
 		}
 
 		logger.warn("not implemented: {} {}", Integer.toHexString(svc), req);
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.InvalidCommand);
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AddressVoid);
 	}
 
 	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
@@ -424,6 +431,35 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			}
 		}
 		return ErrorCodes.KNX_CONNECTION;
+	}
+
+	private int maxApduLength() {
+		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
+		int max = 15;
+		if (dataEndpoint.isPresent())
+			max = dataEndpoint.get().server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, 1, 15);
+		return max;
+	}
+
+	private IndividualAddress serverAddress() {
+		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
+		int addr = 0;
+		if (dataEndpoint.isPresent())
+			addr = dataEndpoint.get().server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.KNX_INDIVIDUAL_ADDRESS, 1, 0);
+		return new IndividualAddress(addr);
+	}
+
+	private List<IndividualAddress> additionalAddresses() {
+		final List<LooperThread> threads = ControlEndpointService.findDataEndpoint(channelId)
+				.map(ep -> ep.server.controlEndpoints).orElse(Collections.emptyList());
+		for (final LooperThread t : threads) {
+			final Optional<ServiceLooper> looper = t.looper();
+			if (looper.isPresent()) {
+				final ControlEndpointService ces = (ControlEndpointService) looper.get();
+				return ces.additionalAddresses();
+			}
+		}
+		return List.of();
 	}
 
 	void updateLastMsgTimestamp()

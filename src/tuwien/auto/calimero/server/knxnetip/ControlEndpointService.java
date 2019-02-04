@@ -788,7 +788,7 @@ final class ControlEndpointService extends ServiceLooper
 		return res;
 	}
 
-	private List<IndividualAddress> additionalAddresses() {
+	List<IndividualAddress> additionalAddresses() {
 		final int oi = objectInstance();
 		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, oi, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
 		final List<IndividualAddress> list = new ArrayList<>();
