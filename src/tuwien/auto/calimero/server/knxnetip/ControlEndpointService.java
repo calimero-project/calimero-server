@@ -296,7 +296,20 @@ final class ControlEndpointService extends ServiceLooper
 			if (!checkVersion(h))
 				status = ErrorCodes.VERSION_NOT_SUPPORTED;
 
-			final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
+			final HPAI controlEndpoint = req.getControlEndpoint();
+			final boolean tcp = controlEndpoint.getHostProtocol() == HPAI.IPV4_TCP;
+			if (tcp) {
+				final var ctrlRouteBack = controlEndpoint.getAddress().isAnyLocalAddress()
+						&& controlEndpoint.getPort() == 0;
+				final HPAI dataEndpoint = req.getDataEndpoint();
+				final var dataRouteBack = dataEndpoint.getAddress().isAnyLocalAddress() && dataEndpoint.getPort() == 0;
+				if (!ctrlRouteBack || !dataRouteBack) {
+					logger.info("connect request from {}:{} does not contain route-back {} endpoint, ignore", src, port,
+							ctrlRouteBack ? "data" : "control");
+					return true;
+				}
+			}
+			final InetSocketAddress ctrlEndpt = createResponseAddress(controlEndpoint, src, port, 1);
 			byte[] buf = null;
 			boolean established = false;
 
@@ -305,8 +318,8 @@ final class ControlEndpointService extends ServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
-					logger.info("{}: setup data endpoint (channel {}) for connection request from {}",
-							svcCont.getName(), channelId, ctrlEndpt);
+					logger.info("{}: setup data endpoint (channel {}) for connection request from {} ({})",
+							svcCont.getName(), channelId, ctrlEndpt, tcp ? "tcp" : "udp");
 					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
@@ -776,10 +789,11 @@ final class ControlEndpointService extends ServiceLooper
 		if (!svcCont.reuseControlEndpoint())
 			looperThreads.add(looperThread);
 
-		// we always create our own HPAI from the socket, since the service container
+		// for udp, always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
-		final HPAI hpai = new HPAI(svcCont.getControlEndpoint().getHostProtocol(),
-				(InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
+		final boolean tcp = req.getControlEndpoint().getHostProtocol() == HPAI.IPV4_TCP;
+		final HPAI hpai = tcp ? new HPAI(HPAI.IPV4_TCP, null)
+				: new HPAI(HPAI.IPV4_UDP, (InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}
 
