@@ -61,6 +61,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -73,6 +74,7 @@ import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
+import tuwien.auto.calimero.device.Keyring;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -238,8 +240,17 @@ public class Launcher implements Runnable
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface netif = getNetIf(r);
-			Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
-					.map(v -> v.replaceFirst("^~", System.getProperty("user.home"))).map(Paths::get).orElse(null);
+
+			final Function<String, String> expandHome = v -> v.replaceFirst("^~", System.getProperty("user.home"));
+
+			// look for a server keyfile
+			Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile")).map(expandHome).map(Paths::get)
+					.orElse(null);
+			// look for a keyring configuration
+			final Optional<Keyring> keyring = ofNullable(r.getAttributeValue(null, "keyring")).map(expandHome)
+					.map(uri -> new Keyring(uri, "pwd".toCharArray()));
+			keyring.ifPresent(Keyring::load);
+			final var keyringConfig = keyring.map(Keyring::configuration).orElse(Map.of());
 
 			String addr = "";
 			String subnetType = "";
