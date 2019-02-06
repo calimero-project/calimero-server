@@ -55,6 +55,7 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXTimeoutException;
+import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -73,7 +74,6 @@ import tuwien.auto.calimero.knxnetip.servicetype.ServiceAck;
 import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature;
 import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.InterfaceFeature;
-import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.Result;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
@@ -392,31 +392,37 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		}
 		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
 			final byte[] value = req.featureValue().get();
-			// write access only permitted if connection is not secured
+			// write access to IA is only permitted if connection is not secured
 			if (req.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
-				final IndividualAddress ia = new IndividualAddress(value);
-				if (!device.equals(ia)) {
-					if (serverAddress().equals(ia) || additionalAddresses().contains(ia))
-						return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.DataVoid, value);
-					// NYI update tunneling address
-				}
-				// TODO check if we need to send feature info service
-				return responseForFeature(req, value);
+				final ReturnCode result = updateTunnelingAddress(value) ? ReturnCode.Success : ReturnCode.DataVoid;
+				return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), result, value);
 			}
-			if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
+			else if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
 				featureInfoServiceEnabled = value[0] == 1;
 				return responseForFeature(req, value);
 			}
 
-			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AccessReadOnly, value);
+			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.AccessReadOnly, value);
 		}
 
-		logger.warn("not implemented: {} {}", Integer.toHexString(svc), req);
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.AddressVoid);
+		logger.warn("unknown or unsupported: {} {}", Integer.toHexString(svc), req);
+		// TODO parsing the tunneling feature will throw on unknown feature id
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.AddressVoid);
 	}
 
 	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), Result.Success, featureValue);
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.Success, featureValue);
+	}
+
+	private boolean updateTunnelingAddress(final byte[] value) {
+		final IndividualAddress ia = new IndividualAddress(value);
+		if (!device.equals(ia)) {
+			if (serverAddress().equals(ia) || additionalAddresses().contains(ia))
+				return false;
+			// NYI update tunneling address
+		}
+		// TODO check if we need to send feature info service
+		return true;
 	}
 
 	private int subnetStatus() {
