@@ -450,7 +450,7 @@ final class ControlEndpointService extends ServiceLooper
 					mac == null ? new byte[6] : mac);
 
 			// skip response if we have a mac filter set which does not match our mac
-			if (macFilter.length > 0 && !macFilter.equals(mac))
+			if (macFilter.length > 0 && !Arrays.equals(macFilter, mac))
 				return;
 		}
 		catch (SocketException | KnxPropertyException e) {}
