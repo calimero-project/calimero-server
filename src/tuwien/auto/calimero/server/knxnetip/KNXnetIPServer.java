@@ -310,18 +310,18 @@ public class KNXnetIPServer
 				logger.warn("service container \"" + sc.getName() + "\" already exists in server");
 				return false;
 			}
+			// add new KNXnet/IP parameter object for this service container
 			final InterfaceObjectServer io = getInterfaceObjectServer();
+			io.addInterfaceObject(knxObject);
+			final InterfaceObject[] objects = io.getInterfaceObjects();
+			svcContToIfObj.put(sc, objects[objects.length - 1]);
+			svcContainers.add(sc);
+
 			final int medium = sc.getMediumSettings().getMedium();
 			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
 			if (medium == KNXMediumSettings.MEDIUM_PL110)
 				setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS, ((PLSettings) sc.getMediumSettings()).getDomainAddress());
 
-			// add new KNXnet/IP parameter object for this service container
-			io.addInterfaceObject(knxObject);
-			final InterfaceObject[] objects = io.getInterfaceObjects();
-			svcContToIfObj.put(sc, objects[objects.length - 1]);
-			// init the parameter object
-			svcContainers.add(sc);
 			initKNXnetIpParameterObject(svcContainers.size(), sc);
 
 			synchronized (this) {
@@ -707,6 +707,14 @@ public class KNXnetIPServer
 			final ServiceContainer sc = findContainer(pe.getInterfaceObject());
 			// multicast routing lost message
 			findRoutingLooperThread(sc).flatMap(t -> t.looper()).ifPresent(l -> sendRoutingLostMessage(l, sc, lost));
+		}
+		else if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
+			if (pe.getPropertyId() == PID.MEDIUM_STATUS) {
+				final var active = (pe.getNewData()[0] & 0x01) == 0x00; // 0x01: communication impossible
+				// NYI filter by control endpoint
+				for (final DataEndpointServiceHandler desh : dataConnections)
+					desh.mediumConnectionStatusChanged(active);
+			}
 		}
 	}
 

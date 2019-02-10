@@ -110,6 +110,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 	// if enabled by client, notify client about changes of connection status and tunneling address
 	private boolean featureInfoServiceEnabled;
+	private boolean tunnelingAddressChanged;
 
 	DataEndpointServiceHandler(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
@@ -292,6 +293,10 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 				if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
 					respondToFeature(h, data, offset, svc);
+					if (tunnelingAddressChanged) {
+						tunnelingAddressChanged = false;
+						sendFeatureInfo(InterfaceFeature.IndividualAddress, device.toByteArray());
+					}
 					return true;
 				}
 
@@ -367,6 +372,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
 		final int svc = h.getServiceType();
+		// NYI detect data type conflict (wrong sized value) and respond with ReturnCode.DataTypeConflict
+		// NYI for an unknown interface feature, respond with ReturnCode.AddressVoid
 		final TunnelingFeature req = TunnelingFeature.from(svc, buffer);
 		logger.debug("received {}", req);
 
@@ -395,23 +402,29 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			// write access to IA is only permitted if connection is not secured
 			if (req.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
 				final ReturnCode result = updateTunnelingAddress(value) ? ReturnCode.Success : ReturnCode.DataVoid;
-				return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), result, value);
+				return responseForFeature(req, result, value);
 			}
 			else if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
+				if (value[0] != 0 && value[1] != 1)
+					return responseForFeature(req, ReturnCode.OutOfMaxRange, value);
 				featureInfoServiceEnabled = value[0] == 1;
 				return responseForFeature(req, value);
 			}
 
-			return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.AccessReadOnly, value);
+			return responseForFeature(req, ReturnCode.AccessReadOnly, value);
 		}
 
 		logger.warn("unknown or unsupported: {} {}", Integer.toHexString(svc), req);
-		// TODO parsing the tunneling feature will throw on unknown feature id
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.AddressVoid);
+		return responseForFeature(req, ReturnCode.AddressVoid);
 	}
 
 	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), ReturnCode.Success, featureValue);
+		return responseForFeature(req, ReturnCode.Success, featureValue);
+	}
+
+	private TunnelingFeature responseForFeature(final TunnelingFeature req, final ReturnCode rc,
+		final byte... featureValue) {
+		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), rc, featureValue);
 	}
 
 	private boolean updateTunnelingAddress(final byte[] value) {
@@ -421,7 +434,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				return false;
 			// NYI update tunneling address
 		}
-		// TODO check if we need to send feature info service
+		tunnelingAddressChanged = true;
 		return true;
 	}
 
@@ -466,6 +479,23 @@ final class DataEndpointServiceHandler extends ConnectionBase
 			}
 		}
 		return List.of();
+	}
+
+	void mediumConnectionStatusChanged(final boolean active) {
+		sendFeatureInfo(InterfaceFeature.ConnectionStatus, (byte) (active ? 1 : 0));
+	}
+
+	private void sendFeatureInfo(final InterfaceFeature id, final byte... value) {
+		if (featureInfoServiceEnabled) {
+			final TunnelingFeature info = TunnelingFeature.newInfo(channelId, getSeqSend(), id, value);
+			logger.debug("send {}", info);
+			try {
+				send(PacketHelper.toPacket(info), dataEndpt);
+			}
+			catch (final IOException e) {
+				logger.error("sending {}", info, e);
+			}
+		}
 	}
 
 	void updateLastMsgTimestamp()
