@@ -458,7 +458,7 @@ final class ControlEndpointService extends ServiceLooper
 		if (requestedServices.length > 0) {
 			final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(svcCont, true);
 			// skip response if we have a service request which we don't support
-			for (int i = 0; i < requestedServices.length; i++) {
+			for (int i = 0; i < requestedServices.length; i += 2) {
 				final int familyId = requestedServices[i] & 0xff;
 				final int version = requestedServices[i + 1] & 0xff;
 				if (families.getVersion(familyId) < version)
