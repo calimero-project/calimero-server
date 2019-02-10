@@ -528,7 +528,7 @@ final class ControlEndpointService extends ServiceLooper
 		for (int i = 0; i < addresses.size(); i++) {
 			final IndividualAddress addr = addresses.get(i);
 			final boolean inuse = addressInUse(addr);
-			status[i] = 4 | (inuse ? 0 : 1);
+			status[i] = 4 | 2 | (inuse ? 0 : 1);
 		}
 		final int maxApduLength = svcCont.getMediumSettings().maxApduLength();
 		return new TunnelingDib((short) maxApduLength, addresses, status);
