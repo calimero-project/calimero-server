@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -343,7 +343,9 @@ public class KnxServerGateway implements Runnable
 				verifySubnetInterfaceAddress(svcContainer);
 			}
 			catch (KNXException | InterruptedException | RuntimeException e) {
-				logger.error("skip verifying knx address of '{}' subnet interface", svcContainer.getName(), e);
+				String msg = e.getMessage();
+				msg = msg != null && msg.length() > 0 ? msg : e.getClass().getSimpleName();
+				logger.error("skip verifying knx address of '{}' subnet interface ({})", svcContainer.getName(), msg);
 			}
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
@@ -1379,7 +1381,7 @@ public class KnxServerGateway implements Runnable
 						ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, f.getPayload());
 				}
 				catch (final KnxPropertyException e) {
-					logger.info(e.getMessage());
+					logger.debug(e.getMessage());
 					data = new byte[] { (byte) e.errorCode() };
 					elems = 0;
 				}
