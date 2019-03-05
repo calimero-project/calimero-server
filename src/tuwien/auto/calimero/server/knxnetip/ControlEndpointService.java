@@ -52,6 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -360,7 +361,7 @@ final class ControlEndpointService extends ServiceLooper
 					boundTo.getAddress().getHostAddress(), boundTo.getPort());
 			return s;
 		}
-		catch (SocketException | UnknownHostException e) {
+		catch (final SocketException e) {
 			logger.error("socket creation failed for {}:{}", ip, ep.getPort(), e);
 			throw wrappedException(e);
 		}
@@ -380,12 +381,26 @@ final class ControlEndpointService extends ServiceLooper
 		return ByteBuffer.allocate(4).putInt((int) ((0xffffffffL >> length) ^ 0xffffffffL)).array();
 	}
 
-	private List<InetAddress> assignedIpAddresses() throws SocketException, UnknownHostException
-	{
+	private List<InetAddress> assignedIpAddresses() throws SocketException {
 		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
-		final List<InetAddress> list = netif != null ? Collections.list(netif.getInetAddresses())
-				: Collections.singletonList(localHost());
-		return list;
+		if (netif != null)
+			return Collections.list(netif.getInetAddresses());
+		try {
+			final InetAddress localHost = localHost();
+			if (!localHost.isLoopbackAddress())
+				return Collections.singletonList(localHost);
+		}
+		catch (final UnknownHostException ignore) {}
+
+		final List<InetAddress> addresses = new ArrayList<>();
+		for (final NetworkInterface nif : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+			for (final Enumeration<InetAddress> e = nif.getInetAddresses(); e.hasMoreElements();) {
+				final InetAddress addr = e.nextElement();
+				if (!addr.isLoopbackAddress())
+					addresses.add(addr);
+			}
+		}
+		return addresses;
 	}
 
 	private InetAddress localHost() throws UnknownHostException
