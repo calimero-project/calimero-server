@@ -344,6 +344,11 @@ public class KNXnetIPServer
 				return false;
 			}
 			final InterfaceObjectServer io = getInterfaceObjectServer();
+			if (svcContainers.isEmpty()) {
+				final byte[] device = sc.getMediumSettings().getDeviceAddress().toByteArray();
+				setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
+				setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
+			}
 			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0,
 					(byte) sc.getMediumSettings().getMedium());
 			// add new KNXnet/IP parameter object for this service container
