@@ -317,6 +317,11 @@ public class KNXnetIPServer
 			svcContToIfObj.put(sc, objects[objects.length - 1]);
 			svcContainers.add(sc);
 
+			if (svcContainers.size() == 1) {
+				final byte[] device = sc.getMediumSettings().getDeviceAddress().toByteArray();
+				setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
+				setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
+			}
 			final int medium = sc.getMediumSettings().getMedium();
 			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
 			if (medium == KNXMediumSettings.MEDIUM_PL110)
