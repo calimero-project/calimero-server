@@ -49,6 +49,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -227,7 +228,7 @@ public class KNXnetIPServer
 	// list of LooperThread objects running a routing endpoint
 	final List<LooperThread> routingEndpoints = new ArrayList<>();
 	// list of DataEndpointServiceHandler objects
-	final List<DataEndpointServiceHandler> dataConnections = new ArrayList<>();
+	final List<DataEndpointServiceHandler> dataConnections = Collections.synchronizedList(new ArrayList<>());
 
 	private InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;

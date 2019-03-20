@@ -1176,7 +1176,9 @@ public class KnxServerGateway implements Runnable
 
 	private Optional<KNXnetIPConnection> findRoutingConnection()
 	{
-		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
+		synchronized (serverConnections) {
+			return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
+		}
 	}
 
 	// check whether we have to slow down or pause sending for routing flow control
