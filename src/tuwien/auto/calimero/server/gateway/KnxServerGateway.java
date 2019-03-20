@@ -44,9 +44,11 @@ import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.Wait
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,6 +58,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +87,7 @@ import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -94,6 +98,8 @@ import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
+import tuwien.auto.calimero.dptxlator.PropertyTypes;
+import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -645,6 +651,8 @@ public class KnxServerGateway implements Runnable
 			ios.setProperty(ROUTER_OBJECT, objinst, pidMaxRoutingApduLength, 1, 1, data);
 			logger.debug("set maximum APDU length of '{}' to {}", sc.getName(), sc.getMediumSettings().maxApduLength());
 
+			ios.setProperty(ROUTER_OBJECT, objinst, pidIpSbcControl, 1, 1, (byte) 0);
+
 			// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
 			try {
 				ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.PRIORITY_FIFO_ENABLED, 1, 1, (byte) 0);
@@ -880,20 +888,31 @@ public class KnxServerGateway implements Runnable
 				}
 				final CEMILData send = adjustHopCount(f);
 				if (send != null)
-					dispatchToSubnets(send);
+					dispatchToSubnets(send, fe.systemBroadcast());
 			}
 			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
+				// get connector of that subnet
+				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
+
+				// check if frame is addressed to us
+				// TODO probably have to add exception for usb routing
+				if (connector != null) {
+					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
+					if (f.getDestination().equals(containerAddr)) {
+						functionPropertyCommand(connector, f);
+						return;
+					}
+				}
+
 				final CEMILData send = adjustHopCount(f);
 				if (send == null)
 					return;
-				// get connector of that subnet
-				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 				if (connector != null) {
 					recordEvent(connector, fe);
 					dispatchToServer(connector, send, fe.id());
 				}
 
-				dispatchToOtherSubnets(send, connector);
+				dispatchToOtherSubnets(send, connector, false);
 			}
 			else {
 				logger.warn("{}{} - ignored", s, f);
@@ -978,7 +997,7 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
-	private void dispatchToOtherSubnets(final CEMILData f, final SubnetConnector exclude)
+	private void dispatchToOtherSubnets(final CEMILData f, final SubnetConnector exclude, final boolean systemBroadcast)
 	{
 		if (f.getDestination() instanceof IndividualAddress) {
 			// deal with medium independent default individual address
@@ -1006,19 +1025,20 @@ public class KnxServerGateway implements Runnable
 			final int raw = f.getDestination().getRawAddress();
 			for (final SubnetConnector subnet : connectors) {
 				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
-					dispatchToSubnet(subnet, f, raw);
-				else if (exclude != null)
+					dispatchToSubnet(subnet, f, raw, systemBroadcast);
+				else if (subnet.equals(exclude))
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
 			}
 		}
 	}
 
-	private void dispatchToSubnets(final CEMILData f)
+	private void dispatchToSubnets(final CEMILData f, final boolean systemBroadcast)
 	{
-		dispatchToOtherSubnets(f, null);
+		dispatchToOtherSubnets(f, null, systemBroadcast);
 	}
 
-	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f, final int rawAddress)
+	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f, final int rawAddress,
+		final boolean systemBroadcast)
 	{
 		final int objinst = objectInstance(subnet);
 		if (rawAddress <= 0x6fff) {
@@ -1035,8 +1055,22 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 		}
-		if (isNetworkLink(subnet))
-			send(subnet, f);
+
+		if (!isNetworkLink(subnet))
+			return;
+		final CEMILData ldata = f;
+		if (systemBroadcast) {
+			if (!isIpSystemBroadcast(objinst, f)) {
+				logger.warn("cEMI in IP system broadcast not qualified for subnet broadcast: {}", f);
+				return;
+			}
+			// std frames have the SB flag already removed when adjusting the hop count
+			if (f instanceof CEMILDataEx) {
+				final CEMILDataEx cemilDataEx = (CEMILDataEx) f;
+				cemilDataEx.setBroadcast(true);
+			}
+		}
+		send(subnet, ldata);
 	}
 
 	// ensure we have a network link open (and no monitor link)
@@ -1149,6 +1183,42 @@ public class KnxServerGateway implements Runnable
 						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
+
+					final KNXnetIPConnection routing = findRoutingConnection().orElse(null);
+					if (routing != null && isSubnetBroadcast(objinst, f)) {
+						logger.info("forward as IP system broadcast {}", f);
+						final CEMILData bcast;
+						if (f instanceof CEMILDataEx) {
+							((CEMILDataEx) f).setBroadcast(false);
+							bcast = f;
+						}
+						else {
+							bcast = new CEMILDataEx(f.getMessageCode(), f.getSource(), f.getDestination(),
+									f.getPayload(), f.getPriority(), f.isRepetition(), false, f.isAckRequested(),
+									f.getHopCount());
+						}
+
+						final var sentOnNetif = new HashSet<NetworkInterface>();
+						for (final KNXnetIPConnection c : serverConnections) {
+							if (c instanceof KNXnetIPRouting) {
+								NetworkInterface netif = null;
+								try {
+									final Field field = ConnectionBase.class.getDeclaredField("socket");
+									field.setAccessible(true);
+									final MulticastSocket s = (MulticastSocket) field.get(c);
+									netif = s.getNetworkInterface();
+								}
+								catch (ReflectiveOperationException | SecurityException | SocketException e) {
+									e.printStackTrace();
+								}
+								if (!sentOnNetif.contains(netif)) {
+									send(sc, c, bcast, false);
+									sentOnNetif.add(netif);
+								}
+							}
+						}
+						return;
+					}
 				}
 
 				logger.debug("dispatch {}->{} to all server-side connections", f.getSource(), f.getDestination());
@@ -1172,6 +1242,75 @@ public class KnxServerGateway implements Runnable
 		catch (KnxPropertyException | InterruptedException e) {
 			logger.error("send to server-side failed for " + f.toString(), e);
 		}
+	}
+
+
+	private static final int SystemNetworkParamRead = 0b0111001000;
+	private static final int SystemNetworkParamResponse = 0b0111001001;
+	private static final int DomainAddressSerialNumberWrite = 0b1111101110;
+	private static final int SecureService = 0b1111110001;
+
+	private static final int SecureDataPdu = 0;
+	private static final int SecureSyncRequest = 2;
+	private static final int SecureSyncResponse = 3;
+
+	private static final int pidIpSbcControl = 120;
+
+	// checks if received subnet frame qualifies as IP system broadcast
+	private boolean isSubnetBroadcast(final int objInstance, final CEMILData f) {
+		if (f.getDestination().getRawAddress() != 0)
+			return false;
+
+		final int sbc = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
+		if (sbc == 0)
+			return false;
+
+		final byte[] tpdu = f.getPayload();
+		final ByteBuffer asdu = ByteBuffer.wrap(DataUnitBuilder.extractASDU(tpdu));
+		final int svc = DataUnitBuilder.getAPDUService(tpdu);
+		switch (svc) {
+		case SystemNetworkParamRead:
+			return asdu.getShort() == InterfaceObject.DEVICE_OBJECT && asdu.getShort() >> 4 == PID.SERIAL_NUMBER
+					&& asdu.get() == 1;
+
+		case DomainAddressSerialNumberWrite: // DoA serial number write service with IP domain
+			return asdu.capacity() == 6 + 4; // SNo + mcast group
+
+		case SecureService: // we look for secure data or sync request, and require tool access, system broadcast, A+C
+			final int scf = asdu.get() & 0xff;
+			final boolean toolAccess = (scf & 128) == 128;
+			final int algorithmId = (scf >> 4) & 0x7;
+			final boolean systemBroadcast = (scf & 0x8) == 0x8;
+			final int service = scf & 0x3;
+			if (service == SecureDataPdu || service == SecureSyncRequest)
+				return toolAccess && systemBroadcast && algorithmId == 1;
+		}
+		return false;
+	}
+
+	// checks if received server-side frame qualifies as subnet broadcast
+	private boolean isIpSystemBroadcast(final int objInstance, final CEMILData f) {
+		final int sbc = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
+		// NYI if disabled, still check if sysbcast, and handle like IP device
+		if (sbc == 0)
+			return false;
+
+		final byte[] tpdu = f.getPayload();
+		final ByteBuffer asdu = ByteBuffer.wrap(DataUnitBuilder.extractASDU(tpdu));
+		final int svc = DataUnitBuilder.getAPDUService(tpdu);
+		switch (svc) {
+		case SystemNetworkParamResponse:
+			return asdu.getShort() == InterfaceObject.DEVICE_OBJECT && (asdu.getShort() >> 4) == PID.SERIAL_NUMBER
+					&& asdu.get() == 1; // TODO toolaccess bit
+		case SecureService: // we look for sync response, and require tool access, system broadcast, A+C
+			final int scf = asdu.get() & 0xff;
+			final boolean toolAccess = (scf & 128) == 128;
+			final int algorithmId = (scf >> 4) & 0x7;
+			final boolean systemBroadcast = (scf & 0x8) == 0x8;
+			final int service = scf & 0x3;
+			return service == SecureSyncResponse && toolAccess && systemBroadcast && algorithmId == 1;
+		}
+		return false;
 	}
 
 	private Optional<KNXnetIPConnection> findRoutingConnection()
@@ -1204,9 +1343,14 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
-		throws InterruptedException
-	{
-		applyRoutingFlowControl(c);
+			throws InterruptedException {
+		send(svcContainer, c, f, true);
+	}
+
+	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
+		final boolean applyRoutingFlowControl) throws InterruptedException {
+		if (applyRoutingFlowControl)
+			applyRoutingFlowControl(c);
 		final int oi = objectInstance(svcContainer.getName());
 		try {
 			c.send(f, WaitForAck);
@@ -1431,6 +1575,107 @@ public class KnxServerGateway implements Runnable
 			if (connectors.get(i).getName().equals(id))
 				return i + 1;
 		throw new RuntimeException("no subnet connector with ID '" + id + "'");
+	}
+
+	private static final int A_FunctionPropertyCommand =          0b1011000111;
+	private static final int A_FunctionPropertyStateResponse =    0b1011001001;
+	private static final int A_FunctionPropertyExtCommand =       0b0111010100;
+	private static final int A_FunctionPropertyExtStateResponse = 0b0111010110;
+
+	private void functionPropertyCommand(final SubnetConnector connector, final CEMILData f) {
+		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+		ReturnCode ret = ReturnCode.Success;
+
+		final var apdu = f.getPayload();
+		final var svc = DataUnitBuilder.getAPDUService(apdu);
+		final var asdu = ByteBuffer.wrap(apdu, 2, apdu.length - 2);
+		if (svc == A_FunctionPropertyCommand) {
+			final var objectIndex = asdu.get() & 0xff;
+			final var pid = asdu.get() & 0xff;
+			// first make sure we have a function property
+			final var pdt = ios.getDescription(objectIndex, pid).getPDT();
+			if (pdt != PropertyTypes.PDT_FUNCTION) {
+				logger.warn("property {}|{} is not a function property", objectIndex, pid);
+				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyStateResponse,
+						(byte) objectIndex, (byte) pid);
+				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
+						f.getSource(), tpdu, f.getPriority());
+				dispatchToSubnet(connector, res, f.getDestination().getRawAddress(), false);
+				return;
+			}
+
+			if (objectIndex == objectIndex(InterfaceObject.ROUTER_OBJECT, 1) && pid == pidIpSbcControl) {
+				/*var reserved = */asdu.get();
+				final int serviceId = asdu.get() & 0xff;
+				if (serviceId == 0) {
+					final byte info = asdu.get();
+					if (info == 0 || info == 1) {
+						final var state = info == 1 ? "enable" : "disable";
+						logger.info("{} IP system broadcast routing mode", state);
+						ios.setProperty(objectIndex, pid, 1, 1, info);
+						// NYI if enabled, (re-)schedule SBC disable 20 seconds from now
+					}
+					else
+						ret = ReturnCode.DataVoid;
+				}
+				else
+					ret = ReturnCode.InvalidCommand;
+
+				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyStateResponse, (byte) objectIndex,
+						(byte) pid, (byte) ret.code(), (byte) serviceId);
+				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
+						f.getSource(), tpdu, f.getPriority());
+				dispatchToSubnet(connector, res, 0, false);
+			}
+		}
+		else if (svc == A_FunctionPropertyExtCommand) {
+			final var objectType = asdu.getShort() & 0xffff;
+			final var objectInstHi = asdu.get() & 0xff;
+			final var tmp = asdu.get() & 0xff;
+			final var objectInst = (objectInstHi << 4) | (tmp >> 4);
+			final var pid = (tmp & 0x0f << 8) | (asdu.get() & 0xff);
+			// first make sure we have a function property
+			final var pdt = ios.getDescription(objectIndex(objectType, objectInst), pid).getPDT();
+			if (pdt != PropertyTypes.PDT_FUNCTION) {
+				logger.warn("property {}|{}|{} is not a function property", objectType, objectInst, pid);
+				asdu.rewind();
+				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyExtStateResponse, asdu.get(),
+					asdu.get(), asdu.get(), asdu.get(), asdu.get(), (byte) ReturnCode.DataTypeConflict.code());
+				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
+						f.getSource(), tpdu, f.getPriority());
+				dispatchToSubnet(connector, res, f.getDestination().getRawAddress(), false);
+				return;
+			}
+
+			if (objectType == InterfaceObject.ROUTER_OBJECT && objectInst == 1 && pid == pidIpSbcControl) {
+				/*var reserved = */asdu.get();
+				final int serviceId = asdu.get() & 0xff;
+				if (serviceId == 0) {
+					final byte info = asdu.get();
+					if (info == 0 || info == 1) {
+						final var state = info == 1 ? "enable" : "disable";
+						logger.info("{} IP system broadcast routing mode", state);
+						ios.setProperty(objectType, objectInst, pid, 1, 1, info);
+						// NYI if enabled, (re-)schedule SBC disable 20 seconds from now
+					}
+					else
+						ret = ReturnCode.DataVoid;
+				}
+				else
+					ret = ReturnCode.DataVoid;
+				// NYI send response
+			}
+		}
+	}
+
+	private int objectIndex(final int interfaceObjectType, final int instance) {
+		final var objects = server.getInterfaceObjectServer().getInterfaceObjects();
+		int inst = 0;
+		for (final InterfaceObject io : objects) {
+			if (io.getType() == interfaceObjectType && ++inst == instance)
+				return io.getIndex();
+		}
+		return -1;
 	}
 
 	// TODO support > 1 service containers with usb
