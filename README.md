@@ -95,7 +95,7 @@ Elements and attributes of `server-config.xml`:
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
 	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available (non-loopback) network adapter is chosen depending on your OS network setup (or localhost setting). 
     - `reuseCtrlEP` (optional): reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, `false` by default. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
-
+    - `keyfile="~/.knx/keyfile"` (required for KNX IP Secure): path to a keyfile containing the KNX IP Secure keys
 * `<knxAddress type="individual">7.1.0</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
     - `type="individual"`: indicates a device address.
     - `x.y.z`: Address of the service container, will be visible in e.g. ETS-tool. If routing is activated, requires a coupler/backbone address (`x.y.0` or `x.0.0`).
@@ -107,7 +107,6 @@ Elements and attributes of `server-config.xml`:
 Required attributes for secure routing:
     - `secure="true"`: `true` activates KNX IP Secure, `false` defaults to KNXnet/IP Routing
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
-    - `keyfile="~/.knx/keyfile"`: path to keyfile containing the KNX IP Secure group (or backbone) key
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
