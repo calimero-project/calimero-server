@@ -1041,7 +1041,7 @@ public class KnxServerGateway implements Runnable
 		final boolean systemBroadcast)
 	{
 		final int objinst = objectInstance(subnet);
-		if (rawAddress <= 0x6fff) {
+		if (rawAddress > 0 && rawAddress <= 0x6fff) {
 			// get forwarding settings for group destination address
 			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.MAIN_LCGROUPCONFIG, 3);
 			final int subGroupAddressConfig = value & 0x03;
