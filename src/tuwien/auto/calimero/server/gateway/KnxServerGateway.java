@@ -1224,9 +1224,12 @@ public class KnxServerGateway implements Runnable
 				logger.debug("dispatch {}->{} to all server-side connections", f.getSource(), f.getDestination());
 				// create temporary array to not block concurrent access during iteration
 				for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
+					final String type = c.getName().toLowerCase();
+					if (type.contains("devmgmt"))
+						continue;
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
-					final boolean monitoring = c.getName().toLowerCase().contains("monitor");
+					final boolean monitoring = type.contains("monitor");
 					final CEMI send = monitoring ? convertToBusmon(f, eventId, subnet) : f;
 					try {
 						send(sc, c, send);
@@ -1234,7 +1237,7 @@ public class KnxServerGateway implements Runnable
 					catch (final KNXIllegalArgumentException e) {
 						// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
-						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), send);
+						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), send, e);
 					}
 				}
 			}
