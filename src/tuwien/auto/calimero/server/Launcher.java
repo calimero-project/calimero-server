@@ -323,7 +323,7 @@ public class Launcher implements Runnable
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
 								secure = true;
-								if (keyfile == null) {
+								if (keyring == null && keyfile == null) {
 									keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
 											.map(v -> v.replaceFirst("^~", System.getProperty("user.home")))
 											.map(Paths::get)
@@ -413,6 +413,10 @@ public class Launcher implements Runnable
 							catch (final IOException e) {
 								throw new KNXMLException("reading key file '" + keyfile + "'", e);
 							}
+						}
+						else if (routingMcast != null && !keyringConfig.isEmpty()){
+							final var mcast = routingMcast.getHostAddress();
+							keyfiles.put(sc, Map.of("group.key", (byte[]) keyringConfig.get(mcast)));
 						}
 						return;
 					}
