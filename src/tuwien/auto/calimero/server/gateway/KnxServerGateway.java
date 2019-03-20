@@ -1364,9 +1364,12 @@ public class KnxServerGateway implements Runnable
 			if (buffer != null)
 				buffer.completeEvent(c, recordFrameEvent);
 		}
-		catch (final KNXTimeoutException | KNXConnectionClosedException e) {
+		catch (final KNXTimeoutException e) {
 			logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
 			setNetworkState(oi, false, true);
+		}
+		catch (final KNXConnectionClosedException e) {
+			logger.debug("sending on {} failed: connection closed", c);
 		}
 	}
 
