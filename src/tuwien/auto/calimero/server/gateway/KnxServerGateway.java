@@ -1630,9 +1630,6 @@ public class KnxServerGateway implements Runnable
 			logger.warn("hop count 0, discard frame {}->{}", msg.getSource(), msg.getDestination());
 			return null;
 		}
-		// if counter == 7, simply forward
-		if (count == 7)
-			return msg;
 		// otherwise, decrement and forward
 		--count;
 		if (msg instanceof CEMILDataEx) {
