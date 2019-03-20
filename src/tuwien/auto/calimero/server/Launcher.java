@@ -568,11 +568,15 @@ public class Launcher implements Runnable
 				datapoints = "\n\tDatapoints "
 						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints();
 
+			final String unicastSecure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).get("user.1") != null
+					? new String(Character.toChars(0x1F512)) + " " : "";;
+			final String unicast = "" + sc.getControlEndpoint().getPort();
 			// @formatter:off
-			final String info = String.format("Service container '%s'%s:%n"
-					+ "\tlisten on %s, KNXnet/IP %srouting %s%n"
+			final String info = String.format("configuration of service container '%s'%s:%n"
+					+ "\tlisten on %s (%sport %s), KNXnet/IP %srouting %s%n"
 					+ "\t%s connection: %s%s%s",
-					sc.getName(), activated, sc.networkInterface(), secure, mcast, type, sc.getMediumSettings(), filter, datapoints);
+					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secure, mcast, type,
+					sc.getMediumSettings(), filter, datapoints);
 			// @formatter:on
 			logger.info(info);
 		}

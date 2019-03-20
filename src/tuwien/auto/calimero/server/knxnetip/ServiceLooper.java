@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -152,13 +152,13 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		if (useNat) {
 			addr = new InetSocketAddress(senderHost, senderPort);
 			if (logEndpointType != 0)
-				logger.debug("NAT aware: using {} endpoint {} for responses", type, addr);
+				logger.debug("responses use route back {} endpoint {}", type, addr);
 		}
 		else if (resIP.isAnyLocalAddress() || resPort == 0) {
 			addr = new InetSocketAddress(senderHost, senderPort);
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.debug("NAT aware: using {} endpoint {} for client response", type, addr);
+				logger.debug("responses to client use route back {} endpoint {}", type, addr);
 		}
 		else {
 			addr = new InetSocketAddress(resIP, resPort);
