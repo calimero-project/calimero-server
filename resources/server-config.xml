@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Calimero server settings (required for startup) -->
 <knxServer name="knx-server" friendlyName="Calimero KNXnet/IP Server">
-	<propertyDefinitions ref="resources/properties.xml" />
-
 	<!-- KNXnet/IP search & discovery -->
 	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
 
