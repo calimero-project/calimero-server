@@ -41,6 +41,7 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 import static tuwien.auto.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Inet4Address;
@@ -61,6 +62,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -186,7 +189,7 @@ public class Launcher implements Runnable
 		private final Map<ServiceContainer, List<IndividualAddress>> additionalAddresses = new HashMap<>();
 		private final Map<ServiceContainer, Boolean> tunnelingWithNat = new HashMap<>();
 		private final Map<ServiceContainer, Map<String, byte[]>> keyfiles = new HashMap<>();
-
+		private final Map<ServiceContainer, Map<Integer, List<IndividualAddress>>> tunnelingUsers = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -269,6 +272,7 @@ public class Launcher implements Runnable
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
 			boolean secure = false;
+			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
 
 			try {
 				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
@@ -319,6 +323,8 @@ public class Launcher implements Runnable
 						filter = readGroupAddressFilter(r);
 					else if (name.equals(XmlConfiguration.addAddresses))
 						indAddressPool = readAdditionalAddresses(r);
+					else if (name.equals("tunnelingUsers"))
+						tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
 					else if (name.equals("routing")) {
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
@@ -401,6 +407,8 @@ public class Launcher implements Runnable
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						tunnelingWithNat.put(sc, useNat);
+						if (!tunnelingUserToAddresses.isEmpty())
+							tunnelingUsers.put(sc, tunnelingUserToAddresses);
 
 						if (keyfile != null) {
 							try {
@@ -457,6 +465,22 @@ public class Launcher implements Runnable
 				list.add(new IndividualAddress(r));
 			}
 			return list;
+		}
+
+		private static Map<Integer, List<IndividualAddress>> readTunnelingUsers(final XmlReader r) {
+			final var userToAddresses = new HashMap<Integer, List<IndividualAddress>>();
+			while (r.nextTag() != XmlReader.END_ELEMENT && !r.getLocalName().equals("tunnelingUsers")) {
+				final var user = Integer.parseUnsignedInt(r.getAttributeValue(null, "id"));
+				userToAddresses.put(user, readTunnelingUserAddresses(r));
+			}
+			return userToAddresses;
+		}
+
+		private static List<IndividualAddress> readTunnelingUserAddresses(final XmlReader r) {
+			final var addresses = new ArrayList<IndividualAddress>();
+			while (r.nextTag() != XmlReader.END_ELEMENT && !r.getLocalName().equals("user"))
+				addresses.add(new IndividualAddress(r));
+			return addresses;
 		}
 
 		private static void put(final Map<String, String> m, final XmlReader r, final String attr)
@@ -677,6 +701,9 @@ public class Launcher implements Runnable
 				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
+			if (xml.tunnelingUsers.containsKey(sc))
+				setTunnelingUsers(ios, objectInstance, xml.tunnelingUsers.get(sc),
+						xml.additionalAddresses.get(sc), sc.getMediumSettings().getDeviceAddress());
 		}
 	}
 
@@ -754,6 +781,47 @@ public class Launcher implements Runnable
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, ADDITIONAL_INDIVIDUAL_ADDRESSES, i + 1, 1,
 					ia.toByteArray());
 		}
+	}
+
+	private static final int pidTunnelingAddresses = 79;
+	private static final int pidTunnelingUsers = 97;
+
+	private void setTunnelingUsers(final InterfaceObjectServer ios, final int objectInstance,
+		final Map<Integer, List<IndividualAddress>> userToAddresses, final List<IndividualAddress> additionalAddresses,
+		final IndividualAddress ctrlEndpoint) {
+
+		// address indices are sorted in natural order
+		final var addrIndices = userToAddresses.entrySet().stream().map(Map.Entry::getValue).flatMap(List::stream)
+				.map(addr -> addressIndex(addr, additionalAddresses, ctrlEndpoint)).sorted().distinct()
+				.collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (r1, r2) -> {}).toByteArray();
+		ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pidTunnelingAddresses, 1, addrIndices.length,
+				addrIndices);
+
+		// tunneling user entries are sorted first by user <, then by tunneling addr idx <
+		final var userToAddrIdx = new ByteArrayOutputStream();
+		for (final var user : new TreeMap<>(userToAddresses).entrySet()) {
+			final var tunnelingIndicesSet = new TreeSet<Integer>();
+			for (final IndividualAddress addr : user.getValue()) {
+				final var idx = additionalAddresses.indexOf(addr);
+				final var tunnelingIdx = idx == -1 ? 0 : Arrays.binarySearch(addrIndices, (byte) (idx + 1));
+				tunnelingIndicesSet.add(tunnelingIdx + 1);
+			}
+			// create sorted mapping for user -> tunneling idx
+			for (final var idx : tunnelingIndicesSet) {
+				userToAddrIdx.write(user.getKey());
+				userToAddrIdx.write(idx);
+			}
+		}
+		ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pidTunnelingUsers, 1, userToAddrIdx.size() / 2,
+				userToAddrIdx.toByteArray());
+	}
+
+	private static int addressIndex(final IndividualAddress addr, final List<IndividualAddress> additionalAddresses,
+		final IndividualAddress ctrlEndpoint) {
+		final var idx = additionalAddresses.indexOf(addr);
+		if (idx == -1 && !addr.equals(ctrlEndpoint))
+			throw new RuntimeException("tunneling address " + addr + " is not an additional address");
+		return idx + 1;
 	}
 
 	private int objectIndex(final int objectType, final int objectInstance)
