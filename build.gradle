@@ -68,8 +68,8 @@ test {
 dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
-    implementation 'org.slf4j:slf4j-api:1.8.0-beta2'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-beta2'
+    implementation 'org.slf4j:slf4j-api:1.8.0-beta4'
+    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-beta4'
 
 	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
