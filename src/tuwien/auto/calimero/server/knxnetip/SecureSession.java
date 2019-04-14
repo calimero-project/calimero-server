@@ -39,10 +39,6 @@ package tuwien.auto.calimero.server.knxnetip;
 import static tuwien.auto.calimero.DataUnitBuilder.toHex;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
 import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -61,9 +57,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.Security;
-import java.security.spec.AlgorithmParameterSpec;
+import java.security.interfaces.XECPublicKey;
 import java.security.spec.KeySpec;
+import java.security.spec.NamedParameterSpec;
+import java.security.spec.XECPublicKeySpec;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
@@ -76,8 +73,6 @@ import javax.crypto.KeyAgreement;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.math.ec.rfc7748.X25519;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,11 +88,6 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
 class SecureSession {
-
-	static {
-		if (Runtime.version().version().get(0) < 11)
-			Security.addProvider(new BouncyCastleProvider());
-	}
 
 	private static final int SecureSvc = 0x0950;
 	private static final int SessionReq = 0x0951; // 1. client -> server
@@ -283,27 +273,15 @@ class SecureSession {
 		final byte[] publicKey;
 		final byte[] sharedSecret;
 
-		if (Runtime.version().version().get(0) < 11) {
-			final byte[] privateKey = new byte[keyLength];
-			publicKey = new byte[keyLength];
-			generateKeyPair(privateKey, publicKey);
-			sharedSecret = keyAgreement(privateKey, clientKey);
+		try {
+			final KeyPair keyPair = generateKeyPair();
+			final BigInteger u = ((XECPublicKey) keyPair.getPublic()).getU();
+			publicKey = u.toByteArray();
+			reverse(publicKey);
+			sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
 		}
-		else {
-			try {
-				final KeyPair keyPair = generateKeyPair();
-				// we're compiling for java 9
-//				final BigInteger u = ((XECPublicKey) public1).getU();
-				final MethodHandle bind = MethodHandles.lookup().bind(keyPair.getPublic(), "getU", MethodType.methodType(BigInteger.class));
-				final BigInteger u = (BigInteger) bind.invoke();
-				publicKey = u.toByteArray();
-				reverse(publicKey);
-
-				sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
-			}
-			catch (final Throwable e) {
-				throw new KnxSecureException("error creating secure session keys for " + remote, e);
-			}
+		catch (final Throwable e) {
+			throw new KnxSecureException("error creating secure session keys for " + remote, e);
 		}
 
 		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
@@ -366,7 +344,7 @@ class SecureSession {
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
 			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x18), " ");
-			throw new KnxSecureException("authentication failed for user ID " + session.userId + ", auth " + packet);
+			throw new KnxSecureException("authentication failed for user ID " + userId + ", auth " + packet);
 		}
 
 		session.userId = userId;
@@ -471,10 +449,12 @@ class SecureSession {
 		logger.trace("authenticating (length {}): {}", length, toHex(log, " "));
 
 		try {
-			final Cipher cipher = Cipher.getInstance("AES/CBC/ZeroBytePadding");
+			final Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
 			final IvParameterSpec ivSpec = new IvParameterSpec(new byte[16]);
 			cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
-			final byte[] result = cipher.doFinal(data, offset, length);
+
+			final byte[] padded = Arrays.copyOfRange(data, offset, (length + 15) / 16 * 16);
+			final byte[] result = cipher.doFinal(padded);
 			final byte[] mac = Arrays.copyOfRange(result, result.length - macSize, result.length);
 			return mac;
 		}
@@ -483,40 +463,15 @@ class SecureSession {
 		}
 	}
 
-	private static void generateKeyPair(final byte[] privateKey, final byte[] publicKey) {
-		new SecureRandom().nextBytes(privateKey);
-		X25519.scalarMultBase(privateKey, 0, publicKey, 0);
-	}
-
-	// use java SunEC provider
 	private static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
 		final KeyPairGenerator gen = KeyPairGenerator.getInstance("X25519");
 		return gen.generateKeyPair();
 	}
 
-	private static byte[] keyAgreement(final byte[] privateKey, final byte[] spk) {
-		final byte[] sharedSecret = new byte[keyLength];
-		X25519.scalarMult(privateKey, 0, spk, 0, sharedSecret, 0);
-		return sharedSecret;
-	}
-
-	// use java SunEC provider
-	// we're compiling for java 9, so reflectively access X25519 stuff
 	private static byte[] keyAgreement(final PrivateKey privateKey, final byte[] spk) throws GeneralSecurityException {
 		final byte[] reversed = spk.clone();
 		reverse(reversed);
-//		final KeySpec spec = new XECPublicKeySpec(NamedParameterSpec.X25519, new BigInteger(1, reversed));
-		final KeySpec spec;
-		try {
-			final AlgorithmParameterSpec params = (AlgorithmParameterSpec) constructor("java.security.spec.NamedParameterSpec",
-					String.class).newInstance("X25519");
-			spec = (KeySpec) constructor("java.security.spec.XECPublicKeySpec", AlgorithmParameterSpec.class, BigInteger.class)
-					.newInstance(params, new BigInteger(1, reversed));
-		}
-		catch (IllegalArgumentException | ReflectiveOperationException e) {
-			throw new KnxSecureException("creating key spec for client public key", e);
-		}
-
+		final KeySpec spec = new XECPublicKeySpec(NamedParameterSpec.X25519, new BigInteger(1, reversed));
 		final PublicKey pubKey = KeyFactory.getInstance("X25519").generatePublic(spec);
 		final KeyAgreement ka = KeyAgreement.getInstance("X25519");
 		ka.init(privateKey);
@@ -584,12 +539,5 @@ class SecureSession {
 			array[i] = array[array.length - 1 - i];
 			array[array.length - 1 - i] = b;
 		}
-	}
-
-	private static Constructor<?> constructor(final String className, final Class<?>... parameterTypes)
-		throws ReflectiveOperationException {
-		final Class<?> clazz = Class.forName(className);
-		final Constructor<?> constructor = clazz.getConstructor(parameterTypes);
-		return constructor;
 	}
 }
