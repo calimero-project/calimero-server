@@ -60,7 +60,6 @@ import java.util.TreeSet;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
-import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
@@ -263,17 +262,11 @@ final class DiscoveryService extends ServiceLooper
 				return;
 			}
 
-			final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
-			try {
-				final NetworkInterface ni = NetworkInterface.getByInetAddress(local.getAddress());
-				final byte[] mac = ni != null ? ni.getHardwareAddress() : null;
-				server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS, mac == null ? new byte[6] : mac);
-
-				// skip response if we have a mac filter set which does not match our mac
-				if (macFilter.length > 0 && !macFilter.equals(mac))
-					return;
-			}
-			catch (SocketException | KnxPropertyException e) {}
+			// skip response if we have a mac filter set which does not match our mac
+			final byte[] mac = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS,
+					new byte[6]);
+			if (macFilter.length > 0 && !Arrays.equals(macFilter, mac))
+				return;
 
 			if (requestedServices.length > 0) {
 				final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(sc, ext);
@@ -292,6 +285,7 @@ final class DiscoveryService extends ServiceLooper
 			final List<DIB> dibs = new ArrayList<>();
 			set.forEach(dibType -> ces.createDib(dibType, dibs, ext));
 
+			final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
 			final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);

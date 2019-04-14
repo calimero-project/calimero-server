@@ -134,6 +134,7 @@ final class ControlEndpointService extends ServiceLooper
 		final InetAddress addr = s.getLocalAddress();
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
+		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.MAC_ADDRESS, macAddress(addr));
 
 		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), SecureSession.pidSecuredServices, 1, 0);
 		secureOnly = (securedServices & 2) == 2;
@@ -599,6 +600,16 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		catch (final SocketException ignore) {}
 		return ByteBuffer.allocate(4).putInt((int) ((0xffffffffL >> length) ^ 0xffffffffL)).array();
+	}
+
+	private static byte[] macAddress(final InetAddress addr) {
+		byte[] mac = null;
+		try {
+			final NetworkInterface ni = NetworkInterface.getByInetAddress(addr);
+			mac = ni != null ? ni.getHardwareAddress() : null;
+		}
+		catch (final SocketException ignore) {}
+		return mac == null ? new byte[6] : mac;
 	}
 
 	private List<InetAddress> assignedIpAddresses() throws SocketException {
