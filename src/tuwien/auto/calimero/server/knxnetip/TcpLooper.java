@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -45,22 +46,25 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.util.AbstractQueue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
-import tuwien.auto.calimero.knxnetip.util.HPAI;
 
 final class TcpLooper implements Runnable, AutoCloseable {
 
 	private static final Duration inactiveConnectionTimeout = Duration.ofSeconds(10);
 
 	private final ControlEndpointService ctrlEndpoint;
-	final Socket socket;
+	private final Socket socket;
 	private final Logger logger;
 
 	static final ConcurrentHashMap<InetSocketAddress, TcpLooper> connections = new ConcurrentHashMap<>();
@@ -71,14 +75,24 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		return t;
 	});
 
+	// impl note: we cannot simply return the future of ExecutorService::submit, because Future::cancel is
+	// interrupt-based, and the server socket does not honor interrupts; we have to close the socket directly
+	public static Closeable start(final ControlEndpointService ctrlEndpoint, final InetSocketAddress endpoint)
+		throws InterruptedException {
+		final var serverSocket = new ArrayBlockingQueue<Closeable>(1);
+		final Future<?> task = pool.submit(() -> runTcpServerEndpoint(ctrlEndpoint, endpoint, serverSocket));
+		while (!task.isDone()) {
+			final var v = serverSocket.poll(1, TimeUnit.SECONDS);
+			if (v != null)
+				return v;
+		}
+		throw new RuntimeException("couldn't start tcp service for " + ctrlEndpoint.getServiceContainer().getName());
+	}
+
 	private TcpLooper(final ControlEndpointService ces, final Socket conn) {
 		ctrlEndpoint = ces;
 		socket = conn;
 		logger = ctrlEndpoint.logger;
-	}
-
-	static void start(final ControlEndpointService ctrlEndpoint) {
-		pool.execute(tcpEndpoint(ctrlEndpoint));
 	}
 
 	static boolean send(final byte[] buf, final InetSocketAddress address) throws IOException {
@@ -90,29 +104,33 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		return true;
 	}
 
-	private static Runnable tcpEndpoint(final ControlEndpointService ces) {
-		return () -> {
-			final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
-			Thread.currentThread().setName(name);
+	private static void runTcpServerEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint,
+		final AbstractQueue<Closeable> serverSocket) {
+		final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
+		Thread.currentThread().setName(name);
 
-			final HPAI endpoint = ces.getServiceContainer().getControlEndpoint();
-			try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
-				ces.logger.info("{} is up and running", name);
-				while (true) {
-					final Socket conn = s.accept();
-					final TcpLooper looper = new TcpLooper(ces, conn);
-					connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
-					pool.execute(looper);
-				}
+		try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
+			serverSocket.add(s);
+			ces.logger.info("{} is up and running", name);
+			while (true) {
+				final Socket conn = s.accept();
+				final TcpLooper looper = new TcpLooper(ces, conn);
+				connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
+				pool.execute(looper);
 			}
-			catch (final InterruptedIOException e) {
-				ces.logger.info("TCP control endpoint interrupted", e);
-				Thread.currentThread().interrupt();
-			}
-			catch (final IOException e) {
-				ces.logger.error("socket error in TCP control endpoint", e);
-			}
-		};
+		}
+		catch (final InterruptedIOException e) {
+			ces.logger.info("tcp service {}:{} interrupted", endpoint.getAddress().getHostAddress(),
+					endpoint.getPort());
+			Thread.currentThread().interrupt();
+		}
+		catch (final IOException e) {
+			ces.logger.error("socket error in tcp service {}:{}", endpoint.getAddress().getHostAddress(),
+					endpoint.getPort(), e);
+		}
+		finally {
+			Thread.currentThread().setName("idle tcp looper");
+		}
 	}
 
 	static void lastSessionTimedOut(final InetSocketAddress remote) {

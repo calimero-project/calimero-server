@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import static java.util.stream.Collectors.toList;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -124,6 +125,8 @@ final class ControlEndpointService extends ServiceLooper
 	private final boolean secureOnly;
 	private boolean secureSvcInProgress;
 
+	private final Closeable tcpLooper;
+
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
 		super(server, null, 512, 10000);
@@ -142,9 +145,15 @@ final class ControlEndpointService extends ServiceLooper
 		final String tunneling = (securedServices & 2) == 2 ? "required" : "optional";
 		logger.info("control endpoint '{}' secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
 
-		final boolean tcp = true;
-		if (tcp)
-			TcpLooper.start(this);
+		try {
+			tcpLooper = TcpLooper.start(this, (InetSocketAddress) s.getLocalSocketAddress());
+		}
+		catch (final Exception e) {
+			if (e instanceof InterruptedException)
+				Thread.currentThread().interrupt();
+			s.close();
+			throw wrappedException(e);
+		}
 	}
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
@@ -173,11 +182,14 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	@Override
-	public void quit()
-	{
+	public void quit() {
 		// check if we have open data connections before forwarding the call
 		if (channelsAssigned())
 			server.closeDataConnections(this);
+		try {
+			tcpLooper.close();
+		}
+		catch (final IOException ignore) {}
 		super.quit();
 	}
 
