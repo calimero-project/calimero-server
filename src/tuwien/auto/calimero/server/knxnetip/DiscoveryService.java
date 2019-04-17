@@ -105,23 +105,6 @@ final class DiscoveryService extends ServiceLooper
 		}
 		catch (final IOException ignore) {}
 
-		// on Windows platforms, the IP_MULTICAST_LOOP option applies to the
-		// datagram receive path, whereas on Unix platforms, it applies to
-		// the send path; therefore, leave loopback enabled (as by default)
-//			try {
-//				s.setLoopbackMode(false);
-//			}
-//			catch (final SocketException ignore) {}
-
-//			try {
-//				if (outgoing != null)
-//					s.setNetworkInterface(outgoing);
-//			}
-//			catch (final SocketException e) {
-//				logger.error("setting outgoing network interface to " + outgoing.getName());
-//				s.close();
-//				throw e;
-//			}
 		try {
 			joinOnInterfaces(s, joinOn);
 		}

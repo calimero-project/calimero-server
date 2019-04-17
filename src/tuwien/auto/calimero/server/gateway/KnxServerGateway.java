@@ -1903,8 +1903,7 @@ public class KnxServerGateway implements Runnable
 		else
 			state = (faulty ? state | 2 : state & 0xfd);
 		try {
-			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) state);
+			setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, (byte) state);
 			setProperty(ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, (byte) (faulty ? 1 : 0));
 		}
 		catch (final KnxPropertyException e) {

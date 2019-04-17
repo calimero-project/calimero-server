@@ -308,11 +308,6 @@ final class ControlEndpointService extends ServiceLooper
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			int status = ErrorCodes.NO_ERROR;
 
-//			if (req.getDataEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
-//				logger.warn("connect request: only connection support for UDP/IP");
-//				status = ErrorCodes.HOST_PROTOCOL_TYPE;
-//			}
-//			else
 			if (!checkVersion(h))
 				status = ErrorCodes.VERSION_NOT_SUPPORTED;
 
@@ -607,7 +602,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
-	private byte[] subnetMaskOf(final InetAddress addr)
+	private static byte[] subnetMaskOf(final InetAddress addr)
 	{
 		int length = 0;
 		try {
@@ -697,7 +692,6 @@ final class ControlEndpointService extends ServiceLooper
 		}
 
 		if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
-
 			final TunnelingLayer knxLayer;
 			final TunnelCRI cri = (TunnelCRI) req.getCRI();
 			try {
