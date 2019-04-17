@@ -36,6 +36,7 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
+import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.toList;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
@@ -63,6 +64,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DeviceDescriptor.DD0;
@@ -205,7 +207,7 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		final InetAddress ip = ((InetSocketAddress) s.getLocalSocketAddress()).getAddress();
 		try {
-			final List<InetAddress> addresses = assignedIpAddresses();
+			final List<InetAddress> addresses = usableIpAddresses().collect(toList());
 			if (!addresses.contains(ip)) {
 				logger.warn("{} control endpoint: interface {} updated its IP address from {} to {}",
 						svcCont.getName(), svcCont.networkInterface(), ip.getHostAddress(), addresses);
@@ -586,10 +588,7 @@ final class ControlEndpointService extends ServiceLooper
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 			if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
-			ip = assignedIpAddresses().stream().filter(a -> a instanceof Inet4Address)
-					.filter(a -> !a.isLoopbackAddress())
-					.findFirst()
-					.orElse(null);
+			ip = usableIpAddresses().findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
 			logger.debug("control endpoint '{}' socket bound to {}:{}", svcCont.getName(),
@@ -626,19 +625,20 @@ final class ControlEndpointService extends ServiceLooper
 		return mac == null ? new byte[6] : mac;
 	}
 
-	private List<InetAddress> assignedIpAddresses() throws SocketException {
+	private Stream<InetAddress> usableIpAddresses() throws SocketException {
 		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
 		if (netif != null)
-			return netif.inetAddresses().collect(toList());
+			return netif.inetAddresses().filter(Inet4Address.class::isInstance);
 
 		try {
 			final InetAddress localHost = localHost();
 			if (!localHost.isLoopbackAddress())
-				return List.of(localHost);
+				return Stream.of(localHost);
 		}
 		catch (final UnknownHostException ignore) {}
 
-		return NetworkInterface.networkInterfaces().flatMap(NetworkInterface::inetAddresses).collect(toList());
+		return NetworkInterface.networkInterfaces().flatMap(NetworkInterface::inetAddresses)
+				.filter(Inet4Address.class::isInstance).filter(not(InetAddress::isLoopbackAddress));
 	}
 
 	private InetAddress localHost() throws UnknownHostException
