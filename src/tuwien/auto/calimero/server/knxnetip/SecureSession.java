@@ -129,7 +129,7 @@ class SecureSession {
 		volatile long lastUpdate = System.nanoTime() / 1_000_000;
 		byte[] serverKey;
 		byte[] clientKey;
-		private int userId;
+		int userId;
 
 		private Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
 			this.client = client;

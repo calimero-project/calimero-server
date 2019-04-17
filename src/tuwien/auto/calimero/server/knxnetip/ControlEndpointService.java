@@ -107,6 +107,13 @@ import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 final class ControlEndpointService extends ServiceLooper
 {
+	// Connect response error codes
+	private static final int NoMoreUniqueConnections = 0x25;
+	private static final int AuthError = 0x28; // client is not authorized to use the requested individual address
+	private static final int NoTunnelingAddress = 0x2d; // address requested in the extended CRI is not a tunneling address
+	private static final int ConnectionInUse = 0x2e; // requested individual address for this connection is in use
+
+
 	private final ServiceContainer svcCont;
 
 	private final List<IndividualAddress> usedKnxAddresses = new ArrayList<>();
@@ -666,6 +673,8 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
+	private IndividualAddress device;
+
 	private ConnectResponse initNewConnection(final ConnectRequest req, final InetSocketAddress ctrlEndpt,
 		final InetSocketAddress dataEndpt, final int channelId)
 	{
@@ -737,16 +746,22 @@ final class ControlEndpointService extends ServiceLooper
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 			}
-			device = cri.tunnelingAddress().filter(this::checkSetRequestedTunnelingAddress)
-					.orElseGet(() -> assignDeviceAddress(svcCont.getMediumSettings().getDeviceAddress()));
 
-			if (device == null) {
-				final List<IndividualAddress> list = additionalAddresses();
-				if (new HashSet<>(list).size() != list.size())
-					return errorResponse(0x25, endpoint);
-
-				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
+			final int userId;
+			if (sessionId > 0) {
+				userId = sessions.sessions.get(sessionId).userId;
+				if (!userAuthorizedForTunneling(userId))
+					return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 			}
+			else
+				userId = 0;
+
+			final int ret = cri.tunnelingAddress().map(addr -> extendedConnectRequest(userId, addr))
+					.orElseGet(() -> basicConnectRequest(userId));
+			if (ret != ErrorCodes.NO_ERROR)
+				return errorResponse(ret, endpoint);
+
+			device = this.device;
 			final boolean isServerAddress = device.equals(serverAddress());
 			logger.info("assign {} address {} to channel {}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
@@ -850,58 +865,170 @@ final class ControlEndpointService extends ServiceLooper
 		return list;
 	}
 
-	private boolean checkSetRequestedTunnelingAddress(final IndividualAddress addr) {
-		return additionalAddresses().contains(addr) && checkAndSetDeviceAddress(addr, addr.equals(serverAddress()));
+	private static final int pidTunnelingAddresses = 79;
+	private static final int pidTunnelingUsers = 97;
+
+	private int extendedConnectRequest(final int userId, final IndividualAddress addr) {
+		final int oi = objectInstance();
+		final byte[] indices = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingAddresses);
+		final var additionalAddresses = additionalAddresses();
+		boolean tunnelingAddress = false;
+
+		for (int i = 0; i < indices.length; i++) {
+			final var idx = indices[i] & 0xff;
+			if (idx == 0) {
+				if (addr.equals(serverAddress())) {
+					tunnelingAddress = true;
+					break;
+				}
+			}
+			else if (addr.equals(additionalAddresses.get(idx - 1))) {
+				tunnelingAddress = true;
+				break;
+			}
+		}
+		if (!tunnelingAddress)
+			return NoTunnelingAddress;
+
+		if (userId == 1) {
+			final boolean ret = checkAndSetDeviceAddress(addr, addr.equals(serverAddress()));
+			return ret ? ErrorCodes.NO_ERROR : ConnectionInUse;
+		}
+
+		boolean addrAuthorized = false;
+		if (userId > 0) {
+			// n:m mapping user -> tunneling address index
+			final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+			// users satisfy <= order, indices per user satisfy <= order
+			for (int i = 0; i < userToAddrIdx.length; i += 2) {
+				final var user = userToAddrIdx[i] & 0xff;
+				if (userId > user)
+					break;
+				if (userId == user) {
+					// tunneling address index: { addrIdx | 0 < addrIdx <= 255 }
+					final var addrIdx = (userToAddrIdx[i + 1] & 0xff) - 1;
+					final var idx = indices[addrIdx] & 0xff;
+					final var ia = idx == 0 ? serverAddress() : additionalAddresses.get(idx - 1);
+					if (addr.equals(ia)) {
+						addrAuthorized = true;
+						break;
+					}
+				}
+			}
+		}
+
+		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, oi, SecureSession.pidSecuredServices,
+				1, (byte) 0);
+		final boolean secureTunneling = (securedServices & 2) == 2;
+
+		if (secureTunneling && !addrAuthorized)
+			return AuthError;
+
+		final boolean ret = checkAndSetDeviceAddress(addr, addr.equals(serverAddress()));
+		device = addr;
+		return ret ? ErrorCodes.NO_ERROR : ConnectionInUse;
 	}
 
-	// null return means no address available
-	private IndividualAddress assignDeviceAddress(final IndividualAddress forSubnet)
-	{
-		for (final IndividualAddress addr : additionalAddresses()) {
-			if (matchesSubnet(addr, forSubnet) && checkAndSetDeviceAddress(addr, false))
-				return addr;
+	private int basicConnectRequest(final int userId) {
+		final int oi = objectInstance();
+		final byte[] addressIndices = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingAddresses);
+		final var additionalAddresses = additionalAddresses();
+
+		IndividualAddress assigned = null;
+		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, oi, SecureSession.pidSecuredServices,
+				1, (byte) 0);
+		final boolean secureTunneling = (securedServices & 2) == 2;
+
+		// exclude mgmt user, it always has access and is not stored in tunneling users
+		if (secureTunneling && userId > 1) {
+			// n:m mapping user -> tunneling address index
+			// user is stored in natural order, idx per user is stored in natural order
+			final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+
+			for (int i = 0; i < userToAddrIdx.length; i += 2) {
+				final var user = userToAddrIdx[i];
+				if (userId > user)
+					break;
+
+				if (userId == user) {
+					// tunneling address index is 1-based
+					final var addrIdx = userToAddrIdx[i + 1] - 1;
+					// addresses indices are 1-based
+					final var idx = addressIndices[addrIdx];
+					final var addr = idx == 0 ? serverAddress() : additionalAddresses.get(idx - 1);
+					if (checkAndSetDeviceAddress(addr, addr.equals(serverAddress()))) {
+						assigned = addr;
+						break;
+					}
+				}
+			}
 		}
-		// there are no free addresses, or no additional address at all
-		if (!svcCont.reuseControlEndpoint()) {
-			logger.warn("no additional individual addresses available that match subnet " + forSubnet);
-			return null;
+		else {
+			for (int i = 0; i < addressIndices.length; i++) {
+				// indices are 1-based
+				final var idx = addressIndices[i];
+				final var addr = idx == 0 ? serverAddress() : additionalAddresses.get(idx - 1);
+				if (checkAndSetDeviceAddress(addr, addr.equals(serverAddress()))) {
+					assigned = addr;
+					break;
+				}
+			}
 		}
 
-		// we assign our own KNX server device address iff:
-		// - no unused additional addresses are available
-		// - we don't run KNXnet/IP routing
-		if (svcCont instanceof RoutingServiceContainer) {
-			logger.warn("KNXnet/IP routing active, cannot assign server device address {}", serverAddress());
-			return null;
+		if (assigned == null) {
+			final List<IndividualAddress> list = additionalAddresses;
+			if (new HashSet<>(list).size() != list.size())
+				return NoMoreUniqueConnections;
+			return ErrorCodes.NO_MORE_CONNECTIONS;
 		}
+		device = assigned;
+		return ErrorCodes.NO_ERROR;
+	}
 
-		final IndividualAddress addr = serverAddress();
-		if (addr != null) {
-			if (matchesSubnet(addr, forSubnet) && checkAndSetDeviceAddress(addr, true))
-				return addr;
-			logger.warn("server device address {} already assigned to data connection", addr);
+	private boolean userAuthorizedForTunneling(final int userId) {
+		if (userId == 1)
+			return true;
+		final int oi = objectInstance();
+		final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+		for (int i = 0; i < userToAddrIdx.length; i += 2) {
+			final var user = userToAddrIdx[i];
+			if (userId > user)
+				return false;
+
+			if (userId == user)
+				return true;
 		}
-		return null;
+		return false;
+	}
+
+	private byte[] allPropertyValues(final int objectType, final int objectInstance, final int propertyId) {
+		final var oi = objectInstance();
+		final var elems = server.getPropertyElems(objectType, objectInstance, propertyId);
+		final var ios = server.getInterfaceObjectServer();
+		try {
+			return ios.getProperty(KNXNETIP_PARAMETER_OBJECT, oi, propertyId, 1, elems);
+		}
+		catch (final KnxPropertyException ignore) {}
+		return new byte[0];
 	}
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)
 	{
-		boolean match = false;
-		if (subnetMask == null)
-			match = true;
-		else if (subnetMask.getArea() == addr.getArea()) {
+		if (subnetMask.getArea() == addr.getArea()) {
 			// if we represent an area coupler, line is 0
 			if (subnetMask.getLine() == 0 || subnetMask.getLine() == addr.getLine()) {
 				// address does match the mask
-				match = true;
+				return true;
 			}
 		}
-		logger.trace("match additional address {} for KNX subnet {}: {}", addr, subnetMask, match ? "ok" : "no match");
-		return match;
+		logger.warn("additional individual address {} does not match KNX subnet {}", addr, subnetMask);
+		return false;
 	}
 
 	private boolean checkAndSetDeviceAddress(final IndividualAddress device, final boolean isServerAddress)
 	{
+		if (!matchesSubnet(device, serverAddress()))
+			return false;
 		synchronized (usedKnxAddresses) {
 			if (isServerAddress && activeMgmtConnections > 0) {
 				logger.warn("active management connection, cannot assign server device address");
