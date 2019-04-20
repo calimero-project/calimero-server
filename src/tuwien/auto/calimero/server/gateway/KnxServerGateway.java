@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -121,6 +122,7 @@ import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
@@ -518,6 +520,9 @@ public class KnxServerGateway implements Runnable
 	private volatile boolean trucking;
 	private volatile boolean inReset;
 
+	// we deny clients direct property r/w access to function properties
+	private final Set<PropertyKey> functionProperties = new HashSet<>();
+
 	// Frame forwarding based on KNX address (AN031)
 	// KNX properties to determine address routing and address filtering:
 	// properties for individual address forwarding
@@ -674,6 +679,11 @@ public class KnxServerGateway implements Runnable
 			catch (final KnxPropertyException e) {
 				logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
 			}
+		}
+
+		for (final var entry : ios.propertyDefinitions().entrySet()) {
+			if (entry.getValue().getPDT() == PropertyTypes.PDT_FUNCTION)
+				functionProperties.add(entry.getKey());
 		}
 	}
 
@@ -1518,7 +1528,11 @@ public class KnxServerGateway implements Runnable
 			byte[] data = null;
 			int elems = f.getElementCount();
 
-			if (checkSecurityPermissions(f.getObjectType(), f.getPID(), mc == CEMIDevMgmt.MC_PROPREAD_REQ, false)) {
+			if (functionProperties.contains(new PropertyKey(f.getObjectType(), f.getPID()))) {
+				data = new byte[] { CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR };
+				elems = 0;
+			}
+			else if (checkSecurityPermissions(f.getObjectType(), f.getPID(), mc == CEMIDevMgmt.MC_PROPREAD_REQ, false)) {
 				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 				try {
 					if (read) {
