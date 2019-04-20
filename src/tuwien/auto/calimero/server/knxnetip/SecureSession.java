@@ -179,18 +179,21 @@ class SecureSession {
 				final KNXnetIPHeader svcHeader = new KNXnetIPHeader(knxipPacket, 0);
 				logger.debug("received session {} seq {} (S/N {} tag {}) {}: {}", sid, seq, sno, tag, svcHeader,
 						toHex(knxipPacket, " "));
-				final long lastValidPacket = System.nanoTime() / 1_000_000L;
-				session.lastUpdate = lastValidPacket;
+				session.lastUpdate = System.nanoTime() / 1_000_000L;
 
 				if (svcHeader.getServiceType() == SessionAuth) {
-					int status = AuthSuccess;
-					try {
-						sessionAuth(session, knxipPacket, 6);
-						logger.debug("client {} authorized for session {} with user ID {}", session.client, sessionId, session.userId);
-					}
-					catch (final KnxSecureException e) {
-						logger.info("secure session {}: {}", sessionId, e.getMessage());
-						status = AuthFailed;
+					int status = AuthFailed;
+					// we only authenticate if that didn't happen before, otherwise we fail and remove session
+					if (session.userId == 0) {
+						try {
+							sessionAuth(session, knxipPacket, 6);
+							status = AuthSuccess;
+							logger.debug("client {} authorized for session {} with user ID {}", session.client,
+									sessionId, session.userId);
+						}
+						catch (final KnxSecureException e) {
+							logger.info("secure session {}: {}", sessionId, e.getMessage());
+						}
 					}
 					sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), status, remote);
 					if (status == AuthFailed)
@@ -199,8 +202,25 @@ class SecureSession {
 				else if (svcHeader.getServiceType() == SessionStatus) {
 					final int status = sessionStatus(svcHeader, data, svcHeader.getStructLength());
 					logger.info("secure session {}: {}", sid, statusMsg(status));
+					if (status == Close)
+						closeSession(sessionId, session);
+					else if (status == KeepAlive) {
+						// check unauthenticated case
+						if (session.userId == 0) {
+							sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), Unauthorized, remote);
+							sessions.remove(sessionId);
+							return true;
+						}
+						// a valid keep-alive is a no-op, because session timestamp got already updated
+					}
 				}
 				else {
+					if (session.userId == 0) {
+						sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), Unauthorized, remote);
+						// TODO close all secure connections of this session
+						sessions.remove(sessionId);
+						return true;
+					}
 					// forward to service handler
 					final int start = svcHeader.getStructLength();
 					if (svcHandler instanceof ControlEndpointService) {
@@ -364,7 +384,7 @@ class SecureSession {
 		final ByteBuffer packet = ByteBuffer.allocate(6 + 2);
 		packet.put(new KNXnetIPHeader(SessionStatus, 2).toByteArray());
 		packet.put((byte) status);
-		final int msgTag = 0; // NYI
+		final int msgTag = 0;
 		return newSecurePacket(sessionId, seq, msgTag, packet.array());
 	}
 
@@ -383,21 +403,24 @@ class SecureSession {
 	private static final int AuthFailed = 1;
 	private static final int Unauthorized = 2;
 	private static final int Timeout = 3;
+	private static final int Close = 4;
+	private static final int KeepAlive = 5;
 
 	private static String statusMsg(final int status) {
-		final String[] msg = { "authorization success", "authorization failed", "unauthorized", "timeout" };
-		if (status > 3)
+		final String[] msg = { "authorization success", "authorization failed", "unauthorized", "timeout", "close",
+			"keep-alive" };
+		if (status >= msg.length)
 			return "unknown status " + status;
 		return msg[status];
 	}
 
-	private static final Duration sessionTimeout = Duration.ofMinutes(2);
+	private static final Duration sessionTimeout = Duration.ofSeconds(60);
 
 	void closeDormantSessions() {
 		sessions.forEach(this::checkSessionTimeout);
 	}
 
-	// if we don't receive a valid secure packet for 2 minutes, we close the session (and any open connections)
+	// if we don't receive a valid secure packet for 60 seconds, we close the session (and any open connections)
 	private void checkSessionTimeout(final int sessionId, final Session session) {
 		final long now = System.nanoTime() / 1_000_000;
 		final Duration dormant = Duration.ofMillis(now - session.lastUpdate);
@@ -410,8 +433,16 @@ class SecureSession {
 	private void sessionTimeout(final int sessionId, final Session session) {
 		final long seq = session.sendSeq.getAndIncrement();
 		sendStatusInfo(sessionId, (int) seq, Timeout, session.client);
+		// TODO remove all secure client connections of this session
 		sessions.remove(sessionId);
 		TcpLooper.lastSessionTimedOut(session.client);
+	}
+
+	private void closeSession(final int sessionId, final Session session) {
+		// TODO remove all secure client connections of this session, without notifying client
+		final long seq = session.sendSeq.getAndIncrement();
+		sendStatusInfo(sessionId, (int) seq, Close, session.client);
+		sessions.remove(sessionId);
 	}
 
 	private Key deviceAuthKey() {
