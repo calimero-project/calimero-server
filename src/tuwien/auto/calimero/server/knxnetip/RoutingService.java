@@ -36,6 +36,8 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
+import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -54,6 +56,7 @@ import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingLostMessage;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
@@ -129,7 +132,7 @@ final class RoutingService extends ServiceLooper
 		final int pidGroupKey = 91;
 		final int oi = server.objectInstance(sc);
 		final byte[] groupKey = server.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, oi, pidGroupKey, new byte[0]);
-		secure = groupKey.length == 16;
+		secure = isSecuredService(ServiceFamiliesDIB.ROUTING) && groupKey.length == 16;
 
 		final KNXnetIPRouting inst;
 		if (secure) {
@@ -184,6 +187,13 @@ final class RoutingService extends ServiceLooper
 		if (netif == null)
 			throw new RuntimeException("no network interface with the specified name '" + name + "'");
 		return netif;
+	}
+
+	private boolean isSecuredService(final int serviceFamily) {
+		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, server.objectInstance(svcCont),
+				SecureSession.pidSecuredServices, 1, (byte) 0);
+		final boolean secured = ((securedServices >> serviceFamily) & 0x01) == 0x01;
+		return secured;
 	}
 
 	ServiceContainer getServiceContainer()

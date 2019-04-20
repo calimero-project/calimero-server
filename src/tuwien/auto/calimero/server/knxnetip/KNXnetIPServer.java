@@ -531,7 +531,7 @@ public class KNXnetIPServer
 		final int objIndex = svcContToIfObj.get(sc).getIndex();
 		// if we setup secure unicast services, we need at least device authentication
 		if (keys.containsKey("device.key")) {
-			secureServices |= (1 + 2); // dev mgmt & tunneling
+			secureServices = (1 << ServiceFamiliesDIB.DEVICE_MANAGEMENT) | (1 << ServiceFamiliesDIB.TUNNELING);
 
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
@@ -549,9 +549,10 @@ public class KNXnetIPServer
 			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
 		}
 
+		final boolean routing = sc instanceof RoutingServiceContainer;
 		final byte[] groupKey = keys.get("group.key");
-		if (sc instanceof RoutingServiceContainer && groupKey != null)
-			secureServices |= 4;
+		if (routing && groupKey != null && !((RoutingServiceContainer) sc).latencyTolerance().isZero())
+			secureServices |= (1 << ServiceFamiliesDIB.ROUTING);
 
 		if (secureServices != 0) {
 			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(defDeviceCaps));
@@ -560,14 +561,14 @@ public class KNXnetIPServer
 		}
 
 		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
-				PropertyTypes.PDT_BITSET16, false, 1, 1, 3, 0), true);
+				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
 		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secureServices);
 
-		if (sc instanceof RoutingServiceContainer && groupKey != null) {
+		if (routing && groupKey != null) {
 			try {
 				final int pidGroupKey = 91;
-				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0, PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0),
-						true);
+				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0, PropertyTypes.PDT_GENERIC_16,
+						false, 1, 1, 0, 0), true);
 				setProperty(knxObject, objectInstance, pidGroupKey, groupKey);
 
 				// DPT 7.002
@@ -579,8 +580,8 @@ public class KNXnetIPServer
 
 				final DPTXlator8BitUnsigned scaling = new DPTXlator8BitUnsigned(DPTXlator8BitUnsigned.DPT_SCALING);
 				scaling.setValue(10);
-				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSyncLatencyTolerance, 0, PropertyTypes.PDT_SCALING,
-						false, 1, 1, 3, 0), true);
+				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSyncLatencyTolerance, 0,
+						PropertyTypes.PDT_SCALING, false, 1, 1, 3, 0), true);
 				setProperty(knxObject, objectInstance, SecureSession.pidSyncLatencyTolerance, scaling.getData());
 			}
 			catch (final KNXFormatException e) {
