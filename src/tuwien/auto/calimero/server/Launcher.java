@@ -241,7 +241,7 @@ public class Launcher implements Runnable
 			if (routing && reuse)
 				throw new KNXIllegalArgumentException("with routing activated, reusing control endpoint is not allowed");
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
-			final int port = Integer.parseInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
+			final int port = Integer.parseUnsignedInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
 			final NetworkInterface netif = getNetIf(r);
 
 			final Function<String, String> expandHome = v -> v.replaceFirst("^~", System.getProperty("user.home"));
@@ -337,8 +337,8 @@ public class Launcher implements Runnable
 													"secure group communication requires 'keyfile' attribute", r));
 									logger.warn("server configuration: move attribute 'keyfile' from <routing> to <serviceContainer>");
 								}
-								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance")).map(Integer::parseInt)
-										.orElse(2000);
+								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance"))
+										.map(Integer::parseUnsignedInt).orElse(2000);
 							}
 							routingMcast = InetAddress.getByName(r.getElementText());
 						}
@@ -361,8 +361,8 @@ public class Launcher implements Runnable
 						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
 						final Optional<String> ports = ofNullable(r.getAttributeValue(null, attrUdpPort));
 						final String[] range = ports.orElse("0-65535").split("-", -1);
-						disruptionBufferLowerPort = Integer.parseInt(range[0]);
-						disruptionBufferUpperPort = Integer.parseInt(range.length > 1 ? range[1] : range[0]);
+						disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
+						disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
 					}
 					else {
 						subnet = new IndividualAddress(r);
@@ -395,7 +395,7 @@ public class Launcher implements Runnable
 						else
 							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
-						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseInt(expirationTimeout)),
+						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 						subnetTypes.add(subnetType);
 						if ("emulate".equals(subnetType) && datapoints != null)
