@@ -693,9 +693,23 @@ public class Launcher implements Runnable
 				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
 			if (xml.groupAddressFilters.containsKey(sc))
 				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
-			if (xml.tunnelingUsers.containsKey(sc))
-				setTunnelingUsers(ios, objectInstance, xml.tunnelingUsers.get(sc),
-						xml.additionalAddresses.get(sc), sc.getMediumSettings().getDeviceAddress());
+
+			final boolean routing = sc instanceof RoutingServiceContainer;
+			if (xml.tunnelingUsers.containsKey(sc)) {
+				final var serverAddress = routing ? null : sc.getMediumSettings().getDeviceAddress();
+				setTunnelingUsers(ios, objectInstance, xml.tunnelingUsers.get(sc), xml.additionalAddresses.get(sc),
+						serverAddress);
+			}
+			else {
+				// list all additional addresses as tunneling addresses
+				var size = routing ? 0 : 1; // also reserve entry for server address if we're not routing
+				size += xml.additionalAddresses.getOrDefault(sc, Collections.emptyList()).size();
+				final byte[] addrIndices = new byte[size];
+				var idx = routing ? 1 : 0;
+				for (int k = 0; k < addrIndices.length; k++)
+					addrIndices[k] = (byte) idx++;
+				setTunnelingAddresses(ios, objectInstance, addrIndices);
+			}
 		}
 	}
 
@@ -786,8 +800,7 @@ public class Launcher implements Runnable
 		final var addrIndices = userToAddresses.entrySet().stream().map(Map.Entry::getValue).flatMap(List::stream)
 				.map(addr -> addressIndex(addr, additionalAddresses, ctrlEndpoint)).sorted().distinct()
 				.collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (r1, r2) -> {}).toByteArray();
-		ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pidTunnelingAddresses, 1, addrIndices.length,
-				addrIndices);
+		setTunnelingAddresses(ios, objectInstance, addrIndices);
 
 		// tunneling user entries are sorted first by user <, then by tunneling addr idx <
 		final var userToAddrIdx = new ByteArrayOutputStream();
@@ -808,6 +821,13 @@ public class Launcher implements Runnable
 				userToAddrIdx.toByteArray());
 	}
 
+	private void setTunnelingAddresses(final InterfaceObjectServer ios, final int objectInstance,
+		final byte[] addrIndices) {
+		ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pidTunnelingAddresses, 1, addrIndices.length,
+				addrIndices);
+	}
+
+	// ctrlEndpoint of null indicates we can't use the server ctrlEndpoint address (i.e., routing enabled)
 	private static int addressIndex(final IndividualAddress addr, final List<IndividualAddress> additionalAddresses,
 		final IndividualAddress ctrlEndpoint) {
 		final var idx = additionalAddresses.indexOf(addr);
