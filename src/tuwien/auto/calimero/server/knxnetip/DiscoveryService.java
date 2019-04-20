@@ -225,6 +225,8 @@ final class DiscoveryService extends ServiceLooper
 		// also ignore routing messages
 		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG || svc == KNXnetIPHeader.ROUTING_BUSY)
 			return true;
+		else if (svc == KNXnetIPHeader.RoutingSystemBroadcast)
+			return true;
 		else if (h.isSecure())
 			return true;
 		// other requests are rejected with error
