@@ -247,7 +247,7 @@ public class Launcher implements Runnable
 			final Function<String, String> expandHome = v -> v.replaceFirst("^~", System.getProperty("user.home"));
 
 			// look for a server keyfile
-			Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile")).map(expandHome).map(Paths::get)
+			final Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile")).map(expandHome).map(Paths::get)
 					.orElse(null);
 			// look for a keyring configuration
 			final Optional<Keyring> keyring = ofNullable(r.getAttributeValue(null, "keyring")).map(expandHome)
@@ -329,14 +329,6 @@ public class Launcher implements Runnable
 						try {
 							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
 								secure = true;
-								if (keyring == null && keyfile == null) {
-									keyfile = ofNullable(r.getAttributeValue(null, "keyfile"))
-											.map(v -> v.replaceFirst("^~", System.getProperty("user.home")))
-											.map(Paths::get)
-											.orElseThrow(() -> new KNXMLException(
-													"secure group communication requires 'keyfile' attribute", r));
-									logger.warn("server configuration: move attribute 'keyfile' from <routing> to <serviceContainer>");
-								}
 								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance"))
 										.map(Integer::parseUnsignedInt).orElse(2000);
 							}
