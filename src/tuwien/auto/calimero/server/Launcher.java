@@ -379,7 +379,7 @@ public class Launcher implements Runnable
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
 						if (routing) {
 							if (secure)
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast, null,
+								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast,
 										Duration.ofMillis(latencyTolerance));
 							else
 								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast);

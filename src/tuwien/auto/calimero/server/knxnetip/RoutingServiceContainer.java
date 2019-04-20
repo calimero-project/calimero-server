@@ -60,26 +60,6 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	private final Duration latency;
 
 	/**
-	 * @deprecated Use {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, InetAddress)}.
-	 * @param name see {@link DefaultServiceContainer}
-	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
-	 *        <code>"any"</code> to use system default
-	 * @param controlEndpoint see {@link DefaultServiceContainer}
-	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
-	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
-	 * @param reuseCtrlEndpt not used
-	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
-	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
-	 */
-	@Deprecated
-	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
-		final InetAddress routingMulticast)
-	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, Duration.ofMillis(0));
-	}
-
-	/**
 	 * Creates a new service container configuration with support for a KNXnet/IP routing endpoint.
 	 *
 	 * @param name see {@link DefaultServiceContainer}
@@ -95,7 +75,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring,
 		final InetAddress routingMulticast)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, null, Duration.ofMillis(0));
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, Duration.ofMillis(0));
 	}
 
 	/**
@@ -111,12 +91,11 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
-	 * @param secureGroupKey KNX IP Secure group key (backbone key), <code>groupKey.length == 16</code>
 	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
 	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean allowNetworkMonitoring, final InetAddress routingMulticast, final byte[] secureGroupKey,
+		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
 		final Duration latencyTolerance) {
 		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring);
 		final IndividualAddress addr = subnet.getDeviceAddress();
