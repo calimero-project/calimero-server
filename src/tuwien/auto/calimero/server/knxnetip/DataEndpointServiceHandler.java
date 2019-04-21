@@ -108,6 +108,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	private final SecureSession sessions;
 	private final int sessionId;
 
+	private final boolean tcp;
+
 	// if enabled by client, notify client about changes of connection status and tunneling address
 	private boolean featureInfoServiceEnabled;
 	private boolean tunnelingAddressChanged;
@@ -140,6 +142,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		this.resetRequest = resetRequest;
 
 		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+
+		tcp = TcpLooper.connections.containsKey(remoteDataEndpt);
 
 		if (sessionId > 0)
 			sessions.addConnection(sessionId, remoteCtrlEndpt);
@@ -275,19 +279,24 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				return true;
 
 			final int seq = req.getSequenceNumber();
-			if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
-				final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+			final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+			if (tcp)
+				; // no-op
+			else if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
 				send(buf, dataEndpt);
-				if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
-					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
-					return true;
-				}
 			}
-			else
+			else {
 				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
+				return true;
+			}
 
-			if (seq == getSeqRcv()) {
+			if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
+				close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
+				return true;
+			}
+
+			if (tcp || seq == getSeqRcv()) {
 				incSeqRcv();
 				updateLastMsgTimestamp();
 
