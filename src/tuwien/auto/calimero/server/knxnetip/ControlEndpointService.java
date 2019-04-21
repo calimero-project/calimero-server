@@ -517,7 +517,10 @@ final class ControlEndpointService extends ServiceLooper
 
 	private AdditionalDeviceDib createAdditionalDeviceDib() {
 		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT, objectInstance(), PID.MEDIUM_STATUS, 1, 0);
-		return new AdditionalDeviceDib(status, svcCont.getMediumSettings().maxApduLength(), DD0.TYPE_091A);
+		final int pidMaxLocalApduLength = 69;
+		final int maxLocalApduLength = server.getProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance(),
+				pidMaxLocalApduLength, 1, 15);
+		return new AdditionalDeviceDib(status, maxLocalApduLength, DD0.TYPE_091A);
 	}
 
 	private Optional<ServiceFamiliesDIB> createSecureServiceFamiliesDib() {
@@ -540,7 +543,9 @@ final class ControlEndpointService extends ServiceLooper
 			final boolean inuse = addressInUse(addr);
 			status[i] = 4 | 2 | (inuse ? 0 : 1);
 		}
-		final int maxApduLength = svcCont.getMediumSettings().maxApduLength();
+		final int pidMaxInterfaceApduLength = 68;
+		final int maxApduLength = server.getProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance(),
+				pidMaxInterfaceApduLength, 1, 15);
 		return new TunnelingDib((short) maxApduLength, addresses, status);
 	}
 
