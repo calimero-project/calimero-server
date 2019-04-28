@@ -414,7 +414,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 				return responseForFeature(req, result, value);
 			}
 			else if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
-				if (value[0] != 0 && value[1] != 1)
+				if (value[0] != 0 && value[0] != 1)
 					return responseForFeature(req, ReturnCode.OutOfMaxRange, value);
 				featureInfoServiceEnabled = value[0] == 1;
 				return responseForFeature(req, value);
