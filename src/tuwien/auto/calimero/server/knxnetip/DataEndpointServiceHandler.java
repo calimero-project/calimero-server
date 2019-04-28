@@ -199,7 +199,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	@Override
 	public String toString()
 	{
-		return getName() + " (channel " + getChannelId() + ")";
+		return getName() + " (channel " + getChannelId() + ", " + device + ")";
 	}
 
 	@Override
