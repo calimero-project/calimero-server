@@ -963,33 +963,34 @@ public class KNXnetIPServer
 	ServiceFamiliesDIB createServiceFamiliesDIB(final ServiceContainer sc, final boolean extended)
 	{
 		// we get a 2 byte value
-		final int caps = getProperty(knxObject, objectInstance(sc), PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
+		final int v = getProperty(knxObject, objectInstance(sc), PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
+		// shift caps left one bit because svc family KNXnet/IP Core is always set and left out by default
+		final int caps = (v << 1) | 1;
+		final int[] services = { ServiceFamiliesDIB.CORE, ServiceFamiliesDIB.DEVICE_MANAGEMENT,
+			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING,
+			ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS, ServiceFamiliesDIB.OBJECT_SERVER,
+			ServiceFamiliesDIB.Security };
+		final int[] serviceVersion = { 2, 2, 2, 2, 0, 0, 0, 1 };
 
-		// service family 'core' is skipped here since not used in capabilities bitset
-		final int[] services = new int[] { ServiceFamiliesDIB.DEVICE_MANAGEMENT,
-			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING,
-			ServiceFamiliesDIB.REMOTE_LOGGING, ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS,
-			ServiceFamiliesDIB.OBJECT_SERVER, 9 };
-
-		final int[] tmp = new int[services.length + 1];
-		// now unconditionally add service family 'core'
-		tmp[0] = ServiceFamiliesDIB.CORE;
-		int count = 1;
+		final int[] tmp = new int[services.length];
+		final int[] tmpVersion = new int[tmp.length];
+		int count = 0;
 		for (int i = 0; i < services.length; ++i) {
 			final int familyId = services[i];
 			if (!extended && familyId > ServiceFamiliesDIB.OBJECT_SERVER)
 				break;
-			if ((caps >> i & 0x1) == 1)
-				tmp[count++] = familyId;
+			if ((caps >> i & 0x1) == 1) {
+				tmp[count] = familyId;
+				tmpVersion[count++] = serviceVersion[i];
+			}
 		}
 
 		final int[] supported = new int[count];
 		final int[] versions = new int[count];
 		for (int i = 0; i < count; i++) {
 			supported[i] = tmp[i];
-			versions[i] = 1;
+			versions[i] = tmpVersion[i];
 		}
-		versions[0] = 2;
 		return new ServiceFamiliesDIB(supported, versions);
 	}
 
