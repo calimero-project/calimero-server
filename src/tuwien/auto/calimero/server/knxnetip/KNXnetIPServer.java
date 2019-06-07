@@ -751,12 +751,7 @@ public class KNXnetIPServer
 		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = Settings.getLibraryVersion().split("\\.| |-", 0);
-		int last = 0;
-		try {
-			last = sver.length > 2 ? Integer.parseInt(sver[2]) : 0;
-		}
-		catch (final NumberFormatException e) {}
-		final int ver = Integer.parseInt(sver[0]) << 8 | Integer.parseInt(sver[1]) << 4 | last;
+		final int ver = Integer.parseInt(sver[0]) << 6 | Integer.parseInt(sver[1]);
 		setProperty(DEVICE_OBJECT, objectInstance, PID.VERSION, new byte[] { (byte) (ver >>> 8), (byte) (ver & 0xff) });
 
 		// revision counting is not aligned with library version for now
