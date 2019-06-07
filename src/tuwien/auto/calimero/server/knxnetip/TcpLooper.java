@@ -164,29 +164,20 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			final int rcvBufferSize = 512;
 			final byte[] data = new byte[rcvBufferSize];
 			int offset = 0;
-
 			socket.setSoTimeout((int) inactiveConnectionTimeout.toMillis());
 			while (!socket.isClosed()) {
-				try {
-					final int read = in.read(data, offset, data.length - offset);
-					if (read == -1)
-						return;
-					offset += read;
-				}
-				catch (final SocketTimeoutException e1) {
-					if (inactive()) {
-						close("no active secure session or client connection");
-						return;
-					}
-				}
-
 				if (offset >= 6) {
 					try {
 						final KNXnetIPHeader h = new KNXnetIPHeader(data, 0);
 						if (sanitize(h, offset)) {
 							final int length = offset - h.getStructLength();
-							offset = 0;
+							final var leftover = offset - h.getTotalLength();
+							offset = leftover;
 							onReceive(h, data, h.getStructLength(), length);
+							if (leftover > 0) {
+								System.arraycopy(data, h.getTotalLength(), data, 0, leftover);
+								continue;
+							}
 						}
 						// skip bodies which do not fit into rcv buffer
 						else if (h.getTotalLength() > rcvBufferSize) {
@@ -197,7 +188,21 @@ final class TcpLooper implements Runnable, AutoCloseable {
 					}
 					catch (final KNXFormatException e) {
 						logger.warn("received invalid frame", e);
+						offset = 0;
 						break;
+					}
+				}
+
+				try {
+					final int read = in.read(data, offset, data.length - offset);
+					if (read == -1)
+						return;
+					offset += read;
+				}
+				catch (final SocketTimeoutException e1) {
+					if (inactive()) {
+						close("no active secure session or client connection");
+						return;
 					}
 				}
 			}
