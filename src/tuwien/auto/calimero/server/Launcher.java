@@ -190,6 +190,7 @@ public class Launcher implements Runnable
 		private final Map<ServiceContainer, Boolean> tunnelingWithNat = new HashMap<>();
 		private final Map<ServiceContainer, Map<String, byte[]>> keyfiles = new HashMap<>();
 		private final Map<ServiceContainer, Map<Integer, List<IndividualAddress>>> tunnelingUsers = new HashMap<>();
+		private final Map<ServiceContainer, Integer> securedServicesMap = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -254,6 +255,9 @@ public class Launcher implements Runnable
 					.map(uri -> new Keyring(uri, "pwd".toCharArray()));
 			keyring.ifPresent(Keyring::load);
 			final var keyringConfig = keyring.map(Keyring::configuration).orElse(Map.of());
+
+			final String attrSecuredServices = r.getAttributeValue(null, "securedServices");
+			final int securedServices = attrSecuredServices == null ? 0x3f : Integer.decode(attrSecuredServices);
 
 			String addr = "";
 			String subnetType = "";
@@ -401,6 +405,8 @@ public class Launcher implements Runnable
 						tunnelingWithNat.put(sc, useNat);
 						if (!tunnelingUserToAddresses.isEmpty())
 							tunnelingUsers.put(sc, tunnelingUserToAddresses);
+
+						securedServicesMap.put(sc, securedServices);
 
 						if (keyfile != null) {
 							try {
@@ -665,7 +671,7 @@ public class Launcher implements Runnable
 			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
-			server.configureSecurity(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()));
+			server.configureSecurity(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()), xml.securedServicesMap.get(sc));
 
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);

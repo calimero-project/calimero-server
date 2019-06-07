@@ -524,14 +524,14 @@ public class KNXnetIPServer
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
 	}
 
-	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys) {
-		int secureServices = 0;
+	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys, final int securedServices) {
+		int secure = 0;
 
 		final int objectInstance = objectInstance(sc);
 		final int objIndex = svcContToIfObj.get(sc).getIndex();
 		// if we setup secure unicast services, we need at least device authentication
 		if (keys.containsKey("device.key")) {
-			secureServices = (1 << ServiceFamiliesDIB.DEVICE_MANAGEMENT) | (1 << ServiceFamiliesDIB.TUNNELING);
+			secure = (1 << ServiceFamiliesDIB.DEVICE_MANAGEMENT) | (1 << ServiceFamiliesDIB.TUNNELING);
 
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
@@ -552,17 +552,19 @@ public class KNXnetIPServer
 		final boolean routing = sc instanceof RoutingServiceContainer;
 		final byte[] groupKey = keys.get("group.key");
 		if (routing && groupKey != null && !((RoutingServiceContainer) sc).latencyTolerance().isZero())
-			secureServices |= (1 << ServiceFamiliesDIB.ROUTING);
+			secure |= (1 << ServiceFamiliesDIB.ROUTING);
 
-		if (secureServices != 0) {
+		if (secure != 0) {
 			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(defDeviceCaps));
 			caps[1] |= 64;
 			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
 		}
 
+		secure &= securedServices;
+
 		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
 				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
-		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secureServices);
+		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secure);
 
 		if (routing && groupKey != null) {
 			try {
