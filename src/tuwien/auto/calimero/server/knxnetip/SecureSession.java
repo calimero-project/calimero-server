@@ -158,7 +158,8 @@ class SecureSession {
 			if (h.getServiceType() == SessionReq) {
 				final ByteBuffer res = establishSession(remote, h, data, offset);
 				send(res.array(), remote);
-				logger.trace("currently open sessions: {}", sessions.keySet());
+				final int size = sessions.size();
+				logger.trace("{} session{} currently open {}", size, size == 1 ? "" : "s", sessions.keySet());
 				return true;
 			}
 			if (h.getServiceType() == SecureSvc) {
@@ -345,7 +346,7 @@ class SecureSession {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, data.length - offset);
 		final int userId = buffer.getShort() & 0xffff;
 		if (userId < 1 || userId > 0x7F)
-			throw new KnxSecureException("user ID " + userId + " out of range [1..127]");
+			throw new KnxSecureException("user " + userId + " out of range [1..127]");
 
 		final byte[] mac = new byte[macSize];
 		buffer.get(mac);
@@ -364,7 +365,7 @@ class SecureSession {
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
 			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x18), " ");
-			throw new KnxSecureException("authentication failed for user ID " + userId + ", auth " + packet);
+			throw new KnxSecureException("authentication failed for user " + userId + ", auth " + packet);
 		}
 
 		session.userId = userId;

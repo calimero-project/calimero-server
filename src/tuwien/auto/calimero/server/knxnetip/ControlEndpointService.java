@@ -39,6 +39,10 @@ package tuwien.auto.calimero.server.knxnetip;
 import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.toList;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION;
+import static tuwien.auto.calimero.knxnetip.KNXnetIPTunnel.TUNNEL_CONNECTION;
+import static tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.DEVICE_MANAGEMENT;
+import static tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.TUNNELING;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -75,7 +79,6 @@ import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
-import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel.TunnelingLayer;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectRequest;
@@ -131,7 +134,6 @@ final class ControlEndpointService extends ServiceLooper
 	private int lastChannelId;
 
 	final SecureSession sessions;
-	private final boolean secureOnly;
 	private boolean secureSvcInProgress;
 
 	private final Closeable tcpLooper;
@@ -148,9 +150,8 @@ final class ControlEndpointService extends ServiceLooper
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.MAC_ADDRESS, macAddress(addr));
 
-		final boolean secureMgmt = isSecuredService(ServiceFamiliesDIB.DEVICE_MANAGEMENT);
-		final boolean secureTunneling = isSecuredService(ServiceFamiliesDIB.TUNNELING);
-		secureOnly = secureMgmt && secureTunneling;
+		final boolean secureMgmt = isSecuredService(DEVICE_MANAGEMENT);
+		final boolean secureTunneling = isSecuredService(TUNNELING);
 		final String mgmt = secureMgmt ? "required" : "optional";
 		final String tunneling = secureTunneling ? "required" : "optional";
 		logger.info("control endpoint '{}' secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
@@ -288,14 +289,23 @@ final class ControlEndpointService extends ServiceLooper
 				secureSvcInProgress = false;
 			}
 		}
-		else if (secureOnly) {
-			logger.warn("reject {}, secure service required", h);
-			if (svc == KNXnetIPHeader.CONNECT_REQ) {
-				final ConnectRequest req = new ConnectRequest(data, offset);
+		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
+			final ConnectRequest req = new ConnectRequest(data, offset);
+			final var connType = req.getCRI().getConnectionType();
+
+			final boolean tunneling = connType == TUNNEL_CONNECTION;
+			final boolean devmgmt = connType == DEVICE_MGMT_CONNECTION;
+			final var typeString = tunneling ? "tunneling" : devmgmt ? "device management" : "0x" + connType;
+
+			if (tunneling && isSecuredService(TUNNELING) || devmgmt && isSecuredService(DEVICE_MANAGEMENT)) {
+				logger.warn("reject {}, secure services required for {}", h, typeString);
 				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
-				final byte[] buf = PacketHelper.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
+				final byte[] buf = PacketHelper
+						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
 				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
 			}
+			else
+				return acceptControlService(0, h, data, offset, src, port);
 		}
 		else
 			return acceptControlService(0, h, data, offset, src, port);
@@ -400,8 +410,6 @@ final class ControlEndpointService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-//			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
-//				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
 				final KNXnetIPConnection c = findConnection(csr.getChannelID());
@@ -524,8 +532,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private Optional<ServiceFamiliesDIB> createSecureServiceFamiliesDib() {
-		final int[] supported = Stream
-				.of(ServiceFamiliesDIB.DEVICE_MANAGEMENT, ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING)
+		final int[] supported = Stream.of(DEVICE_MANAGEMENT, TUNNELING, ServiceFamiliesDIB.ROUTING)
 				.filter(this::isSecuredService).mapToInt(i -> i).toArray();
 		if (supported.length == 0)
 			return Optional.empty();
@@ -742,7 +749,7 @@ final class ControlEndpointService extends ServiceLooper
 			final int userId;
 			if (sessionId > 0) {
 				userId = sessions.sessions.get(sessionId).userId;
-				if (isSecuredService(ServiceFamiliesDIB.TUNNELING) && !userAuthorizedForTunneling(userId))
+				if (isSecuredService(TUNNELING) && !userAuthorizedForTunneling(userId))
 					return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 			}
 			else
@@ -759,7 +766,7 @@ final class ControlEndpointService extends ServiceLooper
 					isServerAddress ? "server device" : "additional individual", device, channelId);
 			crd = new TunnelCRD(device);
 		}
-		else if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION) {
+		else if (connType == DEVICE_MGMT_CONNECTION) {
 			logger.info("setup device management connection with channel ID {}", channelId);
 			// At first, check if we are allowed to open mgmt connection at all; if
 			// server assigned its own device address, we have to reject the request
@@ -773,7 +780,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 
 			tunnel = false;
-			crd = CRD.createResponse(KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION, null);
+			crd = CRD.createResponse(DEVICE_MGMT_CONNECTION, null);
 		}
 		else
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
@@ -909,7 +916,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 
-		if (!addrAuthorized && isSecuredService(ServiceFamiliesDIB.TUNNELING))
+		if (!addrAuthorized && isSecuredService(TUNNELING))
 			return AuthError;
 
 		final boolean ret = checkAndSetDeviceAddress(addr, addr.equals(serverAddress()));
@@ -924,7 +931,7 @@ final class ControlEndpointService extends ServiceLooper
 
 		IndividualAddress assigned = null;
 		// exclude mgmt user, it always has access and is not stored in tunneling users
-		if (userId > 1 && isSecuredService(ServiceFamiliesDIB.TUNNELING)) {
+		if (userId > 1 && isSecuredService(TUNNELING)) {
 			// n:m mapping user -> tunneling address index
 			// user is stored in natural order, idx per user is stored in natural order
 			final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
