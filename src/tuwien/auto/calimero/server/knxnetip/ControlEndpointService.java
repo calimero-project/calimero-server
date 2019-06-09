@@ -109,6 +109,7 @@ import tuwien.auto.calimero.knxnetip.util.TunnelCRI;
 import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
 
 final class ControlEndpointService extends ServiceLooper
 {
@@ -559,7 +560,12 @@ final class ControlEndpointService extends ServiceLooper
 	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {
 		byte[] buf = packet;
 		if (sessionId > 0) {
-			final long seq = sessions.sessions.get(sessionId).sendSeq.getAndIncrement();
+			final Session session = sessions.sessions.get(sessionId);
+			if (session == null) {
+				logger.info("session {} got deallocated, channel {} no longer valid", sessionId, channelId);
+				return;
+			}
+			final long seq = session.sendSeq.getAndIncrement();
 			final int msgTag = 0;
 			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
 			logger.info("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);

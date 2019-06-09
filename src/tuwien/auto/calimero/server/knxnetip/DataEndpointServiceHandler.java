@@ -78,6 +78,7 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
 
 /**
  * Server-side implementation of KNX IP (secure) tunneling and device management protocol.
@@ -169,7 +170,12 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	protected void send(final byte[] packet, final InetSocketAddress dst) throws IOException {
 		byte[] buf = packet;
 		if (sessionId > 0) {
-			final long seq = sessions.sessions.get(sessionId).sendSeq.get();
+			final Session session = sessions.sessions.get(sessionId);
+			if (session == null) {
+				close(CloseEvent.INTERNAL, "session " + sessionId + " got deallocated", LogLevel.INFO, null);
+				return;
+			}
+			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
 			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, dst, DataUnitBuilder.toHex(buf, " "));
