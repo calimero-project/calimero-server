@@ -931,7 +931,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			for (int i = 0; i < userToAddrIdx.length; i += 2) {
 				final var user = userToAddrIdx[i];
-				if (userId > user)
+				if (user > userId)
 					break;
 
 				if (userId == user) {
@@ -976,7 +976,7 @@ final class ControlEndpointService extends ServiceLooper
 		final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
 		for (int i = 0; i < userToAddrIdx.length; i += 2) {
 			final var user = userToAddrIdx[i];
-			if (userId > user)
+			if (user > userId)
 				return false;
 
 			if (userId == user)

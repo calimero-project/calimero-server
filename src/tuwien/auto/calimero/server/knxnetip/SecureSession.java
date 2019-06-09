@@ -200,7 +200,7 @@ class SecureSession {
 						sessions.remove(sessionId);
 				}
 				else if (svcHeader.getServiceType() == SessionStatus) {
-					final int status = sessionStatus(svcHeader, data, svcHeader.getStructLength());
+					final int status = sessionStatus(svcHeader, knxipPacket, svcHeader.getStructLength());
 					logger.info("secure session {}: {}", sid, statusMsg(status));
 					if (status == Close)
 						closeSession(sessionId, session);
@@ -403,12 +403,12 @@ class SecureSession {
 	private static final int AuthFailed = 1;
 	private static final int Unauthorized = 2;
 	private static final int Timeout = 3;
-	private static final int Close = 4;
-	private static final int KeepAlive = 5;
+	private static final int KeepAlive = 4;
+	private static final int Close = 5;
 
 	private static String statusMsg(final int status) {
-		final String[] msg = { "authorization success", "authorization failed", "unauthorized", "timeout", "close",
-			"keep-alive" };
+		final String[] msg = { "authorization success", "authorization failed", "unauthorized", "timeout", "keep-alive",
+			"close" };
 		if (status >= msg.length)
 			return "unknown status " + status;
 		return msg[status];
