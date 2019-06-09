@@ -120,16 +120,15 @@ class SecureSession {
 	private static AtomicLong sessionCounter = new AtomicLong();
 
 	static final class Session {
-		final AtomicLong sendSeq = new AtomicLong();
-
-		private final AtomicLong connectionCount = new AtomicLong();
 		private final InetSocketAddress client;
 		private final Key secretKey;
 
-		volatile long lastUpdate = System.nanoTime() / 1_000_000;
-		byte[] serverKey;
-		byte[] clientKey;
+		private byte[] xorClientServer;
 		int userId;
+
+		private final AtomicLong connectionCount = new AtomicLong();
+		final AtomicLong sendSeq = new AtomicLong();
+		private volatile long lastUpdate = System.nanoTime() / 1_000_000;
 
 		private Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
 			this.client = client;
@@ -296,9 +295,14 @@ class SecureSession {
 
 		try {
 			final KeyPair keyPair = generateKeyPair();
+
 			final BigInteger u = ((XECPublicKey) keyPair.getPublic()).getU();
-			publicKey = u.toByteArray();
-			reverse(publicKey);
+			final var tmp = u.toByteArray();
+			reverse(tmp);
+			// make sure key length is correct, otherwise pad with 0
+			publicKey = Arrays.copyOfRange(tmp, 0, keyLength);
+			Arrays.fill(tmp, (byte) 0);
+
 			sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
 		}
 		catch (final Throwable e) {
@@ -309,8 +313,7 @@ class SecureSession {
 
 		final int sessionId = newSessionId();
 		final Session session = new Session(sessionId, remote, secretKey);
-		session.serverKey = publicKey;
-		session.clientKey = clientKey;
+		session.xorClientServer = xor(clientKey, 0, publicKey, 0, keyLength);
 		sessions.put(sessionId, session);
 		logger.debug("establish secure session {} for {}", sessionId, remote);
 
@@ -357,7 +360,7 @@ class SecureSession {
 		macInput.put((byte) 0);
 		macInput.put((byte) msgLen);
 		macInput.put(data, 0, 6 + 2);
-		macInput.put(xor(session.serverKey, 0, session.clientKey, 0, keyLength));
+		macInput.put(session.xorClientServer);
 		final Key userPwdHash = userPwdHash(userId);
 		final byte[] verifyAgainst = cbcMacSimple(userPwdHash, macInput.array(), 0, macInput.capacity());
 		encrypt(verifyAgainst, userPwdHash);
