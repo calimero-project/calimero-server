@@ -648,8 +648,18 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		catch (final UnknownHostException ignore) {}
 
-		return NetworkInterface.networkInterfaces().flatMap(NetworkInterface::inetAddresses)
-				.filter(Inet4Address.class::isInstance).filter(not(InetAddress::isLoopbackAddress));
+		return NetworkInterface.networkInterfaces().filter(ControlEndpointService::interfaceIsUp)
+				.flatMap(NetworkInterface::inetAddresses).filter(Inet4Address.class::isInstance)
+				.filter(not(InetAddress::isLoopbackAddress));
+	}
+
+	private static boolean interfaceIsUp(final NetworkInterface netif) {
+		try {
+			return netif.isUp();
+		}
+		catch (final SocketException e) {
+			return false;
+		}
 	}
 
 	private InetAddress localHost() throws UnknownHostException
