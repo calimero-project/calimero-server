@@ -74,15 +74,17 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.Keyring;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
-import tuwien.auto.calimero.device.Keyring;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
+import tuwien.auto.calimero.knxnetip.KnxSecureException;
+import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -191,6 +193,7 @@ public class Launcher implements Runnable
 		private final Map<ServiceContainer, Map<String, byte[]>> keyfiles = new HashMap<>();
 		private final Map<ServiceContainer, Map<Integer, List<IndividualAddress>>> tunnelingUsers = new HashMap<>();
 		private final Map<ServiceContainer, Integer> securedServicesMap = new HashMap<>();
+		private final Map<ServiceContainer, Keyring> keyrings = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -251,10 +254,8 @@ public class Launcher implements Runnable
 			final Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile")).map(expandHome).map(Paths::get)
 					.orElse(null);
 			// look for a keyring configuration
-			final Optional<Keyring> keyring = ofNullable(r.getAttributeValue(null, "keyring")).map(expandHome)
-					.map(uri -> new Keyring(uri, "pwd".toCharArray()));
-			keyring.ifPresent(Keyring::load);
-			final var keyringConfig = keyring.map(Keyring::configuration).orElse(Map.of());
+			final var keyring = ofNullable(r.getAttributeValue(null, "keyring")).map(expandHome)
+					.map(Keyring::load).orElse(null);
 
 			final String attrSecuredServices = r.getAttributeValue(null, "securedServices");
 			final int securedServices = attrSecuredServices == null ? 0x3f : Integer.decode(attrSecuredServices);
@@ -271,7 +272,7 @@ public class Launcher implements Runnable
 			String subnetLinkClass = null;
 			DatapointModel<Datapoint> datapoints = null;
 			List<GroupAddress> filter = Collections.emptyList();
-			List<IndividualAddress> indAddressPool = Collections.emptyList();
+			List<IndividualAddress> indAddressPool = new ArrayList<>();
 			String expirationTimeout = "0";
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
@@ -403,14 +404,26 @@ public class Launcher implements Runnable
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						tunnelingWithNat.put(sc, useNat);
+						if (keyring != null) {
+							keyrings.put(sc, keyring);
+							final var interfaces = keyring.interfaces().get(subnet);
+							if (interfaces == null)
+								throw new KnxSecureException("no interfaces found in keyring for host " + subnet);
+							for (final var iface : interfaces) {
+								tunnelingUserToAddresses
+										.computeIfAbsent(iface.user(), __ -> new ArrayList<IndividualAddress>())
+										.add(iface.address());
+								indAddressPool.add(iface.address());
+							}
+						}
 						if (!tunnelingUserToAddresses.isEmpty())
 							tunnelingUsers.put(sc, tunnelingUserToAddresses);
 
 						securedServicesMap.put(sc, securedServices);
 
 						if (keyfile != null) {
-							try {
-								final Map<String, byte[]> keys = Files.lines(keyfile)
+							try (var lines = Files.lines(keyfile)) {
+								final Map<String, byte[]> keys = lines
 										.filter(l -> l.contains("=") && Character.isLetter(l.charAt(0)))
 										.collect(Collectors.toMap(l -> l.substring(0, l.indexOf('=')).trim(),
 												l -> fromHex(l.substring(l.indexOf('=') + 1).trim())));
@@ -419,10 +432,6 @@ public class Launcher implements Runnable
 							catch (final IOException e) {
 								throw new KNXMLException("reading key file '" + keyfile + "'", e);
 							}
-						}
-						else if (routingMcast != null && !keyringConfig.isEmpty()){
-							final var mcast = routingMcast.getHostAddress();
-							keyfiles.put(sc, Map.of("group.key", (byte[]) keyringConfig.get(mcast)));
 						}
 						return;
 					}
@@ -671,6 +680,8 @@ public class Launcher implements Runnable
 			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
+			decodeKeyring(sc);
+
 			server.configureSecurity(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()), xml.securedServicesMap.get(sc));
 
 			final String subnetType = xml.subnetTypes.get(i);
@@ -716,6 +727,59 @@ public class Launcher implements Runnable
 					addrIndices[k] = (byte) idx++;
 				setTunnelingAddresses(ios, objectInstance, addrIndices);
 			}
+		}
+	}
+
+	private void decodeKeyring(final ServiceContainer sc) {
+		if (xml.keyrings.containsKey(sc)) {
+			final var keyfile = xml.keyfiles.getOrDefault(sc, Collections.emptyMap());
+			char[] pwd = null;
+			if (keyfile.containsKey("keyring.pwd")) {
+				final var pwdBytes = keyfile.get("keyring.pwd");
+				pwd = new char[pwdBytes.length];
+				for (int k = 0; k < pwdBytes.length; k++) {
+					final byte b = pwdBytes[k];
+					pwd[k] = (char) b;
+				}
+			}
+			else {
+				final var console = System.console();
+				if (console != null)
+					pwd = console.readPassword("Keyring password: ");
+			}
+			if (pwd == null || pwd.length == 0) {
+				logger.error("no keyring password (not in keyfile nor via console) -- exit");
+				System.exit(-1);
+			}
+
+			final var keyring = xml.keyrings.get(sc);
+			final var host = sc.getMediumSettings().getDeviceAddress();
+			final var device = keyring.devices().get(host);
+
+			final var decrypted = new HashMap<String, byte[]>();
+
+			final var authKey = SecureConnection
+					.hashDeviceAuthenticationCode(keyring.decryptPassword(device.authentication(), pwd));
+			decrypted.put("device.key", authKey);
+			final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password(), pwd));
+			decrypted.put("user.1", mgmtKey);
+
+			if (sc instanceof RoutingServiceContainer) {
+				final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
+
+				final var enc = (byte[]) keyring.configuration().get(rsc.routingMulticastAddress());
+				final var groupKey = keyring.decryptKey(enc, pwd);
+				decrypted.put("group.key", groupKey);
+			}
+
+			final var interfaces = keyring.interfaces().get(host);
+			for (final var iface : interfaces) {
+				final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password(), pwd));
+				decrypted.put("user." + iface.user(), key);
+			}
+
+			xml.keyfiles.put(sc, decrypted);
+			Arrays.fill(pwd, (char) 0);
 		}
 	}
 
