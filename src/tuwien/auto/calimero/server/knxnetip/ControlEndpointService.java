@@ -58,15 +58,15 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
@@ -122,6 +122,9 @@ final class ControlEndpointService extends ServiceLooper
 
 	private final ServiceContainer svcCont;
 
+	// channel -> data endpoint
+	private final Map<Integer, DataEndpointServiceHandler> connections = new ConcurrentHashMap<>();
+
 	private final List<IndividualAddress> usedKnxAddresses = new ArrayList<>();
 	// If the server assigns its own KNX individual address to a connection, no
 	// management (using tunneling or from the KNX subnet) shall be allowed.
@@ -131,7 +134,6 @@ final class ControlEndpointService extends ServiceLooper
 
 	// overall maximum allowed is 0xff
 	private static final int MAX_CHANNEL_ID = 255;
-	private final BitSet channelIds = new BitSet(MAX_CHANNEL_ID);
 	private int lastChannelId;
 
 	final SecureSession sessions;
@@ -170,10 +172,9 @@ final class ControlEndpointService extends ServiceLooper
 
 	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
 	{
-		server.dataConnections.remove(h);
+		connections.remove(h.getChannelId());
 		// free knx address and channel id we assigned to the connection
 		freeDeviceAddress(device);
-		freeChannelId(h.getChannelId());
 
 		if (h.isDeviceMgmt())
 			synchronized (usedKnxAddresses) {
@@ -195,9 +196,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	@Override
 	public void quit() {
-		// check if we have open data connections before forwarding the call
-		if (channelsAssigned())
-			server.closeDataConnections(this);
+		closeDataConnections();
 		try {
 			tcpLooper.close();
 		}
@@ -224,6 +223,10 @@ final class ControlEndpointService extends ServiceLooper
 	ServiceContainer getServiceContainer()
 	{
 		return svcCont;
+	}
+
+	Map<Integer, DataEndpointServiceHandler> connections() {
+		return connections;
 	}
 
 	@Override
@@ -353,8 +356,6 @@ final class ControlEndpointService extends ServiceLooper
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
-					if (!established)
-						freeChannelId(channelId);
 				}
 			}
 			if (buf == null)
@@ -362,7 +363,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			send(sessionId, channelId, buf, ctrlEndpt);
 			if (established)
-				connectionEstablished(svcCont, server.dataConnections.get(server.dataConnections.size() - 1));
+				connectionEstablished(svcCont, connections.get(channelId));
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_RES)
 			logger.warn("received connect response - ignored");
@@ -370,7 +371,7 @@ final class ControlEndpointService extends ServiceLooper
 			final DisconnectRequest dr = new DisconnectRequest(data, offset);
 			// find connection based on channel id
 			final int channelId = dr.getChannelID();
-			final DataEndpointServiceHandler conn = findConnection(channelId);
+			final DataEndpointServiceHandler conn = connections.get(channelId);
 
 			// requests with wrong channel ID are ignored (conforming to spec)
 			if (conn == null) {
@@ -413,7 +414,7 @@ final class ControlEndpointService extends ServiceLooper
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				final KNXnetIPConnection c = findConnection(csr.getChannelID());
+				final KNXnetIPConnection c = connections.get(csr.getChannelID());
 				if (c == null)
 					status = ErrorCodes.CONNECTION_ID;
 				else {
@@ -440,7 +441,7 @@ final class ControlEndpointService extends ServiceLooper
 				// to get the channel id, we are just interested in connection header
 				// which has the same layout for request and ack
 				final int channelId = PacketHelper.getEmptyServiceRequest(h, data, offset).getChannelID();
-				sh = findConnection(channelId);
+				sh = connections.get(channelId);
 			}
 			catch (final KNXFormatException e) {}
 			if (sh != null)
@@ -453,6 +454,15 @@ final class ControlEndpointService extends ServiceLooper
 	int subnetStatus() {
 		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT, objectInstance(), PID.MEDIUM_STATUS, 1, 0);
 		return status == 0 ? ErrorCodes.NO_ERROR : ErrorCodes.KNX_CONNECTION;
+	}
+
+	void mediumConnectionStatusChanged(final boolean active) {
+		connections.values().forEach(c -> c.mediumConnectionStatusChanged(active));
+	}
+
+	private void closeDataConnections() {
+		for (final DataEndpointServiceHandler h : connections.values())
+			h.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), LogLevel.INFO, null);
 	}
 
 	private void sendSearchResponse(final InetSocketAddress dst, final byte[] macFilter, final byte[] requestedServices,
@@ -734,8 +744,7 @@ final class ControlEndpointService extends ServiceLooper
 				// supported, only one tunneling connection is allowed per subnetwork,
 				// i.e., if there are any active link-layer connections, we don't
 				// allow tunneling on busmonitor.
-				final List<DataEndpointServiceHandler> active = server.dataConnections.stream()
-						.filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
+				final List<DataEndpointServiceHandler> active = connections.values().stream()
 						.filter(h -> !h.isMonitor()).collect(toList());
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
@@ -836,7 +845,7 @@ final class ControlEndpointService extends ServiceLooper
 			freeDeviceAddress(device);
 			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 		}
-		server.dataConnections.add(sh);
+		connections.put(channelId, sh);
 		if (looperThread != null)
 			looperThread.start();
 		if (!svcCont.reuseControlEndpoint())
@@ -850,10 +859,8 @@ final class ControlEndpointService extends ServiceLooper
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}
 
-	private List<DataEndpointServiceHandler> activeMonitorConnections()
-	{
-		return server.dataConnections.stream().filter(h -> h.getCtrlSocketAddress().equals(s.getLocalSocketAddress()))
-				.filter(DataEndpointServiceHandler::isMonitor).collect(toList());
+	private List<DataEndpointServiceHandler> activeMonitorConnections() {
+		return connections.values().stream().filter(DataEndpointServiceHandler::isMonitor).collect(toList());
 	}
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)
@@ -1096,51 +1103,22 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.empty();
 	}
 
-	private DataEndpointServiceHandler findConnection(final int channelId)
-	{
-		for (final Iterator<DataEndpointServiceHandler> i = server.dataConnections.iterator(); i.hasNext();) {
-			final DataEndpointServiceHandler c = i.next();
-			if (c.getChannelId() == channelId)
-				return c;
-		}
-		return null;
-	}
-
 	boolean anyMatchDataConnection(final InetSocketAddress remoteEndpoint) {
-		return server.anyMatchDataConnection(this, remoteEndpoint);
+		return connections.values().stream().anyMatch(c -> c.getRemoteAddress().equals(remoteEndpoint));
 	}
 
-	private int assignChannelId()
-	{
+	// we do not assign channel id 0
+	private int assignChannelId() {
+		if (connections.size() == MAX_CHANNEL_ID)
+			return 0;
 		// Try to assign the new channel id by counting up from the last assigned channel
 		// id. We do this to eventually assign the overall usable range of ids, and to
 		// avoid excessive assignment of the low channel ids only.
-		// We do not assign channel id 0.
-		synchronized (channelIds) {
-			int id = channelIds.nextClearBit(lastChannelId + 1);
-			if (id == MAX_CHANNEL_ID + 1)
-				id = channelIds.nextClearBit(1);
-			// if all 255 ids are in use, no more connections are possible
-			if (id == MAX_CHANNEL_ID + 1)
-				return 0;
-			channelIds.set(id);
-			lastChannelId = id;
-		}
+		int id = lastChannelId % MAX_CHANNEL_ID + 1;
+		while (connections.containsKey(id))
+			id = id % MAX_CHANNEL_ID + 1;
+		lastChannelId = id;
 		return lastChannelId;
-	}
-
-	private void freeChannelId(final int channelId)
-	{
-		synchronized (channelIds) {
-			channelIds.clear(channelId);
-		}
-	}
-
-	private boolean channelsAssigned()
-	{
-		synchronized (channelIds) {
-			return channelIds.cardinality() > 0;
-		}
 	}
 
 	private ManufacturerDIB createManufacturerDIB()

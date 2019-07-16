@@ -41,9 +41,7 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -78,13 +76,13 @@ import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
+import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
-import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
@@ -227,8 +225,6 @@ public class KNXnetIPServer
 	final List<LooperThread> controlEndpoints = new ArrayList<>();
 	// list of LooperThread objects running a routing endpoint
 	final List<LooperThread> routingEndpoints = new ArrayList<>();
-	// list of DataEndpointServiceHandler objects
-	final List<DataEndpointServiceHandler> dataConnections = Collections.synchronizedList(new ArrayList<>());
 
 	private InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
@@ -706,6 +702,22 @@ public class KNXnetIPServer
 		return friendlyName;
 	}
 
+	public Map<Integer, KNXnetIPConnection> dataConnections(final ServiceContainer serviceContainer) {
+		for (final LooperThread looperThread : controlEndpoints) {
+			final Optional<ServiceLooper> looper = looperThread.looper();
+			if (looper.isPresent()) {
+				final ControlEndpointService ces = (ControlEndpointService) looper.get();
+				if (ces.getServiceContainer() == serviceContainer)
+					return Collections.unmodifiableMap(ces.connections());
+			}
+		}
+		return Map.of();
+	}
+
+	public IndividualAddress addressOf(final KNXnetIPConnection connection) {
+		return ((DataEndpointServiceHandler) connection).device;
+	}
+
 	private void onPropertyValueChanged(final PropertyEvent pe)
 	{
 		if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
@@ -719,10 +731,9 @@ public class KNXnetIPServer
 		}
 		else if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
 			if (pe.getPropertyId() == PID.MEDIUM_STATUS) {
+				final var svcCont = findContainer(pe.getInterfaceObject());
 				final var active = (pe.getNewData()[0] & 0x01) == 0x00; // 0x01: communication impossible
-				// NYI filter by control endpoint
-				for (final DataEndpointServiceHandler desh : dataConnections)
-					desh.mediumConnectionStatusChanged(active);
+				findControlEndpoint(svcCont).ifPresent(ep -> ep.mediumConnectionStatusChanged(active));
 			}
 		}
 	}
@@ -1058,6 +1069,11 @@ public class KNXnetIPServer
 		return routingEndpoints.stream().filter(ep -> ep.looper().filter(belongsToSvcCont).isPresent()).findFirst();
 	}
 
+	private Optional<ControlEndpointService> findControlEndpoint(final ServiceContainer sc) {
+		return controlEndpoints.stream().map(LooperThread::looper).flatMap(Optional::stream)
+				.map(ControlEndpointService.class::cast).filter(sc::equals).findFirst();
+	}
+
 	private ServiceContainer findContainer(final String svcContName)
 	{
 		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
@@ -1075,41 +1091,13 @@ public class KNXnetIPServer
 			if (svcContToIfObj.get(svcCont) == io)
 				return (ServiceContainer) svcCont;
 		}
-		return null;
-	}
-
-	void closeDataConnections(final ControlEndpointService ces)
-	{
-		final String name = ces.getServiceContainer().getName();
-		final SocketAddress ctrl = ces.getSocket().getLocalSocketAddress();
-		if (ctrl == null) {
-			logger.warn("{} has no local socket address, skip closing data connections", name);
-			return;
+		final var objects = getInterfaceObjectServer().getInterfaceObjects();
+		int svcContainerIdx = 0;
+		for (int i = 0; i < io.getIndex(); i++) {
+			if (objects[i].getType() == io.getType())
+				svcContainerIdx++;
 		}
-		logger.info("closing all data connections of " + name);
-		// Note the indirect access to this list: h.close() invokes the control endpoint callback, which removes
-		// the data connection from the list, hence we create our local copy to avoid concurrent modifications
-		final DataEndpointServiceHandler[] handlerList = dataConnections.toArray(new DataEndpointServiceHandler[0]);
-		for (int i = 0; i < handlerList.length; i++) {
-			final DataEndpointServiceHandler h = handlerList[i];
-			if (ctrl.equals(h.getCtrlSocketAddress()))
-				h.close(CloseEvent.SERVER_REQUEST, "quit service container " + name, LogLevel.INFO, null);
-		}
-	}
-
-	boolean anyMatchDataConnection(final ControlEndpointService ces, final InetSocketAddress remoteEndpoint) {
-		final SocketAddress ctrl = ces.getSocket().getLocalSocketAddress();
-		if (ctrl == null)
-			return false;
-		final DataEndpointServiceHandler[] handlerList = dataConnections.toArray(new DataEndpointServiceHandler[0]);
-		for (int i = 0; i < handlerList.length; i++) {
-			final DataEndpointServiceHandler h = handlerList[i];
-			if (ctrl.equals(h.getCtrlSocketAddress())) {
-				if (remoteEndpoint.equals(h.getRemoteAddress()))
-					return true;
-			}
-		}
-		return false;
+		return svcContainers.get(svcContainerIdx);
 	}
 
 	final EventListeners<ServerListener> listeners()

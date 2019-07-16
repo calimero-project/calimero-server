@@ -97,7 +97,7 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	private final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed;
 	private final Consumer<DataEndpointServiceHandler> resetRequest;
 
-	private final IndividualAddress device;
+	final IndividualAddress device;
 	private final boolean tunnel;
 	private final boolean monitor;
 

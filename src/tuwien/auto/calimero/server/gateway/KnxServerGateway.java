@@ -173,7 +173,6 @@ public class KnxServerGateway implements Runnable
 	{
 		final ServiceContainer sc;
 		final String name;
-		final IndividualAddress addr;
 
 		private Instant lastRoutingBusy = Instant.EPOCH;
 		// avoid null, assign bogus future
@@ -185,7 +184,6 @@ public class KnxServerGateway implements Runnable
 			sc = svcContainer;
 			// same as calling ((KNXnetIPConnection) getSource()).getName()
 			name = connectionName;
-			addr = device;
 		}
 
 		@Override
@@ -283,7 +281,6 @@ public class KnxServerGateway implements Runnable
 		public void connectionClosed(final CloseEvent e)
 		{
 			serverConnections.remove(e.getSource());
-			serverDataConnections.remove(addr);
 			logger.debug("removed connection {} ({})", name, e.getReason());
 			if (e.getInitiator() == CloseEvent.CLIENT_REQUEST) {
 				final KNXnetIPConnection c = (KNXnetIPConnection) e.getSource();
@@ -337,8 +334,6 @@ public class KnxServerGateway implements Runnable
 				tpuart.addAddress(assignedDeviceAddress);
 			}
 			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName(), assignedDeviceAddress));
-			if (assignedDeviceAddress != null)
-				serverDataConnections.put(assignedDeviceAddress, conn);
 			return true;
 		}
 
@@ -503,9 +498,6 @@ public class KnxServerGateway implements Runnable
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
 	private final List<SubnetConnector> connectors = new ArrayList<>();
-
-	private final Map<IndividualAddress, KNXnetIPConnection> serverDataConnections = Collections
-			.synchronizedMap(new HashMap<>());
 	private final List<KNXnetIPConnection> serverConnections = Collections.synchronizedList(new ArrayList<>());
 
 	private final int maxEventQueueSize = 200;
@@ -820,7 +812,8 @@ public class KnxServerGateway implements Runnable
 				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
 				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs]%n", toIP, overflowIP));
 
-				serverDataConnections.forEach((addr, client) -> info.append(format("\t%s: %s%n", addr, client)));
+				final var connections = server.dataConnections(c.getServiceContainer());
+				connections.forEach((addr, client) -> info.append(format("\t%s%n", client)));
 			}
 			catch (final Exception e) {
 				logger.error("gathering stat for service container {}", c.getName(), e);
@@ -1152,8 +1145,9 @@ public class KnxServerGateway implements Runnable
 			if (f.getDestination() instanceof IndividualAddress) {
 				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
 
+				final var connections = server.dataConnections(sc);
 				// 1. look for client tunneling connection with matching assigned address
-				KNXnetIPConnection c = serverDataConnections.get(f.getDestination());
+				KNXnetIPConnection c = findConnection((IndividualAddress) f.getDestination());
 				if (c != null) {
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					send(sc, c, f);
@@ -1162,10 +1156,11 @@ public class KnxServerGateway implements Runnable
 				// even though we always have the same destination (i.e., the address of the usb interface)
 				else if (subnet.getInterfaceType().equals("usb")
 						&& f.getDestination().equals(localInterface)) {
-					for (final Map.Entry<IndividualAddress, KNXnetIPConnection> i : serverDataConnections.entrySet()) {
-						final IndividualAddress assignedAddress = i.getKey();
-						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, i.getValue());
-						send(sc, i.getValue(), CEMIFactory.create(null, assignedAddress, f, false));
+					for (final Map.Entry<Integer, KNXnetIPConnection> entry : connections.entrySet()) {
+						final var connection = entry.getValue();
+						final IndividualAddress assignedAddress = server.addressOf(connection);
+						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, connection);
+						send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
 					}
 					// also dispatch via routing as-is
 					c = findRoutingConnection().orElse(null);
@@ -1268,6 +1263,17 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
+	private KNXnetIPConnection findConnection(final IndividualAddress dst) {
+		for (final ServiceContainer sc : server.getServiceContainers()) {
+			if (matchesSubnet(dst, sc.getMediumSettings().getDeviceAddress())) {
+				final Map<Integer, KNXnetIPConnection> connections = server.dataConnections(sc);
+				for (final var connection : connections.values())
+					if (dst.equals(server.addressOf(connection)))
+						return connection;
+			}
+		}
+		return null;
+	}
 
 	private static final int SystemNetworkParamRead = 0b0111001000;
 	private static final int SystemNetworkParamResponse = 0b0111001001;
