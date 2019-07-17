@@ -76,7 +76,6 @@ import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
-import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
@@ -702,7 +701,7 @@ public class KNXnetIPServer
 		return friendlyName;
 	}
 
-	public Map<Integer, KNXnetIPConnection> dataConnections(final ServiceContainer serviceContainer) {
+	public Map<Integer, DataEndpoint> dataConnections(final ServiceContainer serviceContainer) {
 		for (final LooperThread looperThread : controlEndpoints) {
 			final Optional<ServiceLooper> looper = looperThread.looper();
 			if (looper.isPresent()) {
@@ -712,10 +711,6 @@ public class KNXnetIPServer
 			}
 		}
 		return Map.of();
-	}
-
-	public IndividualAddress addressOf(final KNXnetIPConnection connection) {
-		return ((DataEndpointServiceHandler) connection).device;
 	}
 
 	private void onPropertyValueChanged(final PropertyEvent pe)

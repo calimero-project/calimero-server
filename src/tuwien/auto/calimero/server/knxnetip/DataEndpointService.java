@@ -53,7 +53,7 @@ final class DataEndpointService extends ServiceLooper
 	// KNX receive timeout in seconds
 	private static final int MAX_RECEIVE_INTERVAL = 120;
 
-	DataEndpointServiceHandler svcHandler;
+	DataEndpoint svcHandler;
 
 	DataEndpointService(final KNXnetIPServer server, final DatagramSocket localCtrlEndpt)
 	{
@@ -61,10 +61,10 @@ final class DataEndpointService extends ServiceLooper
 		logger.debug("created socket on " + s.getLocalSocketAddress());
 	}
 
-	void resetRequest(final DataEndpointServiceHandler h)
+	void resetRequest(final DataEndpoint endpoint)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
-		fireResetRequest(h.getName(), ctrlEndpoint);
+		fireResetRequest(endpoint.getName(), ctrlEndpoint);
 	}
 
 	@Override

@@ -813,7 +813,8 @@ public class KnxServerGateway implements Runnable
 				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs]%n", toIP, overflowIP));
 
 				final var connections = server.dataConnections(c.getServiceContainer());
-				connections.forEach((addr, client) -> info.append(format("\t%s%n", client)));
+				connections.forEach((addr, client) -> info.append(format("\t%s, connected since %s%n",
+						client, client.connectedSince())));
 			}
 			catch (final Exception e) {
 				logger.error("gathering stat for service container {}", c.getName(), e);
@@ -1156,9 +1157,9 @@ public class KnxServerGateway implements Runnable
 				// even though we always have the same destination (i.e., the address of the usb interface)
 				else if (subnet.getInterfaceType().equals("usb")
 						&& f.getDestination().equals(localInterface)) {
-					for (final Map.Entry<Integer, KNXnetIPConnection> entry : connections.entrySet()) {
+					for (final var entry : connections.entrySet()) {
 						final var connection = entry.getValue();
-						final IndividualAddress assignedAddress = server.addressOf(connection);
+						final IndividualAddress assignedAddress = connection.deviceAddress();
 						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, connection);
 						send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
 					}
@@ -1266,9 +1267,9 @@ public class KnxServerGateway implements Runnable
 	private KNXnetIPConnection findConnection(final IndividualAddress dst) {
 		for (final ServiceContainer sc : server.getServiceContainers()) {
 			if (matchesSubnet(dst, sc.getMediumSettings().getDeviceAddress())) {
-				final Map<Integer, KNXnetIPConnection> connections = server.dataConnections(sc);
+				final var connections = server.dataConnections(sc);
 				for (final var connection : connections.values())
-					if (dst.equals(server.addressOf(connection)))
+					if (dst.equals(connection.deviceAddress()))
 						return connection;
 			}
 		}

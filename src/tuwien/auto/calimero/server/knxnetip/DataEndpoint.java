@@ -42,6 +42,8 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -85,7 +87,7 @@ import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
  *
  * @author B. Malinowsky
  */
-final class DataEndpointServiceHandler extends ConnectionBase
+public final class DataEndpoint extends ConnectionBase
 {
 	// sender SHALL wait 1 second for the acknowledgment response
 	// to a tunneling request
@@ -94,10 +96,10 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	// to a device configuration request
 	private static final int CONFIGURATION_REQ_TIMEOUT = 10;
 
-	private final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed;
-	private final Consumer<DataEndpointServiceHandler> resetRequest;
+	private final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed;
+	private final Consumer<DataEndpoint> resetRequest;
 
-	final IndividualAddress device;
+	private final IndividualAddress device;
 	private final boolean tunnel;
 	private final boolean monitor;
 
@@ -111,16 +113,18 @@ final class DataEndpointServiceHandler extends ConnectionBase
 
 	private final boolean tcp;
 
+	private final Instant connectedSince;
+
 	// if enabled by client, notify client about changes of connection status and tunneling address
 	private boolean featureInfoServiceEnabled;
 	private boolean tunnelingAddressChanged;
 
-	DataEndpointServiceHandler(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
+	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final boolean tunneling, final boolean busmonitor, final boolean useNAT,
 		final SecureSession sessions, final int sessionId,
-		final BiConsumer<DataEndpointServiceHandler, IndividualAddress> connectionClosed,
-		final Consumer<DataEndpointServiceHandler> resetRequest)
+		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
+		final Consumer<DataEndpoint> resetRequest)
 	{
 		super(tunneling ? KNXnetIPHeader.TUNNELING_REQ : KNXnetIPHeader.DEVICE_CONFIGURATION_REQ,
 				tunneling ? KNXnetIPHeader.TUNNELING_ACK : KNXnetIPHeader.DEVICE_CONFIGURATION_ACK,
@@ -145,6 +149,8 @@ final class DataEndpointServiceHandler extends ConnectionBase
 		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 
 		tcp = TcpLooper.connections.containsKey(remoteDataEndpt);
+
+		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
 		if (sessionId > 0)
 			sessions.addConnection(sessionId, remoteCtrlEndpt);
@@ -207,6 +213,10 @@ final class DataEndpointServiceHandler extends ConnectionBase
 	{
 		return getName() + " (channel " + getChannelId() + ", " + device + ")";
 	}
+
+	public IndividualAddress deviceAddress() { return device; }
+
+	public Instant connectedSince() { return connectedSince; }
 
 	@Override
 	protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t)

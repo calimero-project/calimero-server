@@ -123,7 +123,7 @@ final class ControlEndpointService extends ServiceLooper
 	private final ServiceContainer svcCont;
 
 	// channel -> data endpoint
-	private final Map<Integer, DataEndpointServiceHandler> connections = new ConcurrentHashMap<>();
+	private final Map<Integer, DataEndpoint> connections = new ConcurrentHashMap<>();
 
 	private final List<IndividualAddress> usedKnxAddresses = new ArrayList<>();
 	// If the server assigns its own KNX individual address to a connection, no
@@ -170,28 +170,28 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
-	void connectionClosed(final DataEndpointServiceHandler h, final IndividualAddress device)
+	void connectionClosed(final DataEndpoint endpoint, final IndividualAddress device)
 	{
-		connections.remove(h.getChannelId());
+		connections.remove(endpoint.getChannelId());
 		// free knx address and channel id we assigned to the connection
 		freeDeviceAddress(device);
 
-		if (h.isDeviceMgmt())
+		if (endpoint.isDeviceMgmt())
 			synchronized (usedKnxAddresses) {
 				--activeMgmtConnections;
 			}
 
 		final long now = System.currentTimeMillis();
-		final boolean timeout = (now - h.getLastMsgTimestamp()) >= 120_000;
-		if (timeout && !anyMatchDataConnection(h.getRemoteAddress())) {
-			TcpLooper.lastConnectionTimedOut(h.getRemoteAddress());
+		final boolean timeout = (now - endpoint.getLastMsgTimestamp()) >= 120_000;
+		if (timeout && !anyMatchDataConnection(endpoint.getRemoteAddress())) {
+			TcpLooper.lastConnectionTimedOut(endpoint.getRemoteAddress());
 		}
 	}
 
-	void resetRequest(final DataEndpointServiceHandler h)
+	void resetRequest(final DataEndpoint endpoint)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
-		fireResetRequest(h.getName(), ctrlEndpoint);
+		fireResetRequest(endpoint.getName(), ctrlEndpoint);
 	}
 
 	@Override
@@ -225,7 +225,7 @@ final class ControlEndpointService extends ServiceLooper
 		return svcCont;
 	}
 
-	Map<Integer, DataEndpointServiceHandler> connections() {
+	Map<Integer, DataEndpoint> connections() {
 		return connections;
 	}
 
@@ -371,7 +371,7 @@ final class ControlEndpointService extends ServiceLooper
 			final DisconnectRequest dr = new DisconnectRequest(data, offset);
 			// find connection based on channel id
 			final int channelId = dr.getChannelID();
-			final DataEndpointServiceHandler conn = connections.get(channelId);
+			final DataEndpoint conn = connections.get(channelId);
 
 			// requests with wrong channel ID are ignored (conforming to spec)
 			if (conn == null) {
@@ -414,13 +414,13 @@ final class ControlEndpointService extends ServiceLooper
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				final KNXnetIPConnection c = connections.get(csr.getChannelID());
-				if (c == null)
+				final var endpoint = connections.get(csr.getChannelID());
+				if (endpoint == null)
 					status = ErrorCodes.CONNECTION_ID;
 				else {
-					logger.trace("received connection state request from {} for channel {}", c.getRemoteAddress(),
+					logger.trace("received connection state request from {} for channel {}", endpoint.getRemoteAddress(),
 							csr.getChannelID());
-					((DataEndpointServiceHandler) c).updateLastMsgTimestamp();
+					endpoint.updateLastMsgTimestamp();
 				}
 			}
 
@@ -436,16 +436,16 @@ final class ControlEndpointService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
 			logger.warn("received connection state response - ignored");
 		else {
-			DataEndpointServiceHandler sh = null;
+			DataEndpoint endpoint = null;
 			try {
 				// to get the channel id, we are just interested in connection header
 				// which has the same layout for request and ack
 				final int channelId = PacketHelper.getEmptyServiceRequest(h, data, offset).getChannelID();
-				sh = connections.get(channelId);
+				endpoint = connections.get(channelId);
 			}
 			catch (final KNXFormatException e) {}
-			if (sh != null)
-				return sh.handleDataServiceType(h, data, offset);
+			if (endpoint != null)
+				return endpoint.handleDataServiceType(h, data, offset);
 			return false;
 		}
 		return true;
@@ -461,8 +461,8 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private void closeDataConnections() {
-		for (final DataEndpointServiceHandler h : connections.values())
-			h.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), LogLevel.INFO, null);
+		for (final DataEndpoint endpoint : connections.values())
+			endpoint.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), LogLevel.INFO, null);
 	}
 
 	private void sendSearchResponse(final InetSocketAddress dst, final byte[] macFilter, final byte[] requestedServices,
@@ -744,7 +744,7 @@ final class ControlEndpointService extends ServiceLooper
 				// supported, only one tunneling connection is allowed per subnetwork,
 				// i.e., if there are any active link-layer connections, we don't
 				// allow tunneling on busmonitor.
-				final List<DataEndpointServiceHandler> active = connections.values().stream()
+				final List<DataEndpoint> active = connections.values().stream()
 						.filter(h -> !h.isMonitor()).collect(toList());
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
@@ -763,7 +763,7 @@ final class ControlEndpointService extends ServiceLooper
 				// KNX specification says that if tunneling on busmonitor is supported, only one tunneling connection
 				// is allowed per subnetwork, i.e., if there is an active bus monitor connection, we don't
 				// allow any other tunneling connections.
-				final List<DataEndpointServiceHandler> active = activeMonitorConnections();
+				final List<DataEndpoint> active = activeMonitorConnections();
 				if (active.size() > 0) {
 					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
 							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
@@ -811,26 +811,26 @@ final class ControlEndpointService extends ServiceLooper
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 
 		final ServiceLooper svcLoop;
-		final DataEndpointServiceHandler sh;
+		final DataEndpoint newDataEndpoint;
 		LooperThread looperThread = null;
 
 		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
-			sh = new DataEndpointServiceHandler(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
+			newDataEndpoint = new DataEndpoint(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
 					busmonitor, useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
 			try {
 				svcLoop = new DataEndpointService(server, s);
 
-				final BiConsumer<DataEndpointServiceHandler, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-				sh = new DataEndpointServiceHandler(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
+				final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
+				newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
 						tunnel, busmonitor, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
 						((DataEndpointService) svcLoop)::resetRequest);
-				((DataEndpointService) svcLoop).svcHandler = sh;
+				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
-				looperThread = new LooperThread(server, svcCont.getName() + " data endpoint " + sh.getRemoteAddress(),
-						0, () -> svcLoop);
+				looperThread = new LooperThread(server,
+						svcCont.getName() + " data endpoint " + newDataEndpoint.getRemoteAddress(), 0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
@@ -838,14 +838,14 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 
-		if (!acceptConnection(svcCont, sh, device, busmonitor)) {
+		if (!acceptConnection(svcCont, newDataEndpoint, device, busmonitor)) {
 			// don't use sh.close() here, we would initiate tunneling disconnect sequence
 			// but we have to call svcLoop.quit() to close local data socket
 			svcLoop.quit();
 			freeDeviceAddress(device);
 			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 		}
-		connections.put(channelId, sh);
+		connections.put(channelId, newDataEndpoint);
 		if (looperThread != null)
 			looperThread.start();
 		if (!svcCont.reuseControlEndpoint())
@@ -859,8 +859,8 @@ final class ControlEndpointService extends ServiceLooper
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}
 
-	private List<DataEndpointServiceHandler> activeMonitorConnections() {
-		return connections.values().stream().filter(DataEndpointServiceHandler::isMonitor).collect(toList());
+	private List<DataEndpoint> activeMonitorConnections() {
+		return connections.values().stream().filter(DataEndpoint::isMonitor).collect(toList());
 	}
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)

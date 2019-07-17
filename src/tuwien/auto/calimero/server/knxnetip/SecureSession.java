@@ -231,7 +231,7 @@ class SecureSession {
 						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote.getAddress(), remote.getPort());
 					}
 					else
-						return ((DataEndpointServiceHandler) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
+						return ((DataEndpoint) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
 				}
 				return true;
 			}
