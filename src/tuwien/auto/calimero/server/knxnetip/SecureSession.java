@@ -87,7 +87,7 @@ import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
-class SecureSession {
+final class SecureSession {
 
 	private static final int SecureSvc = 0x0950;
 	private static final int SessionReq = 0x0951; // 1. client -> server

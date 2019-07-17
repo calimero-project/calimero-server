@@ -622,7 +622,7 @@ public class KnxServerGateway implements Runnable
 		server.addServerListener(new KNXnetIPServerListener());
 		connectors.addAll(Arrays.asList(subnetConnectors));
 		logger = LogService.getLogger("calimero.server.gateway." + name);
-		startTime = Instant.now();
+		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 		dispatcher.setName(name + " subnet dispatcher");
 
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
@@ -779,7 +779,8 @@ public class KnxServerGateway implements Runnable
 
 	private String stat() {
 		final StringBuilder info = new StringBuilder();
-		info.append(format("start time %s (uptime %s)%n", startTime, Duration.between(startTime, Instant.now())));
+		final var uptime = Duration.between(startTime, Instant.now()).truncatedTo(ChronoUnit.SECONDS);
+		info.append(format("start time %s (uptime %s)%n", startTime, uptime));
 
 		int objInst = 0;
 		for (final SubnetConnector c : getSubnetConnectors()) {
@@ -845,7 +846,7 @@ public class KnxServerGateway implements Runnable
 					send(svcContainer, c, fe.getFrame());
 				}
 				catch (final InterruptedException e) {
-					logger.error("failed to replay frame event", e);
+					logger.warn("failed to replay frame event", e);
 				}
 			});
 			waitingForReplay.remove(c);
@@ -960,7 +961,6 @@ public class KnxServerGateway implements Runnable
 			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16) + " - ignored");
 	}
 
-	@SuppressWarnings("FutureReturnValueIgnored")
 	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
 		CompletableFuture.runAsync(() -> {
 			try {
