@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2019 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -66,16 +66,11 @@ final class RoutingService extends ServiceLooper
 
 	private class RoutingServiceHandler extends KNXnetIPRouting
 	{
-		private RoutingServiceHandler(final String netIf, final InetAddress mcGroup, final boolean enableLoopback)
-		{
+		private RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup,
+			final boolean enableLoopback) throws KNXException {
 			super(mcGroup);
-			try {
-				init(networkInterface(), enableLoopback, false);
-				logger = LogService.getLogger("calimero.server.knxnetip." + getName());
-			}
-			catch (SocketException | KNXException e) {
-				throw wrappedException(e);
-			}
+			init(netif, enableLoopback, false);
+			logger = LogService.getLogger("calimero.server.knxnetip." + getName());
 		}
 
 		// forwarder for RoutingService dispatch, called from handleServiceType
@@ -135,10 +130,11 @@ final class RoutingService extends ServiceLooper
 		secure = isSecuredService(ServiceFamiliesDIB.ROUTING) && groupKey.length == 16;
 
 		final KNXnetIPRouting inst;
-		if (secure) {
-			try {
-				inst = (KNXnetIPRouting) SecureConnection.newRouting(networkInterface(), mcGroup, groupKey, sc.latencyTolerance());
-				r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback) {
+		try {
+			final NetworkInterface netif = networkInterface();
+			if (secure) {
+				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
+				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback) {
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
 						// NYI sending routing lost message
@@ -146,12 +142,11 @@ final class RoutingService extends ServiceLooper
 					}
 
 					@Override
-					public String getName() {
-						return inst.getName();
-					}
+					public String getName() { return inst.getName(); }
 
 					@Override
-					protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t) {
+					protected void close(final int initiator, final String reason, final LogLevel level,
+							final Throwable t) {
 						closing = true;
 						inst.close();
 						super.close(initiator, reason, level, t);
@@ -160,19 +155,22 @@ final class RoutingService extends ServiceLooper
 				// add listener to inst after r got initialized
 				inst.addConnectionListener(new KNXListener() {
 					@Override
-					public void frameReceived(final FrameEvent e) {}
+					public void frameReceived(final FrameEvent e) {
+					}
 
 					@Override
-					public void connectionClosed(final CloseEvent e) { r.close(); }
+					public void connectionClosed(final CloseEvent e) {
+						r.close();
+					}
 				});
 			}
-			catch (SocketException | KNXException e) {
-				throw wrappedException(e);
+			else {
+				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback);
+				inst = r;
 			}
 		}
-		else {
-			r = new RoutingServiceHandler(sc.networkInterface(), mcGroup, enableLoopback);
-			inst = r;
+		catch (SocketException | KNXException e) {
+			throw wrappedException(e);
 		}
 
 		s = r.getLocalDataSocket();
