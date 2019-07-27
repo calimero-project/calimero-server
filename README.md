@@ -108,15 +108,16 @@ Required attributes for secure routing:
     - `secure="true"`: `true` activates KNX IP Secure, `false` defaults to KNXnet/IP Routing
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
-    - `type`: interface type to KNX subnet, one of "ip", "knxip", "usb", "ft12", "tpuart", "virtual", "emulate", "user-supplied"
+    - `type`: interface type to the KNX subnet, one of:
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
       - `knxip`: the KNX subnet is connected via KNX IP or KNXnet/IP routing
       - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
-      - `ft12`: use a FT1.2 protocol connection
+      - `ft12`: use a FT1.2 protocol connection with EMI2 format
+      - `ft12-cemi`: use a FT1.2 protocol connection with cEMI format
       - `tpuart`: use a TP-UART adapter to connect to a KNX TP1 network
-      - `virtual`: Run KNX subnet and enable the connection of virtual and real devices
-      - `emulate`: Emulates the behaviour of a KNX subnet. KNX datapoints may be specified in an accompanying datapoint XML file.
-      - `user-supplied`: Own programmed connections may be added here.
+      - `virtual`: run KNX subnet and enable the connection of virtual and real devices
+      - `emulate`: emulates the behaviour of a KNX subnet for process communication. KNX datapoints may be specified in an accompanying datapoint XML file.
+      - `user-supplied`: own programmed connections may be added here
     - `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
 	   - `tp1`: Twisted pair (transmission with 9600 Baud as specified in the KNX standard)
       - `pl110`: use power-line to connect

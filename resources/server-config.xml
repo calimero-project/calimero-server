@@ -29,6 +29,7 @@
 
 		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
 		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->
+		<!-- <knxSubnet type="ft12-cemi" medium="tp1">/dev/ttyS0</knxSubnet> -->
 		<!-- if USB device identifier (here "siemens") is left empty, the first found KNX USB device is used -->
 		<knxSubnet type="usb" medium="tp1">siemens</knxSubnet>
 		<!-- <knxSubnet type="tpuart" medium="tp1">/dev/ttyACM0</knxSubnet> -->

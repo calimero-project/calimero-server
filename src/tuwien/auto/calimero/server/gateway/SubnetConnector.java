@@ -42,11 +42,10 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.IndividualAddress;
@@ -227,9 +226,8 @@ public final class SubnetConnector
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(subnetType)) {
 			// find IPv4 address for local socket address
-			final List<InetAddress> l = Optional.ofNullable(netif).map(ni -> Collections.list(ni.getInetAddresses()))
-					.orElse(new ArrayList<>());
-			final InetAddress ia = l.stream().filter(Inet4Address.class::isInstance).findFirst().orElse(null);
+			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
+				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
 			final InetSocketAddress local = new InetSocketAddress(ia, 0);
 
 			final String[] args = linkArgs.split(":", -1);
@@ -253,6 +251,8 @@ public final class SubnetConnector
 		}
 		else if ("ft12".equals(subnetType))
 			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
+		else if ("ft12-cemi".equals(subnetType))
+			ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
 		else if ("tpuart".equals(subnetType)) {
 			// TODO workaround for the only case when server ctrl endpoint address is reused!!
 			final List<KNXAddress> ack = Arrays.asList(sc.getMediumSettings().getDeviceAddress());
@@ -322,6 +322,8 @@ public final class SubnetConnector
 			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
 		else if ("ft12".equals(subnetType))
 			ts = () -> new KNXNetworkMonitorFT12(linkArgs, settings);
+		else if ("ft12-cemi".equals(subnetType))
+			ts = () -> KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings);
 		else if ("tpuart".equals(subnetType))
 			ts = () -> new KNXNetworkMonitorTpuart(linkArgs, false);
 		else if ("user-supplied".equals(subnetType))
@@ -358,7 +360,6 @@ public final class SubnetConnector
 			((KNXNetworkMonitor) link).addMonitorListener(listener);
 	}
 
-	@SuppressWarnings("TypeParameterUnusedInFormals")
 	private static <T> T newLinkUsing(final String className, final String[] initArgs)
 	{
 		try {
