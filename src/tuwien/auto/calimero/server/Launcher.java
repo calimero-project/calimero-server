@@ -194,6 +194,7 @@ public class Launcher implements Runnable
 		private final Map<ServiceContainer, Map<Integer, List<IndividualAddress>>> tunnelingUsers = new HashMap<>();
 		private final Map<ServiceContainer, Integer> securedServicesMap = new HashMap<>();
 		private final Map<ServiceContainer, Keyring> keyrings = new HashMap<>();
+		private final Map<ServiceContainer, Boolean> udpOnlyContainer = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -259,6 +260,8 @@ public class Launcher implements Runnable
 
 			final String attrSecuredServices = r.getAttributeValue(null, "securedServices");
 			final int securedServices = attrSecuredServices == null ? 0x3f : Integer.decode(attrSecuredServices);
+
+			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String addr = "";
 			String subnetType = "";
@@ -404,6 +407,8 @@ public class Launcher implements Runnable
 						groupAddressFilters.put(sc, filter);
 						additionalAddresses.put(sc, indAddressPool);
 						tunnelingWithNat.put(sc, useNat);
+						udpOnlyContainer.put(sc, udpOnly);
+
 						if (keyring != null) {
 							keyrings.put(sc, keyring);
 							final var interfaces = keyring.interfaces().get(subnet);
@@ -673,6 +678,8 @@ public class Launcher implements Runnable
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			server.addServiceContainer(sc);
+			if (xml.udpOnlyContainer.get(sc) == true)
+				server.udpOnly.add(sc);
 
 			final int objectInstance = i + 1;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();

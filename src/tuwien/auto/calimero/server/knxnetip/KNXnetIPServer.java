@@ -49,10 +49,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -189,8 +191,7 @@ public class KNXnetIPServer
 	// from init KNX properties
 
 	// PID.DESCRIPTION
-	private static final byte[] defDesc = new byte[] { 'J', '2', 'M', 'E', ' ', 'K', 'N', 'X', 'n',
-		'e', 't', '/', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
+	private static final byte[] defDesc = defFriendlyName;
 
 	// unmodifiable name assigned by user, used in getName() and logger
 	private final String serverName;
@@ -232,6 +233,7 @@ public class KNXnetIPServer
 
 	private final EventListeners<ServerListener> listeners;
 
+	public final Set<ServiceContainer> udpOnly = new HashSet<>();
 
 	/**
 	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
@@ -973,7 +975,8 @@ public class KNXnetIPServer
 			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING,
 			ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS, ServiceFamiliesDIB.OBJECT_SERVER,
 			ServiceFamiliesDIB.Security };
-		final int[] serviceVersion = { 2, 2, 2, 2, 0, 0, 0, 1 };
+		final int coreVersion = udpOnly.contains(sc) ? 1 : 2;
+		final int[] serviceVersion = { coreVersion, 2, 2, 2, 0, 0, 0, 1 };
 
 		final int[] tmp = new int[services.length];
 		final int[] tmpVersion = new int[tmp.length];
