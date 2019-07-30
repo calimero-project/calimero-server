@@ -1,7 +1,7 @@
 Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
 =========================
 
-A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://jdk.java.net/11/) (_java.base_).
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://www.oracle.com/technetwork/java/javase/downloads/index.html) (_java.base_).
 
 * No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
@@ -12,8 +12,7 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 
 ### Dependencies
 
-The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`. KNX IP Secure requires [Bouncy Castle](https://www.bouncycastle.org) (as long as Calimero targets Java 9).
-
+The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`.
 _Optional_ dependencies, required for communication over serial ports:
 
 * Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
@@ -23,7 +22,7 @@ Supported Features
 ------------------
 
 ### Client-side KNXnet/IP & KNX IP Secure
-For running KNX IP Secure, a keyfile is required, see [section below](#knx-ip-secure).
+Note that for KNX IP Secure a keyfile or an ETS keyring (*.knxkeys) is required, see [section below](#knx-ip-secure).
 
 * Discovery and self-description
 * Tunneling
@@ -39,12 +38,10 @@ For running KNX IP Secure, a keyfile is required, see [section below](#knx-ip-se
 * KNX FT1.2 Protocol
 * TP-UART
 
-### Configuration
-* XML server configuration for startup
-* KNX Interface Object Server during runtime, offering interface objects, e.g., Device Object, KNXnet/IP Parameter Object, cEMI Server Object, Group-Object Table Object
-
 How-to & Examples
 -----------------
+
+Note, running gradle build (e.g., `./gradlew build`) will create _build/distributions/calimero-server-*.tar/.zip_, which contains a directly executable script and all required dependencies.
 
 ### Start Server
 
