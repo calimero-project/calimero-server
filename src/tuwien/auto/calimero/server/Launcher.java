@@ -70,6 +70,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
@@ -431,7 +432,7 @@ public class Launcher implements Runnable
 								final Map<String, byte[]> keys = lines
 										.filter(l -> l.contains("=") && Character.isLetter(l.charAt(0)))
 										.collect(Collectors.toMap(l -> l.substring(0, l.indexOf('=')).trim(),
-												l -> fromHex(l.substring(l.indexOf('=') + 1).trim())));
+												l -> DataUnitBuilder.fromHex(l.substring(l.indexOf('=') + 1).trim())));
 								keyfiles.put(sc, keys);
 							}
 							catch (final IOException e) {
@@ -442,14 +443,6 @@ public class Launcher implements Runnable
 					}
 				}
 			}
-		}
-
-		private static byte[] fromHex(final String hex) {
-			final int len = hex.length();
-			final byte[] data = new byte[len / 2];
-			for (int i = 0; i < len; i += 2)
-				data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i + 1), 16));
-			return data;
 		}
 
 		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r)
