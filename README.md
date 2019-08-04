@@ -51,7 +51,7 @@ On the terminal, a running server instance can be stopped by typing "stop".
 
 #### Using Gradle
 
-    ./gradlew run -Dexec.args=resources/server-config.xml
+    ./gradlew run --args resources/server-config.xml
 
 #### Using Maven
 
