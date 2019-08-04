@@ -1,6 +1,7 @@
 
 def safeIncludeBuild(String dir) {
-	if (file(dir).exists()) includeBuild dir
+	boolean inComposite = gradle.parent != null
+	if (!inComposite && file(dir).exists()) includeBuild dir
 }
 
 safeIncludeBuild '../calimero-core'
