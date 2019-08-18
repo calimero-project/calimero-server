@@ -715,11 +715,17 @@ public class KNXnetIPServer
 		return Map.of();
 	}
 
+	private int lastOverflowToKnx = 0;
+
 	private void onPropertyValueChanged(final PropertyEvent pe)
 	{
 		if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
 			final byte[] data = pe.getNewData();
-			final int lost = toInt(data);
+			final int overflow = toInt(data);
+			if (overflow == 0)
+				return;
+			final int lost = (overflow - lastOverflowToKnx) & 0xffff;
+			lastOverflowToKnx = overflow;
 			if (lost == 0)
 				return;
 			final ServiceContainer sc = findContainer(pe.getInterfaceObject());
