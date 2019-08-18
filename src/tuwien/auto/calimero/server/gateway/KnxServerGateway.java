@@ -197,8 +197,8 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void lostMessage(final LostMessageEvent e)
 		{
-			logger.warn("routing message loss of KNXnet/IP router " + e.getSender()
-					+ " increased to a total of " + e.getLostMessages());
+			final String unit = e.getLostMessages() > 1 ? "messages" : "message";
+			logger.warn("KNXnet/IP router {} lost {} {}",  e.getSender(), e.getLostMessages(), unit);
 		}
 
 		@Override
@@ -218,8 +218,7 @@ public class KnxServerGateway implements Runnable
 				level = LogLevel.WARN;
 				update = true;
 			}
-			LogService.log(logger, level, "routing busy from device {}, wait time {} ms{}", e.sender(), e.waitTime(),
-					e.get().isKnxFault() ? " (reason: KNX network fault)" : "");
+			LogService.log(logger, level, "device {} sent {}", e.sender(), e.get());
 
 			// increment random wait scaling iff >= 10 ms have passed since the last counted routing busy
 			if (now.isAfter(lastRoutingBusy.plusMillis(10))) {
@@ -239,7 +238,7 @@ public class KnxServerGateway implements Runnable
 			final long throttle = routingBusyCounter.get() * throttleScale.toMillis();
 			throttleUntil = pauseSendingUntil.plusMillis(throttle);
 
-			final long continueIn = Duration.between(Instant.now(), pauseSendingUntil).toMillis();
+			final long continueIn = Duration.between(now, pauseSendingUntil).toMillis();
 			logger.info("set routing busy counter = {}, random wait = {} ms, continue sending in {} ms, throttle {} ms",
 					routingBusyCounter, randomWait, continueIn, throttle);
 
@@ -1339,9 +1338,11 @@ public class KnxServerGateway implements Runnable
 		// we have to loop because a new arrival of routing busy might update timings
 		while (true) {
 			final Instant now = Instant.now();
-			final Duration sleep = Duration.between(now, pauseSendingUntil);
-			if (!sleep.isNegative()) {
-				Thread.sleep(sleep.toMillis());
+			final long sleep = Duration.between(now, pauseSendingUntil).toMillis();
+			if (sleep > 0) {
+				logger.info("applying routing flow control for {}, wait {} ms ...",
+						c.getRemoteAddress().getAddress().getHostAddress(), sleep);
+				Thread.sleep(sleep);
 			}
 			else if (now.isBefore(throttleUntil)) {
 				Thread.sleep(5);
@@ -1881,6 +1882,8 @@ public class KnxServerGateway implements Runnable
 			return;
 		}
 		++overflow;
+		final var direction = toKnxNetwork ? "IP => KNX" : "KNX => IP";
+		logger.warn("queue overflow {}, counter incremented to {}", direction, overflow);
 		try {
 			server.getInterfaceObjectServer().setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pid, 1, 1,
 					bytesFromWord(overflow));
