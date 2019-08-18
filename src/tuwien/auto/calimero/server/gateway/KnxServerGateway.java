@@ -507,6 +507,10 @@ public class KnxServerGateway implements Runnable
 	private volatile boolean trucking;
 	private volatile boolean inReset;
 
+	private static final Duration sendRateHistory = Duration.ofMinutes(10);
+	private final List<SlidingTimeWindowCounter> telegramsToKnx = new ArrayList<>();
+	private final List<SlidingTimeWindowCounter> telegramsFromKnx = new ArrayList<>();
+
 	// we deny clients direct property r/w access to function properties
 	private final Set<PropertyKey> functionProperties = new HashSet<>();
 
@@ -664,6 +668,11 @@ public class KnxServerGateway implements Runnable
 			catch (final KnxPropertyException e) {
 				logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
 			}
+
+			telegramsToKnx.add(
+					new SlidingTimeWindowCounter(connector.getName() + " to KNX", sendRateHistory, ChronoUnit.MINUTES));
+			telegramsFromKnx.add(
+					new SlidingTimeWindowCounter(connector.getName() + " to IP", sendRateHistory, ChronoUnit.MINUTES));
 		}
 
 		for (final var entry : ios.propertyDefinitions().entrySet()) {
@@ -789,10 +798,12 @@ public class KnxServerGateway implements Runnable
 
 				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
 				final long overflowKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_KNX).orElse(0L);
-				info.append(format("\tIP => KNX: sent %d, overflow %d [msgs]%n", toKnx, overflowKnx));
+				final int rateToKnx = telegramsToKnx.get(objInst - 1).average();
+				info.append(format("\tIP => KNX: sent %d, overflow %d [msgs], %d [msgs/min]%n", toKnx, overflowKnx, rateToKnx));
 				final long toIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_IP).orElse(0L);
 				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
-				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs]%n", toIP, overflowIP));
+				final int rateToIP = telegramsFromKnx.get(objInst - 1).average();
+				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs], %d [msgs/min]%n", toIP, overflowIP, rateToIP));
 
 				final var connections = server.dataConnections(c.getServiceContainer());
 				connections.forEach((addr, client) -> info.append(format("\t%s, connected since %s%n",
@@ -1864,6 +1875,13 @@ public class KnxServerGateway implements Runnable
 		catch (final KnxPropertyException e) {
 			logger.error("on increasing message transmit counter", e);
 		}
+		incSendRateCounter(objinst, toKnxNetwork);
+	}
+
+	private void incSendRateCounter(final int objInstance, final boolean toKnxNetwork) {
+		final int idx = objInstance - 1;
+		final var counter = toKnxNetwork ? telegramsToKnx.get(idx) : telegramsFromKnx.get(idx);
+		counter.increment();
 	}
 
 	// support queue overflow statistics
