@@ -759,7 +759,7 @@ public class Launcher implements Runnable
 			final var decrypted = new HashMap<String, byte[]>();
 
 			final var authKey = SecureConnection
-					.hashDeviceAuthenticationCode(keyring.decryptPassword(device.authentication(), pwd));
+					.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication(), pwd));
 			decrypted.put("device.key", authKey);
 			final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password(), pwd));
 			decrypted.put("user.1", mgmtKey);
