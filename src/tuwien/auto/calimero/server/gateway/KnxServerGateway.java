@@ -44,7 +44,6 @@ import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.Wait
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -103,7 +102,6 @@ import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
-import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -1210,20 +1208,9 @@ public class KnxServerGateway implements Runnable
 						final var sentOnNetif = new HashSet<NetworkInterface>();
 						for (final KNXnetIPConnection c : serverConnections) {
 							if (c instanceof KNXnetIPRouting) {
-								NetworkInterface netif = null;
-								try {
-									final Field field = ConnectionBase.class.getDeclaredField("socket");
-									field.setAccessible(true);
-									final MulticastSocket s = (MulticastSocket) field.get(c);
-									netif = s.getNetworkInterface();
-								}
-								catch (ReflectiveOperationException | SecurityException | SocketException e) {
-									e.printStackTrace();
-								}
-								if (!sentOnNetif.contains(netif)) {
-									send(sc, c, bcast, false);
-									sentOnNetif.add(netif);
-								}
+								final KNXnetIPRouting rc = (KNXnetIPRouting) c;
+								if (sentOnNetif.add(rc.networkInterface()))
+									send(sc, rc, bcast, false);
 							}
 						}
 						return;
