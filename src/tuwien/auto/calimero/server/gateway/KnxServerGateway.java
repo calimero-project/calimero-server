@@ -882,9 +882,24 @@ public class KnxServerGateway implements Runnable
 
 			// we get L-data.ind if client uses routing protocol
 			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
-				// send confirmation only for .req type
-				if (mc == CEMILData.MC_LDATA_REQ)
+				if (mc == CEMILData.MC_LDATA_REQ) {
+					// send confirmation only for .req type
 					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), (CEMILData) CEMIFactory.copy(f));
+
+					// if routing is active, dispatch .req over routing connection
+					final var c = findRoutingConnection().orElse(null);
+					if (c != null) {
+						logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+						try {
+							final var ind = CEMIFactory.create(null, null,
+									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+							send(server.getServiceContainers()[0], c, ind);
+						}
+						catch (KNXFormatException | InterruptedException | RuntimeException e) {
+							e.printStackTrace();
+						}
+					}
+				}
 
 				if (f.getDestination() instanceof IndividualAddress) {
 					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
