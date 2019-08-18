@@ -65,9 +65,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -189,17 +192,8 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void frameReceived(final FrameEvent e)
 		{
-			synchronized (KnxServerGateway.this) {
-				if (ipEvents.size() < maxEventQueueSize) {
-					ipEvents.add(e);
-					KnxServerGateway.this.notifyAll();
-					synchronized (dispatcher) {
-						dispatcher.notify();
-					}
-				}
-				else
-					incMsgQueueOverflow(true);
-			}
+			if (!ipEvents.offer(e))
+				incMsgQueueOverflow(true);
 		}
 
 		@Override
@@ -500,9 +494,9 @@ public class KnxServerGateway implements Runnable
 	private final List<SubnetConnector> connectors = new ArrayList<>();
 	private final List<KNXnetIPConnection> serverConnections = Collections.synchronizedList(new ArrayList<>());
 
-	private final int maxEventQueueSize = 200;
-	private final List<FrameEvent> ipEvents = new ArrayList<>();
-	private final List<FrameEvent> subnetEvents = new ArrayList<>();
+	private final int maxEventQueueSize = 1000;
+	private final BlockingQueue<FrameEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
+	private final List<FrameEvent> subnetEvents = new ArrayList<>( );
 
 	// support replaying subnet events for disrupted tunneling connections
 	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
@@ -540,28 +534,19 @@ public class KnxServerGateway implements Runnable
 		{
 			try {
 				while (trucking) {
-					for (FrameEvent event = getIPEvent(); event != null; event = getIPEvent())
-						try {
+					final FrameEvent event = ipEvents.take();
+					try {
+						if (!event.systemBroadcast())
 							checkRoutingBusy();
-							onFrameReceived(event, true);
-						}
-						catch (final RuntimeException e) {
-							logger.error("on server-side frame event", e);
-						}
-					synchronized (this) {
-						wait();
+						onFrameReceived(event, true);
+					}
+					catch (final RuntimeException e) {
+						logger.error("on server-side frame event", e);
 					}
 				}
 			}
 			catch (final InterruptedException e) {}
 		};
-
-		private FrameEvent getIPEvent()
-		{
-			synchronized (KnxServerGateway.this) {
-				return ipEvents.isEmpty() ? null : ipEvents.remove(0);
-			}
-		}
 
 		private void checkRoutingBusy()
 		{
@@ -570,10 +555,7 @@ public class KnxServerGateway implements Runnable
 			final int maxMsgsPerSecond = 200;
 
 			ipMsgCount++;
-			final int msgs;
-			synchronized (KnxServerGateway.this) {
-				msgs = ipEvents.size();
-			}
+			final int msgs = ipEvents.size();
 			final double seconds = ((double) observationPeriod.toMillis()) / 1000;
 			final int msgsPerPeriod = (int) (maxMsgsPerSecond * seconds);
 			if (msgs >= msgsPerPeriod)
@@ -727,9 +709,8 @@ public class KnxServerGateway implements Runnable
 				Thread.currentThread().interrupt();
 			}
 		}
-		synchronized (dispatcher) {
-			dispatcher.notify();
-		}
+
+		dispatcher.interrupt();
 	}
 
 	/**
