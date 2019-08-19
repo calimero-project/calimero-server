@@ -111,7 +111,7 @@ import tuwien.auto.calimero.xml.XmlReader;
  *
  * @author B. Malinowsky
  */
-public class Launcher implements Runnable
+public class Launcher implements Runnable, AutoCloseable
 {
 	/**
 	 * Specifies the supported XML tags and attribute names for a server configuration. See also the
@@ -542,12 +542,11 @@ public class Launcher implements Runnable
 			return;
 		}
 		final String configUri = args[args.length - 1];
-		try {
-			final Launcher sr = new Launcher(configUri);
-			final boolean detached = "--no-stdin".equals(args[0]);
-			sr.terminal = !detached;
-			Runtime.getRuntime().addShutdownHook(new Thread(sr::quit, sr.server.getName() + " shutdown"));
-			sr.run();
+		final boolean detached = "--no-stdin".equals(args[0]);
+		try (var launcher = new Launcher(configUri)) {
+			launcher.terminal = !detached;
+			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
+			launcher.run();
 		}
 		catch (final KNXException e) {
 			logger.error("loading configuration from " + configUri, e);
@@ -649,21 +648,25 @@ public class Launcher implements Runnable
 	}
 
 	/**
-	 * Quits a running server gateway launched by this launcher, and shuts down the KNX server.
-	 */
-	public void quit()
-	{
-		server.shutdown();
-	}
-
-	/**
 	 * Returns the KNX server gateway.
 	 *
 	 * @return the gateway
 	 */
-	public final KnxServerGateway getGateway()
-	{
-		return gw;
+	public final KnxServerGateway getGateway() { return gw; }
+
+	/**
+	 * Quits a running server gateway launched by this launcher, and shuts down the KNX server.
+	 */
+	public void quit() {
+		close();
+	}
+
+	/**
+	 * Shuts down a running KNX server and gateway launched by this launcher.
+	 */
+	@Override
+	public void close() {
+		server.shutdown();
 	}
 
 	private void connect(final List<KNXNetworkLink> linksToClose,
