@@ -76,6 +76,7 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Keyring;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.KnxSecureException;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
@@ -902,7 +903,7 @@ public class Launcher implements Runnable
 		final IndividualAddress ctrlEndpoint) {
 		final var idx = additionalAddresses.indexOf(addr);
 		if (idx == -1 && !addr.equals(ctrlEndpoint))
-			throw new RuntimeException("tunneling address " + addr + " is not an additional address");
+			throw new KnxRuntimeException("tunneling address " + addr + " is not an additional address");
 		return idx + 1;
 	}
 

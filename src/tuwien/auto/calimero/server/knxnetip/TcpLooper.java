@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
 final class TcpLooper implements Runnable, AutoCloseable {
@@ -86,7 +87,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			if (v != null)
 				return v;
 		}
-		throw new RuntimeException("couldn't start tcp service for " + ctrlEndpoint.getServiceContainer().getName());
+		throw new KnxRuntimeException("couldn't start tcp service for " + ctrlEndpoint.getServiceContainer().getName());
 	}
 
 	private TcpLooper(final ControlEndpointService ces, final Socket conn) {

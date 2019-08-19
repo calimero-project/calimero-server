@@ -89,6 +89,7 @@ import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.cemi.CEMI;
@@ -1607,7 +1608,7 @@ public class KnxServerGateway implements Runnable
 		for (int i = 0; i < connectors.size(); i++)
 			if (connectors.get(i).getName().equals(id))
 				return i + 1;
-		throw new RuntimeException("no subnet connector with ID '" + id + "'");
+		throw new KnxRuntimeException("no subnet connector with ID '" + id + "'");
 	}
 
 	private static final int A_FunctionPropertyCommand =          0b1011000111;

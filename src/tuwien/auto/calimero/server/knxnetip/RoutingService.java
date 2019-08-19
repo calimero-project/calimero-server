@@ -49,6 +49,7 @@ import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXListener;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -183,7 +184,7 @@ final class RoutingService extends ServiceLooper
 			return null;
 		final NetworkInterface netif = NetworkInterface.getByName(name);
 		if (netif == null)
-			throw new RuntimeException("no network interface with the specified name '" + name + "'");
+			throw new KnxRuntimeException("no network interface with the specified name '" + name + "'");
 		return netif;
 	}
 
