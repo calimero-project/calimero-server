@@ -69,7 +69,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -789,9 +788,11 @@ public class KnxServerGateway implements Runnable
 				info.append(format("\tserver IP %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
 						NetworkInterface.getByInetAddress(ip)));
 
-				@SuppressWarnings("unchecked")
-				final Link<AutoCloseable> link = (Link<AutoCloseable>) c.getSubnetLink();
-				final String subnet = Optional.ofNullable(link.target()).map(Object::toString).orElse("link connecting ...");
+				AutoCloseable link = c.getSubnetLink();
+				if (link instanceof Link<?>)
+					link = ((Link<?>) link).target();
+
+				final String subnet = Optional.ofNullable(link).map(Object::toString).orElse("link connecting ...");
 				info.append(format("\tsubnet %s%n", subnet));
 
 				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
