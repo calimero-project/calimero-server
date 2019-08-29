@@ -233,6 +233,41 @@ final class ControlEndpointService extends ServiceLooper
 	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
 		final int port) throws KNXFormatException, IOException
 	{
+		if (h.isSecure()) {
+			try {
+				secureSvcInProgress = true;
+				return sessions.acceptService(h, data, offset, new InetSocketAddress(src, port), this);
+			}
+			finally {
+				secureSvcInProgress = false;
+			}
+		}
+		else if (h.getServiceType() == KNXnetIPHeader.CONNECT_REQ) {
+			final ConnectRequest req = new ConnectRequest(data, offset);
+			final var connType = req.getCRI().getConnectionType();
+
+			final boolean tunneling = connType == TUNNEL_CONNECTION;
+			final boolean devmgmt = connType == DEVICE_MGMT_CONNECTION;
+			final var typeString = tunneling ? "tunneling" : devmgmt ? "device management" : "0x" + connType;
+
+			if (tunneling && isSecuredService(TUNNELING) || devmgmt && isSecuredService(DEVICE_MANAGEMENT)) {
+				logger.warn("reject {}, secure services required for {}", h, typeString);
+				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
+				final byte[] buf = PacketHelper
+						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
+				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
+			}
+			else
+				return acceptControlService(0, h, data, offset, src, port);
+		}
+		else
+			return acceptControlService(0, h, data, offset, src, port);
+		return true;
+	}
+
+	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
+		final int port) throws KNXFormatException, IOException
+	{
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SearchRequest) {
 			// extended unicast search request to this control endpoint
@@ -261,16 +296,12 @@ final class ControlEndpointService extends ServiceLooper
 			}
 
 			final InetSocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
-			sendSearchResponse(addr, macFilter, requestedServices, requestedDibs);
+			sendSearchResponse(sessionId, addr, macFilter, requestedServices, requestedDibs);
 		}
 		else if (svc == KNXnetIPHeader.DESCRIPTION_REQ) {
 			if (!checkVersion(h))
 				return true;
 			final DescriptionRequest dr = new DescriptionRequest(data, offset);
-			if (dr.getEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
-				logger.warn("description request: protocol support for UDP/IP only");
-				return true;
-			}
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
 			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont, false);
 			final ManufacturerDIB mfr = createManufacturerDIB();
@@ -281,46 +312,10 @@ final class ControlEndpointService extends ServiceLooper
 
 			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, port, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
-			s.send(new DatagramPacket(buf, buf.length, responseAddress));
 			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
-		}
-		else if (h.isSecure()) {
-			try {
-				secureSvcInProgress = true;
-				return sessions.acceptService(h, data, offset, new InetSocketAddress(src, port), this);
-			}
-			finally {
-				secureSvcInProgress = false;
-			}
+			send(sessionId, 0, buf, responseAddress);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
-			final ConnectRequest req = new ConnectRequest(data, offset);
-			final var connType = req.getCRI().getConnectionType();
-
-			final boolean tunneling = connType == TUNNEL_CONNECTION;
-			final boolean devmgmt = connType == DEVICE_MGMT_CONNECTION;
-			final var typeString = tunneling ? "tunneling" : devmgmt ? "device management" : "0x" + connType;
-
-			if (tunneling && isSecuredService(TUNNELING) || devmgmt && isSecuredService(DEVICE_MANAGEMENT)) {
-				logger.warn("reject {}, secure services required for {}", h, typeString);
-				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
-				final byte[] buf = PacketHelper
-						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
-				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
-			}
-			else
-				return acceptControlService(0, h, data, offset, src, port);
-		}
-		else
-			return acceptControlService(0, h, data, offset, src, port);
-		return true;
-	}
-
-	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port) throws KNXFormatException, IOException
-	{
-		final int svc = h.getServiceType();
-		if (svc == KNXnetIPHeader.CONNECT_REQ) {
 			useNat = false;
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			int status = ErrorCodes.NO_ERROR;
@@ -465,8 +460,8 @@ final class ControlEndpointService extends ServiceLooper
 			endpoint.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), LogLevel.INFO, null);
 	}
 
-	private void sendSearchResponse(final InetSocketAddress dst, final byte[] macFilter, final byte[] requestedServices,
-		final byte[] requestedDibs) throws IOException {
+	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
+		final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 
 		// we create our own HPAI from the actual socket, since
 		// the service container might have opted for ephemeral port use
@@ -512,7 +507,7 @@ final class ControlEndpointService extends ServiceLooper
 		final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
 		final byte[] buf = PacketHelper.toPacket(new SearchResponse(true, hpai, dibs));
 		logger.trace("sending search response with container '" + svcCont.getName() + "' to " + dst);
-		send(0, 0, buf, dst);
+		send(sessionId, 0, buf, dst);
 		final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
 		logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
 	}
