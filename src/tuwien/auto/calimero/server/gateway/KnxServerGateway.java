@@ -913,9 +913,50 @@ public class KnxServerGateway implements Runnable
 				}
 
 				if (f.getDestination() instanceof IndividualAddress) {
-					final Optional<SubnetConnector> connector = connectorFor((IndividualAddress) f.getDestination());
+					final IndividualAddress dst = (IndividualAddress) f.getDestination();
+					final Optional<SubnetConnector> connector = connectorFor(dst);
 					if (connector.isPresent() && localDeviceManagement(connector.get(), f))
 						return;
+					if (connector.isPresent()) {
+						final var svcContainer = connector.get().getServiceContainer();
+
+						// check if destination is a client of ours
+						final var dataConnections = server.dataConnections(svcContainer);
+						for (final var dataEndpoint : dataConnections.values()) {
+							if (f.getDestination().equals(dataEndpoint.deviceAddress())) {
+								try {
+									final var ind = CEMIFactory.create(null, null,
+											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+									send(svcContainer, dataEndpoint, ind, true);
+								}
+								catch (final InterruptedException e) {
+									Thread.currentThread().interrupt();
+								}
+								catch (KNXFormatException | RuntimeException e) {
+									e.printStackTrace();
+								}
+								return;
+							}
+						}
+
+						// defend our own additional individual addresses when receiving a TL connect.req
+						if (DataUnitBuilder.getTPDUService(f.getPayload()) == 0x80) {
+							final int objectInstance = 1;
+							final var addresses = additionalAddresses(objectInstance);
+							if (addresses.contains(f.getDestination())) {
+								// send disconnect
+								try {
+									final var ind = CEMIFactory.create(dst, f.getSource(), (CEMILData) CEMIFactory
+											.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, f), false);
+									dispatchToServer(connector.get(), ind, fe.id());
+								}
+								catch (final KNXFormatException e) {
+									e.printStackTrace();
+								}
+								return;
+							}
+						}
+					}
 				}
 				final CEMILData send = adjustHopCount(f);
 				if (send != null)
@@ -1505,6 +1546,23 @@ public class KnxServerGateway implements Runnable
 			// when in doubt, pass the message on...
 			return true;
 		}
+	}
+
+	private List<IndividualAddress> additionalAddresses(final int objectInstance) {
+		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+		final int elems = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 0, 1)[1] & 0xff;
+		final List<IndividualAddress> list = new ArrayList<>();
+		try {
+			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
+			final ByteBuffer buf = ByteBuffer.wrap(data);
+			for (int i = 0; i < elems; ++i)
+				list.add(new IndividualAddress(buf.getShort() & 0xffff));
+		}
+		catch (final KnxPropertyException e) {
+			logger.warn(e.getMessage());
+		}
+		return list;
 	}
 
 	// @formatter:off
