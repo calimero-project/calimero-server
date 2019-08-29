@@ -767,9 +767,18 @@ public class KnxServerGateway implements Runnable
 	private String stat() {
 		final StringBuilder info = new StringBuilder();
 		final var uptime = Duration.between(startTime, Instant.now()).truncatedTo(ChronoUnit.SECONDS);
-		info.append(format("start time %s (uptime %s)%n", startTime, uptime));
+		final var days = uptime.toDays();
+		final var dayPart = days > 1 ? days + " days " : days == 1 ? "1 day " : "";
+		info.append(format("start time %s (uptime %s%d:%d)%n", startTime, dayPart, uptime.toHoursPart(),
+				uptime.toMinutesPart()));
 
 		int objInst = 0;
+
+		info.append(format("used msg buffer IP => KNX: %d/%d (%d %%)%n", ipEvents.size(), maxEventQueueSize,
+				ipEvents.size() * 100 / maxEventQueueSize));
+		info.append(format("used msg buffer KNX => IP: %d/%d (%d %%)%n", subnetEvents.size(), maxEventQueueSize,
+				subnetEvents.size() * 100 / maxEventQueueSize));
+
 		for (final SubnetConnector c : getSubnetConnectors()) {
 			objInst++;
 			info.append(format("service container '%s'%n", c.getName()));
