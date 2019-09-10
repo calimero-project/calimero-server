@@ -66,6 +66,8 @@ import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.KnxRuntimeException;
+import tuwien.auto.calimero.KnxSecureException;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
@@ -543,6 +545,8 @@ public class KNXnetIPServer
 					PropertyTypes.PDT_GENERIC_16, false, 2, 127, 0, 0), true);
 			final byte[] userPwdHashes = baos.toByteArray();
 			final int users = userPwdHashes.length / 16;
+			if (users == 0)
+				throw new KnxSecureException("user 1 is mandatory, but not configured");
 			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
 		}
 
@@ -584,7 +588,7 @@ public class KNXnetIPServer
 				setProperty(knxObject, objectInstance, SecureSession.pidSyncLatencyTolerance, scaling.getData());
 			}
 			catch (final KNXFormatException e) {
-				throw new RuntimeException(e);
+				throw new KnxRuntimeException("configure secure routing", e);
 			}
 		}
 	}
