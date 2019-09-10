@@ -50,6 +50,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -61,10 +62,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -417,9 +420,7 @@ public class Launcher implements Runnable, AutoCloseable
 							if (interfaces == null)
 								throw new KnxSecureException("no interfaces found in keyring for host " + subnet);
 							for (final var iface : interfaces) {
-								tunnelingUserToAddresses
-										.computeIfAbsent(iface.user(), __ -> new ArrayList<IndividualAddress>())
-										.add(iface.address());
+								tunnelingUserToAddresses.computeIfAbsent(iface.user(), ArrayList::new).add(iface.address());
 								indAddressPool.add(iface.address());
 							}
 						}
@@ -428,22 +429,40 @@ public class Launcher implements Runnable, AutoCloseable
 
 						securedServicesMap.put(sc, securedServices);
 
-						if (keyfile != null) {
-							try (var lines = Files.lines(keyfile)) {
-								final Map<String, byte[]> keys = lines
-										.filter(l -> l.contains("=") && Character.isLetter(l.charAt(0)))
-										.collect(Collectors.toMap(l -> l.substring(0, l.indexOf('=')).trim(),
-												l -> DataUnitBuilder.fromHex(l.substring(l.indexOf('=') + 1).trim())));
-								keyfiles.put(sc, keys);
-							}
-							catch (final IOException e) {
-								throw new KNXMLException("reading key file '" + keyfile + "'", e);
-							}
-						}
+						if (keyfile != null)
+							keyfiles.put(sc, readKeyfile(keyfile));
 						return;
 					}
 				}
 			}
+		}
+
+		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
+			try (final var lines = Files.lines(keyfile)) {
+				// ignore comments, limit keys to words with dot separator, require '='
+				final var matcher = Pattern.compile("^[^/#][\\w\\.]+\\s*=.+$").asMatchPredicate();
+				final Map<String, byte[]> keys = lines.filter(matcher)
+						.map(line -> line.split("=", 2))
+						.map(XmlConfiguration::hashDeviceOrUserPassword)
+						.collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+				return keys;
+			}
+			catch (final IOException e) {
+				throw new KNXMLException("reading key file '" + keyfile + "'", e);
+			}
+		}
+
+		private static Entry<String, byte[]> hashDeviceOrUserPassword(final String[] entry) {
+			final var key = entry[0].trim();
+			final var value = entry[1].trim();
+			final var chars = value.toCharArray();
+			if ("keyring.pwd".equals(key))
+				return Map.entry(key, value.getBytes(StandardCharsets.US_ASCII));
+			if ("device.pwd".equals(key))
+				return Map.entry("device.key", SecureConnection.hashDeviceAuthenticationPassword(chars));
+			if (key.endsWith("pwd"))
+				return Map.entry(key.replace(".pwd", ""), SecureConnection.hashUserPassword(chars));
+			return Map.entry(key, DataUnitBuilder.fromHex(value));
 		}
 
 		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r)
@@ -685,8 +704,9 @@ public class Launcher implements Runnable, AutoCloseable
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
 			decodeKeyring(sc);
-
-			server.configureSecurity(sc, xml.keyfiles.getOrDefault(sc, Collections.emptyMap()), xml.securedServicesMap.get(sc));
+			final var keyfile = xml.keyfiles.getOrDefault(sc, Collections.emptyMap());
+			server.configureSecurity(sc, keyfile, xml.securedServicesMap.get(sc));
+			keyfile.values().forEach(key -> Arrays.fill(key, (byte) 0));
 
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
@@ -736,7 +756,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 	private void decodeKeyring(final ServiceContainer sc) {
 		if (xml.keyrings.containsKey(sc)) {
-			final var keyfile = xml.keyfiles.getOrDefault(sc, Collections.emptyMap());
+			final var keyfile = xml.keyfiles.getOrDefault(sc, new HashMap<>());
 			char[] pwd = null;
 			if (keyfile.containsKey("keyring.pwd")) {
 				final var pwdBytes = keyfile.get("keyring.pwd");
@@ -782,7 +802,7 @@ public class Launcher implements Runnable, AutoCloseable
 				decrypted.put("user." + iface.user(), key);
 			}
 
-			xml.keyfiles.put(sc, decrypted);
+			keyfile.putAll(decrypted);
 			Arrays.fill(pwd, (char) 0);
 		}
 	}
@@ -871,7 +891,7 @@ public class Launcher implements Runnable, AutoCloseable
 		final IndividualAddress ctrlEndpoint) {
 
 		// address indices are sorted in natural order
-		final var addrIndices = userToAddresses.entrySet().stream().map(Map.Entry::getValue).flatMap(List::stream)
+		final var addrIndices = userToAddresses.entrySet().stream().map(Entry::getValue).flatMap(List::stream)
 				.map(addr -> addressIndex(addr, additionalAddresses, ctrlEndpoint)).sorted().distinct()
 				.collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (r1, r2) -> {}).toByteArray();
 		setTunnelingAddresses(ios, objectInstance, addrIndices);
