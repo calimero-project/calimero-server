@@ -528,6 +528,7 @@ public class KNXnetIPServer
 
 		final int objectInstance = objectInstance(sc);
 		final int objIndex = svcContToIfObj.get(sc).getIndex();
+
 		// if we setup secure unicast services, we need at least device authentication
 		if (keys.containsKey("device.key")) {
 			secure = (1 << ServiceFamiliesDIB.DEVICE_MANAGEMENT) | (1 << ServiceFamiliesDIB.TUNNELING);
@@ -550,24 +551,10 @@ public class KNXnetIPServer
 			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
 		}
 
-		final boolean routing = sc instanceof RoutingServiceContainer;
 		final byte[] groupKey = keys.get("group.key");
-		if (routing && groupKey != null && !((RoutingServiceContainer) sc).latencyTolerance().isZero())
+		if (sc instanceof RoutingServiceContainer && groupKey != null) {
 			secure |= (1 << ServiceFamiliesDIB.ROUTING);
 
-		if (secure != 0) {
-			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(defDeviceCaps));
-			caps[1] |= 64;
-			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
-		}
-
-		secure &= securedServices;
-
-		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
-				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
-		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secure);
-
-		if (routing && groupKey != null) {
 			try {
 				final int pidGroupKey = 91;
 				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0, PropertyTypes.PDT_GENERIC_16,
@@ -591,6 +578,19 @@ public class KNXnetIPServer
 				throw new KnxRuntimeException("configure secure routing", e);
 			}
 		}
+
+		if (secure != 0) {
+			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES,
+					bytesFromWord(defDeviceCaps));
+			caps[1] |= 64;
+			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
+		}
+
+		secure &= securedServices;
+
+		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
+				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
+		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secure);
 	}
 
 	private NetworkInterface[] parseNetworkInterfaces(final String optionKey, final String value)

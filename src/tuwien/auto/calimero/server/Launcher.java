@@ -88,10 +88,11 @@ import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
-import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.link.KNXNetworkLink;
+import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
@@ -274,7 +275,7 @@ public class Launcher implements Runnable, AutoCloseable
 			byte[] subnetDoA = null;
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
-			InetAddress routingMcast = null;
+			InetAddress routingMcast = KNXNetworkLinkIP.DefaultMulticast;
 			int latencyTolerance = 1000; // ms
 			boolean useNat = false;
 			String subnetLinkClass = null;
@@ -284,13 +285,7 @@ public class Launcher implements Runnable, AutoCloseable
 			String expirationTimeout = "0";
 			int disruptionBufferLowerPort = 0;
 			int disruptionBufferUpperPort = 0;
-			boolean secure = false;
 			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
-
-			try {
-				routingMcast = InetAddress.getByName(KNXnetIPRouting.DEFAULT_MULTICAST);
-			}
-			catch (final UnknownHostException ignore) {}
 
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
 				final String name = r.getLocalName();
@@ -340,12 +335,11 @@ public class Launcher implements Runnable, AutoCloseable
 						tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
 					else if (name.equals("routing")) {
 						try {
-							if (Boolean.parseBoolean(r.getAttributeValue(null, "secure"))) {
-								secure = true;
-								latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance"))
-										.map(Integer::parseUnsignedInt).orElse(2000);
-							}
-							routingMcast = InetAddress.getByName(r.getElementText());
+							latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance"))
+									.map(Integer::parseUnsignedInt).orElse(2000);
+							final String mcast = r.getElementText();
+							if (!mcast.isEmpty())
+								routingMcast = InetAddress.getByName(mcast);
 						}
 						catch (final UnknownHostException uhe) {
 							throw new KNXMLException(uhe.getMessage(), r);
@@ -390,13 +384,9 @@ public class Launcher implements Runnable, AutoCloseable
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
-						if (routing) {
-							if (secure)
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast,
-										Duration.ofMillis(latencyTolerance));
-							else
-								sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast);
-						}
+						if (routing)
+							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast,
+									Duration.ofMillis(latencyTolerance));
 						else
 							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);
 						sc.setActivationState(activate);
@@ -536,6 +526,8 @@ public class Launcher implements Runnable, AutoCloseable
 
 	private static Logger logger = LoggerFactory.getLogger("calimero.server");
 
+	private static final String secureSymbol = new String(Character.toChars(0x1F512));
+
 	private final KNXnetIPServer server;
 	private KnxServerGateway gw;
 
@@ -601,11 +593,15 @@ public class Launcher implements Runnable, AutoCloseable
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			final String activated = sc.isActivated() ? "" : " [not activated]";
 			String mcast = "disabled";
-			String secure = "";
+			String secureRouting = "";
+			final int securedServices = xml.securedServicesMap.get(sc);
 			if ((sc instanceof RoutingServiceContainer)) {
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
-				secure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).getOrDefault("group.key", new byte[0]).length == 16
-						? new String(Character.toChars(0x1F512)) + " " : "";
+
+				final boolean secureRoutingRequired = (securedServices & (1 << ServiceFamiliesDIB.ROUTING)) != 0;
+				if (secureRoutingRequired && xml.keyfiles.containsKey(sc)
+						&& xml.keyfiles.get(sc).getOrDefault("group.key", new byte[0]).length == 16)
+					secureRouting = secureSymbol + " ";
 			}
 			final String type = xml.subnetTypes.get(i);
 			String filter = "";
@@ -616,14 +612,15 @@ public class Launcher implements Runnable, AutoCloseable
 				datapoints = "\n\tDatapoints "
 						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints();
 
-			final String unicastSecure = xml.keyfiles.containsKey(sc) && xml.keyfiles.get(sc).get("user.1") != null
-					? new String(Character.toChars(0x1F512)) + " " : "";;
+			final boolean secureUnicastRequired = (securedServices & (1 << ServiceFamiliesDIB.TUNNELING)) != 0;
+			final String unicastSecure = secureUnicastRequired && xml.keyfiles.containsKey(sc)
+					&& xml.keyfiles.get(sc).get("user.1") != null ? secureSymbol + " " : "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
 			// @formatter:off
 			final String info = String.format("configuration of service container '%s'%s:%n"
-					+ "\tlisten on %s (%sport %s), KNXnet/IP %srouting %s%n"
+					+ "\tlisten on %s (%sport %s), KNX IP %srouting %s%n"
 					+ "\t%s connection: %s%s%s",
-					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secure, mcast, type,
+					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secureRouting, mcast, type,
 					sc.getMediumSettings(), filter, datapoints);
 			// @formatter:on
 			logger.info(info);
