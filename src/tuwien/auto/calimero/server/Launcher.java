@@ -875,7 +875,7 @@ public class Launcher implements Runnable, AutoCloseable
 		final int objectIndex = objectIndex(KNXNETIP_PARAMETER_OBJECT, objectInstance);
 		final int size = addresses.size();
 		final Description d = new Description(objectIndex, KNXNETIP_PARAMETER_OBJECT, ADDITIONAL_INDIVIDUAL_ADDRESSES,
-				0, PropertyTypes.PDT_UNSIGNED_INT, true, size, size, 3, 3);
+				0, PropertyTypes.PDT_UNSIGNED_INT, true, size, Math.max(size, 30), 3, 3);
 		ios.setDescription(d, true);
 
 		for (int i = 0; i < size; i++) {
