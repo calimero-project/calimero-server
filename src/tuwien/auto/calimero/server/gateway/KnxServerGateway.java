@@ -83,6 +83,7 @@ import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
@@ -90,7 +91,6 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
-import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -119,6 +119,7 @@ import tuwien.auto.calimero.link.KNXNetworkLinkUsb;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
@@ -127,6 +128,7 @@ import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.VirtualLink;
+import tuwien.auto.calimero.server.knxnetip.DataEndpoint;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
@@ -588,6 +590,73 @@ public class KnxServerGateway implements Runnable
 		}
 	};
 
+	private final List<NetworkLinkListener> deviceListeners = new ArrayList<>();
+	private final KNXNetworkLink deviceLinkProxy = new KNXNetworkLink() {
+		@Override
+		public void addLinkListener(final NetworkLinkListener l) { deviceListeners.add(l); }
+
+		@Override
+		public void removeLinkListener(final NetworkLinkListener l) { deviceListeners.remove(l); }
+
+		@Override
+		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu)
+				throws KNXTimeoutException, KNXLinkClosedException {
+			sendRequestWait(dst, p, nsdu);
+		}
+
+		@Override
+		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
+				throws KNXTimeoutException, KNXLinkClosedException {
+
+			final boolean ldm = dst.equals(new IndividualAddress(0));
+			if (ldm) {
+				for (final var c : serverConnections) {
+					// device mgmt endpoints don't have a device address assigned
+					if (c instanceof DataEndpoint && ((DataEndpoint) c).deviceAddress() == null) {
+						final var deviceMgmtEndpoint = (DataEndpoint) c;
+						// send cEMI T-Data
+					}
+				}
+			}
+			else {
+				final var self = new IndividualAddress(1, 1, 0); // XXX
+				final var msg = new CEMILData(CEMILData.MC_LDATA_IND, self, dst, nsdu, p);
+				send(msg, false);
+			}
+		}
+
+		@Override
+		public void send(final CEMILData msg, final boolean waitForCon)
+				throws KNXTimeoutException, KNXLinkClosedException {
+			// TODO support > 1 service containers
+			final SubnetConnector connector = connectors.get(0);
+			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
+			dispatchToServer(connector, msg, eventId);
+		}
+
+		@Override
+		public String getName() { return "server device"; }
+
+		@Override
+		public void setKNXMedium(final KNXMediumSettings settings) {}
+
+		@Override
+		public KNXMediumSettings getKNXMedium() { return TPSettings.TP1; }
+
+		@Override
+		public void setHopCount(final int count) {}
+
+		@Override
+		public int getHopCount() { return 6; }
+
+		@Override
+		public boolean isOpen() { return true; }
+
+		@Override
+		public void close() {}
+	};
+
+
 	/**
 	 * Creates a new server gateway for the supplied KNXnet/IP server.
 	 * <p>
@@ -607,6 +676,13 @@ public class KnxServerGateway implements Runnable
 		logger = LogService.getLogger("calimero.server.gateway." + name);
 		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 		dispatcher.setName(name + " subnet dispatcher");
+
+		try {
+			server.device.setDeviceLink(deviceLinkProxy);
+		}
+		catch (final KNXLinkClosedException e) {
+			throw new KnxRuntimeException("setting device link", e);
+		}
 
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 
@@ -958,6 +1034,24 @@ public class KnxServerGateway implements Runnable
 						}
 					}
 				}
+
+				// see if the frame is also of interest to us, or addressed to us
+				final var dst = f.getDestination();
+				if (dst instanceof GroupAddress && dst.getRawAddress() == 0)
+					deviceListeners.forEach(l -> l.indication(fe));
+				else if (dst instanceof IndividualAddress) {
+					final var ia = (IndividualAddress) dst;
+					final Optional<SubnetConnector> connector = connectorFor(ia);
+					if (connector.isPresent()) {
+						final IndividualAddress localInterface = connector.get().getServiceContainer()
+								.getMediumSettings().getDeviceAddress();
+						if (f.getDestination().equals(localInterface)) {
+							deviceListeners.forEach(l -> l.indication(fe));
+							return;
+						}
+					}
+				}
+
 				final CEMILData send = adjustHopCount(f);
 				if (send != null)
 					dispatchToSubnets(send, fe.systemBroadcast());
@@ -967,12 +1061,17 @@ public class KnxServerGateway implements Runnable
 				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 
 				// check if frame is addressed to us
-				// TODO probably have to add exception for usb routing
 				if (connector != null) {
 					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
 					if (f.getDestination().equals(containerAddr)) {
-						functionPropertyCommand(connector, f);
-						return;
+						// with a usb interface, device is always our own address, so we always exclude it for now
+						if (connector.getInterfaceType().equals("usb"))
+							logger.debug("received from subnet using usb interface {}, don't intercept frame",
+									connector.getName());
+						else {
+							deviceListeners.forEach(l -> l.indication(fe));
+							return;
+						}
 					}
 				}
 
@@ -1677,107 +1776,6 @@ public class KnxServerGateway implements Runnable
 			if (connectors.get(i).getName().equals(id))
 				return i + 1;
 		throw new KnxRuntimeException("no subnet connector with ID '" + id + "'");
-	}
-
-	private static final int A_FunctionPropertyCommand =          0b1011000111;
-	private static final int A_FunctionPropertyStateResponse =    0b1011001001;
-	private static final int A_FunctionPropertyExtCommand =       0b0111010100;
-	private static final int A_FunctionPropertyExtStateResponse = 0b0111010110;
-
-	private void functionPropertyCommand(final SubnetConnector connector, final CEMILData f) {
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		ReturnCode ret = ReturnCode.Success;
-
-		final var apdu = f.getPayload();
-		final var svc = DataUnitBuilder.getAPDUService(apdu);
-		final var asdu = ByteBuffer.wrap(apdu, 2, apdu.length - 2);
-		if (svc == A_FunctionPropertyCommand) {
-			final var objectIndex = asdu.get() & 0xff;
-			final var pid = asdu.get() & 0xff;
-			// first make sure we have a function property
-			final var pdt = ios.getDescription(objectIndex, pid).getPDT();
-			if (pdt != PropertyTypes.PDT_FUNCTION) {
-				logger.warn("property {}|{} is not a function property", objectIndex, pid);
-				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyStateResponse,
-						(byte) objectIndex, (byte) pid);
-				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
-						f.getSource(), tpdu, f.getPriority());
-				dispatchToSubnet(connector, res, f.getDestination().getRawAddress(), false);
-				return;
-			}
-
-			if (objectIndex == objectIndex(InterfaceObject.ROUTER_OBJECT, 1) && pid == pidIpSbcControl) {
-				/*var reserved = */asdu.get();
-				final int serviceId = asdu.get() & 0xff;
-				if (serviceId == 0) {
-					final byte info = asdu.get();
-					if (info == 0 || info == 1) {
-						final var state = info == 1 ? "enable" : "disable";
-						logger.info("{} IP system broadcast routing mode", state);
-						ios.setProperty(objectIndex, pid, 1, 1, info);
-						// NYI if enabled, (re-)schedule SBC disable 20 seconds from now
-					}
-					else
-						ret = ReturnCode.DataVoid;
-				}
-				else
-					ret = ReturnCode.InvalidCommand;
-
-				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyStateResponse, (byte) objectIndex,
-						(byte) pid, (byte) ret.code(), (byte) serviceId);
-				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
-						f.getSource(), tpdu, f.getPriority());
-				dispatchToSubnet(connector, res, 0, false);
-			}
-		}
-		else if (svc == A_FunctionPropertyExtCommand) {
-			final var objectType = asdu.getShort() & 0xffff;
-			final var objectInstHi = asdu.get() & 0xff;
-			final var tmp = asdu.get() & 0xff;
-			final var objectInst = (objectInstHi << 4) | (tmp >> 4);
-			final var pid = (tmp & 0x0f << 8) | (asdu.get() & 0xff);
-			// first make sure we have a function property
-			final var pdt = ios.getDescription(objectIndex(objectType, objectInst), pid).getPDT();
-			if (pdt != PropertyTypes.PDT_FUNCTION) {
-				logger.warn("property {}|{}|{} is not a function property", objectType, objectInst, pid);
-				asdu.rewind();
-				final var tpdu = DataUnitBuilder.createAPDU(A_FunctionPropertyExtStateResponse, asdu.get(),
-					asdu.get(), asdu.get(), asdu.get(), asdu.get(), (byte) ReturnCode.DataTypeConflict.code());
-				final CEMILData res = new CEMILData(CEMILData.MC_LDATA_REQ, (IndividualAddress) f.getDestination(),
-						f.getSource(), tpdu, f.getPriority());
-				dispatchToSubnet(connector, res, f.getDestination().getRawAddress(), false);
-				return;
-			}
-
-			if (objectType == InterfaceObject.ROUTER_OBJECT && objectInst == 1 && pid == pidIpSbcControl) {
-				/*var reserved = */asdu.get();
-				final int serviceId = asdu.get() & 0xff;
-				if (serviceId == 0) {
-					final byte info = asdu.get();
-					if (info == 0 || info == 1) {
-						final var state = info == 1 ? "enable" : "disable";
-						logger.info("{} IP system broadcast routing mode", state);
-						ios.setProperty(objectType, objectInst, pid, 1, 1, info);
-						// NYI if enabled, (re-)schedule SBC disable 20 seconds from now
-					}
-					else
-						ret = ReturnCode.DataVoid;
-				}
-				else
-					ret = ReturnCode.DataVoid;
-				// NYI send response
-			}
-		}
-	}
-
-	private int objectIndex(final int interfaceObjectType, final int instance) {
-		final var objects = server.getInterfaceObjectServer().getInterfaceObjects();
-		int inst = 0;
-		for (final InterfaceObject io : objects) {
-			if (io.getType() == interfaceObjectType && ++inst == instance)
-				return io.getIndex();
-		}
-		return -1;
 	}
 
 	// TODO support > 1 service containers with usb

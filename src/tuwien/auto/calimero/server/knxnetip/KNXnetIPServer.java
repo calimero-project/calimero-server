@@ -64,17 +64,26 @@ import org.slf4j.Logger;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DeviceDescriptor;
+import tuwien.auto.calimero.DeviceDescriptor.DD0;
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.KnxSecureException;
+import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
+import tuwien.auto.calimero.datapoint.Datapoint;
+import tuwien.auto.calimero.device.BaseKnxDevice;
+import tuwien.auto.calimero.device.KnxDevice;
+import tuwien.auto.calimero.device.KnxDeviceServiceLogic;
+import tuwien.auto.calimero.device.ServiceResult;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
+import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
 import tuwien.auto.calimero.dptxlator.DPTXlator8BitUnsigned;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
@@ -84,10 +93,12 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
+import tuwien.auto.calimero.mgmt.Destination;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 /**
@@ -229,6 +240,7 @@ public class KNXnetIPServer
 	// list of LooperThread objects running a routing endpoint
 	final List<LooperThread> routingEndpoints = new ArrayList<>();
 
+	public final KnxDevice device; // TODO basically part of the server api
 	private InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
 
@@ -237,6 +249,44 @@ public class KNXnetIPServer
 	private final EventListeners<ServerListener> listeners;
 
 	public final Set<ServiceContainer> udpOnly = new HashSet<>();
+
+	final KnxDeviceServiceLogic logic = new KnxDeviceServiceLogic() {
+		private static final int pidIpSbcControl = 120;
+
+		@Override
+		public void updateDatapointValue(final Datapoint ofDp, final DPTXlator update) {}
+
+		@Override
+		public DPTXlator requestDatapointValue(final Datapoint ofDp) throws KNXException { return null; }
+
+		@Override
+		public ServiceResult functionPropertyCommand(final Destination remote, final int objectIndex,
+				final int propertyId, final byte[] command) {
+			final int serviceId = command[1] & 0xff;
+			final int objectType = device.getInterfaceObjectServer().getInterfaceObjects()[objectIndex].getType();
+
+			if (objectType == InterfaceObject.ROUTER_OBJECT) {
+				if (propertyId == pidIpSbcControl) {
+					var returnCode = ReturnCode.Success;
+					if (serviceId == 0) {
+						final int info = command[2] & 0xff;
+						if (info == 0 || info == 1) {
+							logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
+							device.getInterfaceObjectServer().setProperty(objectIndex, propertyId, 1, 1, (byte) info);
+							// NYI if enabled, (re-)schedule disable SBC 20 seconds from now
+						}
+						else
+							returnCode = ReturnCode.DataVoid;
+					}
+					else
+						returnCode = ReturnCode.InvalidCommand;
+					return new ServiceResult((byte) returnCode.code(), (byte) serviceId);
+				}
+			}
+			return super.functionPropertyCommand(remote, objectIndex, propertyId, command);
+		}
+	};
+
 
 	/**
 	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
@@ -263,6 +313,14 @@ public class KNXnetIPServer
 			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		this.friendlyName = friendlyName;
 		logger = LogService.getLogger("calimero.server." + getName());
+
+		try {
+			device = new BaseKnxDevice(localName, DD0.TYPE_091A, new IndividualAddress(0), null, null, logic);
+		}
+		catch (final KNXLinkClosedException e) {
+			throw new Error("can't happen", e);
+		}
+		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
 		logger.info("{} (v{}) \'{}\'", new String(defFriendlyName, StandardCharsets.ISO_8859_1),
@@ -760,15 +818,13 @@ public class KNXnetIPServer
 
 	private void initBasicServerProperties() throws KnxPropertyException
 	{
-		if (ios == null)
-			ios = new InterfaceObjectServer(false);
 		ios.addServerListener(this::onPropertyValueChanged);
 
 		// initialize interface device object properties
 
 		// max APDU length is in range [15 .. 254]
 		setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, new byte[] { 0, (byte) 15 });
-		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
+//		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
 
 		final String[] sver = Settings.getLibraryVersion().split("\\.| |-", 0);
 		final int ver = Integer.parseInt(sver[0]) << 6 | Integer.parseInt(sver[1]);
