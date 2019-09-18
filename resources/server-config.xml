@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Calimero server settings (required for startup) -->
-<knxServer name="knx-server" friendlyName="Calimero KNXnet/IP Server">
+<knxServer name="knx-server" friendlyName="Calimero KNX IP Server">
 	<!-- KNXnet/IP search & discovery -->
 	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
 
@@ -8,10 +8,10 @@
 	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
 		udpPort="3671" listenNetIf="any">
 		<knxAddress type="individual">7.1.0</knxAddress>
-		<routing secure="false">224.0.23.12</routing>
+		<routing/>
 		<!-- latency specifies the time window for accepting secure multicasts, 
-			depends on max. end-to-end network latency (usually [500 .. 5000] ms) -->
-		<!-- <routing secure="true" latencyTolerance="1000">224.0.23.12</routing> -->
+			depends on max. end-to-end network latency (usually [500 .. 8000] ms) -->
+		<!-- <routing latencyTolerance="1000">224.0.23.12</routing> -->
 		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link 
 			using the specific client UDP port range (if caused by a disrupted connection). -->
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
@@ -42,10 +42,9 @@
 
 		<!-- KNX group address filter applied for this service container (optional) -->
 		<groupAddressFilter>
-			<knxAddress type="group">0/0/0</knxAddress>
-			<knxAddress type="group">2/1/1</knxAddress>
-			<knxAddress type="group">2/1/0</knxAddress>
-			<knxAddress type="group">2/1/20</knxAddress>
+			<!-- <knxAddress type="group">2/1/1</knxAddress> -->
+			<!-- <knxAddress type="group">2/1/0</knxAddress> -->
+			<!-- <knxAddress type="group">2/1/20</knxAddress> -->
 		</groupAddressFilter>
 		<!-- Additional KNX individual addresses assigned to client KNXnet/IP connections (optional) -->
 		<additionalAddresses>

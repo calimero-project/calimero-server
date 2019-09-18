@@ -45,6 +45,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -153,7 +154,7 @@ public class KNXnetIPServer
 
 	// PID.FRIENDLY_NAME
 	private static final byte[] defFriendlyName = new byte[] { 'C', 'a', 'l', 'i', 'm', 'e', 'r',
-		'o', ' ', 'K', 'N', 'X', 'n', 'e', 't', '/', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
+		'o', ' ', 'K', 'N', 'X', ' ', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
 	// PID.PROGMODE
 	private static final int defDeviceStatus = 0;
 	// PID.PROJECT_INSTALLATION_ID
@@ -264,7 +265,8 @@ public class KNXnetIPServer
 		logger = LogService.getLogger("calimero.server." + getName());
 		listeners = new EventListeners<>(logger);
 
-		logger.info("Calimero KNXnet/IP server (v{}) \'{}\'", Settings.getLibraryVersion(), friendlyName);
+		logger.info("{} (v{}) \'{}\'", new String(defFriendlyName, StandardCharsets.ISO_8859_1),
+				Settings.getLibraryVersion(), friendlyName);
 		initBasicServerProperties();
 	}
 

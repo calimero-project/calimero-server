@@ -618,7 +618,7 @@ public final class DataEndpoint extends ConnectionBase
 				logger.warn("received reset indication - ignored");
 				break;
 			default:
-				logger.warn("unsupported cEMI message code " + cemi.getMessageCode() + " - ignored");
+				logger.warn("unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode()) + " - ignored");
 			}
 		}
 	}
