@@ -101,8 +101,7 @@ Elements and attributes of `server-config.xml`:
     - `udpPort="5555-5559"`: The disruption buffer is only available for clients which connect via the specified (client-side) UDP port range. All other clients are ignored.
 
 * `<routing>224.0.23.12</routing>` (optional): the multicast setup used by the service container for KNX IP (Secure) routing, defaults to the IP multicast address 224.0.23.12. (If the `routing` attribute of the service container is set to `false`, this setting has no effect.)  
-Required attributes for secure routing:
-    - `secure="true"`: `true` activates KNX IP Secure, `false` defaults to KNXnet/IP Routing
+Optional attributes for secure routing:
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to the KNX subnet, one of:
