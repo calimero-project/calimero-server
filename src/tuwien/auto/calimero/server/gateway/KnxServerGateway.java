@@ -1315,8 +1315,11 @@ public class KnxServerGateway implements Runnable
 					for (final var entry : connections.entrySet()) {
 						final var connection = entry.getValue();
 						final IndividualAddress assignedAddress = connection.deviceAddress();
-						logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, connection);
-						send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
+						// skip devmgmt connections
+						if (assignedAddress != null) {
+							logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, connection);
+							send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
+						}
 					}
 					// also dispatch via routing as-is
 					c = findRoutingConnection().orElse(null);
