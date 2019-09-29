@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server;
 
 import static java.util.Optional.ofNullable;
+import static tuwien.auto.calimero.device.ios.InterfaceObject.ADDRESSTABLE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
 
@@ -49,6 +50,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -76,6 +78,7 @@ import org.slf4j.LoggerFactory;
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Keyring;
@@ -710,6 +713,12 @@ public class Launcher implements Runnable, AutoCloseable
 			server.configureSecurity(sc, keyfile, xml.securedServicesMap.get(sc));
 			keyfile.values().forEach(key -> Arrays.fill(key, (byte) 0));
 
+			if (xml.additionalAddresses.containsKey(sc))
+				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
+			if (xml.groupAddressFilters.containsKey(sc))
+				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
+
+
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
 			final String activated = sc.isActivated() ? "" : " [not activated]";
@@ -721,6 +730,8 @@ public class Launcher implements Runnable, AutoCloseable
 				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
 			else if ("ip".equals(subnetType))
 				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs);
+			else if ("tpuart".equals(subnetType))
+				connector = SubnetConnector.newWithTpuartLink(sc, () -> acknowledgeOnTp(sc, objectInstance), subnetArgs);
 			else if ("user-supplied".equals(subnetType))
 				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs);
 			else if ("emulate".equals(subnetType))
@@ -731,11 +742,6 @@ public class Launcher implements Runnable, AutoCloseable
 			if (sc.isActivated())
 				linksToClose.add(connector.openNetworkLink());
 			connectors.add(connector);
-
-			if (xml.additionalAddresses.containsKey(sc))
-				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
-			if (xml.groupAddressFilters.containsKey(sc))
-				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
 
 			final boolean routing = sc instanceof RoutingServiceContainer;
 			if (xml.tunnelingUsers.containsKey(sc)) {
@@ -940,5 +946,52 @@ public class Launcher implements Runnable, AutoCloseable
 				return io.getIndex();
 		}
 		return -1;
+	}
+
+	private List<KNXAddress> acknowledgeOnTp(final ServiceContainer sc, final int objectInstance) {
+		final int indAddrElems = propertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+				ADDITIONAL_INDIVIDUAL_ADDRESSES);
+		final int grpAddrFilterElems = propertyElems(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE);
+
+		final var ack = new ArrayList<KNXAddress>(1 + indAddrElems + grpAddrFilterElems);
+		ack.add(sc.getMediumSettings().getDeviceAddress());
+		final var ios = server.getInterfaceObjectServer();
+		try {
+			if (indAddrElems > 0) {
+				final var buf = ByteBuffer.wrap(ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+						ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, indAddrElems));
+				while (buf.hasRemaining())
+					ack.add(new IndividualAddress(buf.getShort() & 0xffff));
+			}
+
+			if (grpAddrFilterElems > 0) {
+				final var buf = ByteBuffer
+						.wrap(ios.getProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, grpAddrFilterElems));
+				while (buf.hasRemaining())
+					ack.add(new GroupAddress(buf.getShort() & 0xffff));
+			}
+		}
+		catch (final KnxPropertyException e) {
+			logger.warn("querying default acknowledge addresses for TP-UART ({})", e.getMessage());
+		}
+
+		return ack;
+	}
+
+	private int propertyElems(final int objectType, final int objectInstance, final int propertyId) {
+		try {
+			final var ios = server.getInterfaceObjectServer();
+			return toInt(ios.getProperty(objectType, objectInstance, propertyId, 0, 1));
+		}
+		catch (final KnxPropertyException e) {}
+		return 0;
+	}
+
+	private static int toInt(final byte[] data) {
+		if (data.length == 1)
+			return data[0] & 0xff;
+		if (data.length == 2)
+			return (data[0] & 0xff) << 8 | (data[1] & 0xff);
+		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | (data[3] & 0xff);
 	}
 }

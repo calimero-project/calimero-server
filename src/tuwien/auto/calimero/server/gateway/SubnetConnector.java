@@ -42,9 +42,9 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import tuwien.auto.calimero.DataUnitBuilder;
@@ -130,6 +130,11 @@ public final class SubnetConnector
 		final boolean useNat, final String subnetArgs)
 	{
 		return new SubnetConnector(container, "ip", netif, null, subnetArgs, useNat);
+	}
+
+	public static SubnetConnector newWithTpuartLink(final ServiceContainer container,
+		final Supplier<List<KNXAddress>> acknowledge, final String subnetArgs) {
+		return new SubnetConnector(container, "tpuart", null, null, subnetArgs, acknowledge);
 	}
 
 	/**
@@ -254,9 +259,12 @@ public final class SubnetConnector
 		else if ("ft12-cemi".equals(subnetType))
 			ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
 		else if ("tpuart".equals(subnetType)) {
-			// TODO workaround for the only case when server ctrl endpoint address is reused!!
-			final List<KNXAddress> ack = Arrays.asList(sc.getMediumSettings().getDeviceAddress());
-			ts = () -> new KNXNetworkLinkTpuart(linkArgs, settings, ack);
+			ts = () -> {
+				@SuppressWarnings("unchecked")
+				final var ack = args.length > 0 && args[0] instanceof Supplier
+						? ((Supplier<List<KNXAddress>>) args[0]).get() : List.<KNXAddress> of();
+				return new KNXNetworkLinkTpuart(linkArgs, settings, ack);
+			};
 		}
 		else if ("user-supplied".equals(subnetType))
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
