@@ -207,8 +207,9 @@ final class ControlEndpointService extends ServiceLooper
 	@Override
 	protected void onTimeout()
 	{
-		final InetAddress ip = ((InetSocketAddress) s.getLocalSocketAddress()).getAddress();
 		try {
+			final InetAddress ip = Optional.ofNullable(((InetSocketAddress) s.getLocalSocketAddress()))
+					.map(InetSocketAddress::getAddress).orElse(InetAddress.getByAddress(new byte[4]));
 			final List<InetAddress> addresses = usableIpAddresses().collect(toList());
 			if (!addresses.contains(ip)) {
 				logger.warn("{} control endpoint: interface {} updated its IP address from {} to {}",
