@@ -110,8 +110,10 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
 		Thread.currentThread().setName(name);
 
+		ServerSocket localRef = null;
 		try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
 			serverSocket.add(s);
+			localRef = s;
 			ces.logger.info("{} is up and running", name);
 			while (true) {
 				final Socket conn = s.accept();
@@ -126,8 +128,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			Thread.currentThread().interrupt();
 		}
 		catch (final IOException e) {
-			ces.logger.error("socket error in tcp service {}:{}", endpoint.getAddress().getHostAddress(),
-					endpoint.getPort(), e);
+			if (localRef == null || !localRef.isClosed())
+				ces.logger.error("socket error in tcp service {}:{}", endpoint.getAddress().getHostAddress(),
+						endpoint.getPort(), e);
 		}
 		finally {
 			Thread.currentThread().setName("idle tcp looper");
