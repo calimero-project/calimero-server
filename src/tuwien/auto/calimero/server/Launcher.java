@@ -744,17 +744,18 @@ public class Launcher implements Runnable, AutoCloseable
 			connectors.add(connector);
 
 			final boolean routing = sc instanceof RoutingServiceContainer;
+			final boolean useServerAddress = !routing && sc.reuseControlEndpoint();
 			if (xml.tunnelingUsers.containsKey(sc)) {
-				final var serverAddress = routing ? null : sc.getMediumSettings().getDeviceAddress();
+				final var serverAddress = useServerAddress ? sc.getMediumSettings().getDeviceAddress() : null;
 				setTunnelingUsers(ios, objectInstance, xml.tunnelingUsers.get(sc), xml.additionalAddresses.get(sc),
 						serverAddress);
 			}
 			else {
 				// list all additional addresses as tunneling addresses
-				var size = routing ? 0 : 1; // also reserve entry for server address if we're not routing
+				var size = useServerAddress ? 1 : 0; // also reserve entry for server address if we're using it
 				size += xml.additionalAddresses.getOrDefault(sc, Collections.emptyList()).size();
 				final byte[] addrIndices = new byte[size];
-				var idx = routing ? 1 : 0;
+				var idx = useServerAddress ? 0 : 1;
 				for (int k = 0; k < addrIndices.length; k++)
 					addrIndices[k] = (byte) idx++;
 				setTunnelingAddresses(ios, objectInstance, addrIndices);
