@@ -288,18 +288,20 @@ final class DiscoveryService extends ServiceLooper
 		}
 		final List<NetworkInterface> nifs = outgoing.length > 0 ? Arrays.asList(outgoing)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
+		final var sentOn = new ArrayList<String>();
 		for (final NetworkInterface nif : nifs) {
 			if (nif.getInetAddresses().hasMoreElements() && nif.isUp()) {
 				try {
 					((MulticastSocket) s).setNetworkInterface(nif);
-					logger.trace("send search response on interface " + nameOf(nif));
 					s.send(p);
+					sentOn.add(nameOf(nif));
 				}
 				catch (final SocketException e) {
 					logger.info("failure sending on interface " + nameOf(nif));
 				}
 			}
 		}
+		logger.trace("sent search response on interfaces {}", sentOn);
 	}
 
 	// some OS use a dedicated display name, others use the same as returned by getName, etc.
