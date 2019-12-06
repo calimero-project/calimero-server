@@ -48,16 +48,14 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -230,15 +228,49 @@ public class KNXnetIPServer
 	// used in KNXnet/IP Routing
 	private boolean multicastLoopback = true;
 
-	// list of ServiceContainer objects
-	private final List<ServiceContainer> svcContainers = new ArrayList<>();
+	class Endpoint {
+		final ServiceContainer serviceContainer;
+		final InterfaceObject knxipParameters;
+		private final LooperThread controlEndpoint;
+		private volatile LooperThread routingEndpoint;
 
-	private final Map<ServiceContainer, InterfaceObject> svcContToIfObj = new HashMap<>();
+		Endpoint(final ServiceContainer sc, final InterfaceObject knxipParameters, final LooperThread controlEndpoint) {
+			serviceContainer = sc;
+			this.knxipParameters = knxipParameters;
+			this.controlEndpoint = controlEndpoint;
+		}
 
-	// list of LooperThread objects running a control endpoint
-	final List<LooperThread> controlEndpoints = new ArrayList<>();
-	// list of LooperThread objects running a routing endpoint
-	final List<LooperThread> routingEndpoints = new ArrayList<>();
+		Optional<ControlEndpointService> controlEndpoint() {
+			return controlEndpoint.looper().map(ControlEndpointService.class::cast);
+		}
+
+		Optional<RoutingService> routingEndpoint() {
+			return Optional.ofNullable(routingEndpoint).flatMap(LooperThread::looper).map(RoutingService.class::cast);
+		}
+
+		void start() {
+			if (!serviceContainer.isActivated())
+				return;
+			controlEndpoint.start();
+			if (serviceContainer instanceof RoutingServiceContainer) {
+				final var routingContainer = (RoutingServiceContainer) serviceContainer;
+				final InetAddress mcast = routingContainer.routingMulticastAddress();
+				routingEndpoint = new LooperThread(KNXnetIPServer.this,
+						serverName + " routing service " + mcast.getHostAddress(), -1,
+						() -> new RoutingService(KNXnetIPServer.this, routingContainer, mcast, multicastLoopback));
+				routingEndpoint.start();
+			}
+		}
+
+		void stop() {
+			controlEndpoint.quit();
+			final var routing = routingEndpoint;
+			if (routing != null)
+				routing.quit();
+		}
+	}
+
+	final List<Endpoint> endpoints = new CopyOnWriteArrayList<>();
 
 	public final KnxDevice device; // TODO basically part of the server api
 	private InterfaceObjectServer ios;
@@ -363,37 +395,39 @@ public class KNXnetIPServer
 	 * @param sc the service container to add
 	 * @return <code>true</code> if the service container was added successfully, <code>false</code> otherwise
 	 */
-	public final boolean addServiceContainer(final ServiceContainer sc)
+	public final synchronized boolean addServiceContainer(final ServiceContainer sc)
 	{
-		synchronized (svcContainers) {
-			if (findContainer(sc.getName()) != null) {
-				logger.warn("service container \"" + sc.getName() + "\" already exists in server");
-				return false;
-			}
-			// add new KNXnet/IP parameter object for this service container
-			final InterfaceObjectServer io = getInterfaceObjectServer();
-			io.addInterfaceObject(knxObject);
-			final InterfaceObject[] objects = io.getInterfaceObjects();
-			svcContToIfObj.put(sc, objects[objects.length - 1]);
-			svcContainers.add(sc);
-
-			if (svcContainers.size() == 1) {
-				final byte[] device = sc.getMediumSettings().getDeviceAddress().toByteArray();
-				setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
-				setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
-			}
-			final int medium = sc.getMediumSettings().getMedium();
-			setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
-			if (medium == KNXMediumSettings.MEDIUM_PL110)
-				setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS, ((PLSettings) sc.getMediumSettings()).getDomainAddress());
-
-			initKNXnetIpParameterObject(svcContainers.size(), sc);
-
-			synchronized (this) {
-				if (running)
-					startControlEndpoint(sc);
-			}
+		if (findContainer(sc.getName()) != null) {
+			logger.warn("service container \"" + sc.getName() + "\" already exists in server");
+			return false;
 		}
+
+		// add new KNXnet/IP parameter object for this service container
+		final InterfaceObjectServer io = getInterfaceObjectServer();
+		io.addInterfaceObject(knxObject);
+		final InterfaceObject[] objects = io.getInterfaceObjects();
+
+		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
+		final var controlEndpoint = new LooperThread(this, serverName + " control endpoint " + sc.getName(), -1, builder);
+
+		final var endpoint = new Endpoint(sc, objects[objects.length - 1], controlEndpoint);
+		endpoints.add(endpoint);
+
+		final int size = endpoints.size();
+		if (size == 1) {
+			final byte[] device = sc.getMediumSettings().getDeviceAddress().toByteArray();
+			setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
+			setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
+		}
+		final int medium = sc.getMediumSettings().getMedium();
+		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
+		if (medium == KNXMediumSettings.MEDIUM_PL110)
+			setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS,
+					((PLSettings) sc.getMediumSettings()).getDomainAddress());
+
+		initKNXnetIpParameterObject(size, sc);
+		if (running)
+			endpoint.start();
 		fireServiceContainerAdded(sc);
 		return true;
 	}
@@ -407,20 +441,17 @@ public class KNXnetIPServer
 	 *
 	 * @param sc the service container to remove
 	 */
-	public final void removeServiceContainer(final ServiceContainer sc)
-	{
-		synchronized (svcContainers) {
-			// stop service, if we are already launched
+	public final void removeServiceContainer(final ServiceContainer sc) {
+		endpointFor(sc).ifPresent(endpoint -> {
+			// stop service if we are already launched
 			synchronized (this) {
-				if (running) {
-					stopControlEndpoint(sc);
-				}
+				if (running)
+					endpoint.stop();
 			}
-			final boolean removed = svcContainers.remove(sc);
-			if (removed)
-				getInterfaceObjectServer().removeInterfaceObject(svcContToIfObj.get(sc));
-		}
-		fireServiceContainerRemoved(sc);
+			endpoints.remove(endpoint);
+			getInterfaceObjectServer().removeInterfaceObject(endpoint.knxipParameters);
+			fireServiceContainerRemoved(sc);
+		});
 	}
 
 	/**
@@ -431,9 +462,7 @@ public class KNXnetIPServer
 	 */
 	public ServiceContainer[] getServiceContainers()
 	{
-		synchronized (svcContainers) {
-			return svcContainers.toArray(new ServiceContainer[svcContainers.size()]);
-		}
+		return endpoints.stream().map(ep -> ep.serviceContainer).toArray(ServiceContainer[]::new);
 	}
 
 	/**
@@ -587,7 +616,8 @@ public class KNXnetIPServer
 		int secure = 0;
 
 		final int objectInstance = objectInstance(sc);
-		final int objIndex = svcContToIfObj.get(sc).getIndex();
+		final var endpoint = endpointFor(sc);
+		final int objIndex = endpoint.get().knxipParameters.getIndex();
 
 		// if we setup secure unicast services, we need at least device authentication
 		if (keys.containsKey("device.key")) {
@@ -711,7 +741,7 @@ public class KNXnetIPServer
 			return;
 
 		startDiscoveryService(outgoingIf, discoveryIfs, -1);
-		svcContainers.forEach(this::startControlEndpoint);
+		endpoints.forEach(Endpoint::start);
 		running = true;
 	}
 
@@ -732,11 +762,7 @@ public class KNXnetIPServer
 
 		stopDiscoveryService();
 
-		controlEndpoints.forEach(LooperThread::quit);
-		controlEndpoints.clear();
-
-		routingEndpoints.forEach(LooperThread::quit);
-		routingEndpoints.clear();
+		endpoints.forEach(Endpoint::stop);
 
 		inShutdown = false;
 		running = false;
@@ -768,21 +794,15 @@ public class KNXnetIPServer
 	}
 
 	public Map<Integer, DataEndpoint> dataConnections(final ServiceContainer serviceContainer) {
-		for (final LooperThread looperThread : controlEndpoints) {
-			final Optional<ServiceLooper> looper = looperThread.looper();
-			if (looper.isPresent()) {
-				final ControlEndpointService ces = (ControlEndpointService) looper.get();
-				if (ces.getServiceContainer() == serviceContainer)
-					return Collections.unmodifiableMap(ces.connections());
-			}
-		}
-		return Map.of();
+		return endpointFor(serviceContainer).flatMap(Endpoint::controlEndpoint).map(ControlEndpointService::connections)
+				.orElse(Map.of());
 	}
 
 	private int lastOverflowToKnx = 0;
 
 	private void onPropertyValueChanged(final PropertyEvent pe)
 	{
+		final InterfaceObject io = pe.getInterfaceObject();
 		if (pe.getPropertyId() == PID.QUEUE_OVERFLOW_TO_KNX) {
 			final byte[] data = pe.getNewData();
 			final int overflow = toInt(data);
@@ -792,24 +812,25 @@ public class KNXnetIPServer
 			lastOverflowToKnx = overflow;
 			if (lost == 0)
 				return;
-			final ServiceContainer sc = findContainer(pe.getInterfaceObject());
 			// multicast routing lost message
-			findRoutingLooperThread(sc).flatMap(t -> t.looper()).ifPresent(l -> sendRoutingLostMessage(l, sc, lost));
+			endpointFor(io).ifPresent(ep -> sendRoutingLostMessage(ep, lost));
 		}
-		else if (pe.getInterfaceObject().getType() == InterfaceObject.ROUTER_OBJECT) {
+		else if (io.getType() == InterfaceObject.ROUTER_OBJECT) {
 			if (pe.getPropertyId() == PID.MEDIUM_STATUS) {
-				final var svcCont = findContainer(pe.getInterfaceObject());
 				final var active = (pe.getNewData()[0] & 0x01) == 0x00; // 0x01: communication impossible
-				findControlEndpoint(svcCont).ifPresent(ep -> ep.mediumConnectionStatusChanged(active));
+				endpointFor(io).flatMap(Endpoint::controlEndpoint).ifPresent(ep -> ep.mediumConnectionStatusChanged(active));
 			}
 		}
 	}
 
-	private void sendRoutingLostMessage(final ServiceLooper svc, final ServiceContainer sc, final int lost) {
-		final int oi = objectInstance(sc);
-		final int state = getProperty(KNXNETIP_PARAMETER_OBJECT, oi, PID.KNXNETIP_DEVICE_STATE, 1, 0);
+	private void sendRoutingLostMessage(final Endpoint endpoint, final int lost) {
+		final var routingService = endpoint.routingEndpoint();
+		if (routingService.isEmpty())
+			return;
+		final int index = endpoint.knxipParameters.getIndex();
+		final int state = toInt(getInterfaceObjectServer().getProperty(index, PID.KNXNETIP_DEVICE_STATE, 1, 1));
 		try {
-			((RoutingService) svc).sendRoutingLostMessage(lost, state);
+			routingService.get().sendRoutingLostMessage(lost, state);
 		}
 		catch (final KNXConnectionClosedException e) {
 			logger.error("sending routing lost message notification", e);
@@ -952,11 +973,10 @@ public class KNXnetIPServer
 
 	int objectInstance(final ServiceContainer sc)
 	{
-		final ServiceContainer[] sca = getServiceContainers();
-		for (int i = 0; i < sca.length; i++) {
-			if (sca[i] == sc) {
+		final int i = 0;
+		for (final var endpoint : endpoints) {
+			if (endpoint.serviceContainer == sc)
 				return i + 1;
-			}
 		}
 		throw new IllegalStateException("service container \"" + sc.getName() + "\" not found");
 	}
@@ -1089,81 +1109,27 @@ public class KNXnetIPServer
 			d.quit();
 	}
 
-	private void startControlEndpoint(final ServiceContainer sc)
-	{
-		if (!sc.isActivated())
-			return;
-		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
-		final LooperThread t = new LooperThread(this, serverName + " control endpoint " + sc.getName(), -1, builder);
-		controlEndpoints.add(t);
-		t.start();
-		if (sc instanceof RoutingServiceContainer)
-			startRoutingService((RoutingServiceContainer) sc);
+	private Optional<Endpoint> endpointFor(final ServiceContainer sc) {
+		return endpoints.stream().filter(ep -> ep.serviceContainer == sc).findFirst();
 	}
 
-	private void stopControlEndpoint(final ServiceContainer sc)
-	{
-		for (final Iterator<LooperThread> i = controlEndpoints.iterator(); i.hasNext();) {
-			final LooperThread t = i.next();
-			if (t.looper().filter(l -> ((ControlEndpointService) l).getServiceContainer() == sc).isPresent()) {
-				t.quit();
-				i.remove();
-				break;
-			}
+	private Optional<Endpoint> endpointFor(final InterfaceObject io) {
+		final var objects = getInterfaceObjectServer().getInterfaceObjects();
+		Endpoint endpoint = null;
+		final Iterator<Endpoint> iterator = endpoints.iterator();
+		for (int i = 0; i <= io.getIndex() && iterator.hasNext(); i++) {
+			if (objects[i].getType() == io.getType())
+				endpoint = iterator.next();
 		}
-		findRoutingLooperThread(sc).ifPresent(this::stopRoutingService);
+		return Optional.ofNullable(endpoint);
 	}
 
-	private void startRoutingService(final RoutingServiceContainer sc)
-	{
-		final InetAddress mcast = sc.routingMulticastAddress();
-		final LooperThread t = new LooperThread(this, serverName + " routing service " + mcast.getHostAddress(), -1,
-				() -> new RoutingService(this, sc, mcast, multicastLoopback));
-		routingEndpoints.add(t);
-		t.start();
-	}
-
-	private void stopRoutingService(final LooperThread t)
-	{
-		t.quit();
-		routingEndpoints.remove(t);
-	}
-
-	private Optional<LooperThread> findRoutingLooperThread(final ServiceContainer sc)
-	{
-		final Predicate<ServiceLooper> belongsToSvcCont = svc -> ((RoutingService) svc).getServiceContainer() == sc;
-		return routingEndpoints.stream().filter(ep -> ep.looper().filter(belongsToSvcCont).isPresent()).findFirst();
-	}
-
-	private Optional<ControlEndpointService> findControlEndpoint(final ServiceContainer sc) {
-		return controlEndpoints.stream().map(LooperThread::looper).flatMap(Optional::stream)
-				.map(ControlEndpointService.class::cast).filter(sc::equals).findFirst();
-	}
-
-	private ServiceContainer findContainer(final String svcContName)
-	{
-		for (final Iterator<ServiceContainer> i = svcContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = i.next();
-			if (sc.getName().compareTo(svcContName) == 0)
-				return sc;
+	private ServiceContainer findContainer(final String svcContName) {
+		for (final var endpoint : endpoints) {
+			if (endpoint.serviceContainer.getName().equals(svcContName))
+				return endpoint.serviceContainer;
 		}
 		return null;
-	}
-
-	private ServiceContainer findContainer(final InterfaceObject io)
-	{
-		for (final Iterator<ServiceContainer> i = svcContToIfObj.keySet().iterator(); i.hasNext();) {
-			final Object svcCont = i.next();
-			if (svcContToIfObj.get(svcCont) == io)
-				return (ServiceContainer) svcCont;
-		}
-		final var objects = getInterfaceObjectServer().getInterfaceObjects();
-		int svcContainerIdx = 0;
-		for (int i = 0; i < io.getIndex(); i++) {
-			if (objects[i].getType() == io.getType())
-				svcContainerIdx++;
-		}
-		return svcContainers.get(svcContainerIdx);
 	}
 
 	final EventListeners<ServerListener> listeners()

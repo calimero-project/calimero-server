@@ -44,7 +44,6 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -464,12 +463,12 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private int subnetStatus() {
-		final List<LooperThread> threads = ControlEndpointService.findDataEndpoint(channelId).map(ep -> ep.server.controlEndpoints)
-				.orElse(Collections.emptyList());
-		for (final LooperThread t : threads) {
-			final Optional<ServiceLooper> looper = t.looper();
+		final var endpoints = ControlEndpointService.findDataEndpoint(channelId).map(ep -> ep.server.endpoints)
+				.orElse(List.of());
+		for (final var endpoint : endpoints) {
+			final Optional<ControlEndpointService> looper = endpoint.controlEndpoint();
 			if (looper.isPresent()) {
-				final ControlEndpointService ces = (ControlEndpointService) looper.get();
+				final ControlEndpointService ces = looper.get();
 				if (ces.addressInUse(device))
 					return ces.subnetStatus();
 			}
@@ -494,13 +493,12 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private List<IndividualAddress> additionalAddresses() {
-		final List<LooperThread> threads = ControlEndpointService.findDataEndpoint(channelId)
-				.map(ep -> ep.server.controlEndpoints).orElse(Collections.emptyList());
-		for (final LooperThread t : threads) {
-			final Optional<ServiceLooper> looper = t.looper();
+		final var endpoints = ControlEndpointService.findDataEndpoint(channelId)
+				.map(ep -> ep.server.endpoints).orElse(List.of());
+		for (final var endpoint : endpoints) {
+			final Optional<ControlEndpointService> looper = endpoint.controlEndpoint();
 			if (looper.isPresent()) {
-				final ControlEndpointService ces = (ControlEndpointService) looper.get();
-				return ces.additionalAddresses();
+				return looper.get().additionalAddresses();
 			}
 		}
 		return List.of();

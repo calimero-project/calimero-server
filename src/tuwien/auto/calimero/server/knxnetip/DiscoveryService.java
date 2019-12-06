@@ -57,6 +57,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
@@ -72,6 +73,7 @@ import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.knxnetip.util.Srp;
 import tuwien.auto.calimero.knxnetip.util.Srp.Type;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
 final class DiscoveryService extends ServiceLooper
 {
@@ -212,11 +214,10 @@ final class DiscoveryService extends ServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
-			for (final LooperThread t : server.controlEndpoints) {
-				final Optional<ControlEndpointService> looper = t.looper().map(ControlEndpointService.class::cast);
-				if (looper.isPresent())
-					sendSearchResponse(addr, looper.get(), ext, macFilter, requestedServices, requestedDibs);
-			}
+			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream)
+					.collect(Collectors.toList());
+			for (final ControlEndpointService ces : list)
+				sendSearchResponse(addr, ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		// we can safely ignore search responses and avoid a warning being logged
