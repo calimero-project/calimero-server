@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -135,8 +136,9 @@ final class DiscoveryService extends ServiceLooper
 		}
 		final List<NetworkInterface> nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
-		final StringBuilder found = new StringBuilder();
+		final var found = new StringJoiner(", ");
 		boolean joinedAny = false;
+		final var joined = new ArrayList<String>();
 		// we try to bind to all requested interfaces. Only if that completely fails, we throw
 		// the first caught exception
 		IOException thrown = null;
@@ -147,29 +149,30 @@ final class DiscoveryService extends ServiceLooper
 				logger.warn("KNXnet/IP discovery join fails with no IP address bound to interface " + ni.getName());
 				continue;
 			}
-			found.append(" ").append(ni.getName()).append(" [");
+			var nifInfo = ni.getName();
 			while (addrs.hasMoreElements()) {
 				final InetAddress addr = addrs.nextElement();
 				if (addr instanceof Inet4Address) {
-					found.append(addr.getHostAddress());
+					nifInfo += " [" + addr.getHostAddress() + "]";
 					try {
 						s.joinGroup(group, ni);
 						joinedAny = true;
-						logger.info("KNXnet/IP discovery listens on interface " + ni.getName());
+						joined.add(ni.getName());
 					}
 					catch (final IOException e) {
 						if (thrown == null)
 							thrown = e;
-						logger.error("KNXnet/IP discovery could not join on interface " + ni.getName(), e);
+						logger.warn("KNXnet/IP discovery could not join on interface " + ni.getName(), e);
 					}
 					break;
 				}
 			}
-			found.append("],");
+			found.add(nifInfo);
 		}
-		logger.trace("found network interfaces" + found);
+		logger.trace("found network interfaces {}", found);
 		if (!joinedAny)
 			throw Objects.requireNonNull(thrown);
+		logger.info("KNXnet/IP discovery listens on interfaces {}", joined);
 	}
 
 	@Override
