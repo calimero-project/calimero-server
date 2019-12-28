@@ -162,7 +162,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		}
 		else {
 			addr = new InetSocketAddress(resIP, resPort);
-			if (logEndpointType != 0)
+			if (logEndpointType == 2)
 				logger.trace("using client-assigned {} endpoint {} for responses", type, addr);
 		}
 		return addr;
