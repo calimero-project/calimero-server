@@ -91,6 +91,7 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.cemi.AdditionalInfo;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -2024,7 +2025,7 @@ public class KnxServerGateway implements Runnable
 		final CEMILData copy = (CEMILData) CEMIFactory.copy(ldata);
 		if (copy instanceof CEMILDataEx) {
 			final CEMILDataEx ex = (CEMILDataEx) copy;
-			doa = ex.getAdditionalInfo(CEMILDataEx.ADDINFO_PLMEDIUM);
+			doa = ex.getAdditionalInfo(AdditionalInfo.PlMedium);
 			ex.additionalInfo().clear();
 		}
 
