@@ -722,7 +722,10 @@ public class Launcher implements Runnable, AutoCloseable
 			final String subnetType = xml.subnetTypes.get(i);
 			final String subnetArgs = xml.subnetAddresses.get(i);
 			final String activated = sc.isActivated() ? "" : " [not activated]";
-			logger.info("setup {} subnet '{}'{}", subnetType, subnetArgs, activated);
+
+			final String subnetName = subnetArgs.isEmpty()
+					? subnetType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
+			logger.info("setup {} subnet '{}'{}", subnetType, subnetName, activated);
 
 			final NetworkInterface netif = xml.subnetNetIf.get(sc);
 			final SubnetConnector connector;
