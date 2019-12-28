@@ -210,7 +210,8 @@ public final class DataEndpoint extends ConnectionBase
 	@Override
 	public String toString()
 	{
-		return getName() + " (channel " + getChannelId() + ", " + device + ")";
+		final var deviceAddress = device != null ? ", " + device : "";
+		return getName() + " (channel " + getChannelId() + deviceAddress + ")";
 	}
 
 	public IndividualAddress deviceAddress() { return device; }
