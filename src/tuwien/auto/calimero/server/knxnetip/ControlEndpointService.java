@@ -327,10 +327,9 @@ final class ControlEndpointService extends ServiceLooper
 			final HPAI controlEndpoint = req.getControlEndpoint();
 			final boolean tcp = controlEndpoint.getHostProtocol() == HPAI.IPV4_TCP;
 			if (tcp) {
-				final var ctrlRouteBack = controlEndpoint.getAddress().isAnyLocalAddress()
-						&& controlEndpoint.getPort() == 0;
+				final var ctrlRouteBack = controlEndpoint.isRouteBack();
 				final HPAI dataEndpoint = req.getDataEndpoint();
-				final var dataRouteBack = dataEndpoint.getAddress().isAnyLocalAddress() && dataEndpoint.getPort() == 0;
+				final var dataRouteBack = dataEndpoint.isRouteBack();
 				if (!ctrlRouteBack || !dataRouteBack) {
 					logger.info("connect request from {}:{} does not contain route-back {} endpoint, ignore", src, port,
 							ctrlRouteBack ? "data" : "control");
