@@ -71,11 +71,6 @@
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.60</version>
-		</dependency>
 	</dependencies>
 	<repositories>
 		<repository>
