@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2019 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -404,10 +404,10 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void onShutdown(final ShutdownEvent se)
 		{
-			// shutdown is guaranteed to be called before server is shutdown, therefore
-			// this flag status is correct
-			if (inReset)
+			if (inReset) {
+				inReset = false;
 				return;
+			}
 			final int i = se.getInitiator();
 			final String s = i == CloseEvent.USER_REQUEST ? "user" : i == CloseEvent.CLIENT_REQUEST
 					? "client" : "server internal";
@@ -449,20 +449,14 @@ public class KnxServerGateway implements Runnable
 		public void indication(final FrameEvent e)
 		{
 			subnetConnected(true);
-			synchronized (KnxServerGateway.this) {
-				if (subnetEvents.size() < maxEventQueueSize) {
-					// In the dispatching to server side, we rely on having the
-					// subnet link in the frame event source stored so to know where the
-					// frame came from.
-					// But this will not work if the sending link differs from the one
-					// stored in this frame event, e.g., when using a buffered link.
-					// Therefore, I store the svcContainer in here for re-association.
-					subnetEvents.add(new FrameEvent(scid, e.getFrame()));
-					KnxServerGateway.this.notify();
-				}
-				else
-					incMsgQueueOverflow(false);
-			}
+			// In the dispatching to server side, we rely on having the
+			// subnet link in the frame event source stored so to know where the
+			// frame came from.
+			// But this will not work if the sending link differs from the one
+			// stored in this frame event, e.g., when using a buffered link.
+			// Therefore, I store the svcContainer in here for re-association.
+			if (!subnetEvents.offer(new FrameEvent(scid, e.getFrame())))
+				incMsgQueueOverflow(false);
 		}
 
 		@Override
@@ -487,7 +481,9 @@ public class KnxServerGateway implements Runnable
 
 	private final int maxEventQueueSize = 1000;
 	private final BlockingQueue<FrameEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
-	private final List<FrameEvent> subnetEvents = new ArrayList<>( );
+	private final BlockingQueue<FrameEvent> subnetEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
+
+	private static final FrameEvent ResetEvent = new FrameEvent(KnxServerGateway.class, new byte[0]);
 
 	// support replaying subnet events for disrupted tunneling connections
 	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
@@ -757,22 +753,16 @@ public class KnxServerGateway implements Runnable
 				// although we possibly run in a dedicated thread so to not delay any
 				// other user tasks, be aware that subnet frame dispatching to IP
 				// front-end is done in this thread
-				for (FrameEvent event = getSubnetEvent(); event != null; event = getSubnetEvent())
-					onFrameReceived(event, false);
-
-				// How does reset work:
-				// If we receive a reset.req message in the message handler, we set
-				// the inReset flag, trigger the server shutdown, and resume here.
-				// Check trucking, since someone might have called quit during
-				// server shutdown.
-				if (inReset && trucking) {
-					inReset = false;
-					launchServer();
+				final FrameEvent event = subnetEvents.take();
+				// If we received a reset.req message in the message handler, the resetEvent marker gets added
+				if (event == ResetEvent) {
+					// Check trucking, since someone might have called quit during server shutdown
+					if (trucking)
+						launchServer();
 				}
-
-				synchronized (this) {
-					if (subnetEvents.isEmpty())
-						wait();
+				else {
+					replayPendingSubnetEvents();
+					onFrameReceived(event, false);
 				}
 			}
 			catch (final RuntimeException e) {
@@ -795,9 +785,7 @@ public class KnxServerGateway implements Runnable
 		if (!trucking)
 			return;
 		trucking = false;
-		synchronized (this) {
-			notifyAll();
-		}
+		subnetEvents.offer(ResetEvent);
 		server.shutdown();
 	}
 
@@ -890,15 +878,6 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		return info.toString();
-	}
-
-	private synchronized FrameEvent getSubnetEvent()
-	{
-		replayPendingSubnetEvents();
-
-		if (subnetEvents.isEmpty())
-			return null;
-		return subnetEvents.remove(0);
 	}
 
 	private void replayPendingSubnetEvents()
@@ -1747,9 +1726,10 @@ public class KnxServerGateway implements Runnable
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
 			// handle reset.req here since we have the connection name for logging
 			logger.info("received reset request " + c.getName() + " - restarting " + server.getName());
-			// corresponding launch is done in run()
 			inReset = true;
 			server.shutdown();
+			// corresponding launch is done in run()
+			subnetEvents.offer(ResetEvent);
 		}
 	}
 
