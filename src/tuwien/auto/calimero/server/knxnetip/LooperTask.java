@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -37,27 +37,55 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.util.Optional;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+
+import org.slf4j.Logger;
 
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
 // interrupt policy: cleanup and exit
-class LooperThread extends Thread
-{
-	private final KNXnetIPServer server;
+class LooperTask implements Runnable {
+	private static final ScheduledThreadPoolExecutor looperPool = new ScheduledThreadPoolExecutor(Integer.MAX_VALUE,
+		r -> {
+			final Thread t = new Thread(r, "looper thread");
+			t.setDaemon(true);
+			return t;
+		});
+
+	static {
+		looperPool.setKeepAliveTime(30, TimeUnit.SECONDS);
+		looperPool.allowCoreThreadTimeOut(true);
+	}
+
+	public static void execute(final LooperTask task) {
+		task.scheduledFuture = looperPool.schedule(task, 0, TimeUnit.SECONDS);
+	}
+
+	private static final int retryDelay = 10; // [s]
+
+	public static void scheduleWithRetry(final LooperTask task) {
+		task.scheduledFuture = looperPool.scheduleWithFixedDelay(task, 0, retryDelay, TimeUnit.SECONDS);
+	}
+
+	private final Logger logger;
+	private final String serviceName;
 	private final int maxRetries;
 	private final Supplier<ServiceLooper> supplier;
 	private volatile ServiceLooper looper;
-	private volatile boolean quit;
+	private volatile int attempt;
+
+	private volatile ScheduledFuture<?> scheduledFuture;
 
 	// maxRetries: -1: always retry, 0 none, 1: at most one retry, ...
-	LooperThread(final KNXnetIPServer server, final String serviceName,
+	LooperTask(final KNXnetIPServer server, final String serviceName,
 		final int retryAttempts, final Supplier<ServiceLooper> serviceSupplier)
 	{
-		super(serviceName);
-		this.server = server;
-		setDaemon(true);
+		logger = server.logger;
+		this.serviceName = serviceName;
 		maxRetries = retryAttempts >= -1 ? retryAttempts : 0;
 		supplier = serviceSupplier;
 	}
@@ -65,58 +93,48 @@ class LooperThread extends Thread
 	@Override
 	public void run()
 	{
-		final int inc = maxRetries == -1 ? 0 : 1;
-		int attempt = 0;
-		while (!quit) {
-			if (maxRetries != -1 && attempt > maxRetries) {
-				quit = true;
-				break;
-			}
-			attempt += inc;
-			try {
-				looper = supplier.get();
-				// reset for the next reconnection attempt
-				attempt = 0;
-				server.logger.info(super.getName() + " is up and running");
-				looper.run();
-				quit |= maxRetries == 0;
-				cleanup(LogLevel.INFO, null);
-			}
-			catch (final RuntimeException e) {
-				final String s = attempt > 0 ? " (attempt " + attempt + "/" + (maxRetries + 1) + ")" : "";
-				server.logger.error("initialization of {} failed{}", super.getName(), s, e);
-				if (maxRetries == -1 || attempt <= maxRetries) {
-					final int wait = 10;
-					server.logger.info("retry to start " + super.getName() + " in " + wait + " seconds");
-					try {
-						sleep(wait * 1000);
-					}
-					catch (final InterruptedException ie) {
-						quit();
-					}
-				}
-				else {
-					server.logger.error("error setting up " + super.getName());
-				}
+		Thread.currentThread().setName(serviceName);
+
+		if (maxRetries != -1)
+			++attempt;
+
+		try {
+			looper = supplier.get();
+			// reset for the next reconnection attempt
+			attempt = 0;
+			logger.info(serviceName + " is up and running");
+			looper.run();
+			cleanup(LogLevel.INFO, null);
+		}
+		catch (final RuntimeException e) {
+			final String s = attempt > 0 ? " (attempt " + attempt + "/" + (maxRetries + 1) + ")" : "";
+			if (maxRetries == -1 || attempt <= maxRetries)
+				logger.warn("initialization of {} failed{}, retry in {} seconds", serviceName, s, retryDelay, e);
+			else {
+				logger.error("error initializing {}{}", serviceName, s, e);
+				quit();
 			}
 		}
+		Thread.currentThread().setName("idle looper thread");
 	}
 
-	synchronized Optional<ServiceLooper> looper() {
+	@Override
+	public String toString() {
+		return serviceName;
+	}
+
+	Optional<ServiceLooper> looper() {
 		return Optional.ofNullable(looper);
 	}
 
-	void quit()
-	{
-		quit = true;
-		interrupt();
+	void quit() {
+		scheduledFuture.cancel(true);
 		// we quit the looper, because interrupts are ignored on non-interruptible sockets
 		// only call cleanup if there is no looper, otherwise cleanup is called in run()
 		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(LogLevel.INFO, null));
 	}
 
-	void cleanup(final LogLevel level, final Throwable t)
-	{
-		LogService.log(server.logger, level, super.getName() + " closed", t);
+	void cleanup(final LogLevel level, final Throwable t) {
+		LogService.log(logger, level, serviceName + " closed", t);
 	}
 }

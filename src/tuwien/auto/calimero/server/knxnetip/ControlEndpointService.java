@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2019 B. Malinowsky
+    Copyright (c) 2016, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -807,7 +807,7 @@ final class ControlEndpointService extends ServiceLooper
 
 		final ServiceLooper svcLoop;
 		final DataEndpoint newDataEndpoint;
-		LooperThread looperThread = null;
+		LooperTask looperTask = null;
 
 		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
@@ -824,7 +824,7 @@ final class ControlEndpointService extends ServiceLooper
 						((DataEndpointService) svcLoop)::resetRequest);
 				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
-				looperThread = new LooperThread(server,
+				looperTask = new LooperTask(server,
 						svcCont.getName() + " data endpoint " + newDataEndpoint.getRemoteAddress(), 0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
@@ -841,10 +841,10 @@ final class ControlEndpointService extends ServiceLooper
 			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 		}
 		connections.put(channelId, newDataEndpoint);
-		if (looperThread != null)
-			looperThread.start();
+		if (looperTask != null)
+			LooperTask.execute(looperTask);
 		if (!svcCont.reuseControlEndpoint())
-			looperThreads.add(looperThread);
+			looperTasks.add(looperTask);
 
 		// for udp, always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
@@ -1087,10 +1087,10 @@ final class ControlEndpointService extends ServiceLooper
 
 	// workaround to find the correct looper/connection when ETS sends to the wrong UDP port
 	// TODO make thread-safe
-	private static final Set<LooperThread> looperThreads = Collections.newSetFromMap(new WeakHashMap<>());
+	private static final Set<LooperTask> looperTasks = Collections.newSetFromMap(new WeakHashMap<>());
 
 	static Optional<DataEndpointService> findDataEndpoint(final int channelId) {
-		for (final LooperThread t : looperThreads) {
+		for (final LooperTask t : looperTasks) {
 			final Optional<DataEndpointService> looper = t.looper().map(DataEndpointService.class::cast);
 			if (looper.isPresent() && looper.get().svcHandler.getChannelId() == channelId)
 				return looper;

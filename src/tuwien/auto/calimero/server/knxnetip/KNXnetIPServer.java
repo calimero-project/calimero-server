@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2019 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -218,7 +218,7 @@ public class KNXnetIPServer
 	// Discovery and description
 
 	private boolean runDiscovery;
-	private LooperThread discovery;
+	private LooperTask discovery;
 	private NetworkInterface[] outgoingIf;
 	private NetworkInterface[] discoveryIfs;
 
@@ -231,10 +231,10 @@ public class KNXnetIPServer
 	class Endpoint {
 		final ServiceContainer serviceContainer;
 		final InterfaceObject knxipParameters;
-		private final LooperThread controlEndpoint;
-		private volatile LooperThread routingEndpoint;
+		private final LooperTask controlEndpoint;
+		private volatile LooperTask routingEndpoint;
 
-		Endpoint(final ServiceContainer sc, final InterfaceObject knxipParameters, final LooperThread controlEndpoint) {
+		Endpoint(final ServiceContainer sc, final InterfaceObject knxipParameters, final LooperTask controlEndpoint) {
 			serviceContainer = sc;
 			this.knxipParameters = knxipParameters;
 			this.controlEndpoint = controlEndpoint;
@@ -245,20 +245,20 @@ public class KNXnetIPServer
 		}
 
 		Optional<RoutingService> routingEndpoint() {
-			return Optional.ofNullable(routingEndpoint).flatMap(LooperThread::looper).map(RoutingService.class::cast);
+			return Optional.ofNullable(routingEndpoint).flatMap(LooperTask::looper).map(RoutingService.class::cast);
 		}
 
 		void start() {
 			if (!serviceContainer.isActivated())
 				return;
-			controlEndpoint.start();
+			LooperTask.scheduleWithRetry(controlEndpoint);
 			if (serviceContainer instanceof RoutingServiceContainer) {
 				final var routingContainer = (RoutingServiceContainer) serviceContainer;
 				final InetAddress mcast = routingContainer.routingMulticastAddress();
-				routingEndpoint = new LooperThread(KNXnetIPServer.this,
+				routingEndpoint = new LooperTask(KNXnetIPServer.this,
 						serverName + " routing service " + mcast.getHostAddress(), -1,
 						() -> new RoutingService(KNXnetIPServer.this, routingContainer, mcast, multicastLoopback));
-				routingEndpoint.start();
+				LooperTask.scheduleWithRetry(routingEndpoint);
 			}
 		}
 
@@ -408,7 +408,7 @@ public class KNXnetIPServer
 		final InterfaceObject[] objects = io.getInterfaceObjects();
 
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
-		final var controlEndpoint = new LooperThread(this, serverName + " control endpoint " + sc.getName(), -1, builder);
+		final var controlEndpoint = new LooperTask(this, serverName + " control endpoint " + sc.getName(), -1, builder);
 
 		final var endpoint = new Endpoint(sc, objects[objects.length - 1], controlEndpoint);
 		endpoints.add(endpoint);
@@ -1096,14 +1096,13 @@ public class KNXnetIPServer
 				return;
 		}
 		final Supplier<ServiceLooper> builder = () -> new DiscoveryService(this, outgoing, listen);
-		final LooperThread t = new LooperThread(this, serverName + " discovery endpoint", retryAttempts, builder);
-		discovery = t;
-		discovery.start();
+		discovery = new LooperTask(this, serverName + " discovery endpoint", retryAttempts, builder);
+		LooperTask.scheduleWithRetry(discovery);
 	}
 
 	private void stopDiscoveryService()
 	{
-		final LooperThread d = discovery;
+		final LooperTask d = discovery;
 		discovery = null;
 		if (d != null)
 			d.quit();
