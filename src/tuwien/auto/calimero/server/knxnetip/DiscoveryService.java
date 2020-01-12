@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2019 B. Malinowsky
+    Copyright (c) 2016, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,7 +51,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -118,22 +117,9 @@ final class DiscoveryService extends ServiceLooper
 		return s;
 	}
 
-	// supply null for joinOn to join on all found network interfaces
 	private void joinOnInterfaces(final MulticastSocket s, final NetworkInterface[] joinOn) throws IOException
 	{
 		final SocketAddress group = new InetSocketAddress(systemSetupMulticast, 0);
-		if (joinOn == null) {
-			// We want to use the system-chosen network interface to send our join request.
-			// If joinGroup is called with the interface omitted, the interface as returned by
-			// getInterface() is used. If getInterface returns 0.0.0.0, join with interface
-			// set to null (on OSX, joinGroup(InetAddress) will fail)
-			if (s.getInterface().isAnyLocalAddress())
-				s.joinGroup(group, null);
-			else
-				s.joinGroup(systemSetupMulticast);
-			logger.info("KNXnet/IP discovery listens on interface with address " + s.getInterface());
-			return;
-		}
 		final List<NetworkInterface> nifs = joinOn.length > 0 ? Arrays.asList(joinOn)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
 		final var found = new StringJoiner(", ");
@@ -142,8 +128,7 @@ final class DiscoveryService extends ServiceLooper
 		// we try to bind to all requested interfaces. Only if that completely fails, we throw
 		// the first caught exception
 		IOException thrown = null;
-		for (final Iterator<NetworkInterface> i = nifs.iterator(); i.hasNext();) {
-			final NetworkInterface ni = i.next();
+		for (final var ni : nifs) {
 			final Enumeration<InetAddress> addrs = ni.getInetAddresses();
 			if (!addrs.hasMoreElements()) {
 				logger.warn("KNXnet/IP discovery join fails with no IP address bound to interface " + ni.getName());
