@@ -92,6 +92,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
@@ -603,9 +604,15 @@ public class Launcher implements Runnable, AutoCloseable
 		final boolean detached = "--no-stdin".equals(args[optIdx]);
 		try (var launcher = new Launcher(configUri)) {
 			launcher.terminal = !detached;
-			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
+			Runtime.getRuntime().addShutdownHook(shutdownHook(launcher));
 			launcher.run();
 		}
+	}
+
+	@SuppressWarnings("preview")
+	private static Thread shutdownHook(final Launcher launcher) {
+		return Thread.ofVirtual().inheritInheritableThreadLocals(false).allowSetThreadLocals(false)
+				.name(launcher.server.getName() + " shutdown").unstarted(launcher::quit);
 	}
 
 	/**
@@ -635,7 +642,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final String name = server.getName();
 			if (terminal) {
-				new Thread(gw, name).start();
+				Executor.execute(gw, name);
 				waitForTermination();
 				quit();
 			}

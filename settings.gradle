@@ -1,3 +1,4 @@
+rootProject.name = 'calimero-server-loom'
 
 def safeIncludeBuild(String dir) {
 	boolean inComposite = gradle.parent != null

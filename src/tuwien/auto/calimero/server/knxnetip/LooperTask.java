@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,37 +38,26 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
 // interrupt policy: cleanup and exit
 class LooperTask implements Runnable {
-	private static final ScheduledThreadPoolExecutor looperPool = new ScheduledThreadPoolExecutor(Integer.MAX_VALUE,
-		r -> {
-			final Thread t = new Thread(r, "looper thread");
-			t.setDaemon(true);
-			return t;
-		});
-
-	static {
-		looperPool.setKeepAliveTime(30, TimeUnit.SECONDS);
-		looperPool.allowCoreThreadTimeOut(true);
-	}
 
 	public static void execute(final LooperTask task) {
-		task.scheduledFuture = looperPool.schedule(task, 0, TimeUnit.SECONDS);
+		task.scheduledFuture = Executor.scheduledExecutor().schedule(task, 0, TimeUnit.SECONDS);
 	}
 
 	private static final int retryDelay = 10; // [s]
 
 	public static void scheduleWithRetry(final LooperTask task) {
-		task.scheduledFuture = looperPool.scheduleWithFixedDelay(task, 0, retryDelay, TimeUnit.SECONDS);
+		task.scheduledFuture = Executor.scheduledExecutor().scheduleWithFixedDelay(task, 0, retryDelay, TimeUnit.SECONDS);
 	}
 
 	private final Logger logger;
@@ -115,7 +104,6 @@ class LooperTask implements Runnable {
 				quit();
 			}
 		}
-		Thread.currentThread().setName("idle looper thread");
 	}
 
 	@Override
@@ -128,10 +116,9 @@ class LooperTask implements Runnable {
 	}
 
 	void quit() {
-		scheduledFuture.cancel(true);
-		// we quit the looper, because interrupts are ignored on non-interruptible sockets
 		// only call cleanup if there is no looper, otherwise cleanup is called in run()
 		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(LogLevel.INFO, null));
+		scheduledFuture.cancel(true);
 	}
 
 	void cleanup(final LogLevel level, final Throwable t) {

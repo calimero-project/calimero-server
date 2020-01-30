@@ -1,6 +1,13 @@
 Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml/badge.svg)](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml)
 =========================
 
+### Virtual threads
+
+* Detect when a virtual thread is pinned to the carrier thread due to a held monitor   
+  `-Djdk.tracePinnedThreads=full` or `-Djdk.tracePinnedThreads=short`
+* Use a scheduler with a single worker (carrier) thread. With the default scheduler (by creating the thread with no-argument `Thread.builder().virtual()` method), use `-Djdk.defaultScheduler.parallelism=1`
+
+
 A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://www.oracle.com/technetwork/java/javase/downloads/index.html) (_java.base_).
 
 * No KNXnet/IP server hardware required

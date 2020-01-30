@@ -60,6 +60,7 @@ import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.internal.EventListeners;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -131,14 +132,12 @@ class KnxServerGatewayTest
 				List.of(container));
 
 		final KnxServerGateway gw2 = new KnxServerGateway(s, config);
-		Thread t = new Thread(gw2);
-		t.start();
+		Thread t = Executor.execute(gw2, "gw2");
 		Thread.sleep(1000);
 		assertTrue(t.isAlive());
 		gw2.quit();
 
-		t = new Thread(gw);
-		t.start();
+		t = Executor.execute(gw, "gw");
 		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();
@@ -147,8 +146,7 @@ class KnxServerGatewayTest
 	@Test
 	void testQuit() throws InterruptedException
 	{
-		final Thread t = new Thread(gw);
-		t.start();
+		final Thread t = Executor.execute(gw, "gw");
 		Thread.sleep(2000);
 		assertTrue(t.isAlive());
 		gw.quit();

@@ -3,11 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>com.github.calimero</groupId>
-		<artifactId>calimero-parent</artifactId>
+		<artifactId>calimero-parent-loom</artifactId>
 		<version>2.6-SNAPSHOT</version>
 	</parent>
-	<artifactId>calimero-server</artifactId>
-	<name>Calimero KNXnet/IP Server</name>
+	<artifactId>calimero-server-loom</artifactId>
+	<name>Calimero KNXnet/IP Server (Loom)</name>
 	<description>Calimero KNXnet/IP server, a free KNX network server</description>
 	<scm>
 		<url>https://github.com/calimero-project/calimero-server.git</url>
@@ -39,7 +39,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>exec-maven-plugin</artifactId>
-				<version>1.5.0</version>
+				<version>3.1.0</version>
 				<configuration>
 					<cleanupDaemonThreads>false</cleanupDaemonThreads>
 				</configuration>
@@ -49,12 +49,12 @@
 	<dependencies>
 		<dependency>
 			<groupId>com.github.calimero</groupId>
-			<artifactId>calimero-core</artifactId>
+			<artifactId>calimero-core-loom</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.calimero</groupId>
-			<artifactId>calimero-device</artifactId>
+			<artifactId>calimero-device-loom</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
