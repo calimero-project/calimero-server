@@ -1806,9 +1806,12 @@ public class KnxServerGateway implements Runnable
 		if (adapter != null && adapter.isOpen())
 			return adapter;
 		@SuppressWarnings("unchecked")
-		final KNXNetworkLink link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.getSubnetLink()).target();
+		KNXNetworkLink link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.getSubnetLink()).target();
 		if (link == null)
 			throw new KNXException("no open subnet link for " + connector.getName());
+		if (!link.isOpen())
+			link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.openNetworkLink()).target();
+
 		try {
 			Class<?> clazz = link.getClass();
 			while (clazz != null && !clazz.getSimpleName().equals("AbstractLink"))
