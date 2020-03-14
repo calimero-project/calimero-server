@@ -98,11 +98,17 @@ import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
+import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
+import tuwien.auto.calimero.dptxlator.DPTXlator;
+import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
+import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
+import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
+import tuwien.auto.calimero.dptxlator.TranslatorTypes;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -815,6 +821,40 @@ public class KnxServerGateway implements Runnable
 		return new ArrayList<>(connectors);
 	}
 
+	public void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
+		final var connector = getSubnetConnector(sc.getName());
+		for (final var datapoint : datapoints) {
+			final var dpt = datapoint.getDPT();
+			final var dst = datapoint.getMainAddress();
+			final int sendInterval = datapoint.getExpirationTimeout();
+			logger.debug("setup time server for {}: publish '{}' ({}) to {} every {} seconds", connector.getName(),
+					datapoint.getName(), dpt, dst, sendInterval);
+			final var xlator = TranslatorTypes.createTranslator(dpt);
+
+			timeServerCyclicTransmitter.scheduleAtFixedRate(
+					() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
+					5, sendInterval, TimeUnit.SECONDS);
+		}
+	}
+
+	private void transmitCurrentTime(final SubnetConnector connector, final DPTXlator xlator, final GroupAddress dst,
+			final Priority p) {
+		final long millis = System.currentTimeMillis();
+		final var src = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
+		if (xlator instanceof DPTXlatorDate)
+			((DPTXlatorDate) xlator).setValue(millis);
+		else if (xlator instanceof DPTXlatorTime)
+			((DPTXlatorTime) xlator).setValue(millis);
+		else if (xlator instanceof DPTXlatorDateTime) {
+			final DPTXlatorDateTime dateTime = (DPTXlatorDateTime) xlator;
+			dateTime.setValue(millis);
+			dateTime.setClockSync(true);
+		}
+		final var apdu = DataUnitBuilder.createAPDU(0x80, xlator.getData());
+		final var ldata = new CEMILData(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
+		dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
+	}
+
 	@Override
 	public String toString() {
 		return server.getFriendlyName() + " -- " + stat();
@@ -912,6 +952,8 @@ public class KnxServerGateway implements Runnable
 			throw e;
 		}
 	}
+
+	private static final ScheduledExecutorService timeServerCyclicTransmitter = Executors.newSingleThreadScheduledExecutor();
 
 	private FrameEvent recordFrameEvent;
 

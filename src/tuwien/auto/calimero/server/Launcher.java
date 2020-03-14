@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2019 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -87,9 +87,13 @@ import tuwien.auto.calimero.KnxSecureException;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
+import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
+import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
+import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -204,6 +208,7 @@ public class Launcher implements Runnable, AutoCloseable
 		private final Map<ServiceContainer, Integer> securedServicesMap = new HashMap<>();
 		private final Map<ServiceContainer, Keyring> keyrings = new HashMap<>();
 		private final Map<ServiceContainer, Boolean> udpOnlyContainer = new HashMap<>();
+		private final Map<ServiceContainer, List<StateDP>> timeServer = new HashMap<>();
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -290,6 +295,8 @@ public class Launcher implements Runnable, AutoCloseable
 			int disruptionBufferUpperPort = 0;
 			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
 
+			final var timeServerDatapoints = new ArrayList<StateDP>();
+
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
 				final String name = r.getLocalName();
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
@@ -366,6 +373,17 @@ public class Launcher implements Runnable, AutoCloseable
 						disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
 						disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
 					}
+					else if (name.equals("timeServer")) {
+						final var formats = List.of(DPTXlatorDate.DPT_DATE.getID(),
+								DPTXlatorTime.DPT_TIMEOFDAY.getID(), DPTXlatorDateTime.DPT_DATE_TIME.getID());
+						while (r.nextTag() == XmlReader.START_ELEMENT) {
+							final var datapoint = new StateDP(r);
+							if (!formats.contains(datapoint.getDPT()))
+								throw new KNXMLException("invalid time server datapoint type '" + datapoint.getDPT()
+										+ "', supported are " + formats);
+							timeServerDatapoints.add(datapoint);
+						}
+					}
 					else {
 						subnet = new IndividualAddress(r);
 					}
@@ -406,6 +424,9 @@ public class Launcher implements Runnable, AutoCloseable
 						additionalAddresses.put(sc, indAddressPool);
 						tunnelingWithNat.put(sc, useNat);
 						udpOnlyContainer.put(sc, udpOnly);
+						if (!timeServerDatapoints.isEmpty())
+							timeServer.put(sc, timeServerDatapoints);
+
 
 						if (keyring != null) {
 							keyrings.put(sc, keyring);
@@ -638,11 +659,12 @@ public class Launcher implements Runnable, AutoCloseable
 
 		try {
 			connect(linksToClose, connectors);
-			xml = null;
 			final String name = server.getName();
 			// create a gateway which forwards and answers most of the KNX stuff
 			// if no connectors were created, gateway will throw
 			gw = new KnxServerGateway(name, server, connectors.toArray(new SubnetConnector[0]));
+			setupTimeServer();
+			xml = null;
 
 			if (terminal) {
 				new Thread(gw, name).start();
@@ -817,6 +839,11 @@ public class Launcher implements Runnable, AutoCloseable
 			keyfile.putAll(decrypted);
 			Arrays.fill(pwd, (char) 0);
 		}
+	}
+
+	private void setupTimeServer() throws KNXException {
+		for (final var entry : xml.timeServer.entrySet())
+			gw.setupTimeServer(entry.getKey(), entry.getValue());
 	}
 
 	private void waitForTermination()

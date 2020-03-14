@@ -60,6 +60,18 @@
 			<knxAddress type="individual">7.1.12</knxAddress>
 			<knxAddress type="individual">7.1.13</knxAddress>
 		</additionalAddresses>
+
+		<!-- Cyclically transmit date (11.001), time (10.001), or date+time (19.001) information on the subnetwork, 
+			 using the default time zone and the specified datapoint(s).
+			 Expiration timeout specifies tx cycle in seconds, e.g., 1 min = 60, 1 hour = 3600, 12 hours = 43200 -->
+		<!--
+		<timeServer>
+			<datapoint stateBased="true" name="current time" dptID="10.001" priority="low">
+				<knxAddress type="group">3/4/5</knxAddress>
+				<expiration timeout="600" />
+			</datapoint>
+		</timeServer>
+		-->
 	</serviceContainer>
 
 	<!-- Add next service container (optional) -->
