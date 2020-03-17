@@ -34,7 +34,7 @@
 		<!-- <knxSubnet type="ft12-cemi" medium="tp1">/dev/ttyS0</knxSubnet> -->
 
 		<!-- KNX USB: specify the vendorId:productId or vendor name, e.g., siemens -->
-		<!-- <knxSubnet type="usb" medium="tp1">siemens</knxSubnet> -->
+		<!-- <knxSubnet  type="usb" medium="tp1">siemens</knxSubnet> -->
 		<!-- if USB device identifier is left empty, the first found KNX USB device is used -->
 		<knxSubnet type="usb" medium="tp1"></knxSubnet>
 
