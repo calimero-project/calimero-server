@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -405,8 +406,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void onResetRequest(final ShutdownEvent se)
-		{}
+		public void onResetRequest(final ShutdownEvent se) {}
 
 		@Override
 		public void onShutdown(final ShutdownEvent se)
@@ -1624,13 +1624,13 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private Optional<Long> property(final int objectType, final int objectInstance, final int propertyId) {
+	private OptionalLong property(final int objectType, final int objectInstance, final int propertyId) {
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 		try {
-			return Optional.of(toUnsignedInt(ios.getProperty(objectType, objectInstance, propertyId, 1, 1)));
+			return OptionalLong.of(toUnsignedInt(ios.getProperty(objectType, objectInstance, propertyId, 1, 1)));
 		}
 		catch (final KnxPropertyException e) {
-			return Optional.empty();
+			return OptionalLong.empty();
 		}
 	}
 
@@ -1824,8 +1824,11 @@ public class KnxServerGateway implements Runnable
 		KNXNetworkLink link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.getSubnetLink()).target();
 		if (link == null)
 			throw new KNXException("no open subnet link for " + connector.getName());
-		if (!link.isOpen())
-			link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.openNetworkLink()).target();
+		if (!link.isOpen()) {
+			@SuppressWarnings("unchecked")
+			final var cast = ((Link<KNXNetworkLink>) connector.openNetworkLink());
+			link = (KNXNetworkLink) cast.target();
+		}
 
 		try {
 			Class<?> clazz = link.getClass();

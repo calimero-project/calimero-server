@@ -44,7 +44,6 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -337,7 +336,7 @@ public class KNXnetIPServer
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
 		serverName = localName;
-		if (!Charset.forName("ISO-8859-1").newEncoder().canEncode(friendlyName))
+		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
 			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		this.friendlyName = friendlyName;
 		logger = LogService.getLogger("calimero.server." + getName());
@@ -843,7 +842,7 @@ public class KNXnetIPServer
 		// set properties used in device DIB for search response during discovery
 		//
 		// friendly name property entry is an array of 30 characters
-		final byte[] data = Arrays.copyOf(friendlyName.getBytes(Charset.forName("ISO-8859-1")), 30);
+		final byte[] data = Arrays.copyOf(friendlyName.getBytes(StandardCharsets.ISO_8859_1), 30);
 		ios.setProperty(knxObject, objectInstance, PID.FRIENDLY_NAME, 1, data.length, data);
 		setProperty(knxObject, objectInstance, PID.PROJECT_INSTALLATION_ID, bytesFromWord(defProjectInstallationId));
 		final byte[] addr = endpoint.getMediumSettings().getDeviceAddress().toByteArray();
