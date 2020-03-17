@@ -645,13 +645,13 @@ final class ControlEndpointService extends ServiceLooper
 		final NetworkInterface netif = NetworkInterface.getByName(svcCont.networkInterface());
 		if (netif != null)
 			return netif.inetAddresses().filter(Inet4Address.class::isInstance);
+		if (!"any".equals(svcCont.networkInterface()))
+			return Stream.empty();
 
-		try {
-			final InetAddress localHost = localHost();
-			if (!localHost.isLoopbackAddress())
-				return Stream.of(localHost);
-		}
-		catch (final UnknownHostException ignore) {}
+		final var localHost = localHost().filter(Inet4Address.class::isInstance)
+				.filter(not(InetAddress::isLoopbackAddress));
+		if (localHost.isPresent())
+			return localHost.stream();
 
 		return NetworkInterface.networkInterfaces().filter(ControlEndpointService::interfaceIsUp)
 				.flatMap(NetworkInterface::inetAddresses).filter(Inet4Address.class::isInstance)
@@ -667,14 +667,18 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
-	private InetAddress localHost() throws UnknownHostException
-	{
+	private Optional<InetAddress> localHost() {
 		final long start = System.nanoTime();
-		final InetAddress addr = InetAddress.getLocalHost();
-		final long elapsed = System.nanoTime() - start;
-		if (elapsed > 3_000_000_000L)
-			logger.warn("slow local host resolution, took {} ms", elapsed / 1000 / 1000);
-		return addr;
+		try {
+			return Optional.of(InetAddress.getLocalHost());
+		}
+		catch (final UnknownHostException e) {}
+		finally {
+			final long elapsed = System.nanoTime() - start;
+			if (elapsed > 3_000_000_000L)
+				logger.warn("slow local host resolution, took {} ms", elapsed / 1000 / 1000);
+		}
+		return Optional.empty();
 	}
 
 	private int objectInstance()
