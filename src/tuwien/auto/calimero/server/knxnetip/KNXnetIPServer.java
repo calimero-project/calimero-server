@@ -61,7 +61,6 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 
 import tuwien.auto.calimero.CloseEvent;
-import tuwien.auto.calimero.DeviceDescriptor;
 import tuwien.auto.calimero.DeviceDescriptor.DD0;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXException;
@@ -201,9 +200,6 @@ public class KNXnetIPServer
 	static final byte[] defMfrData = new byte[] { 'b', 'm', '2', '0', '1', '1', ' ', ' ' };
 
 	// from init KNX properties
-
-	// PID.DESCRIPTION
-	private static final byte[] defDesc = defFriendlyName;
 
 	// unmodifiable name assigned by user, used in getName() and logger
 	private final String serverName;
@@ -357,7 +353,15 @@ public class KNXnetIPServer
 
 		logger.info("{} (v{}) \'{}\'", new String(defFriendlyName, StandardCharsets.ISO_8859_1),
 				Settings.getLibraryVersion(), friendlyName);
-		initBasicServerProperties();
+
+		ios.addServerListener(this::onPropertyValueChanged);
+
+		// server KNX device address, since we don't know about routing at this time
+		// address is always 15.15.0; might be updated later or by routing configuration
+		final byte[] device1 = defKnxAddress.toByteArray();
+		// equal to PID.KNX_INDIVIDUAL_ADDRESS
+		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device1[0]);
+		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device1[1]);
 	}
 
 	/**
@@ -835,45 +839,6 @@ public class KNXnetIPServer
 		catch (final KNXConnectionClosedException e) {
 			logger.error("sending routing lost message notification", e);
 		}
-	}
-
-	private void initBasicServerProperties() throws KnxPropertyException
-	{
-		ios.addServerListener(this::onPropertyValueChanged);
-
-		// initialize interface device object properties
-
-		// max APDU length is in range [15 .. 254]
-		setProperty(DEVICE_OBJECT, objectInstance, PID.MAX_APDULENGTH, new byte[] { 0, (byte) 15 });
-//		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.DESCRIPTION, 1, defDesc.length, defDesc);
-
-		final String[] sver = Settings.getLibraryVersion().split("\\.| |-", 0);
-		final int ver = Integer.parseInt(sver[0]) << 6 | Integer.parseInt(sver[1]);
-		setProperty(DEVICE_OBJECT, objectInstance, PID.VERSION, new byte[] { (byte) (ver >>> 8), (byte) (ver & 0xff) });
-
-		// revision counting is not aligned with library version for now
-		setProperty(DEVICE_OBJECT, objectInstance, PID.FIRMWARE_REVISION, new byte[] { 1 });
-
-		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_DESCRIPTOR, DeviceDescriptor.DD0.TYPE_091A.toByteArray());
-
-		//
-		// set properties used in device DIB for search response during discovery
-		//
-		// device status is not in programming mode
-		setProperty(DEVICE_OBJECT, objectInstance, PID.PROGMODE, new byte[] { defDeviceStatus });
-		setProperty(DEVICE_OBJECT, objectInstance, PID.SERIAL_NUMBER, defSerialNumber);
-		// server KNX device address, since we don't know about routing at this time
-		// address is always 15.15.0; might be updated later or by routing configuration
-		final byte[] device = defKnxAddress.toByteArray();
-		// equal to PID.KNX_INDIVIDUAL_ADDRESS
-		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
-		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
-
-		//
-		// set properties used in manufacturer data DIB for discovery self description
-		//
-		setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_ID, bytesFromWord(defMfrId));
-		ios.setProperty(DEVICE_OBJECT, objectInstance, PID.MANUFACTURER_DATA, 1, defMfrData.length / 4, defMfrData);
 	}
 
 	// precondition: we have an IOS instance
