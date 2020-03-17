@@ -783,20 +783,6 @@ public class KNXnetIPServer
 		return serverName;
 	}
 
-	/**
-	 * Returns the friendly name of this server.
-	 * <p>
-	 * This is the friendly server name value as returned by KNX property PID.FRIENDLY_NAME in the
-	 * Interface Object Server. If that property does not exist or has an empty name set, a server
-	 * default name is returned.
-	 *
-	 * @return server name as string
-	 */
-	public String getFriendlyName()
-	{
-		return friendlyName;
-	}
-
 	public Map<Integer, DataEndpoint> dataConnections(final ServiceContainer serviceContainer) {
 		return endpointFor(serviceContainer).flatMap(Endpoint::controlEndpoint).map(ControlEndpointService::connections)
 				.orElse(Map.of());

@@ -48,6 +48,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -857,7 +858,7 @@ public class KnxServerGateway implements Runnable
 
 	@Override
 	public String toString() {
-		return server.getFriendlyName() + " -- " + stat();
+		return friendlyName() + " -- " + stat();
 	}
 
 	private String stat() {
@@ -947,9 +948,23 @@ public class KnxServerGateway implements Runnable
 			server.launch();
 		}
 		catch (final RuntimeException e) {
-			logger.error("cannot launch " + server.getFriendlyName(), e);
+			logger.error("cannot launch " + friendlyName(), e);
 			quit();
 			throw e;
+		}
+	}
+
+	private String friendlyName() {
+		try {
+			// friendly name property entry is an array of 30 characters
+			final var data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, 1,
+					PID.FRIENDLY_NAME, 1, 30);
+			final String s = new String(data, StandardCharsets.ISO_8859_1);
+			final int end = s.indexOf(0);
+			return s.substring(0, end == -1 ? data.length : end);
+		}
+		catch (final KnxPropertyException e) {
+			return name;
 		}
 	}
 
