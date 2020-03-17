@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2019 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -251,7 +251,8 @@ public final class SubnetConnector
 			}
 		}
 		else if ("usb".equals(subnetType)) {
-			final KNXMediumSettings adjustForTP1 = settings instanceof TPSettings ? TPSettings.TP1 : settings;
+			// ignore configured device address with USB on TP1 and always use 0.0.0
+			final var adjustForTP1 = settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
 			ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
 		}
 		else if ("ft12".equals(subnetType))
@@ -390,5 +391,20 @@ public final class SubnetConnector
 		subnetLink = link;
 		if (listener != null)
 			setSubnetListener(listener);
+	}
+
+	// always use device address 0.0.0 with USB interface on TP1
+	private static final class UsbSettingsProxy extends TPSettings {
+		private final KNXMediumSettings delegate;
+
+		public UsbSettingsProxy(final KNXMediumSettings settings) {
+			this.delegate = settings;
+		}
+
+		@Override
+		public void setMaxApduLength(final int maxApduLength) {
+			super.setMaxApduLength(maxApduLength);
+			delegate.setMaxApduLength(maxApduLength);
+		}
 	}
 }
