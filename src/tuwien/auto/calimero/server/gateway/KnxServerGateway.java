@@ -1382,7 +1382,8 @@ public class KnxServerGateway implements Runnable
 						return;
 					}
 					// check if forwarding requests us to use the filter table
-					if (mainGroupAddressConfig == 3 && !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
+					if (mainGroupAddressConfig == 3 && raw != 0
+							&& !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
 						logger.warn(f + ", destination not in group address table - throw away");
 						return;
 					}
