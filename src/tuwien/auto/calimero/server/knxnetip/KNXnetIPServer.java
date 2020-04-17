@@ -406,14 +406,12 @@ public class KNXnetIPServer
 		}
 
 		// add new KNXnet/IP parameter object for this service container
-		final InterfaceObjectServer io = getInterfaceObjectServer();
-		io.addInterfaceObject(knxObject);
-		final InterfaceObject[] objects = io.getInterfaceObjects();
+		final var knxipParameters = getInterfaceObjectServer().addInterfaceObject(knxObject);
 
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
 		final var controlEndpoint = new LooperTask(this, serverName + " control endpoint " + sc.getName(), -1, builder);
 
-		final var endpoint = new Endpoint(sc, objects[objects.length - 1], controlEndpoint);
+		final var endpoint = new Endpoint(sc, knxipParameters, controlEndpoint);
 		endpoints.add(endpoint);
 
 		final int size = endpoints.size();
