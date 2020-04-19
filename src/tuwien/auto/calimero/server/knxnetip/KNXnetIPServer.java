@@ -414,17 +414,24 @@ public class KNXnetIPServer
 		final var endpoint = new Endpoint(sc, knxipParameters, controlEndpoint);
 		endpoints.add(endpoint);
 
+		final var settings = sc.getMediumSettings();
 		final int size = endpoints.size();
 		if (size == 1) {
-			final byte[] device = sc.getMediumSettings().getDeviceAddress().toByteArray();
+			final byte[] device = settings.getDeviceAddress().toByteArray();
 			setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device[0]);
 			setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device[1]);
 		}
-		final int medium = sc.getMediumSettings().getMedium();
+		final int medium = settings.getMedium();
 		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, PID.MEDIUM_TYPE, (byte) 0, (byte) medium);
+
+		final int pidMaxInterfaceApduLength = 68;
+		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, pidMaxInterfaceApduLength, bytesFromWord(settings.maxApduLength()));
+		final int pidMaxLocalApduLength = 69;
+		setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, pidMaxLocalApduLength, bytesFromWord(1400));
+
 		if (medium == KNXMediumSettings.MEDIUM_PL110)
 			setProperty(DEVICE_OBJECT, objectInstance, PID.DOMAIN_ADDRESS,
-					((PLSettings) sc.getMediumSettings()).getDomainAddress());
+					((PLSettings) settings).getDomainAddress());
 
 		initKNXnetIpParameterObject(size, sc);
 		if (running)
