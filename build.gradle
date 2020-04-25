@@ -2,6 +2,10 @@ buildscript {
     repositories {
         mavenCentral()
         maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.ben-manes:gradle-versions-plugin:0.28.0'
     }
 }
 
@@ -17,6 +21,7 @@ ext.junitJupiterVersion = '5.5.2'
 apply plugin: 'java-library'
 apply plugin: 'maven'
 apply plugin: 'application'
+apply plugin: 'com.github.ben-manes.versions'
 
 group = 'com.github.calimero'
 version = '2.5-SNAPSHOT'
@@ -71,13 +76,13 @@ dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
 
-    implementation 'org.slf4j:slf4j-api:1.8.0-beta4'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.8.0-beta4'
+    implementation 'org.slf4j:slf4j-api:2.0.0-alpha1'
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.0-alpha1'
 
     runtimeOnly "com.github.calimero:calimero-rxtx:${version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-	testCompileOnly 'junit:junit:4.12'
+	testCompileOnly 'junit:junit:4.13'
 	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 }
