@@ -293,6 +293,8 @@ public class KnxServerGateway implements Runnable
 
 	private final class KNXnetIPServerListener implements ServerListener
 	{
+		private final Set<ServiceContainer> verifiedSubnetInterfaceAddress = Collections.synchronizedSet(new HashSet<>());
+
 		@Override
 		public boolean acceptDataConnection(final ServiceContainer svcContainer,
 			final KNXnetIPConnection conn, final IndividualAddress assignedDeviceAddress,
@@ -337,7 +339,10 @@ public class KnxServerGateway implements Runnable
 			logger.debug("established connection {}", connection);
 
 			try {
-				verifySubnetInterfaceAddress(svcContainer);
+				if (!verifiedSubnetInterfaceAddress.contains(svcContainer)) {
+					verifySubnetInterfaceAddress(svcContainer);
+					verifiedSubnetInterfaceAddress.add(svcContainer);
+				}
 			}
 			catch (KNXException | InterruptedException | RuntimeException e) {
 				String msg = e.getMessage();
