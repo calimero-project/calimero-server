@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2019 B. Malinowsky
+    Copyright (c) 2016, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -85,7 +85,7 @@ final class RoutingService extends ServiceLooper
 		@Override
 		public String getName()
 		{
-			return "KNXnet/IP routing service " + ctrlEndpt.getAddress().getHostAddress();
+			return "KNX IP routing service " + ctrlEndpt.getAddress().getHostAddress();
 		}
 
 		DatagramSocket getLocalDataSocket()
