@@ -1908,13 +1908,20 @@ public class KnxServerGateway implements Runnable
 						final int propIndex = asdu[2] & 0xff;
 						try {
 							response = ldm.getDescription(objIndex, pid, propIndex);
+							final int descPid = response[1] & 0xff;
+							final int objectType = ldm.interfaceObjects().get(objIndex);
+							final var key = descPid <= 50 ? new PropertyKey(descPid) : new PropertyKey(objectType, descPid);
+							final var definitions = server.getInterfaceObjectServer().propertyDefinitions();
+							final var property = definitions.get(key);
+							if (property != null)
+								response[3] |= property.getPDT();
 							response[response.length - 2] = 1;
 						}
 						catch (final KNXRemoteException pidNotFound) {
 							response = new byte[] { (byte) objIndex, (byte) pid, (byte) propIndex, (byte) 0, 0, 0, 0 };
 						}
-						logger.debug("Local-DM {} read property description {}|{}: {}", localInterface, objIndex, pid,
-								DataUnitBuilder.toHex(response, " "));
+						logger.debug("Local-DM {} read property description {}|{} (idx {}): {}", localInterface,
+								objIndex, pid, propIndex, DataUnitBuilder.toHex(response, " "));
 					}
 					else {
 						try {
