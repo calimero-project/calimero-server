@@ -788,28 +788,20 @@ public class Launcher implements Runnable, AutoCloseable
 	private enum RoutingConfig { Reserved, All, None, Table };
 
 	private static void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
-		final List<GroupAddress> filter) throws KnxPropertyException
-	{
-		// create byte array table
-		final int size = filter.size();
-		final byte[] table = new byte[size * 2];
-		int idx = 0;
-		for (int i = 0; i < size; i++) {
-			final GroupAddress ga = filter.get(i);
-			table[idx++] = (byte) (ga.getRawAddress() >> 8);
-			table[idx++] = (byte) ga.getRawAddress();
-		}
+			final List<GroupAddress> filter) throws KnxPropertyException {
+		if (!filter.isEmpty()) {
+			final var buf = ByteBuffer.allocate(2 * filter.size());
+			filter.forEach(ga -> buf.putShort((short) ga.getRawAddress()));
 
-		if (table.length > 0) {
-			ensureInterfaceObjectInstance(ios, InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance);
-			ios.setProperty(InterfaceObject.ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, size, table);
+			ensureInterfaceObjectInstance(ios, ADDRESSTABLE_OBJECT, objectInstance);
+			ios.setProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, filter.size(), buf.array());
 		}
 
 		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
 
 		// set the handling of group addressed frames, based on whether we have set a
 		// group address filter table or not
-		final RoutingConfig route = table.length > 0 ? RoutingConfig.Table : RoutingConfig.All;
+		final RoutingConfig route = filter.isEmpty() ? RoutingConfig.All : RoutingConfig.Table;
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
 				(byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()));
 		// by default, we don't check the group address filter table for group frames from subnetworks
