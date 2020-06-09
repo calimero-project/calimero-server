@@ -94,6 +94,7 @@ import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.Destination;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.ServerConfiguration;
 
 /**
  * Provides server-side functionality of KNXnet/IP protocols.
@@ -381,6 +382,17 @@ public class KNXnetIPServer
 			final ServiceContainer sc = i.next();
 			addServiceContainer(sc);
 		}
+	}
+
+	public KNXnetIPServer(final ServerConfiguration config) {
+		this(config.name(), config.friendlyName());
+		for (final var containerConfig : config.containers()) {
+			final var svcContainer = containerConfig.subnetConnector().getServiceContainer();
+			addServiceContainer(svcContainer);
+		}
+		setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, config.discoveryNetifs().toString().replaceAll("\\[|\\]", ""));
+		setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, config.outgoingNetifs().toString().replaceAll("\\[|\\]", ""));
+		setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, config.runDiscovery() ? "true" : "false");
 	}
 
 	/**

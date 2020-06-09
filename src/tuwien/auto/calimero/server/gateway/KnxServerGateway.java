@@ -136,6 +136,7 @@ import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.serial.usb.UsbConnection;
+import tuwien.auto.calimero.server.ServerConfiguration;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DataEndpoint;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
@@ -304,7 +305,7 @@ public class KnxServerGateway implements Runnable
 			if (connector == null)
 				return false;
 			final String subnetType = connector.getInterfaceType();
-			final String subnetArgs = connector.getLinkArguments();
+			final String subnetArgs = connector.linkArguments();
 			final ServiceContainer serviceContainer = connector.getServiceContainer();
 			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
 
@@ -657,6 +658,14 @@ public class KnxServerGateway implements Runnable
 	};
 
 
+	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) throws KNXException {
+		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).toArray(SubnetConnector[]::new));
+		for (final var c : config.containers()) {
+			final var sc = c.subnetConnector().getServiceContainer();
+			setupTimeServer(sc, c.timeServer());
+		}
+	}
+
 	/**
 	 * Creates a new server gateway for the supplied KNXnet/IP server.
 	 * <p>
@@ -827,7 +836,7 @@ public class KnxServerGateway implements Runnable
 		return new ArrayList<>(connectors);
 	}
 
-	public void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
+	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
 		final var connector = getSubnetConnector(sc.getName());
 		for (final var datapoint : datapoints) {
 			final var dpt = datapoint.getDPT();
@@ -903,8 +912,7 @@ public class KnxServerGateway implements Runnable
 				if (link instanceof Link<?>)
 					link = ((Link<?>) link).target();
 
-				final String subnet = Optional.ofNullable(link).map(Object::toString).orElse("link connecting ...");
-				info.append(format("\tsubnet %s%n", subnet));
+				info.append(format("\tsubnet %s%n", c.getSubnetLink()));
 
 				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
 				final long overflowKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_KNX).orElse(0L);

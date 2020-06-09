@@ -49,6 +49,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -97,7 +98,6 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
-import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
@@ -105,6 +105,7 @@ import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.ServerConfiguration.Container;
 import tuwien.auto.calimero.server.gateway.KnxServerGateway;
 import tuwien.auto.calimero.server.gateway.SubnetConnector;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
@@ -182,33 +183,19 @@ public class Launcher implements Runnable, AutoCloseable
 		/** */
 		public static final String attrExpirationTimeout = "expirationTimeout";
 
-		// the service containers the KNX server will host
-		private final List<ServiceContainer> svcContainers = new ArrayList<>();
 
-		// in virtual KNX subnets, the subnetwork can be described by a datapoint model
-		private final Map<ServiceContainer, DatapointModel<Datapoint>> subnetDatapoints = new HashMap<>();
+		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
 
-		// Holds the network interface for KNX IP subnets, if specified
-		private final Map<ServiceContainer, NetworkInterface> subnetNetIf = new HashMap<>();
-
-		// Holds the class name of user-supplied subnet links, if specified
-		private final Map<ServiceContainer, String> subnetLinkClasses = new HashMap<>();
-
-		// the following lists contain gateway information, in sequence of the svc containers
-
-		private final List<String> subnetTypes = new ArrayList<>();
-		private final List<String> subnetAddresses = new ArrayList<>();
-
-		// list of group addresses used in the group address filter of the KNXnet/IP server
-		private final Map<ServiceContainer, List<GroupAddress>> groupAddressFilters = new HashMap<>();
-		private final Map<ServiceContainer, List<IndividualAddress>> additionalAddresses = new HashMap<>();
-		private final Map<ServiceContainer, Boolean> tunnelingWithNat = new HashMap<>();
-		private final Map<ServiceContainer, Map<String, byte[]>> keyfiles = new HashMap<>();
-		private final Map<ServiceContainer, Map<Integer, List<IndividualAddress>>> tunnelingUsers = new HashMap<>();
-		private final Map<ServiceContainer, Integer> securedServicesMap = new HashMap<>();
-		private final Map<ServiceContainer, Keyring> keyrings = new HashMap<>();
-		private final Map<ServiceContainer, Boolean> udpOnlyContainer = new HashMap<>();
-		private final Map<ServiceContainer, List<StateDP>> timeServer = new HashMap<>();
+		public static ServerConfiguration from(final URI serverConfigUri) {
+			final var xmlConfiguration = new XmlConfiguration();
+			final var config = xmlConfiguration.load(serverConfigUri.toString());
+			final boolean discovery = Boolean.parseBoolean(config.get(attrActivate));
+			final var name = config.get(attrName);
+			final var friendly = config.get(attrFriendly);
+			final var listen = List.of(config.get(attrListenNetIf).split(","));
+			final var outgoing = List.of(config.get(attrOutgoingNetIf).split(","));
+			return new ServerConfiguration(name, friendly, discovery, listen, outgoing, xmlConfiguration.containers);
+		}
 
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
@@ -232,7 +219,6 @@ public class Launcher implements Runnable, AutoCloseable
 					}
 					else if (name.equals(XmlConfiguration.propDefs)) {
 						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
-						// NYI if resource is null, definitions are directly included in element
 						if (res != null) {
 							if (m.containsKey(XmlConfiguration.attrRef))
 								logger.warn("multiple property definition resources, ignore {}, "
@@ -287,6 +273,7 @@ public class Launcher implements Runnable, AutoCloseable
 			int latencyTolerance = 1000; // ms
 			boolean useNat = false;
 			String subnetLinkClass = null;
+			// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 			DatapointModel<Datapoint> datapoints = null;
 			List<GroupAddress> filter = Collections.emptyList();
 			List<IndividualAddress> indAddressPool = new ArrayList<>();
@@ -296,6 +283,8 @@ public class Launcher implements Runnable, AutoCloseable
 			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
 
 			final var timeServerDatapoints = new ArrayList<StateDP>();
+
+			int objectInstance = 0;
 
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
 				final String name = r.getLocalName();
@@ -413,23 +402,13 @@ public class Launcher implements Runnable, AutoCloseable
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
-						subnetTypes.add(subnetType);
-						if ("emulate".equals(subnetType) && datapoints != null)
-							subnetDatapoints.put(sc, datapoints);
-						subnetAddresses.add(addr);
-						svcContainers.add(sc);
-						subnetNetIf.put(sc, subnetKnxipNetif);
-						subnetLinkClasses.put(sc, subnetLinkClass);
-						groupAddressFilters.put(sc, filter);
-						additionalAddresses.put(sc, indAddressPool);
-						tunnelingWithNat.put(sc, useNat);
-						udpOnlyContainer.put(sc, udpOnly);
-						if (!timeServerDatapoints.isEmpty())
-							timeServer.put(sc, timeServerDatapoints);
 
+						++objectInstance;
+						final var connector = subnetConnector(sc, objectInstance, subnetType, addr, subnetKnxipNetif,
+								useNat, subnetLinkClass, datapoints);
+						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
-							keyrings.put(sc, keyring);
 							final var interfaces = keyring.interfaces().get(subnet);
 							if (interfaces == null)
 								throw new KnxSecureException("no interfaces found in keyring for host " + subnet);
@@ -438,21 +417,39 @@ public class Launcher implements Runnable, AutoCloseable
 								indAddressPool.add(iface.address());
 							}
 						}
-						if (!tunnelingUserToAddresses.isEmpty())
-							tunnelingUsers.put(sc, tunnelingUserToAddresses);
 
-						securedServicesMap.put(sc, securedServices);
-
+						Map<String, byte[]> readKeyfile = null;
 						if (keyfile != null)
-							keyfiles.put(sc, readKeyfile(keyfile));
+							readKeyfile = readKeyfile(keyfile);
+
+						if (keyring != null || readKeyfile != null)
+							config = new Container(indAddressPool, securedServices, tunnelingUserToAddresses, keyring,
+									readKeyfile, connector, filter, timeServerDatapoints);
+						containers.add(config);
 						return;
 					}
 				}
 			}
 		}
 
+		private SubnetConnector subnetConnector(final ServiceContainer sc, final int objectInstance,
+				final String subnetType, final String subnetArgs, final NetworkInterface netif, final boolean useNat,
+				final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
+
+			switch (subnetType) {
+			case "knxip": return SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
+			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, subnetArgs);
+			case "tpuart": return SubnetConnector.newWithTpuartLink(sc, subnetArgs);
+			case "user-supplied": return SubnetConnector.newWithUserLink(sc, subnetLinkClass, subnetArgs);
+			case "emulate":
+				return datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
+						: SubnetConnector.newCustom(sc, "emulate");
+			default: return SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
+			}
+		}
+
 		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
-			try (final var lines = Files.lines(keyfile)) {
+			try (var lines = Files.lines(keyfile)) {
 				// ignore comments, limit keys to words with dot separator, require '='
 				final var matcher = Pattern.compile("^[^/#][\\w\\.]+\\s*=.+$").asMatchPredicate();
 				final Map<String, byte[]> keys = lines.filter(matcher)
@@ -550,12 +547,10 @@ public class Launcher implements Runnable, AutoCloseable
 
 	private static Logger logger = LoggerFactory.getLogger("calimero.server");
 
-	private static final String secureSymbol = new String(Character.toChars(0x1F512));
+	private final ServerConfiguration config;
 
 	private final KNXnetIPServer server;
 	private KnxServerGateway gw;
-
-	private XmlConfiguration xml;
 
 	// are we directly started from main, and allow terminal-based termination
 	private boolean terminal;
@@ -583,89 +578,35 @@ public class Launcher implements Runnable, AutoCloseable
 			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
 			launcher.run();
 		}
-		catch (final KNXException e) {
-			logger.error("loading configuration from " + configUri, e);
-		}
 	}
 
 	/**
 	 * Launcher constructor.
 	 *
 	 * @param configUri location/file of KNX server and gateway configuration
-	 * @throws KNXException on error loading property definitions from a resource (if specified in the configuration)
 	 */
-	public Launcher(final String configUri) throws KNXException
+	public Launcher(final String configUri)
 	{
-		xml = new XmlConfiguration();
-		final Map<String, String> config = xml.load(configUri);
-
-		server = new KNXnetIPServer(config.get("name"), config.get("friendlyName"));
-		// load property definitions
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		if (config.containsKey("ref"))
-			ios.loadDefinitions(config.get("ref"));
-		final String netIfListen = config.get(XmlConfiguration.attrListenNetIf);
-		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, netIfListen);
-		final String netIfOutgoing = config.get(XmlConfiguration.attrOutgoingNetIf);
-		server.setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, netIfOutgoing);
-		final String runDiscovery = config.computeIfAbsent(XmlConfiguration.attrActivate, v -> "true");
-		server.setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, runDiscovery);
+		config = XmlConfiguration.from(URI.create(configUri));
+		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
-		logger.info("KNXnet/IP discovery network interfaces: listen on [{}], send on [{}]", netIfListen, netIfOutgoing);
-		for (int i = 0; i < xml.svcContainers.size(); i++) {
-			final ServiceContainer sc = xml.svcContainers.get(i);
-			final String activated = sc.isActivated() ? "" : " [not activated]";
-			String mcast = "disabled";
-			String secureRouting = "";
-			final int securedServices = xml.securedServicesMap.get(sc);
-			if ((sc instanceof RoutingServiceContainer)) {
-				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
-
-				final boolean secureRoutingRequired = (securedServices & (1 << ServiceFamiliesDIB.ROUTING)) != 0;
-				if (secureRoutingRequired && xml.keyfiles.containsKey(sc)
-						&& xml.keyfiles.get(sc).getOrDefault("group.key", new byte[0]).length == 16)
-					secureRouting = secureSymbol + " ";
-			}
-			final String type = xml.subnetTypes.get(i);
-			String filter = "";
-			if (xml.groupAddressFilters.containsKey(sc) && !xml.groupAddressFilters.get(sc).isEmpty())
-				filter = "\n\tGroup address filter " + xml.groupAddressFilters.get(sc);
-			String datapoints = "";
-			if (xml.subnetDatapoints.containsKey(sc))
-				datapoints = "\n\tDatapoints "
-						+ ((DatapointMap<Datapoint>) xml.subnetDatapoints.get(sc)).getDatapoints();
-
-			final boolean secureUnicastRequired = (securedServices & (1 << ServiceFamiliesDIB.TUNNELING)) != 0;
-			final String unicastSecure = secureUnicastRequired && xml.keyfiles.containsKey(sc)
-					&& xml.keyfiles.get(sc).get("user.1") != null ? secureSymbol + " " : "";
-			final String unicast = "" + sc.getControlEndpoint().getPort();
-			// @formatter:off
-			final String info = String.format("configuration of service container '%s'%s:%n"
-					+ "\tlisten on %s (%sport %s), KNX IP %srouting %s%n"
-					+ "\t%s connection: %s%s%s",
-					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secureRouting, mcast, type,
-					sc.getMediumSettings(), filter, datapoints);
-			// @formatter:on
-			logger.info(info);
+		logger.info("{}", config);
+		for (final var contConfig : config.containers()) {
+			logger.info("{}", contConfig);
 		}
 	}
 
 	@Override
 	public void run()
 	{
-		final List<SubnetConnector> connectors = new ArrayList<>();
 		final List<KNXNetworkLink> linksToClose = new ArrayList<>();
 
 		try {
-			connect(linksToClose, connectors);
-			final String name = server.getName();
-			// create a gateway which forwards and answers most of the KNX stuff
-			// if no connectors were created, gateway will throw
-			gw = new KnxServerGateway(name, server, connectors.toArray(new SubnetConnector[0]));
-			setupTimeServer();
-			xml = null;
+			connect(linksToClose, config.containers());
+			gw = new KnxServerGateway(server, config);
 
+			final String name = server.getName();
 			if (terminal) {
 				new Thread(gw, name).start();
 				waitForTermination();
@@ -710,14 +651,17 @@ public class Launcher implements Runnable, AutoCloseable
 		server.shutdown();
 	}
 
-	private void connect(final List<KNXNetworkLink> linksToClose,
-		final List<SubnetConnector> connectors) throws InterruptedException, KNXException
+	private void connect(final List<KNXNetworkLink> linksToClose, final List<Container> containers)
+			throws InterruptedException, KNXException
 	{
-		for (int i = 0; i < xml.svcContainers.size(); i++) {
-			final ServiceContainer sc = xml.svcContainers.get(i);
+		int objectInstance = 0;
+
+		for (final var container : containers) {
+			final var connector = container.subnetConnector();
+			final ServiceContainer sc = connector.getServiceContainer();
 			server.addServiceContainer(sc);
 
-			final int objectInstance = i + 1;
+			++objectInstance;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
 			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.LOAD_STATE_CONTROL, 1, 1, (byte) 1);
@@ -728,55 +672,44 @@ public class Launcher implements Runnable, AutoCloseable
 
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
-			decodeKeyring(sc);
-			final var keyfile = xml.keyfiles.getOrDefault(sc, Collections.emptyMap());
-			server.configureSecurity(sc, keyfile, xml.securedServicesMap.get(sc));
+			container.keyring().ifPresent(keyring -> decodeKeyring(sc, container));
+			final var keyfile = container.keyfile();
+			server.configureSecurity(sc, keyfile, container.securedServices());
 			keyfile.values().forEach(key -> Arrays.fill(key, (byte) 0));
 
-			if (xml.additionalAddresses.containsKey(sc))
-				setAdditionalIndividualAddresses(ios, objectInstance, xml.additionalAddresses.get(sc));
-			if (xml.groupAddressFilters.containsKey(sc))
-				setGroupAddressFilter(ios, objectInstance, xml.groupAddressFilters.get(sc));
+			final var additionalAddresses = container.additionalAddresses();
+			if (!additionalAddresses.isEmpty())
+				setAdditionalIndividualAddresses(ios, objectInstance, additionalAddresses);
 
+			setGroupAddressFilter(ios, objectInstance, container.groupAddressFilter());
 
-			final String subnetType = xml.subnetTypes.get(i);
-			final String subnetArgs = xml.subnetAddresses.get(i);
+			final String subnetType = connector.interfaceType();
+			final String subnetArgs = connector.linkArguments();
 			final String activated = sc.isActivated() ? "" : " [not activated]";
 
 			final String subnetName = subnetArgs.isEmpty()
 					? subnetType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
 			logger.info("setup {} subnet '{}'{}", subnetType, subnetName, activated);
 
-			final NetworkInterface netif = xml.subnetNetIf.get(sc);
-			final SubnetConnector connector;
-			if ("knxip".equals(subnetType))
-				connector = SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
-			else if ("ip".equals(subnetType))
-				connector = SubnetConnector.newWithTunnelingLink(sc, netif, xml.tunnelingWithNat.get(sc), subnetArgs);
-			else if ("tpuart".equals(subnetType))
-				connector = SubnetConnector.newWithTpuartLink(sc, () -> acknowledgeOnTp(sc, objectInstance), subnetArgs);
-			else if ("user-supplied".equals(subnetType))
-				connector = SubnetConnector.newWithUserLink(sc, xml.subnetLinkClasses.get(sc), subnetArgs);
-			else if ("emulate".equals(subnetType))
-				connector = SubnetConnector.newCustom(sc, "emulate", xml.subnetDatapoints.get(sc));
-			else
-				connector = SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
+			if ("tpuart".equals(subnetType)) {
+				final int oi = objectInstance;
+				connector.setAckOnTp(() -> acknowledgeOnTp(sc, oi));
+			}
 
 			if (sc.isActivated())
 				linksToClose.add(connector.openNetworkLink());
-			connectors.add(connector);
 
 			final boolean routing = sc instanceof RoutingServiceContainer;
 			final boolean useServerAddress = !routing && sc.reuseControlEndpoint();
-			if (xml.tunnelingUsers.containsKey(sc)) {
+			final var tunnelingUsers = container.tunnelingUsers();
+			if (!tunnelingUsers.isEmpty()) {
 				final var serverAddress = useServerAddress ? sc.getMediumSettings().getDeviceAddress() : null;
-				setTunnelingUsers(ios, objectInstance, xml.tunnelingUsers.get(sc), xml.additionalAddresses.get(sc),
-						serverAddress);
+				setTunnelingUsers(ios, objectInstance, tunnelingUsers, additionalAddresses, serverAddress);
 			}
 			else {
 				// list all additional addresses as tunneling addresses
 				var size = useServerAddress ? 1 : 0; // also reserve entry for server address if we're using it
-				size += xml.additionalAddresses.getOrDefault(sc, Collections.emptyList()).size();
+				size += additionalAddresses.size();
 				final byte[] addrIndices = new byte[size];
 				var idx = useServerAddress ? 0 : 1;
 				for (int k = 0; k < addrIndices.length; k++)
@@ -786,62 +719,55 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 	}
 
-	private void decodeKeyring(final ServiceContainer sc) {
-		if (xml.keyrings.containsKey(sc)) {
-			final var keyfile = xml.keyfiles.getOrDefault(sc, new HashMap<>());
-			char[] pwd = null;
-			if (keyfile.containsKey("keyring.pwd")) {
-				final var pwdBytes = keyfile.get("keyring.pwd");
-				pwd = new char[pwdBytes.length];
-				for (int k = 0; k < pwdBytes.length; k++) {
-					final byte b = pwdBytes[k];
-					pwd[k] = (char) b;
-				}
+	private void decodeKeyring(final ServiceContainer sc, final Container config) {
+		final var keyring = config.keyring().orElseThrow();
+		final var keyfile = config.keyfile();
+		char[] pwd = null;
+		if (keyfile.containsKey("keyring.pwd")) {
+			final var pwdBytes = keyfile.get("keyring.pwd");
+			pwd = new char[pwdBytes.length];
+			for (int k = 0; k < pwdBytes.length; k++) {
+				final byte b = pwdBytes[k];
+				pwd[k] = (char) b;
 			}
-			else {
-				final var console = System.console();
-				if (console != null)
-					pwd = console.readPassword("Keyring password: ");
-			}
-			if (pwd == null || pwd.length == 0) {
-				logger.error("no keyring password (not in keyfile nor via console) -- exit");
-				System.exit(-1);
-			}
-
-			final var keyring = xml.keyrings.get(sc);
-			final var host = sc.getMediumSettings().getDeviceAddress();
-			final var device = keyring.devices().get(host);
-
-			final var decrypted = new HashMap<String, byte[]>();
-
-			final var authKey = SecureConnection
-					.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication(), pwd));
-			decrypted.put("device.key", authKey);
-			final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password(), pwd));
-			decrypted.put("user.1", mgmtKey);
-
-			if (sc instanceof RoutingServiceContainer) {
-				final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
-
-				final var enc = (byte[]) keyring.configuration().get(rsc.routingMulticastAddress());
-				final var groupKey = keyring.decryptKey(enc, pwd);
-				decrypted.put("group.key", groupKey);
-			}
-
-			final var interfaces = keyring.interfaces().get(host);
-			for (final var iface : interfaces) {
-				final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password(), pwd));
-				decrypted.put("user." + iface.user(), key);
-			}
-
-			keyfile.putAll(decrypted);
-			Arrays.fill(pwd, (char) 0);
 		}
-	}
+		else {
+			final var console = System.console();
+			if (console != null)
+				pwd = console.readPassword("Keyring password: ");
+		}
+		if (pwd == null || pwd.length == 0) {
+			logger.error("no keyring password (not in keyfile nor via console) -- exit");
+			System.exit(-1);
+		}
 
-	private void setupTimeServer() throws KNXException {
-		for (final var entry : xml.timeServer.entrySet())
-			gw.setupTimeServer(entry.getKey(), entry.getValue());
+		final var host = sc.getMediumSettings().getDeviceAddress();
+		final var device = keyring.devices().get(host);
+
+		final var decrypted = new HashMap<String, byte[]>();
+
+		final var authKey = SecureConnection
+				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication(), pwd));
+		decrypted.put("device.key", authKey);
+		final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password(), pwd));
+		decrypted.put("user.1", mgmtKey);
+
+		if (sc instanceof RoutingServiceContainer) {
+			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
+
+			final var enc = (byte[]) keyring.configuration().get(rsc.routingMulticastAddress());
+			final var groupKey = keyring.decryptKey(enc, pwd);
+			decrypted.put("group.key", groupKey);
+		}
+
+		final var interfaces = keyring.interfaces().get(host);
+		for (final var iface : interfaces) {
+			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password(), pwd));
+			decrypted.put("user." + iface.user(), key);
+		}
+
+		keyfile.putAll(decrypted);
+		Arrays.fill(pwd, (char) 0);
 	}
 
 	private void waitForTermination()

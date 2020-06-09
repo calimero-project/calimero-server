@@ -99,6 +99,8 @@ public final class SubnetConnector
 	private AutoCloseable subnetLink;
 	private LinkListener listener;
 
+	private Supplier<List<KNXAddress>> acknowledge = List::of;
+
 	// count received subnet frames for busmon sequence, using the last processed frame event
 	volatile long lastEventId;
 	long eventCounter;
@@ -132,9 +134,8 @@ public final class SubnetConnector
 		return new SubnetConnector(container, "ip", netif, null, subnetArgs, useNat);
 	}
 
-	public static SubnetConnector newWithTpuartLink(final ServiceContainer container,
-		final Supplier<List<KNXAddress>> acknowledge, final String subnetArgs) {
-		return new SubnetConnector(container, "tpuart", null, null, subnetArgs, acknowledge);
+	public static SubnetConnector newWithTpuartLink(final ServiceContainer container, final String subnetArgs) {
+		return new SubnetConnector(container, "tpuart", null, null, subnetArgs);
 	}
 
 	/**
@@ -259,14 +260,8 @@ public final class SubnetConnector
 			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
 		else if ("ft12-cemi".equals(subnetType))
 			ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
-		else if ("tpuart".equals(subnetType)) {
-			ts = () -> {
-				@SuppressWarnings("unchecked")
-				final var ack = args.length > 0 && args[0] instanceof Supplier
-						? ((Supplier<List<KNXAddress>>) args[0]).get() : List.<KNXAddress> of();
-				return new KNXNetworkLinkTpuart(linkArgs, settings, ack);
-			};
-		}
+		else if ("tpuart".equals(subnetType))
+			ts = () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
 		else if ("user-supplied".equals(subnetType))
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
 		else if ("virtual".equals(subnetType)) {
@@ -349,14 +344,23 @@ public final class SubnetConnector
 		return link;
 	}
 
+	public String interfaceType() { return subnetType; }
+
 	String getInterfaceType()
 	{
 		return subnetType;
 	}
 
-	String getLinkArguments()
-	{
-		return linkArgs;
+	public String linkArguments() { return linkArgs; }
+
+	public void setAckOnTp(final Supplier<List<KNXAddress>> ackOnTp) {
+		acknowledge = ackOnTp;
+	}
+
+	@Override
+	public String toString() {
+		final Object linkDesc = subnetLink != null ? subnetLink : linkArgs;
+		return (subnetType + " " + linkDesc).trim(); // trim because linkDesc might be empty
 	}
 
 	void setSubnetListener(final LinkListener subnetListener)
