@@ -476,8 +476,7 @@ public class Launcher implements Runnable, AutoCloseable
 			return Map.entry(key, DataUnitBuilder.fromHex(value));
 		}
 
-		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r)
-			throws KNXMLException
+		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r) throws KNXMLException
 		{
 			assert r.getLocalName().equals(XmlConfiguration.grpAddrFilter);
 			assert r.getEventType() == XmlReader.START_ELEMENT;
@@ -491,8 +490,7 @@ public class Launcher implements Runnable, AutoCloseable
 			return list;
 		}
 
-		private static List<IndividualAddress> readAdditionalAddresses(final XmlReader r)
-			throws KNXMLException
+		private static List<IndividualAddress> readAdditionalAddresses(final XmlReader r) throws KNXMLException
 		{
 			assert r.getLocalName().equals(XmlConfiguration.addAddresses);
 			assert r.getEventType() == XmlReader.START_ELEMENT;

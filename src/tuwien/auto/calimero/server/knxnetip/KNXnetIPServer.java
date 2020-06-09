@@ -266,7 +266,7 @@ public class KNXnetIPServer
 
 	final List<Endpoint> endpoints = new CopyOnWriteArrayList<>();
 
-	public final KnxDevice device; // TODO basically part of the server api
+	public final KnxDevice device;
 	private InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
 
@@ -347,8 +347,7 @@ public class KNXnetIPServer
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
-		logger.info("{} (v{}) \'{}\'", new String(defFriendlyName, StandardCharsets.ISO_8859_1),
-				Settings.getLibraryVersion(), friendlyName);
+		logger.info("{} v{} \'{}\'", serverName, Settings.getLibraryVersion(), friendlyName);
 
 		ios.addServerListener(this::onPropertyValueChanged);
 
@@ -800,7 +799,7 @@ public class KNXnetIPServer
 				.orElse(Map.of());
 	}
 
-	private int lastOverflowToKnx = 0;
+	private int lastOverflowToKnx;
 
 	private void onPropertyValueChanged(final PropertyEvent pe)
 	{

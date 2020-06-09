@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2019 B. Malinowsky
+    Copyright (c) 2019, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@ final class SlidingTimeWindowCounter {
 	private final int[] buckets;
 	private volatile long lastBucketShift = System.nanoTime();
 
-	public SlidingTimeWindowCounter(final String id, final Duration timeWindow, final ChronoUnit interval) {
+	SlidingTimeWindowCounter(final String id, final Duration timeWindow, final ChronoUnit interval) {
 		this.id = id;
 		shiftInterval = interval.getDuration().toSeconds();
 		final long length = timeWindow.toSeconds() / shiftInterval;

@@ -401,7 +401,7 @@ public final class SubnetConnector
 	private static final class UsbSettingsProxy extends TPSettings {
 		private final KNXMediumSettings delegate;
 
-		public UsbSettingsProxy(final KNXMediumSettings settings) {
+		UsbSettingsProxy(final KNXMediumSettings settings) {
 			this.delegate = settings;
 		}
 
