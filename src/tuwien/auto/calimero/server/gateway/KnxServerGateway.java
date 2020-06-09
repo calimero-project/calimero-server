@@ -123,7 +123,6 @@ import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
-import tuwien.auto.calimero.link.KNXNetworkLinkTpuart;
 import tuwien.auto.calimero.link.KNXNetworkLinkUsb;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
@@ -1620,10 +1619,6 @@ public class KnxServerGateway implements Runnable
 				ldata = CEMIFactory.create(source, null, f, false);
 			else
 				ldata = f;
-
-			// make sure we remove any additional info for tpuarts, its useless
-			if (subnetLink instanceof KNXNetworkLinkTpuart && ldata instanceof CEMILDataEx)
-				((CEMILDataEx) ldata).additionalInfo().clear();
 
 			link.send(ldata, true);
 			setNetworkState(oi, true, false);
