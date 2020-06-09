@@ -902,49 +902,24 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private List<KNXAddress> acknowledgeOnTp(final ServiceContainer sc, final int objectInstance) {
-		final int indAddrElems = propertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-				ADDITIONAL_INDIVIDUAL_ADDRESSES);
-		final int grpAddrFilterElems = propertyElems(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE);
-
-		final var ack = new ArrayList<KNXAddress>(1 + indAddrElems + grpAddrFilterElems);
+		final var ack = new ArrayList<KNXAddress>();
 		ack.add(sc.getMediumSettings().getDeviceAddress());
 		final var ios = server.getInterfaceObjectServer();
 		try {
-			if (indAddrElems > 0) {
-				final var buf = ByteBuffer.wrap(ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-						ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, indAddrElems));
-				while (buf.hasRemaining())
-					ack.add(new IndividualAddress(buf.getShort() & 0xffff));
-			}
+			var buf = ByteBuffer.wrap(ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE));
+			while (buf.hasRemaining())
+				ack.add(new IndividualAddress(buf.getShort() & 0xffff));
 
-			if (grpAddrFilterElems > 0) {
-				final var buf = ByteBuffer
-						.wrap(ios.getProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, grpAddrFilterElems));
-				while (buf.hasRemaining())
-					ack.add(new GroupAddress(buf.getShort() & 0xffff));
-			}
+			buf = ByteBuffer
+					.wrap(ios.getProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, Integer.MAX_VALUE));
+			while (buf.hasRemaining())
+				ack.add(new GroupAddress(buf.getShort() & 0xffff));
 		}
 		catch (final KnxPropertyException e) {
 			logger.warn("querying default acknowledge addresses for TP-UART ({})", e.getMessage());
 		}
 
 		return ack;
-	}
-
-	private int propertyElems(final int objectType, final int objectInstance, final int propertyId) {
-		try {
-			final var ios = server.getInterfaceObjectServer();
-			return toInt(ios.getProperty(objectType, objectInstance, propertyId, 0, 1));
-		}
-		catch (final KnxPropertyException e) {}
-		return 0;
-	}
-
-	private static int toInt(final byte[] data) {
-		if (data.length == 1)
-			return data[0] & 0xff;
-		if (data.length == 2)
-			return (data[0] & 0xff) << 8 | (data[1] & 0xff);
-		return (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | (data[3] & 0xff);
 	}
 }
