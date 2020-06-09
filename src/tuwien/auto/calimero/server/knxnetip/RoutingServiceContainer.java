@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -68,14 +68,15 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
+	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring,
+		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
 		final InetAddress routingMulticast)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, routingMulticast, Duration.ofMillis(0));
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, udpOnly, routingMulticast, Duration.ofMillis(0));
 	}
 
 	/**
@@ -89,15 +90,16 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param controlEndpoint see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
+	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
 	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
 	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean allowNetworkMonitoring, final InetAddress routingMulticast,
+		final boolean allowNetworkMonitoring, final boolean udpOnly, final InetAddress routingMulticast,
 		final Duration latencyTolerance) {
-		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring);
+		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring, udpOnly);
 		final IndividualAddress addr = subnet.getDeviceAddress();
 		if (addr.getDevice() != 0)
 			throw new KNXIllegalArgumentException(

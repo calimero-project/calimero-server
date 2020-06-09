@@ -406,10 +406,10 @@ public class Launcher implements Runnable, AutoCloseable
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
 						if (routing)
-							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, routingMcast,
-									Duration.ofMillis(latencyTolerance));
+							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, udpOnly,
+									routingMcast, Duration.ofMillis(latencyTolerance));
 						else
-							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor);
+							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, udpOnly);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
@@ -716,8 +716,6 @@ public class Launcher implements Runnable, AutoCloseable
 		for (int i = 0; i < xml.svcContainers.size(); i++) {
 			final ServiceContainer sc = xml.svcContainers.get(i);
 			server.addServiceContainer(sc);
-			if (xml.udpOnlyContainer.get(sc) == true)
-				server.udpOnly.add(sc);
 
 			final int objectInstance = i + 1;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();

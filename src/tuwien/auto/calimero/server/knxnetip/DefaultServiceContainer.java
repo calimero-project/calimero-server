@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2017 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -59,6 +59,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private final KNXMediumSettings settings;
 	private final boolean reuseEndpt;
 	private final boolean networkMonitor;
+	private final boolean udpOnly;
 	private volatile Duration disruptionBufferTimeout;
 	private volatile int disruptionBufferLowerPort;
 	private volatile int disruptionBufferUpperPort;
@@ -78,11 +79,13 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param reuseCtrlEndpt <code>true</code> to reuse control endpoint, <code>false</code>
 	 *        otherwise, see {@link #reuseControlEndpoint()}
+	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
 	 *        this service container, <code>false</code> otherwise
 	 */
 	public DefaultServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring)
+		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+		final boolean udpOnly)
 	{
 		if (name == null)
 			throw new NullPointerException("container identifier must not be null");
@@ -102,6 +105,7 @@ public class DefaultServiceContainer implements ServiceContainer
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;
 		networkMonitor = allowNetworkMonitoring;
+		this.udpOnly = udpOnly;
 		disruptionBufferTimeout = Duration.of(0, ChronoUnit.SECONDS);
 	}
 
@@ -153,6 +157,8 @@ public class DefaultServiceContainer implements ServiceContainer
 	{
 		return networkMonitor;
 	}
+
+	public boolean udpOnly() { return udpOnly; }
 
 	public void setDisruptionBuffer(final Duration expirationTimeout, final int lowerPort, final int upperPort)
 	{

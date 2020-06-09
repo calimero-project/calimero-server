@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -83,7 +83,7 @@ class KnxServerGatewayTest
 		server = setupServer();
 		final ServiceContainer sc = new DefaultServiceContainer("test container", null,
 				new HPAI((InetAddress) null, 5647),
-				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true);
+				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false);
 		server.addServiceContainer(sc);
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "");
 		connector.openNetworkLink();

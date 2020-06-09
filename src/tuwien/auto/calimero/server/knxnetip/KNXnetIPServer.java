@@ -47,12 +47,10 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -274,8 +272,6 @@ public class KNXnetIPServer
 	private static final int objectInstance = 1;
 
 	private final EventListeners<ServerListener> listeners;
-
-	public final Set<ServiceContainer> udpOnly = new HashSet<>();
 
 	final KnxDeviceServiceLogic logic = new KnxDeviceServiceLogic() {
 		private static final int pidIpSbcControl = 120;
@@ -1018,7 +1014,7 @@ public class KNXnetIPServer
 			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING,
 			ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS, ServiceFamiliesDIB.OBJECT_SERVER,
 			ServiceFamiliesDIB.Security };
-		final int coreVersion = udpOnly.contains(sc) ? 1 : 2;
+		final int coreVersion = ((DefaultServiceContainer) sc).udpOnly() ? 1 : 2;
 		final int[] serviceVersion = { coreVersion, 2, 2, 2, 0, 0, 0, 1 };
 
 		final int[] tmp = new int[services.length];
