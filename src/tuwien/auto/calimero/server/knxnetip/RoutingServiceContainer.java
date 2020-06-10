@@ -81,7 +81,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 
 	/**
 	 * Creates a new service container configuration equal to
-	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, InetAddress)} with
+	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, boolean, InetAddress)} with
 	 * options for knx secure routing.
 	 *
 	 * @param name see {@link DefaultServiceContainer}
