@@ -111,6 +111,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
+import tuwien.auto.calimero.internal.SecureApplicationLayer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -1608,6 +1609,16 @@ public class KnxServerGateway implements Runnable
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
 			final boolean usb = subnetLink instanceof KNXNetworkLinkUsb;
 			final IndividualAddress source = usb ? new IndividualAddress(0) : null;
+
+			// we can't forward secure services if we change the source address
+			if (usb) {
+				final var subnetAddress = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
+				if (!f.getSource().equals(subnetAddress) && SecureApplicationLayer.isSecuredService(f))
+					logger.warn("{}->{} source address mismatch: can't forward secure service to {}", f.getSource(),
+							f.getDestination(), subnet.getName());
+				return;
+			}
+
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
