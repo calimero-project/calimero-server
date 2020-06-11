@@ -67,6 +67,7 @@ import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.ServerConfiguration;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
@@ -96,7 +97,8 @@ class KnxServerGatewayTest
 
 	private KNXnetIPServer setupServer()
 	{
-		final KNXnetIPServer s = new KNXnetIPServer("test", "friendly server name");
+		final var config = new ServerConfiguration("test", "friendly server name", true, List.of(), List.of(), null, List.of());
+		final KNXnetIPServer s = new KNXnetIPServer(config);
 		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
 		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
 		ios.setProperty(InterfaceObject.ROUTER_OBJECT, 1, MAIN_LCGRPCONFIG, 1, 1, new byte[] {0});
@@ -176,7 +178,8 @@ class KnxServerGatewayTest
 			table[idx++] = (byte) (ga.getRawAddress() >> 8);
 			table[idx++] = (byte) ga.getRawAddress();
 		}
-		final KNXnetIPServer server = new KNXnetIPServer("calimero-server", "");
+		final var config = new ServerConfiguration("calimero-server", "", false, List.of(), List.of(), null, List.of());
+		final KNXnetIPServer server = new KNXnetIPServer(config);
 		ios = server.getInterfaceObjectServer();
 		// create interface object and set the address table object property
 		ios.addInterfaceObject(InterfaceObject.ADDRESSTABLE_OBJECT);

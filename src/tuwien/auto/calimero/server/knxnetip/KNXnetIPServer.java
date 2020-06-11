@@ -87,7 +87,6 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
-import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
@@ -313,23 +312,14 @@ public class KNXnetIPServer
 
 
 	/**
-	 * Creates a new KNXnet/IP server instance and assigns a user-defined server name.
-	 * <p>
-	 * The <code>localName</code> argument is user-chosen to locally identify the server instance and also used for
-	 * local naming purposes, e.g., the logger name.<br>
-	 * The <code>friendlyName</code> argument is stored in the KNX property
-	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object Server during
-	 * initialization. It identifies the server instance to clients of this server, and is used, e.g., in responses
-	 * during server discovery.<br>
-	 * During construction, the server creates its own Interface Object Server (IOS) and adds KNX properties with
-	 * default values. Subsequent property changes can be done by calling {@link #getInterfaceObjectServer()}. Be aware
-	 * that KNX properties added might change between implementations, as might their default property values.
+	 * @deprecated Use {@link #KNXnetIPServer(ServerConfiguration)}.
 	 *
 	 * @param localName name of this server as shown to the owner/user of this server
 	 * @param friendlyName a friendly, descriptive name used for discovery and description, consisting of
 	 *        ISO-8859-1 characters only, with string length &lt; 30 characters, <code>friendlyName</code> might be of
 	 *        length 0
 	 */
+	@Deprecated
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
 		serverName = localName;
@@ -338,12 +328,7 @@ public class KNXnetIPServer
 		this.friendlyName = friendlyName;
 		logger = LogService.getLogger("calimero.server." + getName());
 
-		try {
-			device = new BaseKnxDevice(localName, DD0.TYPE_091A, new IndividualAddress(0), null, null, logic);
-		}
-		catch (final KNXLinkClosedException e) {
-			throw new Error("can't happen", e);
-		}
+		device = new BaseKnxDevice(localName, DD0.TYPE_091A, null, logic, null);
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
@@ -360,13 +345,7 @@ public class KNXnetIPServer
 	}
 
 	/**
-	 * Creates a new KNXnet/IP server instance, assigns a user-defined server name, adds the
-	 * supplied service containers, and sets the discovery service.
-	 * <p>
-	 * The assigned server name is stored in the KNX property
-	 * {@link tuwien.auto.calimero.mgmt.PropertyAccess.PID#FRIENDLY_NAME} in the Interface Object
-	 * Server during initialization.<br>
-	 * See {@link #KNXnetIPServer(String, String)} for a list of initialized KNX properties.
+	 * @deprecated Use {@link #KNXnetIPServer(ServerConfiguration)}.
 	 *
 	 * @param serverName both the local and friendly name of this server instance, see
 	 *        {@link #KNXnetIPServer(String, String)}
@@ -374,6 +353,7 @@ public class KNXnetIPServer
 	 *        server
 	 * @see #KNXnetIPServer(String, String)
 	 */
+	@Deprecated
 	public KNXnetIPServer(final String serverName, final List<ServiceContainer> serviceContainers)
 	{
 		this(serverName, serverName);
@@ -383,8 +363,35 @@ public class KNXnetIPServer
 		}
 	}
 
+	/**
+	 * Creates a new KNXnet/IP server instance using the supplied configuration.
+	 * <p>
+	 * During construction, the server creates its own Interface Object Server (IOS) and adds KNX properties with
+	 * default values. Subsequent property changes can be done by calling {@link #getInterfaceObjectServer()}. Be aware
+	 * that KNX properties added might change between implementations, as might their default property values.
+	 *
+	 * @param config server configuration
+	 */
 	public KNXnetIPServer(final ServerConfiguration config) {
-		this(config.name(), config.friendlyName());
+		serverName = config.name();
+		friendlyName = config.friendlyName();
+		logger = LogService.getLogger("calimero.server." + getName());
+
+		device = new BaseKnxDevice(serverName, DD0.TYPE_091A, null, logic, config.iosResource().orElse(null));
+		ios = device.getInterfaceObjectServer();
+		listeners = new EventListeners<>(logger);
+
+		logger.info("{} v{} \'{}\'", serverName, Settings.getLibraryVersion(), friendlyName);
+
+		ios.addServerListener(this::onPropertyValueChanged);
+
+		// server KNX device address, since we don't know about routing at this time
+		// address is always 15.15.0; might be updated later or by routing configuration
+		final byte[] device1 = defKnxAddress.toByteArray();
+		// equal to PID.KNX_INDIVIDUAL_ADDRESS
+		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device1[0]);
+		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device1[1]);
+
 		for (final var containerConfig : config.containers()) {
 			final var svcContainer = containerConfig.subnetConnector().getServiceContainer();
 			addServiceContainer(svcContainer);
