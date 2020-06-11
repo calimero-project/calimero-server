@@ -184,19 +184,55 @@ public class Launcher implements Runnable, AutoCloseable
 		public static final String attrExpirationTimeout = "expirationTimeout";
 
 
+		private URI uri;
 		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
 
 		public static ServerConfiguration from(final URI serverConfigUri) {
-			final var xmlConfiguration = new XmlConfiguration();
-			final var config = xmlConfiguration.load(serverConfigUri.toString());
-			final boolean discovery = Boolean.parseBoolean(config.get(attrActivate));
-			final var name = config.get(attrName);
-			final var friendly = config.get(attrFriendly);
-			final var listen = List.of(config.get(attrListenNetIf).split(","));
-			final var outgoing = List.of(config.get(attrOutgoingNetIf).split(","));
-			return new ServerConfiguration(name, friendly, discovery, listen, outgoing, xmlConfiguration.containers);
+			return new XmlConfiguration(serverConfigUri).load();
 		}
 
+		@Deprecated
+		public XmlConfiguration() {}
+
+		private XmlConfiguration(final URI serverConfigUri) { uri = serverConfigUri; }
+
+		private ServerConfiguration load() {
+			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(uri.toString());
+			if (r.nextTag() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.knxServer))
+				throw new KNXMLException("no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
+
+			final var serverName = attr(r, XmlConfiguration.attrName).orElseThrow();
+			final String friendly = attr(r, XmlConfiguration.attrFriendly).orElseThrow();
+			logger = LoggerFactory.getLogger("calimero.server." + serverName);
+
+			boolean discovery = true;
+			var listen = "";
+			var outgoing = "";
+
+			while (r.next() != XmlReader.END_DOCUMENT) {
+				if (r.getEventType() == XmlReader.START_ELEMENT) {
+					switch (r.getLocalName()) {
+					case XmlConfiguration.discovery:
+						discovery = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
+						listen = attr(r, XmlConfiguration.attrListenNetIf).orElse("");
+						outgoing = attr(r, XmlConfiguration.attrOutgoingNetIf).orElse("");
+						break;
+					case XmlConfiguration.svcCont:
+						readServiceContainer(r);
+						break;
+					}
+				}
+			}
+			final URI iosResource = Path.of("./" + serverName + "-ios.xml").normalize().toUri();
+			return new ServerConfiguration(serverName, friendly, discovery, List.of(listen.split(",")),
+					List.of(outgoing.split(",")), iosResource, containers);
+		}
+
+		private static Optional<String> attr(final XmlReader r, final String name) {
+			return Optional.ofNullable(r.getAttributeValue(null, name));
+		}
+
+		@Deprecated
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
 			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
