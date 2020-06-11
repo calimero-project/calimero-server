@@ -36,6 +36,8 @@
 
 package tuwien.auto.calimero.server;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,11 +48,20 @@ import tuwien.auto.calimero.Keyring;
 import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.server.gateway.SubnetConnector;
+import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
+/**
+ * Configuration for a KNXnet/IP server.
+ *
+ * @see KNXnetIPServer#KNXnetIPServer(ServerConfiguration)
+ */
 public class ServerConfiguration {
 
+	/**
+	 * Contains the configuration for a service container managed by the KNXnet/IP server.
+	 */
 	public static final class Container {
 		private static final String secureSymbol = new String(Character.toChars(0x1F512));
 
@@ -149,16 +160,21 @@ public class ServerConfiguration {
 	private final boolean discovery;
 	private final List<String> discoveryNetifs;
 	private final List<String> outgoingNetifs;
+	private final URI iosResource;
 	private final List<Container> containers;
 
 
 	public ServerConfiguration(final String name, final String friendlyName, final boolean discovery,
-			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final List<Container> containers) {
+			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final URI iosResource,
+			final List<Container> containers) {
 		this.name = name;
+		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
+			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		friendly = friendlyName;
 		this.discovery = discovery;
 		this.discoveryNetifs = List.copyOf(discoveryNetifs);
 		this.outgoingNetifs = List.copyOf(outgoingNetifs);
+		this.iosResource = iosResource;
 		this.containers = List.copyOf(containers);
 	}
 
@@ -171,6 +187,8 @@ public class ServerConfiguration {
 	public List<String> discoveryNetifs() { return discoveryNetifs; }
 
 	public List<String> outgoingNetifs() { return outgoingNetifs; }
+
+	public Optional<URI> iosResource() { return Optional.ofNullable(iosResource); }
 
 	public List<Container> containers() { return containers; }
 
