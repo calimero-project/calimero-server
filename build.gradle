@@ -16,7 +16,7 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.5.2'
+ext.junitJupiterVersion = '5.6.2'
 
 apply plugin: 'java-library'
 apply plugin: 'maven'
