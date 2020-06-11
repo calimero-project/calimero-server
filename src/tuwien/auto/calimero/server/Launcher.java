@@ -656,8 +656,6 @@ public class Launcher implements Runnable, AutoCloseable
 
 		for (final var container : containers) {
 			final var connector = container.subnetConnector();
-			final ServiceContainer sc = connector.getServiceContainer();
-			server.addServiceContainer(sc);
 
 			++objectInstance;
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
@@ -670,6 +668,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
+			final ServiceContainer sc = connector.getServiceContainer();
 			container.keyring().ifPresent(keyring -> decodeKeyring(sc, container));
 			final var keyfile = container.keyfile();
 			server.configureSecurity(sc, keyfile, container.securedServices());
