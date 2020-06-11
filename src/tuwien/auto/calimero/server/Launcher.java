@@ -36,7 +36,6 @@
 
 package tuwien.auto.calimero.server;
 
-import static java.util.Optional.ofNullable;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.ADDRESSTABLE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
@@ -275,28 +274,23 @@ public class Launcher implements Runnable, AutoCloseable
 			if (r.getEventType() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.svcCont))
 				throw new KNXMLException("no service container element");
 
-			final String attrActivate = r.getAttributeValue(null, XmlConfiguration.attrActivate);
-			final boolean activate = attrActivate == null || Boolean.parseBoolean(attrActivate);
+			final boolean activate = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
 			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
 			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
 			if (routing && reuse)
 				throw new KNXIllegalArgumentException("with routing activated, reusing control endpoint is not allowed");
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
-			final int port = Integer.parseUnsignedInt(r.getAttributeValue(null, XmlConfiguration.attrUdpPort));
+			final int port = attr(r, XmlConfiguration.attrUdpPort).map(Integer::parseUnsignedInt).orElse(3671);
 			final NetworkInterface netif = getNetIf(r);
 
 			final Function<String, String> expandHome = v -> v.replaceFirst("^~", System.getProperty("user.home"));
 
 			// look for a server keyfile
-			final Path keyfile = ofNullable(r.getAttributeValue(null, "keyfile")).map(expandHome).map(Paths::get)
-					.orElse(null);
+			final Path keyfile = attr(r, "keyfile").map(expandHome).map(Paths::get).orElse(null);
 			// look for a keyring configuration
-			final var keyring = ofNullable(r.getAttributeValue(null, "keyring")).map(expandHome)
-					.map(Keyring::load).orElse(null);
+			final var keyring = attr(r, "keyring").map(expandHome).map(Keyring::load).orElse(null);
 
-			final String attrSecuredServices = r.getAttributeValue(null, "securedServices");
-			final int securedServices = attrSecuredServices == null ? 0x3f : Integer.decode(attrSecuredServices);
-
+			final int securedServices = attr(r, "securedServices").map(Integer::decode).orElse(0x3f);
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String addr = "";
@@ -327,9 +321,8 @@ public class Launcher implements Runnable, AutoCloseable
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					if (name.equals(XmlConfiguration.datapoints)) {
 						final DatapointMap<Datapoint> dps = new DatapointMap<>();
-						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
-						final XmlReader dpReader = res != null
-								? XmlInputFactory.newInstance().createXMLReader(res) : r;
+						final XmlReader dpReader = attr(r, XmlConfiguration.attrRef)
+								.map(XmlInputFactory.newInstance()::createXMLReader).orElse(r);
 						dps.load(dpReader);
 						datapoints = dps;
 					}
@@ -353,8 +346,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 						if (subnetType.equals("ip")) {
 							subnetKnxipNetif = getNetIf(r);
-							final String attr = r.getAttributeValue(null, "useNat");
-							useNat = attr != null && Boolean.parseBoolean(attr);
+							useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
 						}
 						else if (subnetType.equals("knxip"))
 							subnetKnxipNetif = getNetIf(r);
@@ -370,8 +362,7 @@ public class Launcher implements Runnable, AutoCloseable
 						tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
 					else if (name.equals("routing")) {
 						try {
-							latencyTolerance = ofNullable(r.getAttributeValue(null, "latencyTolerance"))
-									.map(Integer::parseUnsignedInt).orElse(2000);
+							latencyTolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(2000);
 							final String mcast = r.getElementText();
 							if (!mcast.isEmpty())
 								routingMcast = InetAddress.getByName(mcast);
@@ -393,8 +384,7 @@ public class Launcher implements Runnable, AutoCloseable
 					}
 					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
 						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
-						final Optional<String> ports = ofNullable(r.getAttributeValue(null, attrUdpPort));
-						final String[] range = ports.orElse("0-65535").split("-", -1);
+						final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
 						disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
 						disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
 					}
@@ -560,9 +550,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 		private static NetworkInterface getNetIf(final XmlReader r)
 		{
-			String attr = r.getAttributeValue(null, XmlConfiguration.attrListenNetIf);
-			if (attr == null)
-				attr = r.getAttributeValue(null, "netif");
+			final String attr = attr(r, XmlConfiguration.attrListenNetIf).or(() -> attr(r, "netif")).orElse(null);
 			if (attr != null && !"any".equals(attr)) {
 				try {
 					final NetworkInterface netIf = NetworkInterface.getByName(attr);
