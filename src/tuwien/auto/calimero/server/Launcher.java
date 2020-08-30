@@ -61,7 +61,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -97,7 +96,6 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
-import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
@@ -622,10 +620,8 @@ public class Launcher implements Runnable, AutoCloseable
 	@Override
 	public void run()
 	{
-		final List<KNXNetworkLink> linksToClose = new ArrayList<>();
-
 		try {
-			connect(linksToClose, config.containers());
+			setupContainers(config.containers());
 			gw = new KnxServerGateway(server, config);
 
 			final String name = server.getName();
@@ -639,15 +635,8 @@ public class Launcher implements Runnable, AutoCloseable
 				gw.run();
 			}
 		}
-		catch (final InterruptedException e) {
-			logger.error("initialization of KNX server interrupted");
-		}
 		catch (KNXException | RuntimeException e) {
 			logger.error("initialization of KNX server failed", e);
-		}
-		finally {
-			for (final Iterator<KNXNetworkLink> i = linksToClose.iterator(); i.hasNext();)
-				i.next().close();
 		}
 	}
 
@@ -673,9 +662,7 @@ public class Launcher implements Runnable, AutoCloseable
 		server.shutdown();
 	}
 
-	private void connect(final List<KNXNetworkLink> linksToClose, final List<Container> containers)
-			throws InterruptedException, KNXException
-	{
+	private void setupContainers(final List<Container> containers) {
 		int objectInstance = 0;
 
 		for (final var container : containers) {
@@ -716,9 +703,6 @@ public class Launcher implements Runnable, AutoCloseable
 				final int oi = objectInstance;
 				connector.setAckOnTp(() -> acknowledgeOnTp(sc, oi));
 			}
-
-			if (sc.isActivated())
-				linksToClose.add(connector.openNetworkLink());
 
 			final boolean routing = sc instanceof RoutingServiceContainer;
 			final boolean useServerAddress = !routing && sc.reuseControlEndpoint();

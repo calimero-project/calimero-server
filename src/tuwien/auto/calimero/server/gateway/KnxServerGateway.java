@@ -119,7 +119,6 @@ import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingBusyEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingBusy;
-import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -444,7 +443,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private final class SubnetListener implements NetworkLinkListener
+	final class SubnetListener implements NetworkLinkListener
 	{
 		private final String scid;
 
@@ -478,6 +477,8 @@ public class KnxServerGateway implements Runnable
 			subnetConnected(false);
 			logger.info("KNX subnet link closed (" + e.getReason() + ")");
 		}
+
+		void connectionStatus(final boolean connected) { subnetConnected(connected); }
 
 		private void subnetConnected(final boolean connected) {
 			setNetworkState(objectInstance(scid), true, !connected);
@@ -701,15 +702,6 @@ public class KnxServerGateway implements Runnable
 
 			connector.setSubnetListener(new SubnetListener(connector.getName()));
 
-			final AutoCloseable closable = connector.getSubnetLink();
-			KNXNetworkLink link = null;
-			if (closable instanceof Connector.Link)
-				link = (KNXNetworkLink) ((Connector.Link<?>) closable).target();
-			else
-				link = (KNXNetworkLink) closable;
-			if (link != null && link.isOpen())
-				setNetworkState(objinst, true, false);
-
 			final ServiceContainer sc = connector.getServiceContainer();
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
 			if (!timeout.isZero()) {
@@ -767,6 +759,23 @@ public class KnxServerGateway implements Runnable
 	public void run()
 	{
 		launchServer();
+
+		for (final var connector : connectors) {
+			if (connector.getServiceContainer().isActivated())
+				try {
+					connector.openNetworkLink();
+				}
+				catch (final KNXException e) {
+					server.shutdown();
+					return;
+				}
+				catch (final InterruptedException e) {
+					server.shutdown();
+					Thread.currentThread().interrupt();
+					return;
+				}
+		}
+
 		trucking = true;
 		dispatcher.start();
 		while (trucking) {

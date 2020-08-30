@@ -74,11 +74,10 @@ import tuwien.auto.calimero.link.KNXNetworkMonitorFT12;
 import tuwien.auto.calimero.link.KNXNetworkMonitorIP;
 import tuwien.auto.calimero.link.KNXNetworkMonitorTpuart;
 import tuwien.auto.calimero.link.KNXNetworkMonitorUsb;
-import tuwien.auto.calimero.link.LinkListener;
-import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.server.VirtualLink;
+import tuwien.auto.calimero.server.gateway.KnxServerGateway.SubnetListener;
 import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 
 /**
@@ -97,7 +96,7 @@ public final class SubnetConnector
 	private final Object[] args;
 
 	private AutoCloseable subnetLink;
-	private LinkListener listener;
+	private SubnetListener listener;
 
 	private Supplier<List<KNXAddress>> acknowledge = List::of;
 
@@ -305,7 +304,7 @@ public final class SubnetConnector
 			throw new KNXException("network link: unknown KNX subnet specifier " + subnetType);
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
-				.reconnectDelay(Duration.ofSeconds(10)).maxConnectAttempts(Connector.NoMaxAttempts);
+				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
 		final KNXNetworkLink link = c.newLink(ts);
 		setSubnetLink(link);
 		return link;
@@ -338,7 +337,7 @@ public final class SubnetConnector
 			throw new KNXException("monitor link: unknown KNX subnet specifier " + subnetType);
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
-				.reconnectDelay(Duration.ofSeconds(10)).maxConnectAttempts(Connector.NoMaxAttempts);
+				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
 		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
@@ -363,14 +362,19 @@ public final class SubnetConnector
 		return (subnetType + " " + linkDesc).trim(); // trim because linkDesc might be empty
 	}
 
-	void setSubnetListener(final LinkListener subnetListener)
+	void setSubnetListener(final SubnetListener subnetListener)
 	{
 		listener = subnetListener;
 		final AutoCloseable link = getSubnetLink();
 		if (link instanceof KNXNetworkLink)
-			((KNXNetworkLink) link).addLinkListener((NetworkLinkListener) listener);
+			((KNXNetworkLink) link).addLinkListener(listener);
 		if (link instanceof KNXNetworkMonitor)
 			((KNXNetworkMonitor) link).addMonitorListener(listener);
+	}
+
+	private void connectionStatusChanged(final boolean connected) {
+		if (listener != null)
+			listener.connectionStatus(connected);
 	}
 
 	private static <T> T newLinkUsing(final String className, final String[] initArgs)
