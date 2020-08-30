@@ -842,7 +842,7 @@ final class ControlEndpointService extends ServiceLooper
 			// but we have to call svcLoop.quit() to close local data socket
 			svcLoop.quit();
 			freeDeviceAddress(device);
-			return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
+			return errorResponse(ErrorCodes.KNX_CONNECTION, endpoint);
 		}
 		connections.put(channelId, newDataEndpoint);
 		if (looperTask != null)
