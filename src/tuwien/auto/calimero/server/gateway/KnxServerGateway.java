@@ -114,6 +114,7 @@ import tuwien.auto.calimero.dptxlator.TranslatorTypes;
 import tuwien.auto.calimero.internal.SecureApplicationLayer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
+import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingBusyEvent;
@@ -303,29 +304,31 @@ public class KnxServerGateway implements Runnable
 			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
 			if (connector == null)
 				return false;
-			final String subnetType = connector.getInterfaceType();
-			final String subnetArgs = connector.linkArguments();
-			final ServiceContainer serviceContainer = connector.getServiceContainer();
-			final KNXMediumSettings settings = serviceContainer.getMediumSettings();
 
-			final AutoCloseable subnetLink = connector.getSubnetLink();
-			final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
-			try {
-				if (rawLink instanceof VirtualLink) { /* no-op */ }
-				else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
-					closeLink(subnetLink);
-					connector.openNetworkLink();
+			if (!(conn instanceof KNXnetIPDevMgmt)) {
+				final AutoCloseable subnetLink = connector.getSubnetLink();
+				final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
+				try {
+					if (rawLink instanceof VirtualLink) { /* no-op */ }
+					else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
+						closeLink(subnetLink);
+						connector.openNetworkLink();
+					}
+					else if (networkMonitor && !(rawLink instanceof KNXNetworkMonitor)) {
+						closeLink(subnetLink);
+						connector.openMonitorLink();
+					}
 				}
-				else if (networkMonitor && !(rawLink instanceof KNXNetworkMonitor)) {
-					closeLink(subnetLink);
-					connector.openMonitorLink();
+				catch (KNXException | InterruptedException e) {
+					final String subnetType = connector.getInterfaceType();
+					final String subnetArgs = connector.linkArguments();
+					final ServiceContainer serviceContainer = connector.getServiceContainer();
+					final KNXMediumSettings settings = serviceContainer.getMediumSettings();
+					logger.error("open network link using {} interface {} for {}", subnetType, subnetArgs, settings, e);
+					if (e instanceof InterruptedException)
+						Thread.currentThread().interrupt();
+					return false;
 				}
-			}
-			catch (KNXException | InterruptedException e) {
-				logger.error("open network link using {} interface {} for {}", subnetType, subnetArgs, settings, e);
-				if (e instanceof InterruptedException)
-					Thread.currentThread().interrupt();
-				return false;
 			}
 
 			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName(), assignedDeviceAddress));
