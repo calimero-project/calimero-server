@@ -81,8 +81,6 @@ Elements and attributes of `server-config.xml`:
 	- `name="knx-server"`: Attribute to specify the internal name of the server (mainly for logging, naming, debugging purposes)
 	- `friendlyName="My KNXnet/IP Server"`: Attribute to specify a custom name (max. 30 characters). Will be displayed in e.g. ETS-tool.
 
-* `<propertyDefinitions ref="resources/properties.xml" />` It is possible to provide additional KNX property definitions through this tag. Specify properties in a file, e.g. 'properties.xml', and use the `ref` attribute to specify the URI/path to this file. The predefined properties may be explored in a user friendly way when opening the Calimero GUI.
-
 * `<discovery listenNetIf="all" outgoingNetIf="all" activate="true"/>` (optional attributes): the network interfaces to listen for KNXnet/IP discovery requests, as well as the network interfaces to answer requests, e.g., `"all"`, `"any"`, or `"lo,eth0,eth1"`. The attribute `activate` allows to disable KNXnet/IP discovery & self-description. If disabled, any received discovery or descriptions request will be ignored.
 
 * `<serviceContainer>` (1..*): specify a server service container, i.e., the client-side endpoint for a KNX subnet. Attributes: 
