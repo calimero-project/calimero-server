@@ -301,7 +301,7 @@ public final class SubnetConnector
 			ts = () -> config.getBufferedLink();
 		}
 		else
-			throw new KNXException("network link: unknown KNX subnet specifier " + subnetType);
+			throw new KNXException("network link: unknown KNX subnet specifier '" + subnetType + "'");
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);

@@ -128,7 +128,6 @@ import tuwien.auto.calimero.link.KNXNetworkLinkUsb;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
-import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
@@ -180,6 +179,13 @@ public class KnxServerGateway implements Runnable
 		t.setDaemon(true);
 		return t;
 	});
+
+	private static final ScheduledExecutorService timeServerCyclicTransmitter = Executors
+			.newSingleThreadScheduledExecutor(r -> {
+				final var t = new Thread(r, "Calimero time server");
+				t.setDaemon(true);
+				return t;
+			});
 
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
@@ -640,13 +646,13 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public String getName() { return "server device"; }
+		public String getName() { return name + " device"; }
 
 		@Override
 		public void setKNXMedium(final KNXMediumSettings settings) {}
 
 		@Override
-		public KNXMediumSettings getKNXMedium() { return TPSettings.TP1; }
+		public KNXMediumSettings getKNXMedium() { return connectors.get(0).getServiceContainer().getMediumSettings(); }
 
 		@Override
 		public void setHopCount(final int count) {}
@@ -769,6 +775,7 @@ public class KnxServerGateway implements Runnable
 					connector.openNetworkLink();
 				}
 				catch (final KNXException e) {
+					logger.error("error opening network link for {}", connector.getName(), e);
 					server.shutdown();
 					return;
 				}
@@ -992,8 +999,6 @@ public class KnxServerGateway implements Runnable
 			return name;
 		}
 	}
-
-	private static final ScheduledExecutorService timeServerCyclicTransmitter = Executors.newSingleThreadScheduledExecutor();
 
 	private FrameEvent recordFrameEvent;
 
@@ -1304,7 +1309,7 @@ public class KnxServerGateway implements Runnable
 			link = ((Link<?>) link).target();
 		if (!(link instanceof KNXNetworkLink)) {
 			final IndividualAddress addr = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
-			logger.warn("cannot dispatch to KNX subnet {}, no network link ({})", addr, link);
+			logger.warn("cannot dispatch to KNX subnet {}: {}", addr, link == null ? "no subnet connection" : link);
 			return false;
 		}
 		return true;

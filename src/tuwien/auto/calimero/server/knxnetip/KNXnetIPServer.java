@@ -381,7 +381,7 @@ public class KNXnetIPServer
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
-		logger.info("{} v{} \'{}\'", serverName, Settings.getLibraryVersion(), friendlyName);
+		logger.info("{} v{}", friendlyName, Settings.getLibraryVersion());
 
 		ios.addServerListener(this::onPropertyValueChanged);
 
