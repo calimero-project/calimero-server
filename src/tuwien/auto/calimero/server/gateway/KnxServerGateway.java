@@ -491,7 +491,21 @@ public class KnxServerGateway implements Runnable
 			logger.info("KNX subnet link closed (" + e.getReason() + ")");
 		}
 
-		void connectionStatus(final boolean connected) { subnetConnected(connected); }
+		void connectionStatus(final boolean connected) {
+			final var sc = getSubnetConnector(scid).getServiceContainer();
+			final byte[] data = bytesFromWord(sc.getMediumSettings().maxApduLength());
+			final int pidMaxRoutingApduLength = 58;
+			setProperty(ROUTER_OBJECT, objectInstance(scid), pidMaxRoutingApduLength, data);
+			if (scid.equals(connectors.get(0).getServiceContainer().getName())) {
+				setProperty(DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, data);
+				final int pidMaxInterfaceApduLength = 68;
+				setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, pidMaxInterfaceApduLength, data);
+			}
+
+			logger.debug("set maximum APDU length of '{}' to {}", sc.getName(), sc.getMediumSettings().maxApduLength());
+
+			subnetConnected(connected);
+		}
 
 		private void subnetConnected(final boolean connected) {
 			setNetworkState(objectInstance(scid), true, !connected);
