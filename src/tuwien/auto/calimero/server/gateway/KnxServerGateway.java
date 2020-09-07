@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.gateway;
 
 import static java.lang.String.format;
+import static tuwien.auto.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
@@ -76,6 +77,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 
@@ -93,6 +95,7 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.SecurityControl.DataSecurity;
 import tuwien.auto.calimero.cemi.AdditionalInfo;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
@@ -101,6 +104,7 @@ import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.datapoint.StateDP;
+import tuwien.auto.calimero.device.BaseKnxDevice;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -669,10 +673,17 @@ public class KnxServerGateway implements Runnable
 
 
 	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) throws KNXException {
-		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).toArray(SubnetConnector[]::new));
+		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).collect(Collectors.toList()));
 		for (final var c : config.containers()) {
 			final var sc = c.subnetConnector().getServiceContainer();
 			setupTimeServer(sc, c.timeServer());
+		}
+
+		try {
+			server.device.setDeviceLink(deviceLinkProxy);
+		}
+		catch (final KNXLinkClosedException e) {
+			throw new KnxRuntimeException("setting device link", e);
 		}
 	}
 
@@ -688,13 +699,7 @@ public class KnxServerGateway implements Runnable
 	 */
 	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final SubnetConnector[] subnetConnectors)
 	{
-		name = gatewayName;
-		server = s;
-		server.addServerListener(new KNXnetIPServerListener());
-		connectors.addAll(Arrays.asList(subnetConnectors));
-		logger = LogService.getLogger("calimero.server.gateway." + name);
-		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-		dispatcher.setName(name + " subnet dispatcher");
+		this(gatewayName, s, Arrays.asList(subnetConnectors));
 
 		try {
 			server.device.setDeviceLink(deviceLinkProxy);
@@ -703,7 +708,22 @@ public class KnxServerGateway implements Runnable
 			throw new KnxRuntimeException("setting device link", e);
 		}
 
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+	}
+
+	private KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final List<SubnetConnector> subnetConnectors) {
+		name = gatewayName;
+		server = s;
+		server.addServerListener(new KNXnetIPServerListener());
+		logger = LogService.getLogger("calimero.server.gateway." + name);
+		connectors.addAll(subnetConnectors);
+		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		dispatcher.setName(name + " subnet dispatcher");
+
+		final var ios = server.getInterfaceObjectServer();
+		for (final var entry : ios.propertyDefinitions().entrySet()) {
+			if (entry.getValue().getPDT() == PropertyTypes.PDT_FUNCTION)
+				functionProperties.add(entry.getKey());
+		}
 
 		int objinst = 0;
 		for (final SubnetConnector connector : connectors) {
@@ -720,23 +740,10 @@ public class KnxServerGateway implements Runnable
 				subnetEventBuffers.put(sc, new ReplayBuffer<>(timeout));
 			}
 
-			// this only sets the actual interface's max. apdu if the subnet connection is already up and running
-			final byte[] data = new byte[] { 0, (byte) sc.getMediumSettings().maxApduLength() };
-			ios.setProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, 1, 1, data);
-
-			final int pidMaxRoutingApduLength = 58;
-			ios.setProperty(ROUTER_OBJECT, objinst, pidMaxRoutingApduLength, 1, 1, data);
-			logger.debug("set maximum APDU length of '{}' to {}", sc.getName(), sc.getMediumSettings().maxApduLength());
-
 			ios.setProperty(ROUTER_OBJECT, objinst, pidIpSbcControl, 1, 1, (byte) 0);
-
 			// init PID.PRIORITY_FIFO_ENABLED property to non-fifo message queue
-			try {
-				ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.PRIORITY_FIFO_ENABLED, 1, 1, (byte) 0);
-			}
-			catch (final KnxPropertyException e) {
-				logger.warn("failed to set KNX property 'priority fifo enabled' to false", e);
-			}
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.PRIORITY_FIFO_ENABLED, 1, 1, (byte) 0);
+
 			// init capability list of different routing features
 			// bit field: bit 0: Queue overflow counter available
 			// 1: Transmitted message counter available
@@ -745,22 +752,12 @@ public class KnxServerGateway implements Runnable
 			// 4: Group address mapping supported
 			// other bits reserved
 			final byte caps = 1 << 0 | 1 << 1 | 1 << 3;
-			try {
-				ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, caps);
-			}
-			catch (final KnxPropertyException e) {
-				logger.warn("failed to set KNX property 'KNXnet/IP routing capabilities'", e);
-			}
+			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objinst, PID.KNXNETIP_ROUTING_CAPABILITIES, 1, 1, caps);
 
 			telegramsToKnx.add(
 					new SlidingTimeWindowCounter(connector.getName() + " to KNX", sendRateHistory, ChronoUnit.MINUTES));
 			telegramsFromKnx.add(
 					new SlidingTimeWindowCounter(connector.getName() + " to IP", sendRateHistory, ChronoUnit.MINUTES));
-		}
-
-		for (final var entry : ios.propertyDefinitions().entrySet()) {
-			if (entry.getValue().getPDT() == PropertyTypes.PDT_FUNCTION)
-				functionProperties.add(entry.getKey());
 		}
 	}
 
@@ -858,6 +855,8 @@ public class KnxServerGateway implements Runnable
 	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
 		final var connector = getSubnetConnector(sc.getName());
 		for (final var datapoint : datapoints) {
+			((BaseKnxDevice) server.device).addGroupObject(datapoint, DataSecurity.AuthConf, false);
+
 			final var dpt = datapoint.getDPT();
 			final var dst = datapoint.getMainAddress();
 			final int sendInterval = datapoint.getExpirationTimeout();
@@ -884,9 +883,19 @@ public class KnxServerGateway implements Runnable
 			dateTime.setValue(millis);
 			dateTime.setClockSync(true);
 		}
-		final var apdu = DataUnitBuilder.createAPDU(0x80, xlator.getData());
-		final var ldata = new CEMILData(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
-		dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
+		final var plainApdu = DataUnitBuilder.createAPDU(0x80, xlator.getData());
+		final var sal = ((BaseKnxDevice) server.device).secureApplicationLayer();
+		try {
+			final var apdu = sal.secureGroupObject(src, dst, plainApdu).orElse(plainApdu);
+			final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
+			dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
+		}
+		catch (final InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		catch (final RuntimeException e) {
+			logger.warn("time server error {} {}", dst, xlator, e);
+		}
 	}
 
 	@Override

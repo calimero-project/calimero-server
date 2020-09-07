@@ -65,6 +65,7 @@ import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.TPSettings;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.ServerConfiguration;
@@ -81,8 +82,8 @@ class KnxServerGatewayTest
 	@BeforeEach
 	void init() throws Exception
 	{
-		server = setupServer();
-		final ServiceContainer sc = new DefaultServiceContainer("test container", null,
+		server = setupServer("test");
+		final ServiceContainer sc = new DefaultServiceContainer("test container", "any",
 				new HPAI((InetAddress) null, 5647),
 				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false);
 		server.addServiceContainer(sc);
@@ -95,9 +96,9 @@ class KnxServerGatewayTest
 	private static final int MAIN_LCGRPCONFIG = 54;
 	private static final int SUB_LCGRPCONFIG = 55;
 
-	private KNXnetIPServer setupServer()
+	private KNXnetIPServer setupServer(final String name)
 	{
-		final var config = new ServerConfiguration("test", "friendly server name", true, List.of(), List.of(), null, List.of());
+		final var config = new ServerConfiguration(name, "friendly server name", true, List.of(), List.of(), null, List.of());
 		final KNXnetIPServer s = new KNXnetIPServer(config);
 		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
 		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
@@ -113,16 +114,15 @@ class KnxServerGatewayTest
 	}
 
 	@Test
-	void testKnxServerGateway()
-	{
-		/*final KnxServerGateway gw2 =*/ new KnxServerGateway("testGW", setupServer(), new SubnetConnector[] {});
-	}
-
-	@Test
 	void testRun() throws InterruptedException
 	{
-		final KNXnetIPServer s = setupServer();
-		final KnxServerGateway gw2 = new KnxServerGateway("testGW", s, new SubnetConnector[] {});
+		final KNXnetIPServer s = setupServer("test 2");
+		final var lo = InetAddress.getLoopbackAddress();
+		final var sc = new DefaultServiceContainer("test container 2", "any", new HPAI(lo, 0), new TPSettings(),
+				false, false, false);
+		s.addServiceContainer(sc);
+		final var connector = SubnetConnector.newCustom(sc, "emulate");
+		final KnxServerGateway gw2 = new KnxServerGateway("test GW 2", s, new SubnetConnector[] { connector });
 		Thread t = new Thread(gw2);
 		t.start();
 		Thread.sleep(1000);

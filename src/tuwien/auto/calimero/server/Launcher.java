@@ -94,6 +94,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
+import tuwien.auto.calimero.internal.Security;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
@@ -448,7 +449,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 						if (keyring != null || readKeyfile != null)
 							config = new Container(indAddressPool, securedServices, tunnelingUserToAddresses, keyring,
-									readKeyfile, connector, filter, timeServerDatapoints);
+									Optional.ofNullable(readKeyfile).orElse(Map.of()), connector, filter, timeServerDatapoints);
 						containers.add(config);
 						return;
 					}
@@ -680,8 +681,8 @@ public class Launcher implements Runnable, AutoCloseable
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
 			final ServiceContainer sc = connector.getServiceContainer();
-			container.keyring().ifPresent(keyring -> decodeKeyring(sc, container));
-			final var keyfile = container.keyfile();
+
+			final var keyfile = container.keyring().map(keyring -> decodeKeyring(sc, container)).orElse(container.keyfile());
 			server.configureSecurity(sc, keyfile, container.securedServices());
 			keyfile.values().forEach(key -> Arrays.fill(key, (byte) 0));
 
@@ -724,7 +725,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 	}
 
-	private void decodeKeyring(final ServiceContainer sc, final Container config) {
+	private Map<String, byte[]> decodeKeyring(final ServiceContainer sc, final Container config) {
 		final var keyring = config.keyring().orElseThrow();
 		final var keyfile = config.keyfile();
 		char[] pwd = null;
@@ -746,11 +747,12 @@ public class Launcher implements Runnable, AutoCloseable
 			System.exit(-1);
 		}
 
-		final var host = sc.getMediumSettings().getDeviceAddress();
-		final var device = keyring.devices().get(host);
+		logger.debug("decrypt knx secure keys...");
 
 		final var decrypted = new HashMap<String, byte[]>();
 
+		final var host = sc.getMediumSettings().getDeviceAddress();
+		final var device = keyring.devices().get(host);
 		final var authKey = SecureConnection
 				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication(), pwd));
 		decrypted.put("device.key", authKey);
@@ -771,8 +773,14 @@ public class Launcher implements Runnable, AutoCloseable
 			decrypted.put("user." + iface.user(), key);
 		}
 
-		keyfile.putAll(decrypted);
+		for (final var entry : keyring.groups().entrySet())
+			Security.groupKeys().put(entry.getKey(), keyring.decryptKey(entry.getValue(), pwd));
+
+		final var allKeys = new HashMap<>(keyfile);
+		allKeys.putAll(decrypted);
+
 		Arrays.fill(pwd, (char) 0);
+		return allKeys;
 	}
 
 	private void waitForTermination()
