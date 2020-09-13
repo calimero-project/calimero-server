@@ -319,7 +319,7 @@ public class KNXnetIPServer
 	 *        ISO-8859-1 characters only, with string length &lt; 30 characters, <code>friendlyName</code> might be of
 	 *        length 0
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	public KNXnetIPServer(final String localName, final String friendlyName)
 	{
 		serverName = localName;
@@ -353,7 +353,7 @@ public class KNXnetIPServer
 	 *        server
 	 * @see #KNXnetIPServer(String, String)
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	public KNXnetIPServer(final String serverName, final List<ServiceContainer> serviceContainers)
 	{
 		this(serverName, serverName);

@@ -687,7 +687,13 @@ public class KnxServerGateway implements Runnable
 		public void close() {}
 	};
 
-
+	/**
+	 * Creates a new server gateway for the supplied KNXnet/IP server.
+	 * On running this gateway ({@link #run()}), it is ensured the KNXnet/IP server is launched.
+	 *
+	 * @param s KNXnet/IP server representing the server side
+	 * @param config server configuration
+	 */
 	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) throws KNXException {
 		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).collect(Collectors.toList()));
 		for (final var c : config.containers()) {
@@ -704,15 +710,14 @@ public class KnxServerGateway implements Runnable
 	}
 
 	/**
-	 * Creates a new server gateway for the supplied KNXnet/IP server.
-	 * <p>
-	 * On running this gateway ({@link #run()}), it is ensured the KNXnet/IP server is launched.
+	 * @deprecated Use {@link #KnxServerGateway(KNXnetIPServer, ServerConfiguration)}.
 	 *
 	 * @param gatewayName descriptive name to use for this gateway
 	 * @param s KNXnet/IP server representing the server side
 	 * @param subnetConnectors list of {@link SubnetConnector} objects, which specify the
 	 *        associations between the connections from either side of the gateway
 	 */
+	@Deprecated
 	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final SubnetConnector[] subnetConnectors)
 	{
 		this(gatewayName, s, Arrays.asList(subnetConnectors));
