@@ -116,6 +116,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
 import tuwien.auto.calimero.internal.SecureApplicationLayer;
+import tuwien.auto.calimero.internal.Security;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
@@ -649,7 +650,8 @@ public class KnxServerGateway implements Runnable
 			}
 			else {
 				final var self = new IndividualAddress(1, 1, 0); // XXX
-				final var msg = new CEMILData(CEMILData.MC_LDATA_IND, self, dst, nsdu, p);
+				final var msg = nsdu.length > 16 ? new CEMILDataEx(CEMILData.MC_LDATA_IND, self, dst, nsdu, p)
+												 : new CEMILData(CEMILData.MC_LDATA_IND, self, dst, nsdu, p);
 				send(msg, false);
 			}
 		}
@@ -869,7 +871,11 @@ public class KnxServerGateway implements Runnable
 	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
 		final var connector = getSubnetConnector(sc.getName());
 		for (final var datapoint : datapoints) {
-			((BaseKnxDevice) server.device).addGroupObject(datapoint, DataSecurity.AuthConf, false);
+			final var security = Security.groupKeys().containsKey(datapoint.getMainAddress()) ? DataSecurity.AuthConf
+					: DataSecurity.None;
+			((BaseKnxDevice) server.device).addGroupObject(datapoint, security, false);
+			if (security != DataSecurity.None)
+				server.getInterfaceObjectServer().setProperty(InterfaceObject.SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);
 
 			final var dpt = datapoint.getDPT();
 			final var dst = datapoint.getMainAddress();
