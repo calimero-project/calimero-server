@@ -420,7 +420,7 @@ public class KNXnetIPServer
 		}
 
 		// add new KNXnet/IP parameter object for this service container
-		final var knxipParameters = getInterfaceObjectServer().addInterfaceObject(knxObject);
+		final var knxipParameters = findOrAddInterfaceObject(endpoints.size() + 1, knxObject);
 
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
 		final var controlEndpoint = new LooperTask(this, serverName + " control endpoint " + sc.getName(), -1, builder);
@@ -452,6 +452,18 @@ public class KNXnetIPServer
 			endpoint.start();
 		fireServiceContainerAdded(sc);
 		return true;
+	}
+
+	private InterfaceObject findOrAddInterfaceObject(final int objectInstance, final int objectType) {
+		int instances = 0;
+		for (final var io : ios.getInterfaceObjects()) {
+			if (io.getType() == objectType && ++instances == objectInstance)
+				return io;
+		}
+		InterfaceObject io = null;
+		while (instances++ < objectInstance)
+			io = ios.addInterfaceObject(objectType);
+		return io;
 	}
 
 	/**
@@ -769,6 +781,7 @@ public class KNXnetIPServer
 
 		endpoints.forEach(Endpoint::stop);
 
+		((BaseKnxDevice) device).close();
 		inShutdown = false;
 		running = false;
 	}
