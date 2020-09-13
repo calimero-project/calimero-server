@@ -266,7 +266,7 @@ public class KNXnetIPServer
 	final List<Endpoint> endpoints = new CopyOnWriteArrayList<>();
 
 	public final KnxDevice device;
-	private InterfaceObjectServer ios;
+	private final InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
 
 	private static final int objectInstance = 1;
@@ -488,37 +488,20 @@ public class KNXnetIPServer
 	}
 
 	/**
-	 * Sets a new Interface Object Server for this server, replacing any previously set Interface
-	 * Object Server instance.
-	 * <p>
+	 * @deprecated No replacement.
 	 *
 	 * @param server the Interface Object Server
 	 */
-	public final void setInterfaceObjectServer(final InterfaceObjectServer server)
-	{
-		if (server == null)
-			throw new IllegalArgumentException("there must exist an IOS");
-		synchronized (listeners) {
-			listeners.fire(l -> {
-				ios.removeServerListener(l);
-				server.addServerListener(l);
-			});
-			ios = server;
-		}
-	}
+	@Deprecated(forRemoval = true)
+	public final void setInterfaceObjectServer(final InterfaceObjectServer server) {}
 
 	/**
 	 * Returns the Interface Object Server currently set (and used) by this server.
-	 * <p>
 	 *
 	 * @return the server IOS instance
 	 */
-	public final InterfaceObjectServer getInterfaceObjectServer()
-	{
-		// synchronize on listeners since add/remove listener and setIOS also do
-		synchronized (listeners) {
-			return ios;
-		}
+	public final InterfaceObjectServer getInterfaceObjectServer() {
+		return device.getInterfaceObjectServer();
 	}
 
 	/**
@@ -845,13 +828,9 @@ public class KNXnetIPServer
 		}
 	}
 
-	// precondition: we have an IOS instance
 	private void initKNXnetIpParameterObject(final int objectInstance, final ServiceContainer endpoint)
 		throws KnxPropertyException
 	{
-		if (ios == null)
-			throw new IllegalStateException("KNXnet/IP server has no IOS");
-
 		// reset transmit counter to 0
 		// those two are 4 byte unsigned
 		setProperty(knxObject, objectInstance, PID.MSG_TRANSMIT_TO_IP, new byte[4]);
