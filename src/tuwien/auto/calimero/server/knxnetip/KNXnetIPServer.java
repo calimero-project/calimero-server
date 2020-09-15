@@ -328,7 +328,7 @@ public class KNXnetIPServer
 		this.friendlyName = friendlyName;
 		logger = LogService.getLogger("calimero.server." + getName());
 
-		device = new BaseKnxDevice(localName, DD0.TYPE_091A, null, logic, null);
+		device = new BaseKnxDevice(localName, DD0.TYPE_091A, null, logic, null, new char[0]);
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
@@ -377,7 +377,8 @@ public class KNXnetIPServer
 		friendlyName = config.friendlyName();
 		logger = LogService.getLogger("calimero.server." + getName());
 
-		device = new BaseKnxDevice(serverName, DD0.TYPE_091A, null, logic, config.iosResource().orElse(null));
+		final char[] iosPwd = new char[0]; //config.iosResourcePassword();
+		device = new BaseKnxDevice(serverName, DD0.TYPE_091A, null, logic, config.iosResource().orElse(null), iosPwd);
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
