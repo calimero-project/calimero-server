@@ -856,7 +856,8 @@ public class KNXnetIPServer
 		// friendly name property entry is an array of 30 characters
 		final byte[] data = Arrays.copyOf(friendlyName.getBytes(StandardCharsets.ISO_8859_1), 30);
 		ios.setProperty(knxObject, objectInstance, PID.FRIENDLY_NAME, 1, data.length, data);
-		setProperty(knxObject, objectInstance, PID.PROJECT_INSTALLATION_ID, bytesFromWord(defProjectInstallationId));
+		setPropertyIfAbsent(knxObject, objectInstance, PID.PROJECT_INSTALLATION_ID,
+				bytesFromWord(defProjectInstallationId));
 		final byte[] addr = endpoint.getMediumSettings().getDeviceAddress().toByteArray();
 		setProperty(knxObject, objectInstance, PID.KNX_INDIVIDUAL_ADDRESS, addr);
 		setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, new byte[6]);
@@ -867,7 +868,7 @@ public class KNXnetIPServer
 		else
 			resetRoutingConfiguration(objectInstance);
 		// 100 ms is the default busy wait time
-		setProperty(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, bytesFromWord(100));
+		setPropertyIfAbsent(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, bytesFromWord(100));
 
 		// ip and setup multicast
 		final byte[] ip = endpoint.getControlEndpoint().getAddress().getAddress();
@@ -895,8 +896,8 @@ public class KNXnetIPServer
 		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_STATE, zero);
 
 		setProperty(knxObject, objectInstance, PID.IP_CAPABILITIES, zero);
-		setProperty(knxObject, objectInstance, PID.IP_ASSIGNMENT_METHOD, new byte[] { 1 });
-		setProperty(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, new byte[] { 1 });
+		setPropertyIfAbsent(knxObject, objectInstance, PID.IP_ASSIGNMENT_METHOD, new byte[] { 1 });
+		setPropertyIfAbsent(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, new byte[] { 1 });
 	}
 
 	private void setRoutingConfiguration(final RoutingServiceContainer endpoint, final int objectInstance)
@@ -978,6 +979,16 @@ public class KNXnetIPServer
 	void setProperty(final int objectType, final int objectInstance, final int propertyId, final byte... data)
 	{
 		ios.setProperty(objectType, objectInstance, propertyId, 1, 1, data);
+	}
+
+	private void setPropertyIfAbsent(final int objectType, final int objectInstance, final int propertyId,
+			final byte... data) {
+		try {
+			ios.getProperty(objectType, objectInstance, propertyId, 1, 1);
+		}
+		catch (final KnxPropertyException ignore) {
+			setProperty(objectType, objectInstance, propertyId, data);
+		}
 	}
 
 	DeviceDIB createDeviceDIB(final ServiceContainer sc)
