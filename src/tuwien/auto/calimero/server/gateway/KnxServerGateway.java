@@ -40,6 +40,7 @@ import static java.lang.String.format;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
+import static tuwien.auto.calimero.device.ios.InterfaceObject.SECURITY_OBJECT;
 import static tuwien.auto.calimero.knxnetip.KNXnetIPConnection.BlockingMode.WaitForAck;
 
 import java.lang.reflect.Field;
@@ -57,7 +58,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -95,6 +95,7 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.SecurityControl;
 import tuwien.auto.calimero.SecurityControl.DataSecurity;
 import tuwien.auto.calimero.cemi.AdditionalInfo;
 import tuwien.auto.calimero.cemi.CEMI;
@@ -104,6 +105,7 @@ import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.datapoint.StateDP;
+import tuwien.auto.calimero.device.AccessPolicies;
 import tuwien.auto.calimero.device.BaseKnxDevice;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
@@ -138,6 +140,7 @@ import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.mgmt.PropertyClient;
 import tuwien.auto.calimero.mgmt.PropertyClient.PropertyKey;
 import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.ServerConfiguration;
@@ -1766,41 +1769,28 @@ public class KnxServerGateway implements Runnable
 		return list;
 	}
 
-	// @formatter:off
-	private enum AccessPermission { Read, Write, SecureRead, SecureWrite }
+	private boolean checkPropertyAccess(final int objectType, final int objectInstance, final int pid,
+			final boolean read, final SecurityControl securityCtrl) {
+		final var ios = server.getInterfaceObjectServer();
+		boolean securityMode = false;
+		try {
+			securityMode = ios.getProperty(SECURITY_OBJECT, objectInstance, pid, 1, 1)[0] == 1;
+		}
+		catch (final KnxPropertyException noSecurityObject) {}
+		final boolean allowed = AccessPolicies.checkPropertyAccess(objectType, pid, read, securityMode, securityCtrl);
+		if (!allowed)
+			logger.info("deny property {} access to {}({})|{} ({}{})", read ? "read" : "write", objectType,
+					objectInstance, pid, PropertyClient.getObjectTypeName(objectType), propertyName(objectType, pid));
+		return allowed;
+	}
 
-	private static final Map<Integer, EnumSet<AccessPermission>> knxipSecureProperties = Map.of(
-					91, EnumSet.of(AccessPermission.SecureWrite),
-					92, EnumSet.of(AccessPermission.SecureWrite),
-					93, EnumSet.of(AccessPermission.SecureWrite),
-					94, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
-					95, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
-					96, EnumSet.of(AccessPermission.Read, AccessPermission.SecureRead, AccessPermission.SecureWrite),
-					97, EnumSet.of(AccessPermission.SecureWrite));
-	// @formatter:on
-
-	private boolean checkSecurityPermissions(final int ot, final int pid, final boolean read, final boolean secureConn) {
-		if (ot != InterfaceObject.KNXNETIP_PARAMETER_OBJECT)
-			return true;
-		if (!knxipSecureProperties.containsKey(pid))
-			return true;
-
-		final EnumSet<AccessPermission> ap = knxipSecureProperties.get(pid);
-		final String type = read ? "read" : "write";
-		logger.debug("check access permission '{}' for secure property {}|{} {}", type, ot, pid, ap);
-
-		final boolean write = !read;
-		if (read && ap.contains(AccessPermission.Read))
-			return true;
-		if (write && ap.contains(AccessPermission.Write))
-			return true;
-		if (secureConn && read && ap.contains(AccessPermission.SecureRead))
-			return true;
-		if (secureConn && write && ap.contains(AccessPermission.SecureWrite))
-			return true;
-		final String secure = secureConn ? "secure" : "non-secure";
-		logger.info("deny {} '{}' access to secure property {}|{}", secure, type, ot, pid);
-		return false;
+	private String propertyName(final int objectType, final int pid) {
+		final var ios = server.getInterfaceObjectServer();
+		final var key = pid <= 50 ? new PropertyKey(pid) : new PropertyKey(objectType, pid);
+		final var property = ios.propertyDefinitions().get(key);
+		if (property != null && !property.getName().isEmpty())
+			return " - " + property.getName();
+		return "";
 	}
 
 	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f)
@@ -1815,19 +1805,26 @@ public class KnxServerGateway implements Runnable
 				data = new byte[] { CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR };
 				elems = 0;
 			}
-			else if (checkSecurityPermissions(f.getObjectType(), f.getPID(), mc == CEMIDevMgmt.MC_PROPREAD_REQ, false)) {
-				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+			else {
+				final var ios = server.getInterfaceObjectServer();
 				try {
-					if (read) {
-						data = ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems);
-						// play it safe and set error code if property data was not found
-						if (data == null) {
-							data = new byte[] { CEMIDevMgmt.ErrorCodes.VOID_DP };
-							elems = 0;
-						}
+					// read property elements first so we know property exists
+					ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), 0, 1);
+
+					final var securityControl = SecurityControl.Plain;
+					if (checkPropertyAccess(f.getObjectType(), f.getObjectInstance(), f.getPID(),
+							mc == CEMIDevMgmt.MC_PROPREAD_REQ, securityControl)) {
+						if (read)
+							data = ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(),
+									f.getStartIndex(), elems);
+						else
+							ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(),
+									elems, f.getPayload());
 					}
-					else
-						ios.setProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, f.getPayload());
+					else {
+						data = new byte[] { (byte) CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR };
+						elems = 0;
+					}
 				}
 				catch (final KnxPropertyException e) {
 					logger.debug(e.getMessage());
@@ -1835,10 +1832,7 @@ public class KnxServerGateway implements Runnable
 					elems = 0;
 				}
 			}
-			else {
-				data = new byte[] { (byte) CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR };
-				elems = 0;
-			}
+
 			final int con = read ? CEMIDevMgmt.MC_PROPREAD_CON : CEMIDevMgmt.MC_PROPWRITE_CON;
 			final CEMIDevMgmt dm = read || data != null ? new CEMIDevMgmt(con, f.getObjectType(),
 					f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, data)
