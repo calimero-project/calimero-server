@@ -306,7 +306,7 @@ final class ControlEndpointService extends ServiceLooper
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
 			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont, false);
 			final ManufacturerDIB mfr = createManufacturerDIB();
-			final List<IndividualAddress> addresses = knxAddresses();
+			final List<IndividualAddress> addresses = additionalAddresses();
 			final DescriptionResponse description = addresses.isEmpty()
 					? new DescriptionResponse(device, svcFamilies, mfr)
 					: new DescriptionResponse(device, svcFamilies, new KnxAddressesDIB(addresses), mfr);
@@ -578,21 +578,6 @@ final class ControlEndpointService extends ServiceLooper
 
 		if (!TcpLooper.send(buf, dst))
 			s.send(new DatagramPacket(buf, buf.length, dst));
-	}
-
-	private List<IndividualAddress> knxAddresses()
-	{
-		final List<IndividualAddress> addresses = new ArrayList<>();
-		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-				PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
-		try {
-			final ByteBuffer buffer = ByteBuffer.wrap(server.getInterfaceObjectServer().getProperty(
-					KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems));
-			while (buffer.hasRemaining())
-				addresses.add(new IndividualAddress(buffer.getShort() & 0xffff));
-		}
-		catch (final KnxPropertyException e) {}
-		return addresses;
 	}
 
 	private DatagramSocket createSocket()
@@ -870,14 +855,12 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	List<IndividualAddress> additionalAddresses() {
-		final int oi = objectInstance();
-		final int elems = server.getPropertyElems(KNXNETIP_PARAMETER_OBJECT, oi, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES);
 		final List<IndividualAddress> list = new ArrayList<>();
 		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, oi,
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
+			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE);
 			final ByteBuffer buf = ByteBuffer.wrap(data);
-			for (int i = 0; i < elems; ++i)
+			while (buf.hasRemaining())
 				list.add(new IndividualAddress(buf.getShort() & 0xffff));
 		}
 		catch (final KnxPropertyException e) {

@@ -1753,14 +1753,12 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private List<IndividualAddress> additionalAddresses(final int objectInstance) {
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-		final int elems = ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 0, 1)[1] & 0xff;
 		final List<IndividualAddress> list = new ArrayList<>();
 		try {
 			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, elems);
+					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE);
 			final ByteBuffer buf = ByteBuffer.wrap(data);
-			for (int i = 0; i < elems; ++i)
+			while (buf.hasRemaining())
 				list.add(new IndividualAddress(buf.getShort() & 0xffff));
 		}
 		catch (final KnxPropertyException e) {
