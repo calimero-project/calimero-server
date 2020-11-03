@@ -5,7 +5,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.github.ben-manes:gradle-versions-plugin:0.29.0'
+        classpath 'com.github.ben-manes:gradle-versions-plugin:0.34.0'
     }
 }
 
@@ -16,7 +16,7 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.6.2'
+ext.junitJupiterVersion = '5.7.0'
 
 apply plugin: 'java-library'
 apply plugin: 'maven'
@@ -83,6 +83,6 @@ dependencies {
 
 	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-	testCompileOnly 'junit:junit:4.13'
+	testCompileOnly 'junit:junit:4.13.1'
 	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 }
