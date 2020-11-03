@@ -720,7 +720,7 @@ public class KnxServerGateway implements Runnable
 	 * @param subnetConnectors list of {@link SubnetConnector} objects, which specify the
 	 *        associations between the connections from either side of the gateway
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final SubnetConnector[] subnetConnectors)
 	{
 		this(gatewayName, s, Arrays.asList(subnetConnectors));

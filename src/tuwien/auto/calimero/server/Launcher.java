@@ -189,7 +189,7 @@ public class Launcher implements Runnable, AutoCloseable
 			return new XmlConfiguration(serverConfigUri).load();
 		}
 
-		@Deprecated
+		@Deprecated(forRemoval = true)
 		public XmlConfiguration() {}
 
 		private XmlConfiguration(final URI serverConfigUri) { uri = serverConfigUri; }
@@ -230,7 +230,7 @@ public class Launcher implements Runnable, AutoCloseable
 			return Optional.ofNullable(r.getAttributeValue(null, name));
 		}
 
-		@Deprecated
+		@Deprecated(forRemoval = true)
 		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
 		{
 			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
