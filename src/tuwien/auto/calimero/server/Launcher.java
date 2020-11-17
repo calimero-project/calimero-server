@@ -754,9 +754,9 @@ public class Launcher implements Runnable, AutoCloseable
 		final var host = sc.getMediumSettings().getDeviceAddress();
 		final var device = keyring.devices().get(host);
 		final var authKey = SecureConnection
-				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication(), pwd));
+				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication().get(), pwd));
 		decrypted.put("device.key", authKey);
-		final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password(), pwd));
+		final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password().get(), pwd));
 		decrypted.put("user.1", mgmtKey);
 
 		if (sc instanceof RoutingServiceContainer) {
@@ -769,7 +769,9 @@ public class Launcher implements Runnable, AutoCloseable
 
 		final var interfaces = keyring.interfaces().get(host);
 		for (final var iface : interfaces) {
-			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password(), pwd));
+			if (iface.password().isEmpty())
+				continue;
+			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password().get(), pwd));
 			decrypted.put("user." + iface.user(), key);
 		}
 
