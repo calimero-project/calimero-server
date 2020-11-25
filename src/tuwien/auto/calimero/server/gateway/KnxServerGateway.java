@@ -879,8 +879,8 @@ public class KnxServerGateway implements Runnable
 	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
 		final var connector = getSubnetConnector(sc.getName());
 		for (final var datapoint : datapoints) {
-			final var security = Security.groupKeys().containsKey(datapoint.getMainAddress()) ? DataSecurity.AuthConf
-					: DataSecurity.None;
+			final var security = Security.defaultInstallation().groupKeys().containsKey(datapoint.getMainAddress())
+					? DataSecurity.AuthConf : DataSecurity.None;
 			((BaseKnxDevice) server.device).addGroupObject(datapoint, security, false);
 			if (security != DataSecurity.None)
 				server.getInterfaceObjectServer().setProperty(InterfaceObject.SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);

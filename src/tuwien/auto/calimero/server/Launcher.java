@@ -761,10 +761,14 @@ public class Launcher implements Runnable, AutoCloseable
 
 		if (sc instanceof RoutingServiceContainer) {
 			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
-
-			final var enc = (byte[]) keyring.configuration().get(rsc.routingMulticastAddress());
-			final var groupKey = keyring.decryptKey(enc, pwd);
-			decrypted.put("group.key", groupKey);
+			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().equals(rsc.routingMulticastAddress()));
+			if (backbone.isPresent()) {
+				final var enc = backbone.get().groupKey();
+				final var groupKey = keyring.decryptKey(enc, pwd);
+				decrypted.put("group.key", groupKey);
+			}
+			else
+				logger.warn("KNX IP routing is not secured");
 		}
 
 		final var interfaces = keyring.interfaces().get(host);
@@ -776,7 +780,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		for (final var entry : keyring.groups().entrySet())
-			Security.groupKeys().put(entry.getKey(), keyring.decryptKey(entry.getValue(), pwd));
+			Security.defaultInstallation().groupKeys().put(entry.getKey(), keyring.decryptKey(entry.getValue(), pwd));
 
 		final var allKeys = new HashMap<>(keyfile);
 		allKeys.putAll(decrypted);
