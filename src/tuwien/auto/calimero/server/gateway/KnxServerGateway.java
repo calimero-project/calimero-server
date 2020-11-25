@@ -1132,8 +1132,36 @@ public class KnxServerGateway implements Runnable
 
 				// see if the frame is also of interest to us, or addressed to us
 				final var dst = f.getDestination();
-				if (dst instanceof GroupAddress && dst.getRawAddress() == 0)
+				if (dst instanceof GroupAddress && dst.getRawAddress() == 0) {
 					deviceListeners.forEach(l -> l.indication(fe));
+
+					// send to all clients except sender
+					logger.trace("forward broadcast {} to all tunneling clients (except {})", f, f.getSource());
+					final var svcCont = connectorFor(f.getSource()).map(SubnetConnector::getServiceContainer);
+					if (svcCont.isPresent()) {
+						// create temporary array to not block concurrent access during iteration
+						for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
+							final String type = c.getName().toLowerCase();
+							if (type.contains("devmgmt") || type.contains("monitor"))
+								continue;
+							final var client = (KNXnetIPConnection) fe.getSource();
+							if (client == c)
+								continue;
+
+							try {
+								final var ind = CEMIFactory.create(null, null,
+										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+								send(svcCont.get(), c, ind, true);
+							}
+							catch (final InterruptedException e) {
+								Thread.currentThread().interrupt();
+							}
+							catch (KNXFormatException | RuntimeException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
 				else if (dst instanceof IndividualAddress) {
 					final var ia = (IndividualAddress) dst;
 					final Optional<SubnetConnector> connector = connectorFor(ia);
