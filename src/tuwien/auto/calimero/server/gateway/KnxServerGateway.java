@@ -1213,7 +1213,8 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ || mc == CEMIDevMgmt.MC_RESET_REQ)
-			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame);
+			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame,
+					fe.security().orElse(SecurityControl.Plain));
 		else if (frame instanceof CEMIBusMon) {
 			if (fromServerSide) {
 				logger.error("received cEMI busmonitor frame by server-side client (unspecified)");
@@ -1819,7 +1820,7 @@ public class KnxServerGateway implements Runnable
 		return "";
 	}
 
-	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f)
+	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f, final SecurityControl securityControl)
 	{
 		final int mc = f.getMessageCode();
 		if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ) {
@@ -1837,7 +1838,6 @@ public class KnxServerGateway implements Runnable
 					// read property elements first so we know property exists
 					ios.getProperty(f.getObjectType(), f.getObjectInstance(), f.getPID(), 0, 1);
 
-					final var securityControl = SecurityControl.Plain;
 					if (checkPropertyAccess(f.getObjectType(), f.getObjectInstance(), f.getPID(),
 							mc == CEMIDevMgmt.MC_PROPREAD_REQ, securityControl)) {
 						if (read)

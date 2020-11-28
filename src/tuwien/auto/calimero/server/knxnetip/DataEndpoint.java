@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2019 B. Malinowsky
+    Copyright (c) 2010, 2020 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,11 +52,14 @@ import java.util.function.Consumer;
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.DeviceDescriptor.DD0;
+import tuwien.auto.calimero.FrameEvent;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.ReturnCode;
+import tuwien.auto.calimero.SecurityControl;
+import tuwien.auto.calimero.SecurityControl.DataSecurity;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -598,7 +601,7 @@ public final class DataEndpoint extends ConnectionBase
 		if (cemi.getMessageCode() == CEMIDevMgmt.MC_PROPREAD_REQ
 				|| cemi.getMessageCode() == CEMIDevMgmt.MC_PROPWRITE_REQ
 				|| cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ) {
-			fireFrameReceived(cemi);
+			fireDeviceMgmtFrameReceived(cemi);
 			if (cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ)
 				resetRequest.accept(this);
 		}
@@ -620,6 +623,14 @@ public final class DataEndpoint extends ConnectionBase
 				logger.warn("unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode()) + " - ignored");
 			}
 		}
+	}
+
+	// with cEMI device mgmt we have to adjust security control for frame event
+	private void fireDeviceMgmtFrameReceived(final CEMI frame) {
+		final var securityControl = sessionId == 0 ? SecurityControl.Plain
+				: SecurityControl.of(DataSecurity.AuthConf, true);
+		final FrameEvent fe = new FrameEvent(this, frame, false, securityControl);
+		listeners.fire(l -> l.frameReceived(fe));
 	}
 
 	private void checkFrameType(final CEMI frame)
