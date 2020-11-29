@@ -574,7 +574,7 @@ public class KnxServerGateway implements Runnable
 					try {
 						if (!event.systemBroadcast())
 							checkRoutingBusy();
-						onFrameReceived(event, true);
+						onClientFrameReceived(event);
 					}
 					catch (final RuntimeException e) {
 						logger.error("on server-side frame event", e);
@@ -823,7 +823,7 @@ public class KnxServerGateway implements Runnable
 				}
 				else {
 					replayPendingSubnetEvents();
-					onFrameReceived(event, false);
+					onSubnetFrameReceived(event);
 				}
 			}
 			catch (final RuntimeException e) {
@@ -1048,33 +1048,30 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void onFrameReceived(final FrameEvent fe, final boolean fromServerSide)
-	{
-		final String s = fromServerSide ? "server-side " : "KNX subnet ";
+	private void onClientFrameReceived(final FrameEvent fe) {
+		final String s = "server-side";
 		final CEMI frame = fe.getFrame();
-
-		logger.trace("{}{}: {}", s, fe.getSource(), frame);
 
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
-			final CEMILData f = (CEMILData) frame;
+			final var ldata = (CEMILData) frame;
 
-			logger.trace("{}->{}: {}", f.getSource(), f.getDestination(),
-					DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
+			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
+					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
 
 			// we get L-data.ind if client uses routing protocol
-			if (fromServerSide && (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND)) {
+			if (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND) {
 				if (mc == CEMILData.MC_LDATA_REQ) {
 					// send confirmation only for .req type
-					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), (CEMILData) CEMIFactory.copy(f));
+					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), (CEMILData) CEMIFactory.copy(ldata));
 
 					// if routing is active, dispatch .req over routing connection
 					final var c = findRoutingConnection().orElse(null);
 					if (c != null) {
-						logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+						logger.debug("dispatch {}->{} using {}", ldata.getSource(), ldata.getDestination(), c);
 						try {
 							final var ind = CEMIFactory.create(null, null,
-									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 							send(server.getServiceContainers()[0], c, ind);
 						}
 						catch (KNXFormatException | InterruptedException | RuntimeException e) {
@@ -1083,10 +1080,10 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 
-				if (f.getDestination() instanceof IndividualAddress) {
-					final IndividualAddress dst = (IndividualAddress) f.getDestination();
+				if (ldata.getDestination() instanceof IndividualAddress) {
+					final IndividualAddress dst = (IndividualAddress) ldata.getDestination();
 					final Optional<SubnetConnector> connector = connectorFor(dst);
-					if (connector.isPresent() && localDeviceManagement(connector.get(), f))
+					if (connector.isPresent() && localDeviceManagement(connector.get(), ldata))
 						return;
 					if (connector.isPresent()) {
 						final var svcContainer = connector.get().getServiceContainer();
@@ -1094,10 +1091,10 @@ public class KnxServerGateway implements Runnable
 						// check if destination is a client of ours
 						final var dataConnections = server.dataConnections(svcContainer);
 						for (final var dataEndpoint : dataConnections.values()) {
-							if (f.getDestination().equals(dataEndpoint.deviceAddress())) {
+							if (ldata.getDestination().equals(dataEndpoint.deviceAddress())) {
 								try {
 									final var ind = CEMIFactory.create(null, null,
-											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 									send(svcContainer, dataEndpoint, ind, true);
 								}
 								catch (final InterruptedException e) {
@@ -1111,14 +1108,14 @@ public class KnxServerGateway implements Runnable
 						}
 
 						// defend our own additional individual addresses when receiving a TL connect.req
-						if (DataUnitBuilder.getTPDUService(f.getPayload()) == 0x80) {
+						if (DataUnitBuilder.getTPDUService(ldata.getPayload()) == 0x80) {
 							final int objectInstance = 1;
 							final var addresses = additionalAddresses(objectInstance);
-							if (addresses.contains(f.getDestination())) {
+							if (addresses.contains(ldata.getDestination())) {
 								// send disconnect
 								try {
-									final var ind = CEMIFactory.create(dst, f.getSource(), (CEMILData) CEMIFactory
-											.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, f), false);
+									final var ind = CEMIFactory.create(dst, ldata.getSource(), (CEMILData) CEMIFactory
+											.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
 									dispatchToServer(connector.get(), ind, fe.id());
 								}
 								catch (final KNXFormatException e) {
@@ -1131,13 +1128,13 @@ public class KnxServerGateway implements Runnable
 				}
 
 				// see if the frame is also of interest to us, or addressed to us
-				final var dst = f.getDestination();
+				final var dst = ldata.getDestination();
 				if (dst instanceof GroupAddress && dst.getRawAddress() == 0) {
 					deviceListeners.forEach(l -> l.indication(fe));
 
 					// send to all clients except sender
-					logger.trace("forward broadcast {} to all tunneling clients (except {})", f, f.getSource());
-					final var svcCont = connectorFor(f.getSource()).map(SubnetConnector::getServiceContainer);
+					logger.trace("forward broadcast {} to all tunneling clients (except {})", ldata, ldata.getSource());
+					final var svcCont = connectorFor(ldata.getSource()).map(SubnetConnector::getServiceContainer);
 					if (svcCont.isPresent()) {
 						// create temporary array to not block concurrent access during iteration
 						for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
@@ -1150,7 +1147,7 @@ public class KnxServerGateway implements Runnable
 
 							try {
 								final var ind = CEMIFactory.create(null, null,
-										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 								send(svcCont.get(), c, ind, true);
 							}
 							catch (final InterruptedException e) {
@@ -1168,25 +1165,47 @@ public class KnxServerGateway implements Runnable
 					if (connector.isPresent()) {
 						final IndividualAddress localInterface = connector.get().getServiceContainer()
 								.getMediumSettings().getDeviceAddress();
-						if (f.getDestination().equals(localInterface)) {
+						if (ldata.getDestination().equals(localInterface)) {
 							deviceListeners.forEach(l -> l.indication(fe));
 							return;
 						}
 					}
 				}
 
-				final CEMILData send = adjustHopCount(f);
+				final CEMILData send = adjustHopCount(ldata);
 				if (send != null)
 					dispatchToSubnets(send, fe.systemBroadcast());
+
+				return;
 			}
-			else if (!fromServerSide && mc == CEMILData.MC_LDATA_IND) {
-				// get connector of that subnet
+		}
+		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ || mc == CEMIDevMgmt.MC_RESET_REQ) {
+			logger.trace("{} {}: {}", s, fe.getSource(), frame);
+
+			final var securityControl = fe.security().orElse(SecurityControl.Plain);
+			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame, securityControl);
+			return;
+		}
+
+		logger.warn("received {} {} - ignored", s, frame);
+	}
+
+	private void onSubnetFrameReceived(final FrameEvent fe) {
+		final String s = "subnet";
+		final CEMI frame = fe.getFrame();
+
+		if (frame instanceof CEMILData) {
+			final var ldata = (CEMILData) frame;
+			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
+					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
+
+			if (frame.getMessageCode() == CEMILData.MC_LDATA_IND) {
 				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 
 				// check if frame is addressed to us
 				if (connector != null) {
 					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
-					if (f.getDestination().equals(containerAddr)) {
+					if (ldata.getDestination().equals(containerAddr)) {
 						// with a usb interface, device is always our own address, so we always exclude it for now
 						if (connector.getInterfaceType().equals("usb"))
 							logger.debug("received from subnet using usb interface {}, don't intercept frame",
@@ -1198,7 +1217,7 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 
-				final CEMILData send = adjustHopCount(f);
+				final CEMILData send = adjustHopCount(ldata);
 				if (send == null)
 					return;
 				if (connector != null) {
@@ -1207,19 +1226,12 @@ public class KnxServerGateway implements Runnable
 				}
 
 				dispatchToOtherSubnets(send, connector, false);
-			}
-			else {
-				logger.warn("{}{} - ignored", s, f);
-			}
-		}
-		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ || mc == CEMIDevMgmt.MC_RESET_REQ)
-			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame,
-					fe.security().orElse(SecurityControl.Plain));
-		else if (frame instanceof CEMIBusMon) {
-			if (fromServerSide) {
-				logger.error("received cEMI busmonitor frame by server-side client (unspecified)");
 				return;
 			}
+		}
+		else if (frame instanceof CEMIBusMon) {
+			logger.trace("{} {}: {}", s, fe.getSource(), frame);
+
 			final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
 			if (connector == null)
 				return;
@@ -1235,9 +1247,10 @@ public class KnxServerGateway implements Runnable
 					catch (final InterruptedException e) {}
 				}
 			}
+			return;
 		}
-		else
-			logger.warn("received unknown cEMI msg code 0x" + Integer.toString(mc, 16) + " - ignored");
+
+		logger.warn("received {} {} - ignored", s, frame);
 	}
 
 	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
