@@ -72,6 +72,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -522,7 +523,7 @@ public class KnxServerGateway implements Runnable
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
 	private final List<SubnetConnector> connectors = new ArrayList<>();
-	private final List<KNXnetIPConnection> serverConnections = Collections.synchronizedList(new ArrayList<>());
+	private final List<KNXnetIPConnection> serverConnections = new CopyOnWriteArrayList<>();
 
 	private final int maxEventQueueSize = 1000;
 	private final BlockingQueue<FrameEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
@@ -1136,19 +1137,18 @@ public class KnxServerGateway implements Runnable
 					logger.trace("forward broadcast {} to all tunneling clients (except {})", ldata, ldata.getSource());
 					final var svcCont = connectorFor(ldata.getSource()).map(SubnetConnector::getServiceContainer);
 					if (svcCont.isPresent()) {
-						// create temporary array to not block concurrent access during iteration
-						for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
-							final String type = c.getName().toLowerCase();
+						for (final var conn : serverConnections) {
+							final String type = conn.getName().toLowerCase();
 							if (type.contains("devmgmt") || type.contains("monitor"))
 								continue;
 							final var client = (KNXnetIPConnection) fe.getSource();
-							if (client == c)
+							if (client == conn)
 								continue;
 
 							try {
 								final var ind = CEMIFactory.create(null, null,
 										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-								send(svcCont.get(), c, ind, true);
+								send(svcCont.get(), conn, ind, true);
 							}
 							catch (final InterruptedException e) {
 								Thread.currentThread().interrupt();
@@ -1237,12 +1237,11 @@ public class KnxServerGateway implements Runnable
 				return;
 			recordEvent(connector, fe);
 
-			// create temporary array to not block concurrent access during iteration
-			for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
+			for (final var conn : serverConnections) {
 				// routing does not support busmonitor mode
-				if (!(c instanceof KNXnetIPRouting)) {
+				if (!(conn instanceof KNXnetIPRouting)) {
 					try {
-						send(connector.getServiceContainer(), c, frame);
+						send(connector.getServiceContainer(), conn, frame);
 					}
 					catch (final InterruptedException e) {}
 				}
@@ -1473,8 +1472,7 @@ public class KnxServerGateway implements Runnable
 				else {
 					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} to all server-side"
 							+ " connections", f.getDestination(), f.getSource(), f.getDestination());
-					// create temporary array to not block concurrent access during iteration
-					for (final KNXnetIPConnection conn : serverConnections.toArray(new KNXnetIPConnection[0]))
+					for (final var conn : serverConnections)
 						send(sc, conn, f);
 				}
 			}
@@ -1512,9 +1510,9 @@ public class KnxServerGateway implements Runnable
 						}
 
 						final var sentOnNetif = new HashSet<NetworkInterface>();
-						for (final KNXnetIPConnection c : serverConnections) {
-							if (c instanceof KNXnetIPRouting) {
-								final KNXnetIPRouting rc = (KNXnetIPRouting) c;
+						for (final var conn : serverConnections) {
+							if (conn instanceof KNXnetIPRouting) {
+								final KNXnetIPRouting rc = (KNXnetIPRouting) conn;
 								if (sentOnNetif.add(rc.networkInterface()))
 									send(sc, rc, bcast, false);
 							}
@@ -1524,9 +1522,8 @@ public class KnxServerGateway implements Runnable
 				}
 
 				logger.debug("dispatch {}->{} to all server-side connections", f.getSource(), f.getDestination());
-				// create temporary array to not block concurrent access during iteration
-				for (final KNXnetIPConnection c : serverConnections.toArray(new KNXnetIPConnection[0])) {
-					final String type = c.getName().toLowerCase();
+				for (final var conn : serverConnections) {
+					final String type = conn.getName().toLowerCase();
 					if (type.contains("devmgmt"))
 						continue;
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
@@ -1534,12 +1531,12 @@ public class KnxServerGateway implements Runnable
 					final boolean monitoring = type.contains("monitor");
 					final CEMI send = monitoring ? convertToBusmon(f, eventId, subnet) : f;
 					try {
-						send(sc, c, send);
+						send(sc, conn, send);
 					}
 					catch (final KNXIllegalArgumentException e) {
 						// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
 						// frames. Catch here, so we can continue serving other open connections.
-						logger.warn("frame not accepted by {} ({}): {}", c.getName(), e.getMessage(), send, e);
+						logger.warn("frame not accepted by {} ({}): {}", conn.getName(), e.getMessage(), send, e);
 					}
 				}
 			}
@@ -1631,9 +1628,7 @@ public class KnxServerGateway implements Runnable
 
 	private Optional<KNXnetIPConnection> findRoutingConnection()
 	{
-		synchronized (serverConnections) {
-			return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
-		}
+		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
 	}
 
 	// check whether we have to slow down or pause sending for routing flow control
