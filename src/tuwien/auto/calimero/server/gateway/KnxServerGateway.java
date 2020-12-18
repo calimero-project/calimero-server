@@ -1704,10 +1704,11 @@ public class KnxServerGateway implements Runnable
 			// we can't forward secure services if we change the source address
 			if (usb) {
 				final var subnetAddress = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
-				if (!f.getSource().equals(subnetAddress) && SecureApplicationLayer.isSecuredService(f))
+				if (!f.getSource().equals(subnetAddress) && SecureApplicationLayer.isSecuredService(f)) {
 					logger.warn("{}->{} source address mismatch: can't forward secure service to {}", f.getSource(),
 							f.getDestination(), subnet.getName());
-				return;
+					return;
+				}
 			}
 
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
