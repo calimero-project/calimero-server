@@ -642,7 +642,7 @@ public class KnxServerGateway implements Runnable
 		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
 				throws KNXTimeoutException, KNXLinkClosedException {
 
-			final boolean ldm = dst.equals(new IndividualAddress(0));
+			final boolean ldm = dst != null && dst.equals(new IndividualAddress(0));
 			if (ldm) {
 				for (final var c : serverConnections) {
 					// device mgmt endpoints don't have a device address assigned
