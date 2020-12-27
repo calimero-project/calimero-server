@@ -524,7 +524,8 @@ final class ControlEndpointService extends ServiceLooper
 			createSecureServiceFamiliesDib().ifPresent(dibs::add);
 			return true;
 		case DIB.TunnelingInfo:
-			return dibs.add(createTunnelingDib());
+			createTunnelingDib().ifPresent(dibs::add);
+			return true;
 		}
 		return false;
 	}
@@ -547,8 +548,13 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.of(ServiceFamiliesDIB.newSecureServiceFamilies(supported, versions));
 	}
 
-	private TunnelingDib createTunnelingDib() {
+	private Optional<TunnelingDib> createTunnelingDib() {
 		final List<IndividualAddress> addresses = additionalAddresses();
+		if (addresses.isEmpty() && svcCont.reuseControlEndpoint())
+			addresses.add(svcCont.getMediumSettings().getDeviceAddress());
+		if (addresses.isEmpty())
+			return Optional.empty();
+
 		final int[] status = new int[addresses.size()];
 
 		for (int i = 0; i < addresses.size(); i++) {
@@ -559,7 +565,7 @@ final class ControlEndpointService extends ServiceLooper
 		final int pidMaxInterfaceApduLength = 68;
 		final int maxApduLength = server.getProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance(),
 				pidMaxInterfaceApduLength, 1, 15);
-		return new TunnelingDib((short) maxApduLength, addresses, status);
+		return Optional.of(new TunnelingDib((short) maxApduLength, addresses, status));
 	}
 
 	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {
