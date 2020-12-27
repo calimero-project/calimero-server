@@ -1558,8 +1558,16 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
+	private static final int DOA_WRITE = 0x3E0;
+	private static final int DOA_READ = 0x3E1;
+//	private static final int DOA_RESPONSE = 0x3E2;
+	private static final int DOA_SELECTIVE_READ = 0x3E3;
+
 	private static final int SystemNetworkParamRead = 0b0111001000;
 	private static final int SystemNetworkParamResponse = 0b0111001001;
+	private static final int SystemNetworkParamWrite = 0b0111001010;
+
+	private static final int DomainAddressSerialNumberRead =  0b1111101100;
 	private static final int DomainAddressSerialNumberWrite = 0b1111101110;
 	private static final int SecureService = 0b1111110001;
 
@@ -1723,7 +1731,31 @@ public class KnxServerGateway implements Runnable
 			else
 				ldata = f;
 
-			link.send(ldata, true);
+			var send = ldata;
+
+			final int medium = subnet.getServiceContainer().getMediumSettings().getMedium();
+			if (medium == KNXMediumSettings.MEDIUM_RF && f.getPayload().length > 1) {
+				final byte[] tpdu = f.getPayload();
+				final int svc = DataUnitBuilder.getAPDUService(tpdu);
+				switch (svc) {
+				case SystemNetworkParamRead:
+				case SystemNetworkParamResponse:
+				case SystemNetworkParamWrite:
+				case DOA_WRITE:
+				case DOA_READ:
+				case DOA_SELECTIVE_READ:
+				case DomainAddressSerialNumberRead:
+				case DomainAddressSerialNumberWrite:
+					if (!send.isSystemBroadcast()) {
+						if (!(send instanceof CEMILDataEx))
+							send = CEMIFactory.create(null, null, send, true);
+						((CEMILDataEx) send).setBroadcast(false);
+						logger.debug("{} changed to system broadcast", DataUnitBuilder.decodeAPCI(svc));
+					}
+				}
+			}
+
+			link.send(send, true);
 			setNetworkState(oi, true, false);
 			incMsgTransmitted(oi, true);
 		}
