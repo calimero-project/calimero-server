@@ -50,6 +50,8 @@ import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXListener;
 import tuwien.auto.calimero.KnxRuntimeException;
+import tuwien.auto.calimero.cemi.CEMI;
+import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
@@ -91,6 +93,13 @@ final class RoutingService extends ServiceLooper
 		DatagramSocket getLocalDataSocket()
 		{
 			return socket;
+		}
+
+		@Override
+		public void send(final CEMI frame, final BlockingMode mode) throws KNXConnectionClosedException {
+			if (frame instanceof CEMILDataEx)
+				((CEMILDataEx) frame).additionalInfo().clear();
+			super.send(frame, mode);
 		}
 
 		public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException
