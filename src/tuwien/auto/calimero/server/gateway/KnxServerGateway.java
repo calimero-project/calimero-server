@@ -128,6 +128,7 @@ import tuwien.auto.calimero.knxnetip.LostMessageEvent;
 import tuwien.auto.calimero.knxnetip.RoutingBusyEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingBusy;
+import tuwien.auto.calimero.knxnetip.servicetype.RoutingSystemBroadcast;
 import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -1571,8 +1572,6 @@ public class KnxServerGateway implements Runnable
 	private static final int DomainAddressSerialNumberWrite = 0b1111101110;
 	private static final int SecureService = 0b1111110001;
 
-	private static final int SecureDataPdu = 0;
-	private static final int SecureSyncRequest = 2;
 	private static final int SecureSyncResponse = 3;
 
 	private static final int pidIpSbcControl = 120;
@@ -1586,27 +1585,7 @@ public class KnxServerGateway implements Runnable
 		if (sbc == 0)
 			return false;
 
-		final byte[] tpdu = f.getPayload();
-		final ByteBuffer asdu = ByteBuffer.wrap(DataUnitBuilder.extractASDU(tpdu));
-		final int svc = DataUnitBuilder.getAPDUService(tpdu);
-		switch (svc) {
-		case SystemNetworkParamRead:
-			return asdu.getShort() == InterfaceObject.DEVICE_OBJECT && asdu.getShort() >> 4 == PID.SERIAL_NUMBER
-					&& asdu.get() == 1;
-
-		case DomainAddressSerialNumberWrite: // DoA serial number write service with IP domain
-			return asdu.capacity() == 6 + 4; // SNo + mcast group
-
-		case SecureService: // we look for secure data or sync request, and require tool access, system broadcast, A+C
-			final int scf = asdu.get() & 0xff;
-			final boolean toolAccess = (scf & 128) == 128;
-			final int algorithmId = (scf >> 4) & 0x7;
-			final boolean systemBroadcast = (scf & 0x8) == 0x8;
-			final int service = scf & 0x3;
-			if (service == SecureDataPdu || service == SecureSyncRequest)
-				return toolAccess && systemBroadcast && algorithmId == 1;
-		}
-		return false;
+		return RoutingSystemBroadcast.isSystemBroadcast(f);
 	}
 
 	// checks if received server-side frame qualifies as subnet broadcast
