@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -890,7 +890,11 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private void setTunnelingAddresses(final InterfaceObjectServer ios, final int objectInstance,
-		final byte[] addrIndices) {
+			final byte[] addrIndices) {
+		final int idx = ios.lookup(KNXNETIP_PARAMETER_OBJECT, objectInstance).getIndex();
+		final var d = new Description(idx, KNXNETIP_PARAMETER_OBJECT, pidTunnelingAddresses, 0, 0, true, 0,
+				addrIndices.length, 3, 3);
+		ios.setDescription(d, true);
 		ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, pidTunnelingAddresses, 1, addrIndices.length,
 				addrIndices);
 	}
