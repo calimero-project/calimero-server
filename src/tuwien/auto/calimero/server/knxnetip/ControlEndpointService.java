@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2020 B. Malinowsky
+    Copyright (c) 2016, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -879,8 +879,7 @@ final class ControlEndpointService extends ServiceLooper
 	private static final int pidTunnelingUsers = 97;
 
 	private int extendedConnectRequest(final int userId, final IndividualAddress addr) {
-		final int oi = objectInstance();
-		final byte[] indices = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingAddresses);
+		final byte[] indices = allPropertyValues(pidTunnelingAddresses);
 		final var additionalAddresses = additionalAddresses();
 		boolean tunnelingAddress = false;
 
@@ -908,7 +907,7 @@ final class ControlEndpointService extends ServiceLooper
 		boolean addrAuthorized = false;
 		if (userId > 0) {
 			// n:m mapping user -> tunneling address index
-			final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+			final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
 			// users satisfy <= order, indices per user satisfy <= order
 			for (int i = 0; i < userToAddrIdx.length; i += 2) {
 				final var user = userToAddrIdx[i] & 0xff;
@@ -936,8 +935,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private int basicConnectRequest(final int userId) {
-		final int oi = objectInstance();
-		final byte[] addressIndices = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingAddresses);
+		final byte[] addressIndices = allPropertyValues(pidTunnelingAddresses);
 		final var additionalAddresses = additionalAddresses();
 
 		IndividualAddress assigned = null;
@@ -945,7 +943,7 @@ final class ControlEndpointService extends ServiceLooper
 		if (userId > 1 && isSecuredService(TUNNELING)) {
 			// n:m mapping user -> tunneling address index
 			// user is stored in natural order, idx per user is stored in natural order
-			final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+			final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
 
 			for (int i = 0; i < userToAddrIdx.length; i += 2) {
 				final var user = userToAddrIdx[i];
@@ -990,8 +988,7 @@ final class ControlEndpointService extends ServiceLooper
 	private boolean userAuthorizedForTunneling(final int userId) {
 		if (userId == 1)
 			return true;
-		final int oi = objectInstance();
-		final byte[] userToAddrIdx = allPropertyValues(KNXNETIP_PARAMETER_OBJECT, oi, pidTunnelingUsers);
+		final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
 		for (int i = 0; i < userToAddrIdx.length; i += 2) {
 			final var user = userToAddrIdx[i];
 			if (user > userId)
@@ -1010,12 +1007,10 @@ final class ControlEndpointService extends ServiceLooper
 		return secured;
 	}
 
-	private byte[] allPropertyValues(final int objectType, final int objectInstance, final int propertyId) {
-		final var oi = objectInstance();
-		final var elems = server.getPropertyElems(objectType, objectInstance, propertyId);
+	private byte[] allPropertyValues(final int propertyId) {
 		final var ios = server.getInterfaceObjectServer();
 		try {
-			return ios.getProperty(KNXNETIP_PARAMETER_OBJECT, oi, propertyId, 1, elems);
+			return ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), propertyId, 1, Integer.MAX_VALUE);
 		}
 		catch (final KnxPropertyException ignore) {}
 		return new byte[0];
