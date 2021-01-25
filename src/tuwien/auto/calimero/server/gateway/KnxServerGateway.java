@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -325,7 +325,9 @@ public class KnxServerGateway implements Runnable
 				final AutoCloseable subnetLink = connector.getSubnetLink();
 				final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
 				try {
-					if (rawLink instanceof VirtualLink) { /* no-op */ }
+					if (rawLink instanceof VirtualLink) {
+						/* no-op */
+					}
 					else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
 						closeLink(subnetLink);
 						connector.openNetworkLink();

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2020 B. Malinowsky
+    Copyright (c) 2016, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ final class RoutingService extends ServiceLooper
 
 	private class RoutingServiceHandler extends KNXnetIPRouting
 	{
-		private RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup,
+		RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup,
 			final boolean enableLoopback) throws KNXException {
 			super(mcGroup);
 			init(netif, enableLoopback, false);
