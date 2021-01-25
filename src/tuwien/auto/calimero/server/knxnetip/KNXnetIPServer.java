@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -73,6 +73,7 @@ import tuwien.auto.calimero.device.BaseKnxDevice;
 import tuwien.auto.calimero.device.KnxDevice;
 import tuwien.auto.calimero.device.KnxDeviceServiceLogic;
 import tuwien.auto.calimero.device.ServiceResult;
+import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -160,12 +161,8 @@ public class KNXnetIPServer
 	// PID.FRIENDLY_NAME
 	private static final byte[] defFriendlyName = new byte[] { 'C', 'a', 'l', 'i', 'm', 'e', 'r',
 		'o', ' ', 'K', 'N', 'X', ' ', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
-	// PID.PROGMODE
-	private static final int defDeviceStatus = 0;
 	// PID.PROJECT_INSTALLATION_ID
 	private static final int defProjectInstallationId = 0;
-	// PID.SERIAL_NUMBER
-	private static final byte[] defSerialNumber = new byte[6];
 	// PID.KNX_INDIVIDUAL_ADDRESS
 	// we use default KNX address for KNXnet/IP routers
 	private static final IndividualAddress defKnxAddress = new IndividualAddress(0xff00);
@@ -1007,11 +1004,12 @@ public class KNXnetIPServer
 			sb.append((char) (name[i] & 0xff));
 		final String friendly = sb.toString();
 
-		final int deviceStatus = getProperty(DEVICE_OBJECT, objectInstance, PID.PROGMODE, 1, defDeviceStatus);
+		final var deviceObject = DeviceObject.lookup(ios);
+		final int deviceStatus = deviceObject.programmingMode() ? 1 : 0;
 		final int projectInstallationId = getProperty(knxObject, objectInstance(sc), PID.PROJECT_INSTALLATION_ID, 1,
 				defProjectInstallationId);
 
-		final byte[] serialNumber = getProperty(DEVICE_OBJECT, objectInstance, PID.SERIAL_NUMBER, defSerialNumber);
+		final var serialNumber = deviceObject.serialNumber();
 		final IndividualAddress knxAddress = new IndividualAddress(
 				getProperty(knxObject, objectInstance(sc), PID.KNX_INDIVIDUAL_ADDRESS, defKnxAddress.toByteArray()));
 		InetAddress mcast = defRoutingMulticast;

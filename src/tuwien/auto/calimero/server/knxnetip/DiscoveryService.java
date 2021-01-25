@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2020 B. Malinowsky
+    Copyright (c) 2016, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import tuwien.auto.calimero.KNXFormatException;
-import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
@@ -185,8 +185,7 @@ final class DiscoveryService extends ServiceLooper
 			for (final Srp srp : sr.searchParameters()) {
 				final Type type = srp.getType();
 				if (type == Srp.Type.SelectByProgrammingMode) {
-					final int progmode = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.PROGMODE, 1, 0);
-					if (progmode == 0)
+					if (!DeviceObject.lookup(server.getInterfaceObjectServer()).programmingMode())
 						return true;
 				}
 				else if (type == Srp.Type.SelectByMacAddress)

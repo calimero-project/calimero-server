@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,7 +65,9 @@ import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
+import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
@@ -482,10 +484,13 @@ public final class DataEndpoint extends ConnectionBase
 
 	private int maxApduLength() {
 		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
-		int max = 15;
-		if (dataEndpoint.isPresent())
-			max = dataEndpoint.get().server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, 1, 15);
-		return max;
+		if (dataEndpoint.isPresent()) {
+			try {
+				return DeviceObject.lookup(dataEndpoint.get().server.getInterfaceObjectServer()).maxApduLength();
+			}
+			catch (final KnxPropertyException ignore) {}
+		}
+		return 15;
 	}
 
 	private IndividualAddress serverAddress() {

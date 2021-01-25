@@ -75,6 +75,7 @@ import tuwien.auto.calimero.DeviceDescriptor.DD0;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
+import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -282,8 +283,7 @@ final class ControlEndpointService extends ServiceLooper
 			for (final Srp srp : sr.searchParameters()) {
 				final Type type = srp.getType();
 				if (type == Srp.Type.SelectByProgrammingMode) {
-					final int progmode = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.PROGMODE, 1, 0);
-					if (progmode == 0)
+					if (!DeviceObject.lookup(server.getInterfaceObjectServer()).programmingMode())
 						return true;
 				}
 				else if (type == Srp.Type.SelectByMacAddress)
