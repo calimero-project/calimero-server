@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2019 B. Malinowsky
+    Copyright (c) 2018, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -79,6 +79,7 @@ import org.slf4j.LoggerFactory;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KnxSecureException;
+import tuwien.auto.calimero.SerialNumber;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
@@ -114,7 +115,7 @@ final class SecureSession {
 	private final InterfaceObjectServer ios;
 	private final int objectInstance;
 
-	private final byte[] sno;
+	private final SerialNumber sno;
 	private final Key deviceAuthKey;
 
 	private static AtomicLong sessionCounter = new AtomicLong();
@@ -172,7 +173,7 @@ final class SecureSession {
 				final Object[] fields = SecureConnection.unwrap(h, data, offset, secretKey);
 				final int sid = (int) fields[0];
 				final long seq = (long) fields[1];
-				final long sno = (long) fields[2];
+				final var sno = (SerialNumber) fields[2];
 				final int tag = (int) fields[3];
 				final byte[] knxipPacket = (byte[]) fields[4];
 
@@ -539,19 +540,19 @@ final class SecureSession {
 		return secInfo;
 	}
 
-	private static byte[] deriveSerialNumber(final InetAddress addr) {
+	private static SerialNumber deriveSerialNumber(final InetAddress addr) {
 		if (addr != null) {
 			try {
 				final NetworkInterface netif = NetworkInterface.getByInetAddress(addr);
 				if (netif != null) {
 					final byte[] hardwareAddress = netif.getHardwareAddress();
 					if (hardwareAddress != null)
-						return Arrays.copyOf(hardwareAddress, 6);
+						return SerialNumber.from(Arrays.copyOf(hardwareAddress, 6));
 				}
 			}
 			catch (final SocketException e) {}
 		}
-		return new byte[6];
+		return SerialNumber.Zero;
 	}
 
 	// NYI check for reuse of session ID on overflow, currently we assume ID is already free
