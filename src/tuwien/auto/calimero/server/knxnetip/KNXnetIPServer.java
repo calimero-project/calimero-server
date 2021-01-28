@@ -280,7 +280,7 @@ public class KNXnetIPServer
 		public DPTXlator requestDatapointValue(final Datapoint ofDp) throws KNXException { return null; }
 
 		@Override
-		public ServiceResult functionPropertyCommand(final Destination remote, final int objectIndex,
+		public ServiceResult<byte[]> functionPropertyCommand(final Destination remote, final int objectIndex,
 				final int propertyId, final byte[] command) {
 			final int serviceId = command[1] & 0xff;
 			final int objectType = device.getInterfaceObjectServer().getInterfaceObjects()[objectIndex].getType();
@@ -300,7 +300,7 @@ public class KNXnetIPServer
 					}
 					else
 						returnCode = ReturnCode.InvalidCommand;
-					return new ServiceResult((byte) returnCode.code(), (byte) serviceId);
+					return new ServiceResult<>((byte) returnCode.code(), (byte) serviceId);
 				}
 			}
 			return super.functionPropertyCommand(remote, objectIndex, propertyId, command);
