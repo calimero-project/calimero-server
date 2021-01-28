@@ -51,6 +51,7 @@ import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXListener;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.cemi.CEMI;
+import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
@@ -97,9 +98,12 @@ final class RoutingService extends ServiceLooper
 
 		@Override
 		public void send(final CEMI frame, final BlockingMode mode) throws KNXConnectionClosedException {
-			if (frame instanceof CEMILDataEx)
-				((CEMILDataEx) frame).additionalInfo().clear();
-			super.send(frame, mode);
+			var send = frame;
+			if (frame instanceof CEMILDataEx && !((CEMILDataEx) frame).additionalInfo().isEmpty()) {
+				send = CEMIFactory.copy(frame);
+				((CEMILDataEx) send).additionalInfo().clear();
+			}
+			super.send(send, mode);
 		}
 
 		public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException
