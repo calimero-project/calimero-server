@@ -657,8 +657,15 @@ public class KnxServerGateway implements Runnable
 			}
 			else {
 				final var self = connectors.get(0).getServiceContainer().getMediumSettings().getDeviceAddress();
-				final var msg = nsdu.length > 16 ? new CEMILDataEx(CEMILData.MC_LDATA_IND, self, dst, nsdu, p)
-												 : new CEMILData(CEMILData.MC_LDATA_IND, self, dst, nsdu, p);
+				final boolean sysBcast = dst == null;
+				final CEMILData msg;
+				if (sysBcast) {
+					msg = new CEMILDataEx(CEMILData.MC_LDATA_IND, self, GroupAddress.Broadcast, nsdu, p);
+					((CEMILDataEx) msg).setBroadcast(false);
+				}
+				else
+					msg = nsdu.length > 16 ? new CEMILDataEx(CEMILData.MC_LDATA_IND, self, dst, nsdu, p)
+							: new CEMILData(CEMILData.MC_LDATA_IND, self, dst, nsdu, p);
 				send(msg, false);
 			}
 		}
