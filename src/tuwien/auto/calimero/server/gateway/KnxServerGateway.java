@@ -2191,7 +2191,7 @@ public class KnxServerGateway implements Runnable
 		// provide 32 bit timestamp with 1 us precision
 		final long timestamp = (System.nanoTime() / 1000) & 0xFFFFFFFFL;
 
-		byte[] doa = new byte[2];
+		byte[] doa = null;
 		final CEMILData copy = (CEMILData) CEMIFactory.copy(ldata);
 		if (copy instanceof CEMILDataEx) {
 			final CEMILDataEx ex = (CEMILDataEx) copy;
@@ -2199,24 +2199,21 @@ public class KnxServerGateway implements Runnable
 			ex.additionalInfo().clear();
 		}
 
-		final KNXMediumSettings settings = connector.getServiceContainer().getMediumSettings();
-		final boolean hasDoA = settings.getMedium() == KNXMediumSettings.MEDIUM_PL110;
-		final int doaLength = hasDoA ? 2 : 0;
-
+		final int doaLength = doa != null ? 1 : 0;
 		final byte[] src = copy.toByteArray();
-		// -2 to remove msg code and add.info field, +length for DoA (if any), +1 for fcs
-		final byte[] raw = new byte[src.length - 2 + doaLength + 1];
+		// -2 to remove msg code and add.info field, +1 for fcs + length for DoA (if any)
+		final byte[] raw = new byte[src.length - 2 + 1 + doaLength];
 		System.arraycopy(src, 2, raw, 0, src.length - 2);
-		if (hasDoA) {
-			// insert DoA, we create an extended busmonitor frame, and put DoA after ctrl fields
-			System.arraycopy(raw, 2, raw, 4, raw.length - 4);
-			raw[2] = doa[0];
-			raw[3] = doa[1];
+		if (doa != null) {
+			// insert PL DoA
+			raw[raw.length - 1] = doa[1];
 		}
 
 		final int extFrameFormatFlag = 0x80;
 		raw[0] = (byte) (raw[0] & ~extFrameFormatFlag); // clear bit to indicate ext. frame format
-		raw[raw.length - 1] = (byte) checksum(raw); // fcs
+		if (copy.isSystemBroadcast())
+			raw[0] |= 0x10;
+		raw[raw.length - 1 - doaLength] = (byte) checksum(raw); // fcs
 
 		return CEMIBusMon.newWithSequenceNumber(seq, timestamp, true, raw);
 	}
