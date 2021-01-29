@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.net.InetAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -77,7 +78,6 @@ class KnxServerGatewayTest
 {
 	private KnxServerGateway gw;
 	private KNXnetIPServer server;
-	private SubnetConnector[] subnetConnectors;
 
 	@BeforeEach
 	void init() throws Exception
@@ -89,8 +89,12 @@ class KnxServerGatewayTest
 		server.addServiceContainer(sc);
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "");
 		connector.openNetworkLink();
-		subnetConnectors = new SubnetConnector[] { connector };
-		gw = new KnxServerGateway("gateway", server, subnetConnectors);
+
+		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
+		final var config = new ServerConfiguration("gateway", "friendly server name", true, List.of(), List.of(),
+				URI.create(""), List.of(container));
+
+		gw = new KnxServerGateway(server, config);
 	}
 
 	private static final int MAIN_LCGRPCONFIG = 54;
@@ -122,7 +126,12 @@ class KnxServerGatewayTest
 				false, false, false);
 		s.addServiceContainer(sc);
 		final var connector = SubnetConnector.newCustom(sc, "emulate");
-		final KnxServerGateway gw2 = new KnxServerGateway("test GW 2", s, new SubnetConnector[] { connector });
+
+		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
+		final var config = new ServerConfiguration("test GW 2", "friendly test GW 2", true, List.of(), List.of(),
+				URI.create(""), List.of(container));
+
+		final KnxServerGateway gw2 = new KnxServerGateway(s, config);
 		Thread t = new Thread(gw2);
 		t.start();
 		Thread.sleep(1000);
