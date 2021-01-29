@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2020 B. Malinowsky
+    Copyright (c) 2016, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ class LooperTask implements Runnable {
 	private final int maxRetries;
 	private final Supplier<ServiceLooper> supplier;
 	private volatile ServiceLooper looper;
-	private volatile int attempt;
+	private int attempt;
 
 	private volatile ScheduledFuture<?> scheduledFuture;
 
