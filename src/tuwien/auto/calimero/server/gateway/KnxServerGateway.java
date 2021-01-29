@@ -708,7 +708,7 @@ public class KnxServerGateway implements Runnable
 	 * @param s KNXnet/IP server representing the server side
 	 * @param config server configuration
 	 */
-	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) throws KNXException {
+	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) {
 		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).collect(Collectors.toList()));
 		for (final var c : config.containers()) {
 			final var sc = c.subnetConnector().getServiceContainer();
@@ -887,7 +887,7 @@ public class KnxServerGateway implements Runnable
 		return new ArrayList<>(connectors);
 	}
 
-	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) throws KNXException {
+	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) {
 		final var connector = getSubnetConnector(sc.getName());
 		for (final var datapoint : datapoints) {
 			final var security = Security.defaultInstallation().groupKeys().containsKey(datapoint.getMainAddress())
@@ -901,11 +901,16 @@ public class KnxServerGateway implements Runnable
 			final int sendInterval = datapoint.getExpirationTimeout();
 			logger.debug("setup time server for {}: publish '{}' ({}) to {} every {} seconds", connector.getName(),
 					datapoint.getName(), dpt, dst, sendInterval);
-			final var xlator = TranslatorTypes.createTranslator(dpt);
+			try {
+				final var xlator = TranslatorTypes.createTranslator(dpt);
 
-			timeServerCyclicTransmitter.scheduleAtFixedRate(
-					() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
-					5, sendInterval, TimeUnit.SECONDS);
+				timeServerCyclicTransmitter.scheduleAtFixedRate(
+						() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
+						5, sendInterval, TimeUnit.SECONDS);
+			}
+			catch (final KNXException e) {
+				throw new KnxRuntimeException("time server DPT setup", e);
+			}
 		}
 	}
 

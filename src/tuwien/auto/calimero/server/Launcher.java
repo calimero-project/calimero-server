@@ -78,7 +78,6 @@ import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
-import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Keyring;
 import tuwien.auto.calimero.KnxRuntimeException;
@@ -636,7 +635,7 @@ public class Launcher implements Runnable, AutoCloseable
 				gw.run();
 			}
 		}
-		catch (KNXException | RuntimeException e) {
+		catch (final RuntimeException e) {
 			logger.error("initialization of KNX server failed", e);
 		}
 	}
