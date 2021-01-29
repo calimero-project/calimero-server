@@ -41,6 +41,7 @@ import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 
@@ -214,12 +215,12 @@ final class RoutingService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port) throws KNXFormatException, IOException
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+			throws KNXFormatException, IOException
 	{
 		if (secure)
 			return true;
-		return r.handleServiceType(h, data, offset, src, port);
+		return r.handleServiceType(h, data, offset, src.getAddress(), src.getPort());
 	}
 
 	void sendRoutingLostMessage(final int lost, final int state) throws KNXConnectionClosedException

@@ -232,13 +232,12 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port) throws KNXFormatException, IOException
-	{
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+			throws KNXFormatException, IOException {
 		if (h.isSecure()) {
 			try {
 				secureSvcInProgress = true;
-				return sessions.acceptService(h, data, offset, new InetSocketAddress(src, port), this);
+				return sessions.acceptService(h, data, offset, src, this);
 			}
 			finally {
 				secureSvcInProgress = false;
@@ -254,22 +253,21 @@ final class ControlEndpointService extends ServiceLooper
 
 			if (tunneling && isSecuredService(TUNNELING) || devmgmt && isSecuredService(DEVICE_MANAGEMENT)) {
 				logger.warn("reject {}, secure services required for {}", h, typeString);
-				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, port, 1);
+				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, 1);
 				final byte[] buf = PacketHelper
 						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
 				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
 			}
 			else
-				return acceptControlService(0, h, data, offset, src, port);
+				return acceptControlService(0, h, data, offset, src);
 		}
 		else
-			return acceptControlService(0, h, data, offset, src, port);
+			return acceptControlService(0, h, data, offset, src);
 		return true;
 	}
 
-	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port) throws KNXFormatException, IOException
-	{
+	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset,
+			final InetSocketAddress src) throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SearchRequest) {
 			// extended unicast search request to this control endpoint
@@ -296,7 +294,7 @@ final class ControlEndpointService extends ServiceLooper
 					return true;
 			}
 
-			final InetSocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
+			final InetSocketAddress addr = createResponseAddress(sr.getEndpoint(), src, 1);
 			sendSearchResponse(sessionId, addr, macFilter, requestedServices, requestedDibs);
 		}
 		else if (svc == KNXnetIPHeader.DESCRIPTION_REQ) {
@@ -311,7 +309,7 @@ final class ControlEndpointService extends ServiceLooper
 					? new DescriptionResponse(device, svcFamilies, mfr)
 					: new DescriptionResponse(device, svcFamilies, new KnxAddressesDIB(addresses), mfr);
 
-			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, port, 1);
+			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
 			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
 			send(sessionId, 0, buf, responseAddress);
@@ -331,12 +329,12 @@ final class ControlEndpointService extends ServiceLooper
 				final HPAI dataEndpoint = req.getDataEndpoint();
 				final var dataRouteBack = dataEndpoint.isRouteBack();
 				if (!ctrlRouteBack || !dataRouteBack) {
-					logger.info("connect request from {}:{} does not contain route-back {} endpoint, ignore", src, port,
+					logger.info("connect request from {} does not contain route-back {} endpoint, ignore", hostPort(src),
 							ctrlRouteBack ? "data" : "control");
 					return true;
 				}
 			}
-			final InetSocketAddress ctrlEndpt = createResponseAddress(controlEndpoint, src, port, 1);
+			final InetSocketAddress ctrlEndpt = createResponseAddress(controlEndpoint, src, 1);
 			byte[] buf = null;
 			boolean established = false;
 
@@ -347,7 +345,7 @@ final class ControlEndpointService extends ServiceLooper
 				else {
 					logger.info("{}: setup data endpoint (channel {}) for connection request from {} ({})",
 							svcCont.getName(), channelId, ctrlEndpt, tcp ? "tcp" : "udp");
-					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, port, 2);
+					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
@@ -379,7 +377,7 @@ final class ControlEndpointService extends ServiceLooper
 			// sender control endpoint differs from our connection control endpoint,
 			// issue a warning
 			final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
-			if (!ctrlEndpt.getAddress().equals(src) || ctrlEndpt.getPort() != port) {
+			if (!ctrlEndpt.equals(src)) {
 				logger.warn("disconnect request: sender control endpoint changed from " + ctrlEndpt + " to " + src
 						+ ", not recommended");
 			}
@@ -426,7 +424,7 @@ final class ControlEndpointService extends ServiceLooper
 						ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, port, 0));
+			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
 			logger.warn("received connection state response - ignored");
@@ -444,6 +442,10 @@ final class ControlEndpointService extends ServiceLooper
 			return false;
 		}
 		return true;
+	}
+
+	private static String hostPort(final InetSocketAddress addr) {
+		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
 	}
 
 	int subnetStatus() {

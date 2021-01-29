@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2019 B. Malinowsky
+    Copyright (c) 2016, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,7 +38,6 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import org.slf4j.Logger;
@@ -99,7 +98,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			final KNXnetIPHeader h = new KNXnetIPHeader(data, offset);
 			if (!sanitize(h, length))
 				return;
-			if (!handleServiceType(h, data, offset + h.getStructLength(), source.getAddress(), source.getPort())) {
+			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {
 				final int svc = h.getServiceType();
 				logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
 			}
@@ -124,7 +123,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		return ok;
 	}
 
-	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, InetAddress src, int port)
+	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, InetSocketAddress src)
 		throws KNXFormatException, IOException;
 
 	void cleanup(final LogLevel level, final Throwable t)
@@ -138,34 +137,30 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	}
 
 	// logEndpointType: 0 = don't log, 1 = ctrl endpt, 2 = data endpt
-	InetSocketAddress createResponseAddress(final HPAI endpoint, final InetAddress senderHost, final int senderPort,
-		final int logEndpointType)
-	{
-		final InetAddress resIP = endpoint.getAddress();
-		final int resPort = endpoint.getPort();
-		// in NAT aware mode, if the data EP is incomplete or left
-		// empty, we fall back to the IP address and port of the sender
-		final InetSocketAddress addr;
+	InetSocketAddress createResponseAddress(final HPAI endpoint, final InetSocketAddress sender,
+			final int logEndpointType) {
 		final String type = logEndpointType == 1 ? "control" : logEndpointType == 2 ? "data" : "";
+
 		// if we once decided on NAT aware communication, we will stick to it,
 		// regardless whether subsequent HPAIs contain useful information
 		if (useNat) {
-			addr = new InetSocketAddress(senderHost, senderPort);
 			if (logEndpointType != 0)
-				logger.debug("responses use route back {} endpoint {}", type, addr);
+				logger.debug("responses use route back {} endpoint {}", type, sender);
+			return sender;
 		}
-		else if (resIP.isAnyLocalAddress() || resPort == 0) {
-			addr = new InetSocketAddress(senderHost, senderPort);
+
+		// in NAT aware mode, if the data EP is incomplete or left
+		// empty, we fall back to the IP address and port of the sender
+		if (endpoint.getAddress().isAnyLocalAddress() || endpoint.getPort() == 0) {
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.debug("responses to client use route back {} endpoint {}", type, addr);
+				logger.debug("responses to client use route back {} endpoint {}", type, sender);
+			return sender;
 		}
-		else {
-			addr = new InetSocketAddress(resIP, resPort);
-			if (logEndpointType == 2)
-				logger.trace("using client-assigned {} endpoint {} for responses", type, addr);
-		}
-		return addr;
+
+		if (logEndpointType == 2)
+			logger.trace("using client-assigned {} endpoint {} for responses", type, endpoint.endpoint());
+		return endpoint.endpoint();
 	}
 
 	void fireResetRequest(final String endpointName, final InetSocketAddress ctrlEndpoint)

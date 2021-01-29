@@ -229,7 +229,7 @@ final class SecureSession {
 							connections.put(remote, sessionId);
 						}
 						final ControlEndpointService ces = (ControlEndpointService) svcHandler;
-						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote.getAddress(), remote.getPort());
+						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote);
 					}
 					else
 						return ((DataEndpoint) svcHandler).acceptDataService(svcHeader, knxipPacket, start);

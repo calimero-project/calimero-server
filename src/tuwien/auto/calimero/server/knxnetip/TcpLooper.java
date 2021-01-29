@@ -255,7 +255,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	private void onReceive(final KNXnetIPHeader h, final byte[] data, final int offset, final int length)
 		throws IOException, KNXFormatException {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
-		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote.getAddress(), remote.getPort())) {
+		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote)) {
 			final int svc = h.getServiceType();
 			logger.info("received packet from {} with unknown service type 0x{} - ignored", remote,
 					Integer.toHexString(svc));

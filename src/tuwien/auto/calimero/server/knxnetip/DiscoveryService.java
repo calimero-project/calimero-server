@@ -161,9 +161,8 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetAddress src,
-		final int port) throws KNXFormatException, IOException
-	{
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
 			// A request for TCP communication or a request using an unsupported
@@ -200,7 +199,7 @@ final class DiscoveryService extends ServiceLooper
 
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
-			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, port, 1);
+			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, 1);
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream)
 					.collect(Collectors.toList());
 			for (final ControlEndpointService ces : list)
