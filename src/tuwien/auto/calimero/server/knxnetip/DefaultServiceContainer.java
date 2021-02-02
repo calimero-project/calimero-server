@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@ package tuwien.auto.calimero.server.knxnetip;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
@@ -100,7 +99,7 @@ public class DefaultServiceContainer implements ServiceContainer
 			ctrlEndpt = controlEndpoint;
 		}
 		// IP is mandatory, port might be 0 indicating the use of an ephemeral port
-		if (Arrays.equals(new byte[4], ctrlEndpt.getRawAddress()))
+		if (ctrlEndpt.getAddress().isAnyLocalAddress())
 			throw new KNXIllegalArgumentException("no local host address specified");
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;

@@ -495,7 +495,7 @@ final class ControlEndpointService extends ServiceLooper
 			for (int i = 0; i < requestedServices.length; i += 2) {
 				final int familyId = requestedServices[i] & 0xff;
 				final int version = requestedServices[i + 1] & 0xff;
-				if (families.getVersion(familyId) < version)
+				if (families.families().getOrDefault(familyId, 0) < version)
 					return;
 			}
 		}
