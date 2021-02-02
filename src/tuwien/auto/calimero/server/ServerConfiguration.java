@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2020 B. Malinowsky
+    Copyright (c) 2020, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -80,7 +80,7 @@ public class ServerConfiguration {
 		private final List<StateDP> timeServer;
 
 
-		Container(final List<IndividualAddress> additionalAddresses, final SubnetConnector connector,
+		public Container(final List<IndividualAddress> additionalAddresses, final SubnetConnector connector,
 				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
 			this(additionalAddresses, 0, Map.of(), null, Map.of(), connector, groupAddressFilter, timeServerDatapoints);
 		}
