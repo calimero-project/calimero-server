@@ -80,6 +80,7 @@ final class DiscoveryService extends ServiceLooper
 	private static final InetAddress systemSetupMulticast = KNXnetIPServer.defRoutingMulticast;
 
 	private final NetworkInterface[] outgoing;
+	private final ArrayList<String> joined = new ArrayList<String>();
 
 	DiscoveryService(final KNXnetIPServer server, final NetworkInterface[] outgoing, final NetworkInterface[] joinOn)
 	{
@@ -124,7 +125,6 @@ final class DiscoveryService extends ServiceLooper
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
 		final var found = new StringJoiner(", ");
 		boolean joinedAny = false;
-		final var joined = new ArrayList<String>();
 		// we try to bind to all requested interfaces. Only if that completely fails, we throw
 		// the first caught exception
 		IOException thrown = null;
@@ -157,7 +157,6 @@ final class DiscoveryService extends ServiceLooper
 		logger.trace("found network interfaces {}", found);
 		if (!joinedAny)
 			throw Objects.requireNonNull(thrown);
-		logger.info("KNXnet/IP discovery listens on interfaces {}", joined);
 	}
 
 	@Override
@@ -309,6 +308,11 @@ final class DiscoveryService extends ServiceLooper
 		}
 		catch (final IOException ignore) {}
 		super.quit();
+	}
+
+	@Override
+	public String toString() {
+		return "discovery endpoint " + joined;
 	}
 
 	private int objectInstance(final ServiceContainer sc)

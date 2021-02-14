@@ -207,6 +207,17 @@ final class ControlEndpointService extends ServiceLooper
 		super.quit();
 	}
 
+	public String toString() {
+		final var local = s.getLocalAddress();
+		NetworkInterface netif = null;
+		try {
+			netif = NetworkInterface.getByInetAddress(local);
+		}
+		catch (final SocketException ignore) {}
+		final String bound = netif != null ? netif.getName() : local != null ? local.getHostAddress() : "closed";
+		return "control endpoint " + svcCont.getName() + " (" + bound + ")";
+	}
+
 	@Override
 	protected void onTimeout()
 	{
@@ -815,7 +826,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		else {
 			try {
-				svcLoop = new DataEndpointService(server, s);
+				svcLoop = new DataEndpointService(server, s, svcCont.getName());
 
 				final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
 				newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,

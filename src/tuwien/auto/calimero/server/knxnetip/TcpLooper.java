@@ -42,6 +42,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -114,7 +115,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		try (ServerSocket s = new ServerSocket(endpoint.getPort(), 50, endpoint.getAddress())) {
 			serverSocket.add(s);
 			localRef = s;
-			ces.logger.info("{} is up and running", name);
+			final var netif = NetworkInterface.getByInetAddress(s.getInetAddress());
+			ces.logger.info("{} ({} {}) is up and running", name, netif.getName(),
+					hostPort((InetSocketAddress) s.getLocalSocketAddress()));
 			while (true) {
 				final Socket conn = s.accept();
 				conn.setTcpNoDelay(true);
@@ -136,6 +139,10 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		finally {
 			Thread.currentThread().setName("idle tcp looper");
 		}
+	}
+
+	private static String hostPort(final InetSocketAddress addr) {
+		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
 	}
 
 	static void lastSessionTimedOut(final InetSocketAddress remote) {

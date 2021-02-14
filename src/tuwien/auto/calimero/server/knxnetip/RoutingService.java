@@ -130,7 +130,7 @@ final class RoutingService extends ServiceLooper
 	}
 
 	final RoutingServiceHandler r;
-	private final ServiceContainer svcCont;
+	private final RoutingServiceContainer svcCont;
 	private final boolean secure;
 
 	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final InetAddress mcGroup,
@@ -235,6 +235,11 @@ final class RoutingService extends ServiceLooper
 		super.quit();
 		if (!closing)
 			r.close();
+	}
+
+	@Override
+	public String toString() {
+		return "routing service " + svcCont.routingMulticastAddress().getHostAddress();
 	}
 
 	private void fireRoutingServiceStarted(final ServiceContainer sc, final KNXnetIPRouting r)

@@ -102,7 +102,7 @@ class LooperTask implements Runnable {
 			looper = supplier.get();
 			// reset for the next reconnection attempt
 			attempt = 0;
-			logger.info(serviceName + " is up and running");
+			logger.info(looper.server.getName() + " " + looper + " is up and running");
 			looper.run();
 			cleanup(LogLevel.INFO, null);
 		}

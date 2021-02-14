@@ -53,10 +53,12 @@ final class DataEndpointService extends ServiceLooper
 	private static final int MAX_RECEIVE_INTERVAL = 120;
 
 	DataEndpoint svcHandler;
+	private final String svcContName;
 
-	DataEndpointService(final KNXnetIPServer server, final DatagramSocket localCtrlEndpt)
+	DataEndpointService(final KNXnetIPServer server, final DatagramSocket localCtrlEndpt, final String svcContName)
 	{
 		super(server, newSocketUsingIp(localCtrlEndpt), 512, MAX_RECEIVE_INTERVAL * 1000);
+		this.svcContName = svcContName;
 		logger.debug("created socket on " + s.getLocalSocketAddress());
 	}
 
@@ -64,6 +66,11 @@ final class DataEndpointService extends ServiceLooper
 	{
 		final InetSocketAddress ctrlEndpoint = null;
 		fireResetRequest(endpoint.getName(), ctrlEndpoint);
+	}
+
+	@Override
+	public String toString() {
+		return svcContName + " data endpoint " + svcHandler;
 	}
 
 	@Override
