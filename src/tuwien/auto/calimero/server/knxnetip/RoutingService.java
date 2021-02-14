@@ -39,11 +39,12 @@ package tuwien.auto.calimero.server.knxnetip;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.FrameEvent;
@@ -92,10 +93,8 @@ final class RoutingService extends ServiceLooper
 			return "KNX IP routing service " + ctrlEndpt.getAddress().getHostAddress();
 		}
 
-		DatagramSocket getLocalDataSocket()
-		{
-			return socket;
-		}
+		@Override
+		protected DatagramChannel channel() { return super.channel(); }
 
 		@Override
 		public void send(final CEMI frame, final BlockingMode mode) throws KNXConnectionClosedException {
@@ -188,8 +187,16 @@ final class RoutingService extends ServiceLooper
 			throw wrappedException(e);
 		}
 
-		s = r.getLocalDataSocket();
+		s = r.channel().socket();
 		fireRoutingServiceStarted(svcCont, inst);
+	}
+
+	@Override
+	protected void receive(final byte[] buf) throws IOException {
+		final ByteBuffer buffer = ByteBuffer.wrap(buf);
+		final var source = r.channel().receive(buffer);
+		buffer.flip();
+		onReceive((InetSocketAddress) source, buf, buffer.position(), buffer.remaining());
 	}
 
 	private NetworkInterface networkInterface() throws SocketException {
