@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.util.Set;
 
 import org.slf4j.Logger;
 
@@ -100,13 +101,18 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 				return;
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {
 				final int svc = h.getServiceType();
-				logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
+				if (!ignoreServices.contains(svc))
+					logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
 			}
 		}
 		catch (final KNXFormatException e) {
 			logger.warn("received invalid frame", e);
 		}
 	}
+
+	private static final Set<Integer> ignoreServices = Set.of(
+			KNXnetIPHeader.SEARCH_RES,
+			KNXnetIPHeader.SearchResponse);
 
 	@Override
 	protected void onTimeout()

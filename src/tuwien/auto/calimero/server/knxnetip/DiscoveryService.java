@@ -205,19 +205,23 @@ final class DiscoveryService extends ServiceLooper
 				sendSearchResponse(addr, ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
-		// we can safely ignore search responses and avoid a warning being logged
-		else if (svc == KNXnetIPHeader.SEARCH_RES || svc == KNXnetIPHeader.SearchResponse)
-			return true;
-		// also ignore routing messages
-		else if (svc == KNXnetIPHeader.ROUTING_IND || svc == KNXnetIPHeader.ROUTING_LOST_MSG || svc == KNXnetIPHeader.ROUTING_BUSY)
-			return true;
-		else if (svc == KNXnetIPHeader.RoutingSystemBroadcast)
+		else if (ignoreServices.contains(svc))
 			return true;
 		else if (h.isSecure())
 			return true;
-		// other requests are rejected with error
+		// other requests are rejected
 		return false;
 	}
+
+	// known knx ip services which we receive but can safely ignore
+	private static final Set<Integer> ignoreServices = Set.of(
+			KNXnetIPHeader.ROUTING_IND,
+			KNXnetIPHeader.ROUTING_LOST_MSG,
+			KNXnetIPHeader.ROUTING_BUSY,
+			KNXnetIPHeader.RoutingSystemBroadcast,
+			KNXnetIPHeader.CONNECT_REQ,
+			KNXnetIPHeader.DISCONNECT_REQ,
+			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
 	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final boolean ext,
 		final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
