@@ -70,6 +70,7 @@ import tuwien.auto.calimero.knxnetip.util.DIB;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.knxnetip.util.Srp;
 import tuwien.auto.calimero.knxnetip.util.Srp.Type;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
@@ -247,7 +248,7 @@ final class DiscoveryService extends ServiceLooper
 				final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(sc, ext);
 				// skip response if we have a service request which we don't support
 				for (int i = 0; i < requestedServices.length; i++) {
-					final int familyId = requestedServices[i] & 0xff;
+					final var familyId = ServiceFamily.of(requestedServices[i] & 0xff);
 					final int version = requestedServices[i + 1] & 0xff;
 					if (families.families().getOrDefault(familyId, 0) < version)
 						return;
