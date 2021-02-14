@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +47,7 @@ import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.Keyring;
 import tuwien.auto.calimero.datapoint.StateDP;
-import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.server.gateway.SubnetConnector;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
@@ -68,7 +69,7 @@ public class ServerConfiguration {
 		// server side
 
 		private final List<IndividualAddress> additionalAddresses;
-		private final int securedServices;
+		private final EnumSet<ServiceFamily> securedServices;
 		private final Map<Integer, List<IndividualAddress>> tunnelingUsers;
 		private final Keyring keyring;
 		private final Map<String, byte[]> keyfile;
@@ -82,17 +83,18 @@ public class ServerConfiguration {
 
 		public Container(final List<IndividualAddress> additionalAddresses, final SubnetConnector connector,
 				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
-			this(additionalAddresses, 0, Map.of(), null, Map.of(), connector, groupAddressFilter, timeServerDatapoints);
+			this(additionalAddresses, EnumSet.noneOf(ServiceFamily.class), Map.of(), null, Map.of(), connector,
+					groupAddressFilter, timeServerDatapoints);
 		}
 
 		Container(final List<IndividualAddress> additionalAddresses,
-				final int securedServices, final Map<Integer, List<IndividualAddress>> tunnelingUsers,
+				final EnumSet<ServiceFamily> securedServices, final Map<Integer, List<IndividualAddress>> tunnelingUsers,
 				final Keyring keyring, final Map<String, byte[]> keyfile, final SubnetConnector connector,
 				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
 
 			this.additionalAddresses = List.copyOf(additionalAddresses);
 			this.tunnelingUsers = Map.copyOf(tunnelingUsers);
-			this.securedServices = securedServices;
+			this.securedServices = EnumSet.copyOf(securedServices);
 			this.keyring = keyring;
 			this.keyfile = Map.copyOf(keyfile);
 
@@ -104,7 +106,7 @@ public class ServerConfiguration {
 
 		public List<IndividualAddress> additionalAddresses() { return additionalAddresses; }
 
-		public int securedServices() { return securedServices; }
+		public EnumSet<ServiceFamily> securedServices() { return securedServices.clone(); }
 
 		public Map<Integer, List<IndividualAddress>> tunnelingUsers() { return tunnelingUsers; }
 
@@ -125,13 +127,13 @@ public class ServerConfiguration {
 			final String activated = sc.isActivated() ? "" : " [not activated]";
 			String mcast = "disabled";
 			String secureRouting = "";
-			final int securedServices = securedServices();
+			final var securedServices = securedServices();
 			final var keyfile = keyfile();
 
 			if ((sc instanceof RoutingServiceContainer)) {
 				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
 
-				final boolean secureRoutingRequired = (securedServices & (1 << ServiceFamiliesDIB.ROUTING)) != 0;
+				final boolean secureRoutingRequired = securedServices.contains(ServiceFamily.Routing);
 				if (secureRoutingRequired && keyfile.getOrDefault("group.key", new byte[0]).length == 16)
 					secureRouting = secureSymbol + " ";
 			}
@@ -140,7 +142,7 @@ public class ServerConfiguration {
 			if (!groupAddressFilter().isEmpty())
 				filter = "\n\tGroup address filter " + groupAddressFilter();
 
-			final boolean secureUnicastRequired = (securedServices & (1 << ServiceFamiliesDIB.TUNNELING)) != 0;
+			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null ? secureSymbol + " "
 					: "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();

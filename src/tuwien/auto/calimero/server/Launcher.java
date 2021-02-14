@@ -60,6 +60,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,7 @@ import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.Security;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
@@ -288,7 +290,7 @@ public class Launcher implements Runnable, AutoCloseable
 			// look for a keyring configuration
 			final var keyring = attr(r, "keyring").map(expandHome).map(Keyring::load).orElse(null);
 
-			final int securedServices = attr(r, "securedServices").map(Integer::decode).orElse(0x3f);
+			final var secureServices = toEnumSet(attr(r, "securedServices").map(Integer::decode).orElse(0x3f));
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String addr = "";
@@ -447,13 +449,21 @@ public class Launcher implements Runnable, AutoCloseable
 							readKeyfile = readKeyfile(keyfile);
 
 						if (keyring != null || readKeyfile != null)
-							config = new Container(indAddressPool, securedServices, tunnelingUserToAddresses, keyring,
+							config = new Container(indAddressPool, secureServices, tunnelingUserToAddresses, keyring,
 									Optional.ofNullable(readKeyfile).orElse(Map.of()), connector, filter, timeServerDatapoints);
 						containers.add(config);
 						return;
 					}
 				}
 			}
+		}
+
+		private static EnumSet<ServiceFamily> toEnumSet(final int secureServices) {
+			final var set = EnumSet.noneOf(ServiceFamily.class);
+			for (final var serviceFamily : ServiceFamily.values())
+				if ((secureServices & (1 << serviceFamily.id())) != 0)
+					set.add(serviceFamily);
+			return set;
 		}
 
 		private SubnetConnector subnetConnector(final ServiceContainer sc, final int objectInstance,

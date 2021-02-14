@@ -47,6 +47,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +89,7 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
@@ -627,8 +629,9 @@ public class KNXnetIPServer
 			logger.warn("option \"" + optionKey + "\" not supported or unknown");
 	}
 
-	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys, final int securedServices) {
-		int secure = 0;
+	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys,
+			final EnumSet<ServiceFamily> securedServices) {
+		final var secure = EnumSet.<ServiceFamily>noneOf(ServiceFamily.class);
 
 		final int objectInstance = objectInstance(sc);
 		final var endpoint = endpointFor(sc);
@@ -636,7 +639,8 @@ public class KNXnetIPServer
 
 		// if we setup secure unicast services, we need at least device authentication
 		if (keys.containsKey("device.key")) {
-			secure = (1 << ServiceFamiliesDIB.DEVICE_MANAGEMENT) | (1 << ServiceFamiliesDIB.TUNNELING);
+			secure.add(ServiceFamily.DeviceManagement);
+			secure.add(ServiceFamily.Tunneling);
 
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
@@ -658,7 +662,7 @@ public class KNXnetIPServer
 
 		final byte[] groupKey = keys.get("group.key");
 		if (sc instanceof RoutingServiceContainer && groupKey != null) {
-			secure |= (1 << ServiceFamiliesDIB.ROUTING);
+			secure.add(ServiceFamily.Routing);
 
 			try {
 				final int pidGroupKey = 91;
@@ -684,18 +688,24 @@ public class KNXnetIPServer
 			}
 		}
 
-		if (secure != 0) {
+		if (!secure.isEmpty()) {
 			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES,
 					bytesFromWord(defDeviceCaps));
 			caps[1] |= 64;
 			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
 		}
 
-		secure &= securedServices;
-
+		final var orig = EnumSet.copyOf(secure);
+		final boolean changed = secure.retainAll(securedServices);
+		if (changed) {
+			orig.addAll(securedServices);
+			orig.removeAll(secure);
+			logger.info("KNX IP Secure is disabled for {}", orig);
+		}
+		final int bits = secure.stream().mapToInt(sf -> 1 << sf.id()).sum();
 		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
 				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
-		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) secure);
+		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) bits);
 	}
 
 	private NetworkInterface[] parseNetworkInterfaces(final String optionKey, final String value)
