@@ -835,7 +835,8 @@ final class ControlEndpointService extends ServiceLooper
 				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
 				looperTask = new LooperTask(server,
-						svcCont.getName() + " data endpoint " + newDataEndpoint.getRemoteAddress(), 0, () -> svcLoop);
+						svcCont.getName() + " data endpoint " + hostPort(newDataEndpoint.getRemoteAddress()), 0,
+						() -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
