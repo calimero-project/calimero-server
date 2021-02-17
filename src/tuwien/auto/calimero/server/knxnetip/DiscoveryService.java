@@ -199,7 +199,7 @@ final class DiscoveryService extends ServiceLooper
 
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
-			final SocketAddress addr = createResponseAddress(sr.getEndpoint(), src, 1);
+			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream)
 					.collect(Collectors.toList());
 			for (final ControlEndpointService ces : list)
@@ -224,7 +224,7 @@ final class DiscoveryService extends ServiceLooper
 			KNXnetIPHeader.DISCONNECT_REQ,
 			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
-	private void sendSearchResponse(final SocketAddress dst, final ControlEndpointService ces, final boolean ext,
+	private void sendSearchResponse(final InetSocketAddress dst, final ControlEndpointService ces, final boolean ext,
 		final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
@@ -264,18 +264,18 @@ final class DiscoveryService extends ServiceLooper
 			final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
 			final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
-			logger.trace("sending search response with container '" + sc.getName() + "' to " + dst);
-			sendOnInterfaces(p);
+			logger.trace("sending search response with container '{}' to {}", sc.getName(), hostPort(dst));
+			final var sentOn = sendOnInterfaces(p);
 			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
-			logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
+			logger.debug("KNXnet/IP discovery: identify as '{}' to {} on {}", deviceDib.getName(), hostPort(dst), sentOn);
 		}
 	}
 
-	private void sendOnInterfaces(final DatagramPacket p) throws IOException
+	private List<String> sendOnInterfaces(final DatagramPacket p) throws IOException
 	{
 		if (!p.getAddress().isMulticastAddress() || outgoing == null) {
 			s.send(p);
-			return;
+			return List.of("any");
 		}
 		final List<NetworkInterface> nifs = outgoing.length > 0 ? Arrays.asList(outgoing)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
@@ -292,7 +292,7 @@ final class DiscoveryService extends ServiceLooper
 				}
 			}
 		}
-		logger.trace("sent search response on interfaces {}", sentOn);
+		return sentOn;
 	}
 
 	// some OS use a dedicated display name, others use the same as returned by getName, etc.

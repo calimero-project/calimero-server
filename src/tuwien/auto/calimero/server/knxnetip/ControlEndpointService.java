@@ -457,10 +457,6 @@ final class ControlEndpointService extends ServiceLooper
 		return true;
 	}
 
-	private static String hostPort(final InetSocketAddress addr) {
-		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
-	}
-
 	int subnetStatus() {
 		final int status = server.getProperty(InterfaceObject.ROUTER_OBJECT, objectInstance(), PID.MEDIUM_STATUS, 1, 0);
 		return status == 0 ? ErrorCodes.NO_ERROR : ErrorCodes.KNX_CONNECTION;

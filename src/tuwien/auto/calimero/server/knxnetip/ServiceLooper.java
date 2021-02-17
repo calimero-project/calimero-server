@@ -184,6 +184,10 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		return rte;
 	}
 
+	static String hostPort(final InetSocketAddress addr) {
+		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
+	}
+
 	private boolean sanitize(final KNXnetIPHeader h, final int length)
 	{
 		if (h.getTotalLength() > length)

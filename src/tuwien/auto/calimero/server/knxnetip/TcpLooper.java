@@ -142,7 +142,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	}
 
 	private static String hostPort(final InetSocketAddress addr) {
-		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
+		return ServiceLooper.hostPort(addr);
 	}
 
 	static void lastSessionTimedOut(final InetSocketAddress remote) {
