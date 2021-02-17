@@ -78,7 +78,6 @@ import org.slf4j.LoggerFactory;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
-import tuwien.auto.calimero.KnxSecureException;
 import tuwien.auto.calimero.SerialNumber;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
@@ -86,6 +85,7 @@ import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
+import tuwien.auto.calimero.secure.KnxSecureException;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
 final class SecureSession {

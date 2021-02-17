@@ -45,9 +45,9 @@ import java.util.Optional;
 
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
-import tuwien.auto.calimero.Keyring;
 import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
+import tuwien.auto.calimero.secure.Keyring;
 import tuwien.auto.calimero.server.gateway.SubnetConnector;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;

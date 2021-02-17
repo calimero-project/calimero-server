@@ -65,7 +65,6 @@ import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KnxRuntimeException;
-import tuwien.auto.calimero.KnxSecureException;
 import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.Settings;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -96,6 +95,7 @@ import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.Destination;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.secure.KnxSecureException;
 import tuwien.auto.calimero.server.ServerConfiguration;
 
 /**
