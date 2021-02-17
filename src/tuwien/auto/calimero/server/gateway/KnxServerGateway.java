@@ -1757,7 +1757,9 @@ public class KnxServerGateway implements Runnable
 			logger.warn("timeout sending to {}: {}", f.getDestination(), e.getMessage());
 		}
 		catch (final KNXFormatException | KNXLinkClosedException e) {
-			logger.error("error sending to {} on subnet {}", f.getDestination(), link.getName(), e);
+			logger.error("error sending to {} on subnet {}: {}", f.getDestination(), link.getName(), e.getMessage());
+			if (e.getCause() != null)
+				logger.info("{}, caused by:", e.toString(), e.getCause());
 		}
 	}
 
