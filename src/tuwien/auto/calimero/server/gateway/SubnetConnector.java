@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -234,12 +234,8 @@ public final class SubnetConnector
 			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
 				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
 			final InetSocketAddress local = new InetSocketAddress(ia, 0);
-
-			final String[] args = linkArgs.split(":", -1);
-			final String ip = args[0];
-			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
 			final boolean useNat = (Boolean) this.args[0];
-			ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, new InetSocketAddress(ip, port), useNat, settings);
+			ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, parseRemoteEndpoint(), useNat, settings);
 		}
 		else if ("knxip".equals(subnetType)) {
 			try {
@@ -315,12 +311,8 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts;
 		// can cause a delay of connection timeout in the worst case
-		if ("ip".equals(subnetType)) {
-			final String[] args = linkArgs.split(":", -1);
-			final String ip = args[0];
-			final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
-			ts = () -> new KNXNetworkMonitorIP(null, new InetSocketAddress(ip, port), false, settings);
-		}
+		if ("ip".equals(subnetType))
+			ts = () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
 		else if ("usb".equals(subnetType))
 			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
 		else if ("ft12".equals(subnetType))
@@ -341,6 +333,13 @@ public final class SubnetConnector
 		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
+	}
+
+	private InetSocketAddress parseRemoteEndpoint() {
+		final String[] args = linkArgs.split(":", -1);
+		final String ip = args[0];
+		final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
+		return new InetSocketAddress(ip, port);
 	}
 
 	public String interfaceType() { return subnetType; }
