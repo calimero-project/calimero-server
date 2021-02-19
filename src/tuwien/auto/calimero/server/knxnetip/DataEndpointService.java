@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
@@ -57,7 +58,7 @@ final class DataEndpointService extends ServiceLooper
 
 	DataEndpointService(final KNXnetIPServer server, final DatagramSocket localCtrlEndpt, final String svcContName)
 	{
-		super(server, newSocketUsingIp(localCtrlEndpt), 512, MAX_RECEIVE_INTERVAL * 1000);
+		super(server, newSocket(localCtrlEndpt.getLocalAddress(), 0), 512, MAX_RECEIVE_INTERVAL * 1000);
 		this.svcContName = svcContName;
 		logger.debug("created socket on " + s.getLocalSocketAddress());
 	}
@@ -109,7 +110,7 @@ final class DataEndpointService extends ServiceLooper
 			return;
 		final DatagramSocket old = s;
 		final SocketAddress oldAddress = old.getLocalSocketAddress();
-		s = rebindSocketUsingPort(port);
+		s = newSocket(s.getLocalAddress(), port);
 		svcHandler.setSocket(s);
 		reboundSocket = true;
 		old.close();
@@ -128,27 +129,13 @@ final class DataEndpointService extends ServiceLooper
 		catch (final SocketException e) {}
 	}
 
-	private static DatagramSocket newSocketUsingIp(final DatagramSocket localCtrlEndpt)
+	private static DatagramSocket newSocket(final InetAddress addr, final int port)
 	{
 		try {
-			final DatagramSocket s = new DatagramSocket(null);
+			final var s = new DatagramSocket(null);
 			s.setReuseAddress(true);
-			s.bind(new InetSocketAddress(localCtrlEndpt.getLocalAddress(), 0));
+			s.bind(new InetSocketAddress(addr, port));
 			return s;
-		}
-		catch (final SocketException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	// does not close the current socket
-	private DatagramSocket rebindSocketUsingPort(final int port)
-	{
-		try {
-			final DatagramSocket rebind = new DatagramSocket(null);
-			rebind.setReuseAddress(true);
-			rebind.bind(new InetSocketAddress(s.getLocalAddress(), port));
-			return rebind;
 		}
 		catch (final SocketException e) {
 			throw new RuntimeException(e);
