@@ -36,8 +36,6 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
-import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.Inet4Address;
@@ -46,7 +44,6 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
-import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,24 +53,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
-import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchRequest;
-import tuwien.auto.calimero.knxnetip.servicetype.SearchResponse;
 import tuwien.auto.calimero.knxnetip.util.DIB;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
-import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
-import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.knxnetip.util.Srp;
 import tuwien.auto.calimero.knxnetip.util.Srp.Type;
-import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
 final class DiscoveryService extends ServiceLooper
@@ -225,60 +216,32 @@ final class DiscoveryService extends ServiceLooper
 			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
 	private void sendSearchResponse(final InetSocketAddress dst, final ControlEndpointService ces, final boolean ext,
-		final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
-			// we create our own HPAI from the actual socket, since
-			// the service container might have opted for ephemeral port use
-			// it can happen that our socket got closed and we get null
-			final InetSocketAddress local = (InetSocketAddress) ces.getSocket().getLocalSocketAddress();
-			if (local == null) {
-				logger.warn("KNXnet/IP discovery unable to announce container '{}', problem with local endpoint: "
-						+ "socket bound={}, closed={}", sc.getName(), ces.getSocket().isBound(), ces.getSocket().isClosed());
-				return;
+			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs);
+			if (res.isPresent()) {
+				final var buf = res.get();
+				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));
+				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
+				logger.debug("KNXnet/IP discovery: identify as '{}' for container {} to {} on {}", deviceDib.getName(),
+						sc.getName(), hostPort(dst), sentOn);
 			}
-
-			// skip response if we have a mac filter set which does not match our mac
-			final byte[] mac = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(sc), PID.MAC_ADDRESS,
-					new byte[6]);
-			if (macFilter.length > 0 && !Arrays.equals(macFilter, mac))
-				return;
-
-			if (requestedServices.length > 0) {
-				final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(sc, ext);
-				// skip response if we have a service request which we don't support
-				for (int i = 0; i < requestedServices.length; i++) {
-					final var familyId = ServiceFamily.of(requestedServices[i] & 0xff);
-					final int version = requestedServices[i + 1] & 0xff;
-					if (families.families().getOrDefault(familyId, 0) < version)
-						return;
-				}
-			}
-
-			final Set<Integer> set = new TreeSet<>();
-			for (final byte dibType : requestedDibs)
-				set.add(dibType & 0xff);
-			final List<DIB> dibs = new ArrayList<>();
-			set.forEach(dibType -> ces.createDib(dibType, dibs, ext));
-
-			final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
-			final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
-			final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
-			logger.trace("sending search response with container '{}' to {}", sc.getName(), hostPort(dst));
-			final var sentOn = sendOnInterfaces(p);
-			final DeviceDIB deviceDib = server.createDeviceDIB(sc);
-			logger.debug("KNXnet/IP discovery: identify as '{}' to {} on {}", deviceDib.getName(), hostPort(dst), sentOn);
 		}
 	}
 
-	private List<String> sendOnInterfaces(final DatagramPacket p) throws IOException
-	{
+	private List<String> send(final DatagramPacket p) throws IOException {
 		if (!p.getAddress().isMulticastAddress() || outgoing == null) {
 			s.send(p);
 			return List.of("any");
 		}
 		final List<NetworkInterface> nifs = outgoing.length > 0 ? Arrays.asList(outgoing)
 				: Collections.list(NetworkInterface.getNetworkInterfaces());
+		return sendOnInterfaces(p, nifs);
+	}
+
+	private List<String> sendOnInterfaces(final DatagramPacket p, final List<NetworkInterface> nifs) throws IOException
+	{
 		final var sentOn = new ArrayList<String>();
 		for (final NetworkInterface nif : nifs) {
 			if (nif.getInetAddresses().hasMoreElements() && nif.isUp()) {
@@ -287,7 +250,7 @@ final class DiscoveryService extends ServiceLooper
 					s.send(p);
 					sentOn.add(nameOf(nif));
 				}
-				catch (final SocketException e) {
+				catch (final IOException e) {
 					logger.info("failure sending on interface " + nameOf(nif));
 				}
 			}
@@ -318,10 +281,5 @@ final class DiscoveryService extends ServiceLooper
 	@Override
 	public String toString() {
 		return "discovery endpoint " + joined;
-	}
-
-	private int objectInstance(final ServiceContainer sc)
-	{
-		return server.objectInstance(sc);
 	}
 }

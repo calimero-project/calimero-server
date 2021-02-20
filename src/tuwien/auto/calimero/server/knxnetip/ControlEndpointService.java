@@ -472,18 +472,27 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
-		final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+		final var res = createSearchResponse(true, macFilter, requestedServices, requestedDibs);
+		if (res.isPresent()) {
+			send(sessionId, 0, res.get(), dst);
+			final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
+			logger.debug("KNXnet/IP discovery: identify as '{}' for container {} to {} on {}", deviceDib.getName(),
+					svcCont.getName(), dst, svcCont.networkInterface());
+		}
+	}
+
+	Optional<byte[]> createSearchResponse(final boolean ext, final byte[] macFilter,
+			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 
 		// we create our own HPAI from the actual socket, since
 		// the service container might have opted for ephemeral port use
 		// it can happen that our socket got closed and we get null
 		final InetSocketAddress local = (InetSocketAddress) getSocket().getLocalSocketAddress();
 		if (local == null) {
-			logger.warn(
-					"KNXnet/IP discovery unable to announce container '{}', problem with local endpoint: "
-							+ "socket bound={}, closed={}",
-					svcCont.getName(), getSocket().isBound(), getSocket().isClosed());
-			return;
+			logger.warn("KNXnet/IP discovery unable to announce container '{}', problem with local endpoint: "
+					+ "socket bound={}, closed={}", svcCont.getName(), getSocket().isBound(), getSocket().isClosed());
+			return Optional.empty();
 		}
 
 		try {
@@ -494,18 +503,18 @@ final class ControlEndpointService extends ServiceLooper
 
 			// skip response if we have a mac filter set which does not match our mac
 			if (macFilter.length > 0 && !Arrays.equals(macFilter, mac))
-				return;
+				return Optional.empty();
 		}
 		catch (SocketException | KnxPropertyException e) {}
 
 		if (requestedServices.length > 0) {
-			final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(svcCont, true);
+			final ServiceFamiliesDIB families = server.createServiceFamiliesDIB(svcCont, ext);
 			// skip response if we have a service request which we don't support
 			for (int i = 0; i < requestedServices.length; i += 2) {
 				final var familyId = ServiceFamily.of(requestedServices[i] & 0xff);
 				final int version = requestedServices[i + 1] & 0xff;
 				if (families.families().getOrDefault(familyId, 0) < version)
-					return;
+					return Optional.empty();
 			}
 		}
 
@@ -513,17 +522,14 @@ final class ControlEndpointService extends ServiceLooper
 		for (final byte dibType : requestedDibs)
 			set.add(dibType & 0xff);
 		final List<DIB> dibs = new ArrayList<>();
-		set.forEach(dibType -> createDib(dibType, dibs, true));
+		set.forEach(dibType -> createDib(dibType, dibs, ext));
 
 		final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
-		final byte[] buf = PacketHelper.toPacket(new SearchResponse(true, hpai, dibs));
-		logger.trace("sending search response with container '" + svcCont.getName() + "' to " + dst);
-		send(sessionId, 0, buf, dst);
-		final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
-		logger.debug("KNXnet/IP discovery: identify as '{}' to {}", deviceDib.getName(), dst);
+		final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
+		return Optional.of(buf);
 	}
 
-	boolean createDib(final int dibType, final List<DIB> dibs, final boolean extended) {
+	private boolean createDib(final int dibType, final List<DIB> dibs, final boolean extended) {
 		switch (dibType) {
 		case DIB.DEVICE_INFO:
 			return dibs.add(server.createDeviceDIB(svcCont));
@@ -590,7 +596,7 @@ final class ControlEndpointService extends ServiceLooper
 			final long seq = session.sendSeq.getAndIncrement();
 			final int msgTag = 0;
 			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
-			logger.info("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
+			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
 		}
 
 		if (!TcpLooper.send(buf, dst))

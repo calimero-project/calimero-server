@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.Set;
@@ -81,7 +82,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			loop();
 			cleanup(LogLevel.DEBUG, null);
 		}
-		catch (final IOException e) {
+		catch (IOException | UncheckedIOException e) {
 			cleanup(LogLevel.ERROR, e);
 		}
 		catch (final RuntimeException e) {
