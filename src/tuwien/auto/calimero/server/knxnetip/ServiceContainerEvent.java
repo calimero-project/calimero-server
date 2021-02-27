@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2011 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,8 +42,7 @@ import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 
 /**
  * Encapsulates common events of a service container.
- * <p>
- * 
+ *
  * @author B. Malinowsky
  */
 public class ServiceContainerEvent extends EventObject
@@ -65,8 +64,7 @@ public class ServiceContainerEvent extends EventObject
 
 	/**
 	 * Creates a new service container event.
-	 * <p>
-	 * 
+	 *
 	 * @param source the KNXnet/IP server object
 	 * @param reason specifies the reason for this event, using an event type
 	 * @param svcCont the service container related with this event
@@ -82,8 +80,7 @@ public class ServiceContainerEvent extends EventObject
 
 	/**
 	 * Creates a new service container event holding a KNXnet/IP connection.
-	 * <p>
-	 * 
+	 *
 	 * @param source the KNXnet/IP server object
 	 * @param reason specifies the reason for this event, using an event type
 	 * @param svcCont the service container related with this event
@@ -100,8 +97,7 @@ public class ServiceContainerEvent extends EventObject
 
 	/**
 	 * Returns the event type, supplied as reason during creation of this service container event.
-	 * <p>
-	 * 
+	 *
 	 * @return the event type
 	 */
 	public final int getEventType()
@@ -111,8 +107,7 @@ public class ServiceContainerEvent extends EventObject
 
 	/**
 	 * Returns the service container related with this event.
-	 * <p>
-	 * 
+	 *
 	 * @return the service container object
 	 */
 	public final ServiceContainer getContainer()
@@ -123,7 +118,7 @@ public class ServiceContainerEvent extends EventObject
 	/**
 	 * Returns a KNXnet/IP connection related with this event, or <code>null</code> if this event is
 	 * not related to any service container connection.
-	 * 
+	 *
 	 * @return the KNXnetIPConnection object, or <code>null</code>
 	 */
 	public final KNXnetIPConnection getConnection()

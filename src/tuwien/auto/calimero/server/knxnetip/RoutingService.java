@@ -169,13 +169,10 @@ final class RoutingService extends ServiceLooper
 				// add listener to inst after r got initialized
 				inst.addConnectionListener(new KNXListener() {
 					@Override
-					public void frameReceived(final FrameEvent e) {
-					}
+					public void frameReceived(final FrameEvent e) {}
 
 					@Override
-					public void connectionClosed(final CloseEvent e) {
-						r.close();
-					}
+					public void connectionClosed(final CloseEvent e) { r.close(); }
 				});
 			}
 			else {
