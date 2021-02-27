@@ -208,14 +208,20 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	public String toString() {
-		final var local = s.getLocalAddress();
-		NetworkInterface netif = null;
-		try {
-			netif = NetworkInterface.getByInetAddress(local);
+		final var local = (InetSocketAddress) s.getLocalSocketAddress();
+		String bound = "";
+		if (local == null)
+			bound = "closed";
+		else {
+			try {
+				final NetworkInterface netif = NetworkInterface.getByInetAddress(local.getAddress());
+				if (netif != null)
+					bound = netif.getName() + " ";
+			}
+			catch (final SocketException ignore) {}
+			bound += hostPort(local);
 		}
-		catch (final SocketException ignore) {}
-		final String bound = netif != null ? netif.getName() : local != null ? local.getHostAddress() : "closed";
-		return "control endpoint " + svcCont.getName() + " (" + bound + ")";
+		return svcCont.getName() + " control endpoint (" + bound + ")";
 	}
 
 	@Override

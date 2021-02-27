@@ -405,19 +405,8 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer sc = sce.getContainer();
 			if (event == ServiceContainerEvent.ROUTING_SVC_STARTED) {
 				final KNXnetIPConnection conn = sce.getConnection();
-				logger.info(sc.getName() + " started " + conn.getName());
 				conn.addConnectionListener(new ConnectionListener(sc, conn.getName(), null));
 				serverConnections.add(conn);
-			}
-			else if (event == ServiceContainerEvent.ADDED_TO_SERVER) {
-				logger.error("adding service container at runtime not yet implemented");
-
-				// the following is not working!
-				// XXX subnet link and group address table is missing!
-				// what is the best way to get them here?
-//				final SubnetConnector connector = SubnetConnector.newWithInterfaceType(sc, null, null, 1);
-//				connectors.add(connector);
-//				connector.setSubnetListener(new SubnetListener(connector.getName()));
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
 				for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {

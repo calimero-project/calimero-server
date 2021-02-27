@@ -108,7 +108,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private static void runTcpServerEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint,
 		final AbstractQueue<Closeable> serverSocket) {
-		final String name = ces.server.getName() + " tcp service " + ces.getServiceContainer().getName();
+		final String name = ces.server.getName() + " " + ces.getServiceContainer().getName() + " tcp service";
 		Thread.currentThread().setName(name);
 
 		ServerSocket localRef = null;

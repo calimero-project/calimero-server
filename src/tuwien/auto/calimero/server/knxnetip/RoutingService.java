@@ -246,7 +246,7 @@ final class RoutingService extends ServiceLooper
 
 	@Override
 	public String toString() {
-		return "routing service " + svcCont.routingMulticastAddress().getHostAddress();
+		return svcCont.getName() + " " + r.getName();
 	}
 
 	private void fireRoutingServiceStarted(final ServiceContainer sc, final KNXnetIPRouting r)
