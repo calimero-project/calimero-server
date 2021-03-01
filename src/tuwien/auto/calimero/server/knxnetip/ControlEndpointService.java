@@ -160,7 +160,7 @@ final class ControlEndpointService extends ServiceLooper
 		final boolean secureTunneling = isSecuredService(Tunneling);
 		final String mgmt = secureMgmt ? "required" : "optional";
 		final String tunneling = secureTunneling ? "required" : "optional";
-		logger.info("control endpoint '{}' secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
+		logger.info("{} secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
 
 		try {
 			tcpLooper = TcpLooper.start(this, (InetSocketAddress) s.getLocalSocketAddress());
@@ -621,12 +621,10 @@ final class ControlEndpointService extends ServiceLooper
 			ip = usableIpAddresses().findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
-			logger.debug("control endpoint '{}' socket bound to {}:{}", svcCont.getName(),
-					boundTo.getAddress().getHostAddress(), boundTo.getPort());
+			logger.trace("{} control endpoint bound to {}", svcCont.getName(), hostPort(boundTo));
 			return s;
 		}
 		catch (final SocketException e) {
-			logger.error("socket creation failed for {}:{}", ip, ep.getPort(), e);
 			throw wrappedException(e);
 		}
 	}

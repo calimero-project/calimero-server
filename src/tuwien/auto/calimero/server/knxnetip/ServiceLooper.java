@@ -45,6 +45,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 
 import tuwien.auto.calimero.KNXFormatException;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.internal.UdpSocketLooper;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.ErrorCodes;
@@ -180,7 +181,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	{
 		if (e instanceof RuntimeException)
 			return (RuntimeException) e;
-		final RuntimeException rte = new RuntimeException(e);
+		final var rte = new KnxRuntimeException(e.getMessage(), e);
 		rte.setStackTrace(e.getStackTrace());
 		return rte;
 	}

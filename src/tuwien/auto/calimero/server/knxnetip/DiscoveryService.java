@@ -90,7 +90,6 @@ final class DiscoveryService extends ServiceLooper
 			s = new MulticastSocket(Discoverer.SEARCH_PORT);
 		}
 		catch (final IOException e) {
-			logger.error("failed to create discovery socket for " + server.getName(), e);
 			throw wrappedException(e);
 		}
 
