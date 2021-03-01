@@ -8,7 +8,7 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.7.0'
+ext.junitJupiterVersion = '5.8.0-M1'
 
 apply plugin: 'java-library'
 apply plugin: 'maven'
@@ -74,6 +74,6 @@ dependencies {
 
 	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-	testCompileOnly 'junit:junit:4.13.1'
+	testCompileOnly 'junit:junit:4.13.2'
 	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 }
