@@ -47,6 +47,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1040,33 +1041,18 @@ public class KNXnetIPServer
 		final int v = getProperty(knxObject, objectInstance(sc), PID.KNXNETIP_DEVICE_CAPABILITIES, 1, defDeviceCaps);
 		// shift caps left one bit because svc family KNXnet/IP Core is always set and left out by default
 		final int caps = (v << 1) | 1;
-		final int[] services = { ServiceFamiliesDIB.CORE, ServiceFamiliesDIB.DEVICE_MANAGEMENT,
-			ServiceFamiliesDIB.TUNNELING, ServiceFamiliesDIB.ROUTING, ServiceFamiliesDIB.REMOTE_LOGGING,
-			ServiceFamiliesDIB.REMOTE_CONFIGURATION_DIAGNOSIS, ServiceFamiliesDIB.OBJECT_SERVER,
-			ServiceFamiliesDIB.Security };
 		final int coreVersion = ((DefaultServiceContainer) sc).udpOnly() ? 1 : 2;
 		final int[] serviceVersion = { coreVersion, 2, 2, 2, 0, 0, 0, 1 };
 
-		final int[] tmp = new int[services.length];
-		final int[] tmpVersion = new int[tmp.length];
-		int count = 0;
-		for (int i = 0; i < services.length; ++i) {
-			final int familyId = services[i];
-			if (!extended && familyId > ServiceFamiliesDIB.OBJECT_SERVER)
+		final var supported = new EnumMap<ServiceFamily, Integer>(ServiceFamily.class);
+		for (final var familyId : ServiceFamily.values()) {
+			if (!extended && familyId.id() > ServiceFamily.ObjectServer.id())
 				break;
-			if ((caps >> i & 0x1) == 1) {
-				tmp[count] = familyId;
-				tmpVersion[count++] = serviceVersion[i];
-			}
+			final int bit = familyId.ordinal();
+			if ((caps >> bit & 0x1) == 1)
+				supported.put(familyId, serviceVersion[bit]);
 		}
-
-		final int[] supported = new int[count];
-		final int[] versions = new int[count];
-		for (int i = 0; i < count; i++) {
-			supported[i] = tmp[i];
-			versions[i] = tmpVersion[i];
-		}
-		return new ServiceFamiliesDIB(supported, versions);
+		return new ServiceFamiliesDIB(supported);
 	}
 
 	private void startDiscoveryService(final NetworkInterface[] outgoing,

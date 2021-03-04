@@ -62,7 +62,7 @@ import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingLostMessage;
-import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 
@@ -141,7 +141,7 @@ final class RoutingService extends ServiceLooper
 		final int pidGroupKey = 91;
 		final int oi = server.objectInstance(sc);
 		final byte[] groupKey = server.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, oi, pidGroupKey, new byte[0]);
-		secure = isSecuredService(ServiceFamiliesDIB.ROUTING) && groupKey.length == 16;
+		secure = isSecuredService(ServiceFamily.Routing) && groupKey.length == 16;
 
 		final KNXnetIPRouting inst;
 		try {
@@ -206,10 +206,10 @@ final class RoutingService extends ServiceLooper
 		return netif;
 	}
 
-	private boolean isSecuredService(final int serviceFamily) {
+	private boolean isSecuredService(final ServiceFamily serviceFamily) {
 		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, server.objectInstance(svcCont),
 				SecureSession.pidSecuredServices, 1, (byte) 0);
-		final boolean secured = ((securedServices >> serviceFamily) & 0x01) == 0x01;
+		final boolean secured = ((securedServices >> serviceFamily.id()) & 0x01) == 0x01;
 		return secured;
 	}
 
