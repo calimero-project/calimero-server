@@ -648,8 +648,8 @@ public class KNXnetIPServer
 			setProperty(knxObject, objectInstance, SecureSession.pidDeviceAuth, keys.get("device.key"));
 
 			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			for (int user = 1; keys.containsKey("user." + user); user++) {
-				final byte[] userPwdHash = keys.get("user." + user);
+			for (int user = 1; keys.containsKey("user[" + user + "].key"); user++) {
+				final byte[] userPwdHash = keys.get("user[" + user + "].key");
 				baos.write(userPwdHash.length == 0 ? SecureSession.emptyPwdHash : userPwdHash, 0, 16);
 			}
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidUserPwdHashes, 0,

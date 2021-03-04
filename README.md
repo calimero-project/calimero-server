@@ -167,11 +167,11 @@ group.key=BEEF5A1ADBEEF5A1ADBEEF5A1ADBEEF5
 // device key is a 16 byte hex value
 device.key=0102030405060708090a0b0c0d0e0f10
 // for secure unicast, specify at least user 1 & 2 (max. 127); user 1 is used for management access
-// user key is a 16 byte hex value (empty key means default setup key)
-user.1=
-user.2=d6da71bd89f7e8426250fe5657da900c
-user.3=
-user.4=
+// user pwd or key, key is a 16 byte hex value (empty value means default setup key)
+user[1].key=
+user[2].key=d6da71bd89f7e8426250fe5657da900c
+user[3].pwd=Joshua
+user[4].key=...
 ```
 
 ### Launcher Code

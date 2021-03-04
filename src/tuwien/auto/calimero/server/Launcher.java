@@ -485,7 +485,7 @@ public class Launcher implements Runnable, AutoCloseable
 		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
 			try (var lines = Files.lines(keyfile)) {
 				// ignore comments, limit keys to words with dot separator, require '='
-				final var matcher = Pattern.compile("^[^/#][\\w\\.]+\\s*=.+$").asMatchPredicate();
+				final var matcher = Pattern.compile("^[^/#][\\w[\\[\\d+\\]]\\.]+\\s*=.+$").asMatchPredicate();
 				final Map<String, byte[]> keys = lines.filter(matcher)
 						.map(line -> line.split("=", 2))
 						.map(XmlConfiguration::hashDeviceOrUserPassword)
@@ -506,7 +506,7 @@ public class Launcher implements Runnable, AutoCloseable
 			if ("device.pwd".equals(key))
 				return Map.entry("device.key", SecureConnection.hashDeviceAuthenticationPassword(chars));
 			if (key.endsWith("pwd"))
-				return Map.entry(key.replace(".pwd", ""), SecureConnection.hashUserPassword(chars));
+				return Map.entry(key.replace(".pwd", ".key"), SecureConnection.hashUserPassword(chars));
 			return Map.entry(key, DataUnitBuilder.fromHex(value));
 		}
 
