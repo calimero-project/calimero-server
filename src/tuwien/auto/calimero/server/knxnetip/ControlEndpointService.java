@@ -298,17 +298,17 @@ final class ControlEndpointService extends ServiceLooper
 			byte[] requestedServices = {};
 			byte[] requestedDibs = { DIB.DEVICE_INFO, DIB.AdditionalDeviceInfo, DIB.SUPP_SVC_FAMILIES };
 			for (final Srp srp : sr.searchParameters()) {
-				final Type type = srp.getType();
+				final Type type = srp.type();
 				if (type == Srp.Type.SelectByProgrammingMode) {
 					if (!DeviceObject.lookup(server.getInterfaceObjectServer()).programmingMode())
 						return true;
 				}
 				else if (type == Srp.Type.SelectByMacAddress)
-					macFilter = srp.getData();
+					macFilter = srp.data();
 				else if (type == Srp.Type.SelectByService)
-					requestedServices = srp.getData();
+					requestedServices = srp.data();
 				else if (type == Srp.Type.RequestDibs)
-					requestedDibs = srp.getData();
+					requestedDibs = srp.data();
 				else  if (srp.isMandatory())
 					return true;
 			}
