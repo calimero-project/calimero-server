@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.knxnetip.Discoverer;
+import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchRequest;
 import tuwien.auto.calimero.knxnetip.util.DIB;
@@ -69,7 +70,7 @@ import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
 final class DiscoveryService extends ServiceLooper
 {
-	private static final InetAddress systemSetupMulticast = KNXnetIPServer.defRoutingMulticast;
+	private static final InetAddress systemSetupMulticast = KNXnetIPRouting.DefaultMulticast;
 
 	private final NetworkInterface[] outgoing;
 	private final ArrayList<String> joined = new ArrayList<String>();

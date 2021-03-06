@@ -78,7 +78,6 @@ import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
-import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
@@ -1128,17 +1127,9 @@ final class ControlEndpointService extends ServiceLooper
 
 	private ManufacturerDIB createManufacturerDIB()
 	{
-		final int mfrId = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_ID, 1,
-				KNXnetIPServer.defMfrId);
-		byte[] data = KNXnetIPServer.defMfrData;
-		final int elems = server.getPropertyElems(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA);
-		if (elems > 0) {
-			try {
-				final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-				data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, elems);
-			}
-			catch (final KnxPropertyException e) {}
-		}
+		final int mfrId = server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_ID, 1, 0);
+		final var ios = server.getInterfaceObjectServer();
+		final byte[] data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, Integer.MAX_VALUE);
 		return new ManufacturerDIB(mfrId, data);
 	}
 }

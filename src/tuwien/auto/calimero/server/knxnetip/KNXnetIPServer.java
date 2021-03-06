@@ -38,6 +38,7 @@ package tuwien.auto.calimero.server.knxnetip;
 
 import static tuwien.auto.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static tuwien.auto.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static tuwien.auto.calimero.knxnetip.KNXnetIPRouting.DefaultMulticast;
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
@@ -84,7 +85,6 @@ import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
 import tuwien.auto.calimero.dptxlator.DPTXlator8BitUnsigned;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
-import tuwien.auto.calimero.knxnetip.Discoverer;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
@@ -169,16 +169,6 @@ public class KNXnetIPServer
 	// PID.KNX_INDIVIDUAL_ADDRESS
 	// we use default KNX address for KNXnet/IP routers
 	private static final IndividualAddress defKnxAddress = new IndividualAddress(0xff00);
-	// PID.ROUTING_MULTICAST_ADDRESS
-	static final InetAddress defRoutingMulticast;
-	static {
-		InetAddress a = null;
-		try {
-			a = InetAddress.getByName(Discoverer.SEARCH_MULTICAST);
-		}
-		catch (final UnknownHostException e) {}
-		defRoutingMulticast = a;
-	}
 
 	// Values used for service families DIB
 
@@ -188,13 +178,6 @@ public class KNXnetIPServer
 	private static final int defDeviceCaps = 1 + 2 + 4;
 
 	// Values used for manufacturer data DIB
-
-	// PID.MANUFACTURER_ID
-	static final int defMfrId = 0;
-	// PID.MANUFACTURER_DATA
-	// one element is 4 bytes, value length has to be multiple of that
-	// defaults to 'bm2011  '
-	static final byte[] defMfrData = new byte[] { 'b', 'm', '2', '0', '1', '1', ' ', ' ' };
 
 	// from init KNX properties
 
@@ -881,7 +864,7 @@ public class KNXnetIPServer
 		// ip and setup multicast
 		final byte[] ip = endpoint.getControlEndpoint().getAddress().getAddress();
 		setProperty(knxObject, objectInstance, PID.CURRENT_IP_ADDRESS, ip);
-		setProperty(knxObject, objectInstance, PID.SYSTEM_SETUP_MULTICAST_ADDRESS, defRoutingMulticast.getAddress());
+		setProperty(knxObject, objectInstance, PID.SYSTEM_SETUP_MULTICAST_ADDRESS, DefaultMulticast.getAddress());
 
 		//
 		// set properties used in service families DIB for description
@@ -920,7 +903,7 @@ public class KNXnetIPServer
 			else {
 				final byte[] data = getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, null);
 				if (data == null || Arrays.equals(new byte[4], data))
-					mcast = defRoutingMulticast;
+					mcast = DefaultMulticast;
 				else
 					mcast = InetAddress.getByAddress(data);
 
@@ -1023,7 +1006,7 @@ public class KNXnetIPServer
 		final var serialNumber = deviceObject.serialNumber();
 		final IndividualAddress knxAddress = new IndividualAddress(
 				getProperty(knxObject, objectInstance(sc), PID.KNX_INDIVIDUAL_ADDRESS, defKnxAddress.toByteArray()));
-		InetAddress mcast = defRoutingMulticast;
+		InetAddress mcast = DefaultMulticast;
 		try {
 			mcast = InetAddress
 					.getByAddress(ios.getProperty(knxObject, objectInstance(sc), PID.ROUTING_MULTICAST_ADDRESS, 1, 1));
