@@ -773,7 +773,7 @@ public class KNXnetIPServer
 
 		endpoints.forEach(Endpoint::stop);
 
-		((BaseKnxDevice) device).close();
+		device.close();
 		inShutdown = false;
 		running = false;
 	}

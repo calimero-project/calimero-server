@@ -238,7 +238,7 @@ public class KnxServerGateway implements Runnable
 
 			// setup timing for routing busy flow control
 			final Instant now = Instant.now();
-			final Instant waitUntil = now.plus(e.waitTime(), ChronoUnit.MILLIS);
+			final Instant waitUntil = now.plus(e.waitTime());
 			LogLevel level = LogLevel.TRACE;
 			boolean update = false;
 			if (waitUntil.isAfter(currentWaitUntil)) {
@@ -606,7 +606,7 @@ public class KnxServerGateway implements Runnable
 					PID.KNXNETIP_DEVICE_STATE, 0);
 			final int waitTime = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance,
 					PID.ROUTING_BUSY_WAIT_TIME, 100);
-			final RoutingBusy msg = new RoutingBusy(deviceState, waitTime, 0);
+			final RoutingBusy msg = new RoutingBusy(deviceState, Duration.ofMillis(waitTime), 0);
 			try {
 				connection.send(msg);
 			}
