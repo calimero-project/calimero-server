@@ -1,4 +1,4 @@
-Calimero KNXnet/IP Server [![Build Status](https://travis-ci.org/calimero-project/calimero-server.svg?branch=master)](https://travis-ci.org/calimero-project/calimero-server)
+Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml/badge.svg)](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml)
 =========================
 
 A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://www.oracle.com/technetwork/java/javase/downloads/index.html) (_java.base_).
