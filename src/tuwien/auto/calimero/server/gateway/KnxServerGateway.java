@@ -705,7 +705,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		try {
-			server.device.setDeviceLink(deviceLinkProxy);
+			server.device().setDeviceLink(deviceLinkProxy);
 		}
 		catch (final KNXLinkClosedException e) {
 			throw new KnxRuntimeException("setting device link", e);
@@ -726,7 +726,7 @@ public class KnxServerGateway implements Runnable
 		this(gatewayName, s, Arrays.asList(subnetConnectors));
 
 		try {
-			server.device.setDeviceLink(deviceLinkProxy);
+			server.device().setDeviceLink(deviceLinkProxy);
 		}
 		catch (final KNXLinkClosedException e) {
 			throw new KnxRuntimeException("setting device link", e);
@@ -881,7 +881,7 @@ public class KnxServerGateway implements Runnable
 		for (final var datapoint : datapoints) {
 			final var security = Security.defaultInstallation().groupKeys().containsKey(datapoint.getMainAddress())
 					? DataSecurity.AuthConf : DataSecurity.None;
-			((BaseKnxDevice) server.device).addGroupObject(datapoint, security, false);
+			((BaseKnxDevice) server.device()).addGroupObject(datapoint, security, false);
 			if (security != DataSecurity.None)
 				server.getInterfaceObjectServer().setProperty(InterfaceObject.SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);
 
@@ -917,7 +917,7 @@ public class KnxServerGateway implements Runnable
 			dateTime.setClockSync(true);
 		}
 		final var plainApdu = DataUnitBuilder.createAPDU(0x80, xlator.getData());
-		final var sal = ((BaseKnxDevice) server.device).secureApplicationLayer();
+		final var sal = ((BaseKnxDevice) server.device()).secureApplicationLayer();
 		try {
 			final var apdu = sal.secureGroupObject(src, dst, plainApdu).orElse(plainApdu);
 			final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);

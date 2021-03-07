@@ -248,7 +248,7 @@ public class KNXnetIPServer
 
 	final List<Endpoint> endpoints = new CopyOnWriteArrayList<>();
 
-	public final KnxDevice device;
+	private final KnxDevice device;
 	private final InterfaceObjectServer ios;
 	private static final int knxObject = KNXNETIP_PARAMETER_OBJECT;
 
@@ -777,6 +777,8 @@ public class KNXnetIPServer
 		inShutdown = false;
 		running = false;
 	}
+
+	public final KnxDevice device() { return device; }
 
 	/**
 	 * Returns the server name initialized during server construction and used for logging.
