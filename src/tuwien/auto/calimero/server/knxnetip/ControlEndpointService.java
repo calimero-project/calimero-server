@@ -59,6 +59,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +111,7 @@ import tuwien.auto.calimero.knxnetip.util.Srp.Type;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRD;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRI;
 import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
+import tuwien.auto.calimero.knxnetip.util.TunnelingDib.Status;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
@@ -577,17 +580,24 @@ final class ControlEndpointService extends ServiceLooper
 		if (addresses.isEmpty())
 			return Optional.empty();
 
-		final int[] status = new int[addresses.size()];
+		final boolean authorized = true; // TODO check for secure session / plain access
+		final boolean subnetOk = subnetStatus() == ErrorCodes.NO_ERROR;
 
-		for (int i = 0; i < addresses.size(); i++) {
-			final IndividualAddress addr = addresses.get(i);
-			final boolean inuse = addressInUse(addr);
-			status[i] = 4 | 2 | (inuse ? 0 : 1);
+		final var slots = new HashMap<IndividualAddress, EnumSet<Status>>();
+		for (final var addr : addresses) {
+			final var status = EnumSet.noneOf(Status.class);
+			if (!addressInUse(addr))
+				status.add(Status.Free);
+			if (authorized)
+				status.add(Status.Authorized);
+			if (subnetOk)
+				status.add(Status.Usable);
+			slots.put(addr, status);
 		}
 		final int pidMaxInterfaceApduLength = 68;
 		final int maxApduLength = server.getProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance(),
 				pidMaxInterfaceApduLength, 1, 15);
-		return Optional.of(new TunnelingDib((short) maxApduLength, addresses, status));
+		return Optional.of(new TunnelingDib(maxApduLength, slots));
 	}
 
 	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {
