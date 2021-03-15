@@ -825,7 +825,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 
 			tunnel = false;
-			crd = CRD.createResponse(DEVICE_MGMT_CONNECTION, null);
+			crd = CRD.createResponse(DEVICE_MGMT_CONNECTION);
 		}
 		else
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
