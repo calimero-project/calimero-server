@@ -766,7 +766,7 @@ public class Launcher implements Runnable, AutoCloseable
 				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication().get(), pwd));
 		decrypted.put("device.key", authKey);
 		final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password().get(), pwd));
-		decrypted.put("user.1", mgmtKey);
+		decrypted.put("user[1].key", mgmtKey);
 
 		if (sc instanceof RoutingServiceContainer) {
 			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
@@ -785,7 +785,7 @@ public class Launcher implements Runnable, AutoCloseable
 			if (iface.password().isEmpty())
 				continue;
 			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password().get(), pwd));
-			decrypted.put("user." + iface.user(), key);
+			decrypted.put("user[" + iface.user() + "].key", key);
 		}
 
 		for (final var entry : keyring.groups().entrySet())
