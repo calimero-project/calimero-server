@@ -183,8 +183,12 @@ public class Launcher implements Runnable, AutoCloseable
 		public static final String attrExpirationTimeout = "expirationTimeout";
 
 
+		private static final Function<String, String> expandHome = v -> v.replaceFirst("^~",
+				System.getProperty("user.home"));
+
 		private URI uri;
 		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
+
 
 		public static ServerConfiguration from(final URI serverConfigUri) {
 			return new XmlConfiguration(serverConfigUri).load();
@@ -202,6 +206,8 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final var serverName = attr(r, XmlConfiguration.attrName).orElseThrow();
 			final String friendly = attr(r, XmlConfiguration.attrFriendly).orElseThrow();
+			final Path appData = attr(r, "appData").map(expandHome).map(Paths::get).orElse(Path.of(""));
+
 			logger = LoggerFactory.getLogger("calimero.server." + serverName);
 
 			boolean discovery = true;
@@ -222,7 +228,7 @@ public class Launcher implements Runnable, AutoCloseable
 					}
 				}
 			}
-			final URI iosResource = Path.of("./" + serverName + "-ios.xml").normalize().toUri();
+			final URI iosResource = appData.resolve(serverName + "-ios.xml").normalize().toUri();
 			return new ServerConfiguration(serverName, friendly, discovery, List.of(listen.split(",")),
 					List.of(outgoing.split(",")), iosResource, containers);
 		}
@@ -282,8 +288,6 @@ public class Launcher implements Runnable, AutoCloseable
 			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
 			final int port = attr(r, XmlConfiguration.attrUdpPort).map(Integer::parseUnsignedInt).orElse(3671);
 			final NetworkInterface netif = getNetIf(r);
-
-			final Function<String, String> expandHome = v -> v.replaceFirst("^~", System.getProperty("user.home"));
 
 			// look for a server keyfile
 			final Path keyfile = attr(r, "keyfile").map(expandHome).map(Paths::get).orElse(null);
