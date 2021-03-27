@@ -111,7 +111,7 @@ import tuwien.auto.calimero.knxnetip.util.Srp.Type;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRD;
 import tuwien.auto.calimero.knxnetip.util.TunnelCRI;
 import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
-import tuwien.auto.calimero.knxnetip.util.TunnelingDib.Status;
+import tuwien.auto.calimero.knxnetip.util.TunnelingDib.SlotStatus;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
@@ -583,15 +583,15 @@ final class ControlEndpointService extends ServiceLooper
 		final boolean authorized = true; // TODO check for secure session / plain access
 		final boolean subnetOk = subnetStatus() == ErrorCodes.NO_ERROR;
 
-		final var slots = new HashMap<IndividualAddress, EnumSet<Status>>();
+		final var slots = new HashMap<IndividualAddress, EnumSet<SlotStatus>>();
 		for (final var addr : addresses) {
-			final var status = EnumSet.noneOf(Status.class);
+			final var status = EnumSet.noneOf(SlotStatus.class);
 			if (!addressInUse(addr))
-				status.add(Status.Free);
+				status.add(SlotStatus.Free);
 			if (authorized)
-				status.add(Status.Authorized);
+				status.add(SlotStatus.Authorized);
 			if (subnetOk)
-				status.add(Status.Usable);
+				status.add(SlotStatus.Usable);
 			slots.put(addr, status);
 		}
 		final int pidMaxInterfaceApduLength = 68;
@@ -1105,14 +1105,16 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	// workaround to find the correct looper/connection when ETS sends to the wrong UDP port
-	// TODO make thread-safe
-	private static final Set<LooperTask> looperTasks = Collections.newSetFromMap(new WeakHashMap<>());
+	private static final Set<LooperTask> looperTasks = Collections
+			.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
 	static Optional<DataEndpointService> findDataEndpoint(final int channelId) {
-		for (final LooperTask t : looperTasks) {
-			final Optional<DataEndpointService> looper = t.looper().map(DataEndpointService.class::cast);
-			if (looper.isPresent() && looper.get().svcHandler.getChannelId() == channelId)
-				return looper;
+		synchronized (looperTasks) {
+			for (final LooperTask t : looperTasks) {
+				final Optional<DataEndpointService> looper = t.looper().map(DataEndpointService.class::cast);
+				if (looper.isPresent() && looper.get().svcHandler.getChannelId() == channelId)
+					return looper;
+			}
 		}
 		return Optional.empty();
 	}
