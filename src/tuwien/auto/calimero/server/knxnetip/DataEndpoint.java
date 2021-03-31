@@ -58,6 +58,7 @@ import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.ReturnCode;
+import tuwien.auto.calimero.ServiceType;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -278,7 +279,7 @@ public final class DataEndpoint extends ConnectionBase
 		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
 		final boolean configAck = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_ACK;
 		if (tunnel && (configReq || configAck)) {
-			final int recvChannelId = configReq ? getServiceRequest(h, data, offset).getChannelID()
+			final int recvChannelId = configReq ? ServiceRequest.from(h, data, offset).getChannelID()
 					: new ServiceAck(svc, data, offset).getChannelID();
 			if (recvChannelId == channelId)
 				return false;
@@ -295,7 +296,7 @@ public final class DataEndpoint extends ConnectionBase
 
 		final String type = tunnel ? "tunneling" : "device configuration";
 		if (svc == serviceRequest || svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			final ServiceRequest req = getServiceRequest(h, data, offset);
+			final var req = ServiceRequest.from(h, data, offset);
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 
@@ -330,10 +331,7 @@ public final class DataEndpoint extends ConnectionBase
 					return true;
 				}
 
-				final CEMI cemi = req.getCEMI();
-				// leave if we are working with an empty (broken) service request
-				if (cemi == null)
-					return true;
+				final CEMI cemi = req.service();
 				if (tunnel)
 					checkNotifyTunnelingCEMI(cemi);
 				else
@@ -397,55 +395,56 @@ public final class DataEndpoint extends ConnectionBase
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		logger.debug("respond with {}", res);
-		send(PacketHelper.toPacket(res), dataEndpt);
+		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dataEndpt);
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
 		final int svc = h.getServiceType();
 		// NYI detect data type conflict (wrong sized value) and respond with ReturnCode.DataTypeConflict
 		// NYI for an unknown interface feature, respond with ReturnCode.AddressVoid
-		final TunnelingFeature req = TunnelingFeature.from(svc, buffer);
-		logger.debug("received {}", req);
+		final var req = ServiceRequest.from(h, buffer.array(), buffer.position());
+		final TunnelingFeature feat = req.service();
+		logger.debug("received {}", feat);
 
 		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
-			switch (req.featureId()) {
+			switch (feat.featureId()) {
 			case SupportedEmiTypes:
-				return responseForFeature(req, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)
+				return responseForFeature(feat, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)
 			case IndividualAddress:
-				return responseForFeature(req, device.toByteArray());
+				return responseForFeature(feat, device.toByteArray());
 			case MaxApduLength:
-				return responseForFeature(req, (byte) 0, (byte) maxApduLength());
+				return responseForFeature(feat, (byte) 0, (byte) maxApduLength());
 			case DeviceDescriptorType0:
-				return responseForFeature(req, DD0.TYPE_091A.toByteArray());
+				return responseForFeature(feat, DD0.TYPE_091A.toByteArray());
 			case ConnectionStatus:
-				return responseForFeature(req, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
+				return responseForFeature(feat, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
 			case Manufacturer:
-				return responseForFeature(req, (byte) 0, (byte) 0);
+				return responseForFeature(feat, (byte) 0, (byte) 0);
 			case ActiveEmiType:
-				return responseForFeature(req, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
+				return responseForFeature(feat, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
 			case EnableFeatureInfoService:
-				return responseForFeature(req, (byte) (featureInfoServiceEnabled ? 1 : 0));
+				return responseForFeature(feat, (byte) (featureInfoServiceEnabled ? 1 : 0));
 			}
 		}
 		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			final byte[] value = req.featureValue().get();
+			final byte[] value = feat.featureValue().get();
 			// write access to IA is only permitted if connection is not secured
-			if (req.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
+			if (feat.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
 				final ReturnCode result = updateTunnelingAddress(value) ? ReturnCode.Success : ReturnCode.DataVoid;
-				return responseForFeature(req, result, value);
+				return responseForFeature(feat, result, value);
 			}
-			else if (req.featureId() == InterfaceFeature.EnableFeatureInfoService) {
+			else if (feat.featureId() == InterfaceFeature.EnableFeatureInfoService) {
 				if (value[0] != 0 && value[0] != 1)
-					return responseForFeature(req, ReturnCode.OutOfMaxRange, value);
+					return responseForFeature(feat, ReturnCode.OutOfMaxRange, value);
 				featureInfoServiceEnabled = value[0] == 1;
-				return responseForFeature(req, value);
+				return responseForFeature(feat, value);
 			}
 
-			return responseForFeature(req, ReturnCode.AccessReadOnly, value);
+			return responseForFeature(feat, ReturnCode.AccessReadOnly, value);
 		}
 
-		logger.warn("unknown or unsupported: {} {}", Integer.toHexString(svc), req);
-		return responseForFeature(req, ReturnCode.AddressVoid);
+		logger.warn("unknown or unsupported: {} {}", Integer.toHexString(svc), feat);
+		return responseForFeature(feat, ReturnCode.AddressVoid);
 	}
 
 	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
@@ -454,7 +453,7 @@ public final class DataEndpoint extends ConnectionBase
 
 	private TunnelingFeature responseForFeature(final TunnelingFeature req, final ReturnCode rc,
 		final byte... featureValue) {
-		return TunnelingFeature.newResponse(req.channelId(), getSeqSend(), req.featureId(), rc, featureValue);
+		return TunnelingFeature.newResponse(req.featureId(), rc, featureValue);
 	}
 
 	private boolean updateTunnelingAddress(final byte[] value) {
@@ -519,10 +518,10 @@ public final class DataEndpoint extends ConnectionBase
 
 	private void sendFeatureInfo(final InterfaceFeature id, final byte... value) {
 		if (featureInfoServiceEnabled) {
-			final TunnelingFeature info = TunnelingFeature.newInfo(channelId, getSeqSend(), id, value);
+			final TunnelingFeature info = TunnelingFeature.newInfo(id, value);
 			logger.debug("send {}", info);
 			try {
-				send(PacketHelper.toPacket(info), dataEndpt);
+				send(PacketHelper.toPacket(new ServiceRequest<>(info.type(), channelId, getSeqSend(), info)), dataEndpt);
 			}
 			catch (final IOException e) {
 				logger.error("sending {}", info, e);

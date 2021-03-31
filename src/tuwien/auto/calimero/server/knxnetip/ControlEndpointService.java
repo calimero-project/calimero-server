@@ -97,6 +97,7 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.SearchResponse;
+import tuwien.auto.calimero.knxnetip.servicetype.ServiceRequest;
 import tuwien.auto.calimero.knxnetip.util.AdditionalDeviceDib;
 import tuwien.auto.calimero.knxnetip.util.CRD;
 import tuwien.auto.calimero.knxnetip.util.DIB;
@@ -454,7 +455,7 @@ final class ControlEndpointService extends ServiceLooper
 			try {
 				// to get the channel id, we are just interested in connection header
 				// which has the same layout for request and ack
-				final int channelId = PacketHelper.getEmptyServiceRequest(h, data, offset).getChannelID();
+				final int channelId = ServiceRequest.from(h, data, offset).getChannelID();
 				endpoint = connections.get(channelId);
 			}
 			catch (final KNXFormatException e) {}
