@@ -298,7 +298,8 @@ public class Launcher implements Runnable, AutoCloseable
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String addr = "";
-			String subnetType = "";
+			String interfaceType = "";
+			String msgFormat = "";
 			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
 			byte[] subnetDoA = null;
 			IndividualAddress subnet = null;
@@ -331,9 +332,10 @@ public class Launcher implements Runnable, AutoCloseable
 						datapoints = dps;
 					}
 					else if (name.equals(XmlConfiguration.subnet)) {
-						subnetType = r.getAttributeValue(null, XmlConfiguration.attrType);
+						interfaceType = r.getAttributeValue(null, XmlConfiguration.attrType);
+						msgFormat = attr(r, "format").orElse("");
 						String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
-						if (subnetType.equals("knxip"))
+						if (interfaceType.equals("knxip"))
 							medium = "knxip";
 						else if (medium == null)
 							medium = "tp1";
@@ -348,13 +350,13 @@ public class Launcher implements Runnable, AutoCloseable
 								subnetDoA[i] = (byte) l;
 						}
 
-						if (subnetType.equals("ip")) {
+						if (interfaceType.equals("ip")) {
 							subnetKnxipNetif = getNetIf(r);
 							useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
 						}
-						else if (subnetType.equals("knxip"))
+						else if (interfaceType.equals("knxip"))
 							subnetKnxipNetif = getNetIf(r);
-						else if (subnetType.equals("user-supplied"))
+						else if (interfaceType.equals("user-supplied"))
 							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
 						addr = r.getElementText();
 					}
@@ -423,7 +425,7 @@ public class Launcher implements Runnable, AutoCloseable
 									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
-						final String svcContName = addr.isEmpty() ? subnetType + "-" + subnet : addr;
+						final String svcContName = addr.isEmpty() ? interfaceType + "-" + subnet : addr;
 						if (routing)
 							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, udpOnly,
 									routingMcast, Duration.ofMillis(latencyTolerance));
@@ -434,8 +436,8 @@ public class Launcher implements Runnable, AutoCloseable
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
 						++objectInstance;
-						final var connector = subnetConnector(sc, objectInstance, subnetType, addr, subnetKnxipNetif,
-								useNat, subnetLinkClass, datapoints);
+						final var connector = subnetConnector(sc, objectInstance, interfaceType, addr, msgFormat,
+								subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
@@ -471,18 +473,18 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		private SubnetConnector subnetConnector(final ServiceContainer sc, final int objectInstance,
-				final String subnetType, final String subnetArgs, final NetworkInterface netif, final boolean useNat,
-				final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
+				final String interfaceType, final String subnetArgs, final String msgFormat, final NetworkInterface netif,
+				final boolean useNat, final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
 
-			switch (subnetType) {
+			switch (interfaceType) {
 			case "knxip": return SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
-			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, subnetArgs);
+			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, subnetArgs);
 			case "tpuart": return SubnetConnector.newWithTpuartLink(sc, subnetArgs);
 			case "user-supplied": return SubnetConnector.newWithUserLink(sc, subnetLinkClass, subnetArgs);
 			case "emulate":
 				return datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
 						: SubnetConnector.newCustom(sc, "emulate");
-			default: return SubnetConnector.newWithInterfaceType(sc, subnetType, subnetArgs);
+			default: return SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, subnetArgs);
 			}
 		}
 

@@ -53,6 +53,7 @@ import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.baos.Baos;
 import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
@@ -62,6 +63,7 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
+import tuwien.auto.calimero.knxnetip.Connection;
 import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.TSupplier;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -89,7 +91,8 @@ import tuwien.auto.calimero.server.knxnetip.ServiceContainer;
 public final class SubnetConnector
 {
 	private final ServiceContainer sc;
-	private final String subnetType;
+	private final String interfaceType;
+	private final String msgFormat;
 	private final String linkArgs;
 	private final NetworkInterface netif;
 	private final String className;
@@ -115,7 +118,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "knxip", routingNetif, null, subnetArgs);
+		return new SubnetConnector(container, "knxip", "", routingNetif, null, subnetArgs);
 	}
 
 	/**
@@ -124,17 +127,18 @@ public final class SubnetConnector
 	 * @param container service container
 	 * @param netif the network interface used for the tunneling connection
 	 * @param useNat use network address translation (NAT)
+	 * @param msgFormat messaging formt, one of "" (default), "cemi", "baos"
 	 * @param subnetArgs the arguments to create the KNX link
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
-		final boolean useNat, final String subnetArgs)
+		final boolean useNat, final String msgFormat, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "ip", netif, null, subnetArgs, useNat);
+		return new SubnetConnector(container, "ip", msgFormat, netif, null, subnetArgs, useNat);
 	}
 
 	public static SubnetConnector newWithTpuartLink(final ServiceContainer container, final String subnetArgs) {
-		return new SubnetConnector(container, "tpuart", null, null, subnetArgs);
+		return new SubnetConnector(container, "tpuart", "", null, null, subnetArgs);
 	}
 
 	/**
@@ -148,7 +152,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithUserLink(final ServiceContainer container,
 		final String className, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "user-supplied", null, className, subnetArgs);
+		return new SubnetConnector(container, "user-supplied", "", null, className, subnetArgs);
 	}
 
 	/**
@@ -162,7 +166,22 @@ public final class SubnetConnector
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
 		final String subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, subnetArgs);
+		return newWithInterfaceType(container, interfaceType, "", subnetArgs);
+	}
+
+	/**
+	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
+	 *
+	 * @param container service container
+	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
+	 * @param msgFormat one of "" (default), "cemi", "baos"
+	 * @param subnetArgs the arguments to create the subnet link
+	 * @return the created subnet connector
+	 */
+	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
+			final String msgFormat, final String subnetArgs)
+	{
+		return new SubnetConnector(container, interfaceType, msgFormat, null, null, subnetArgs);
 	}
 
 	/**
@@ -176,14 +195,15 @@ public final class SubnetConnector
 	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
 		final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, null, null, interfaceType, subnetArgs);
+		return new SubnetConnector(container, interfaceType, "", null, null, interfaceType, subnetArgs);
 	}
 
-	private SubnetConnector(final ServiceContainer container, final String interfaceType,
+	private SubnetConnector(final ServiceContainer container, final String interfaceType, final String msgFormat,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
 	{
 		sc = container;
-		subnetType = interfaceType;
+		this.interfaceType = interfaceType;
+		this.msgFormat = msgFormat;
 		netif = routingNetif;
 		this.className = className;
 		linkArgs = subnetArgs;
@@ -229,15 +249,31 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkLink> ts;
 		// can cause a delay of connection timeout in the worst case
-		if ("ip".equals(subnetType)) {
+		if ("ip".equals(interfaceType)) {
 			// find IPv4 address for local socket address
 			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
 				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
 			final InetSocketAddress local = new InetSocketAddress(ia, 0);
 			final boolean useNat = (Boolean) this.args[0];
-			ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, parseRemoteEndpoint(), useNat, settings);
+
+			final var server = parseRemoteEndpoint();
+			if (requestBaos)
+				ts = () -> Baos.newUdpLink(local, server);
+			else
+				ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
 		}
-		else if ("knxip".equals(subnetType)) {
+		else if ("tcp".equals(interfaceType)) {
+			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
+					.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
+				final InetSocketAddress local = new InetSocketAddress(ia, 0);
+			final var server = parseRemoteEndpoint();
+
+			if (requestBaos)
+				ts = () -> Baos.newTcpLink(Connection.newTcpConnection(local, server));
+			else
+				ts = () -> KNXNetworkLinkIP.newTunnelingLink(Connection.newTcpConnection(local, server), settings);
+		}
+		else if ("knxip".equals(interfaceType)) {
 			try {
 				final InetAddress mcGroup = InetAddress.getByName(linkArgs);
 				ts = () -> KNXNetworkLinkIP.newRoutingLink(netif, mcGroup, settings);
@@ -246,26 +282,35 @@ public final class SubnetConnector
 				throw new KNXException("open network link (KNXnet/IP routing): invalid multicast group " + linkArgs, e);
 			}
 		}
-		else if ("usb".equals(subnetType)) {
+		else if ("usb".equals(interfaceType)) {
 			// ignore configured device address with USB on TP1 and always use 0.0.0
 			final var adjustForTP1 = settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
-			ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
+			if (requestBaos)
+				ts = () -> Baos.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
+			else
+				ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
 		}
-		else if ("ft12".equals(subnetType))
-			ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
-		else if ("ft12-cemi".equals(subnetType))
+		else if ("ft12".equals(interfaceType)) {
+			if ("cemi".equals(msgFormat))
+				ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
+			else if (requestBaos)
+				ts = () -> Baos.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
+			else
+				ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
+		}
+		else if ("ft12-cemi".equals(interfaceType))
 			ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
-		else if ("tpuart".equals(subnetType))
+		else if ("tpuart".equals(interfaceType))
 			ts = () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
-		else if ("user-supplied".equals(subnetType))
+		else if ("user-supplied".equals(interfaceType))
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
-		else if ("virtual".equals(subnetType)) {
+		else if ("virtual".equals(interfaceType)) {
 			// if we use connector, we cannot cast link to VirtualLink for creating device links
 			final KNXNetworkLink link = new VirtualLink(linkArgs, settings);
 			setSubnetLink(link);
 			return link;
 		}
-		else if ("emulate".equals(subnetType)) {
+		else if ("emulate".equals(interfaceType)) {
 			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
 			final VirtualLink vl = new VirtualLink(sc.getName(), settings);
 			final Configuration config = nb.addConfiguration(vl);
@@ -297,7 +342,7 @@ public final class SubnetConnector
 			ts = () -> config.getBufferedLink();
 		}
 		else
-			throw new KNXException("network link: unknown KNX subnet specifier '" + subnetType + "'");
+			throw new KNXException("network link: unknown KNX subnet specifier '" + interfaceType + "'");
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
@@ -311,22 +356,22 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts;
 		// can cause a delay of connection timeout in the worst case
-		if ("ip".equals(subnetType))
+		if ("ip".equals(interfaceType))
 			ts = () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
-		else if ("usb".equals(subnetType))
+		else if ("usb".equals(interfaceType))
 			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
-		else if ("ft12".equals(subnetType))
+		else if ("ft12".equals(interfaceType))
 			ts = () -> new KNXNetworkMonitorFT12(linkArgs, settings);
-		else if ("ft12-cemi".equals(subnetType))
+		else if ("ft12-cemi".equals(interfaceType))
 			ts = () -> KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings);
-		else if ("tpuart".equals(subnetType))
+		else if ("tpuart".equals(interfaceType))
 			ts = () -> new KNXNetworkMonitorTpuart(linkArgs, false);
-		else if ("user-supplied".equals(subnetType))
+		else if ("user-supplied".equals(interfaceType))
 			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
-		else if ("virtual".equals(subnetType) || "emulate".equals(subnetType))
+		else if ("virtual".equals(interfaceType) || "emulate".equals(interfaceType))
 			return null;
 		else
-			throw new KNXException("monitor link: unknown KNX subnet specifier " + subnetType);
+			throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
@@ -342,11 +387,13 @@ public final class SubnetConnector
 		return new InetSocketAddress(ip, port);
 	}
 
-	public String interfaceType() { return subnetType; }
+	public String interfaceType() { return interfaceType; }
+
+	public String format() { return msgFormat; }
 
 	String getInterfaceType()
 	{
-		return subnetType;
+		return interfaceType;
 	}
 
 	public String linkArguments() { return linkArgs; }
@@ -357,8 +404,8 @@ public final class SubnetConnector
 
 	@Override
 	public String toString() {
-		final Object linkDesc = subnetLink != null ? subnetLink : linkArgs;
-		return (subnetType + " " + linkDesc).trim(); // trim because linkDesc might be empty
+		final Object linkDesc = subnetLink != null ? subnetLink : (linkArgs + " " + msgFormat);
+		return (interfaceType + " " + linkDesc).trim(); // trim because linkDesc might be empty
 	}
 
 	void setSubnetListener(final SubnetListener subnetListener)
@@ -369,6 +416,13 @@ public final class SubnetConnector
 			((KNXNetworkLink) link).addLinkListener(listener);
 		if (link instanceof KNXNetworkMonitor)
 			((KNXNetworkMonitor) link).addMonitorListener(listener);
+	}
+
+	private volatile boolean requestBaos;
+
+	void requestBaos(final boolean baos) {
+		if ("baos".equals(msgFormat))
+			requestBaos = baos;
 	}
 
 	private void connectionStatusChanged(final boolean connected) {
