@@ -98,7 +98,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		throws IOException
 	{
 		try {
-			final KNXnetIPHeader h = new KNXnetIPHeader(data, offset);
+			final KNXnetIPHeader h = KNXnetIPHeader.from(data, offset);
 			if (!sanitize(h, length))
 				return;
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {

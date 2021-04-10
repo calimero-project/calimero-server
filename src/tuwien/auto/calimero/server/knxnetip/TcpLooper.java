@@ -77,12 +77,14 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		return t;
 	});
 
+	private final boolean baos;
+
 	// impl note: we cannot simply return the future of ExecutorService::submit, because Future::cancel is
 	// interrupt-based, and the server socket does not honor interrupts; we have to close the socket directly
-	public static Closeable start(final ControlEndpointService ctrlEndpoint, final InetSocketAddress endpoint)
-		throws InterruptedException {
+	public static Closeable start(final ControlEndpointService ctrlEndpoint, final InetSocketAddress endpoint,
+			final boolean baos) throws InterruptedException {
 		final var serverSocket = new ArrayBlockingQueue<Closeable>(1);
-		final Future<?> task = pool.submit(() -> runTcpServerEndpoint(ctrlEndpoint, endpoint, serverSocket));
+		final Future<?> task = pool.submit(() -> runTcpServerEndpoint(ctrlEndpoint, endpoint, baos, serverSocket));
 		while (!task.isDone()) {
 			final var v = serverSocket.poll(1, TimeUnit.SECONDS);
 			if (v != null)
@@ -91,9 +93,10 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		throw new KnxRuntimeException("couldn't start tcp service for " + ctrlEndpoint.getServiceContainer().getName());
 	}
 
-	private TcpLooper(final ControlEndpointService ces, final Socket conn) {
+	private TcpLooper(final ControlEndpointService ces, final Socket conn, final boolean baos) {
 		ctrlEndpoint = ces;
 		socket = conn;
+		this.baos = baos;
 		logger = ctrlEndpoint.logger;
 	}
 
@@ -107,8 +110,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	}
 
 	private static void runTcpServerEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint,
-		final AbstractQueue<Closeable> serverSocket) {
-		final String name = ces.server.getName() + " " + ces.getServiceContainer().getName() + " tcp service";
+			final boolean baos, final AbstractQueue<Closeable> serverSocket) {
+		final String name = ces.server.getName() + " " + ces.getServiceContainer().getName() + (baos ? " baos" : "")
+				+ " tcp service";
 		Thread.currentThread().setName(name);
 
 		ServerSocket localRef = null;
@@ -121,7 +125,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			while (true) {
 				final Socket conn = s.accept();
 				conn.setTcpNoDelay(true);
-				final TcpLooper looper = new TcpLooper(ces, conn);
+				final TcpLooper looper = new TcpLooper(ces, conn, baos);
 				connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
 				pool.execute(looper);
 			}
@@ -167,16 +171,23 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	@Override
 	public void run() {
 		final String name = ctrlEndpoint.server.getName() + " " + ctrlEndpoint.getServiceContainer().getName()
-				+ " tcp connection " + socket.getRemoteSocketAddress();
+				+ (baos ? " baos" : "") + " tcp connection " + socket.getRemoteSocketAddress();
 		Thread.currentThread().setName(name);
 
 		try (InputStream in = socket.getInputStream()) {
+			if (baos) {
+				if (!ctrlEndpoint.setupBaosTcpEndpoint((InetSocketAddress) socket.getRemoteSocketAddress()))
+					return;
+			}
+
 			logger.info("accepted {}", name);
 
 			final int rcvBufferSize = 512;
 			final byte[] data = new byte[rcvBufferSize];
 			int offset = 0;
-			socket.setSoTimeout((int) inactiveConnectionTimeout.toMillis());
+			if (!baos)
+				socket.setSoTimeout((int) inactiveConnectionTimeout.toMillis());
+
 			while (!socket.isClosed()) {
 				if (offset >= 6) {
 					try {
@@ -211,7 +222,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 						return;
 					offset += read;
 				}
-				catch (final SocketTimeoutException e1) {
+				catch (final SocketTimeoutException e) {
 					if (inactive()) {
 						close("no active secure session or client connection");
 						return;
@@ -221,6 +232,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		}
 		catch (final InterruptedIOException e) {
 			Thread.currentThread().interrupt();
+		}
+		catch (final KnxRuntimeException e) {
+			logger.warn("{} error", name, e);
 		}
 		catch (IOException | RuntimeException e) {
 			if (!socket.isClosed())

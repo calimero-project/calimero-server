@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2020 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,12 +71,14 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
 		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
-		final InetAddress routingMulticast)
+		final InetAddress routingMulticast, final boolean baosSupport)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, udpOnly, routingMulticast, Duration.ofMillis(0));
+		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, udpOnly, routingMulticast,
+				Duration.ofMillis(0), baosSupport);
 	}
 
 	/**
@@ -95,11 +97,12 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
 	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
 	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
+	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
 		final boolean allowNetworkMonitoring, final boolean udpOnly, final InetAddress routingMulticast,
-		final Duration latencyTolerance) {
-		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring, udpOnly);
+		final Duration latencyTolerance, final boolean baosSupport) {
+		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring, udpOnly, baosSupport);
 		final IndividualAddress addr = subnet.getDeviceAddress();
 		if (addr.getDevice() != 0)
 			throw new KNXIllegalArgumentException(

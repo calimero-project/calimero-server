@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import tuwien.auto.calimero.CloseEvent;
 import tuwien.auto.calimero.DataUnitBuilder;
@@ -57,8 +58,10 @@ import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KNXTimeoutException;
+import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.ServiceType;
+import tuwien.auto.calimero.baos.BaosService;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
 import tuwien.auto.calimero.cemi.CEMIDevMgmt;
@@ -216,6 +219,21 @@ public final class DataEndpoint extends ConnectionBase
 			ctrlSocket.send(p);
 	}
 
+	public void send(final BaosService svc) throws KNXConnectionClosedException {
+		try {
+			final int chid = tcp ? 0 : channelId;
+			final int seq = tcp ? 0 : getSeqSend();
+			final var buf = PacketHelper.toPacket(new ServiceRequest<>(serviceRequest, chid, seq, svc));
+
+			// NYI udp: we need a send method like for cEMI
+			send(buf, dataEndpt);
+		}
+		catch (final IOException e) {
+			close(CloseEvent.INTERNAL, "communication failure", LogLevel.ERROR, e);
+			throw new KNXConnectionClosedException("connection closed", e);
+		}
+	}
+
 	@Override
 	public String getName()
 	{
@@ -284,6 +302,15 @@ public final class DataEndpoint extends ConnectionBase
 		return sessions.acceptService(h, data, offset, dataEndpt, this);
 	}
 
+	private static final Function<ByteBuffer, BaosService> baosServiceParser = buf -> {
+		try {
+			return BaosService.from(buf);
+		}
+		catch (final KNXFormatException e) {
+			throw new KnxRuntimeException("parsing baos service", e);
+		}
+	};
+
 	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 
@@ -309,7 +336,11 @@ public final class DataEndpoint extends ConnectionBase
 
 		final String type = tunnel ? "tunneling" : "device configuration";
 		if (svc == serviceRequest || svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			final var req = ServiceRequest.from(h, data, offset);
+
+			final var req = svc == KNXnetIPHeader.ObjectServerRequest
+					? ServiceRequest.from(h, data, offset, baosServiceParser)
+					: ServiceRequest.from(h, data, offset);
+
 			if (!checkChannelId(req.getChannelID(), "request"))
 				return true;
 
@@ -341,6 +372,11 @@ public final class DataEndpoint extends ConnectionBase
 						tunnelingAddressChanged = false;
 						sendFeatureInfo(InterfaceFeature.IndividualAddress, device.toByteArray());
 					}
+					return true;
+				}
+				if (svc == KNXnetIPHeader.ObjectServerRequest) {
+					final var baosService = (BaosService) req.service();
+					checkNotifyBaosService(baosService);
 					return true;
 				}
 
@@ -567,20 +603,18 @@ public final class DataEndpoint extends ConnectionBase
 		return ctype == ConnectionType.DevMgmt;
 	}
 
-	boolean isMonitor()
-	{
-		return ctype == ConnectionType.Monitor;
-	}
-
 	public ConnectionType type() { return ctype; }
 
 	private boolean checkVersion(final KNXnetIPHeader h)
 	{
-		final boolean ok = h.getVersion() == KNXnetIPConnection.KNXNETIP_VERSION_10;
-		if (!ok)
+		if (h.getVersion() != protocolVersion())
 			logger.warn("KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
-		return ok;
+		return h.getVersion() == protocolVersion();
+	}
+
+	int protocolVersion() {
+		return ctype == ConnectionType.Baos ? 0x20 : KNXnetIPConnection.KNXNETIP_VERSION_10;
 	}
 
 	private void checkNotifyTunnelingCEMI(final CEMI cemi)
@@ -649,6 +683,16 @@ public final class DataEndpoint extends ConnectionBase
 		final var securityControl = sessionId == 0 ? SecurityControl.Plain
 				: SecurityControl.of(DataSecurity.AuthConf, true);
 		final FrameEvent fe = new FrameEvent(this, frame, false, securityControl);
+		listeners.fire(l -> l.frameReceived(fe));
+	}
+
+	private void checkNotifyBaosService(final BaosService svc) {
+		if (svc.subService() == BaosService.DatapointValueIndication
+				|| svc.subService() == BaosService.ServerItemIndication || svc.isResponse()) {
+			logger.warn("unsupported baos service {}", svc);
+			return;
+		}
+		final FrameEvent fe = new FrameEvent(this, svc.toByteArray());
 		listeners.fire(l -> l.frameReceived(fe));
 	}
 

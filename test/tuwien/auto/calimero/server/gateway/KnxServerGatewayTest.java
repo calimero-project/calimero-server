@@ -85,7 +85,7 @@ class KnxServerGatewayTest
 		server = setupServer("test");
 		final ServiceContainer sc = new DefaultServiceContainer("test container", "any",
 				new HPAI((InetAddress) null, 5647),
-				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false);
+				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false, false);
 		server.addServiceContainer(sc);
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "");
 		connector.openNetworkLink();
@@ -123,7 +123,7 @@ class KnxServerGatewayTest
 		final KNXnetIPServer s = setupServer("test 2");
 		final var lo = InetAddress.getLoopbackAddress();
 		final var sc = new DefaultServiceContainer("test container 2", "any", new HPAI(lo, 0), new TPSettings(),
-				false, false, false);
+				false, false, false, false);
 		s.addServiceContainer(sc);
 		final var connector = SubnetConnector.newCustom(sc, "emulate");
 

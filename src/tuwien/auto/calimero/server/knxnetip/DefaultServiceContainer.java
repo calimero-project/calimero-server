@@ -62,6 +62,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private volatile Duration disruptionBufferTimeout;
 	private volatile int disruptionBufferLowerPort;
 	private volatile int disruptionBufferUpperPort;
+	private final boolean baosSupport;
 
 	/**
 	 * Creates a new service container with the supplied parameters. The control endpoint of this
@@ -81,10 +82,11 @@ public class DefaultServiceContainer implements ServiceContainer
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param allowNetworkMonitoring <code>true</code> to allow KNXnet/IP bus monitor connections at
 	 *        this service container, <code>false</code> otherwise
+	 * @param baosSupport serve BAOS connections
 	 */
 	public DefaultServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
 		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
-		final boolean udpOnly)
+		final boolean udpOnly, final boolean baosSupport)
 	{
 		if (name == null)
 			throw new NullPointerException("container identifier must not be null");
@@ -106,6 +108,7 @@ public class DefaultServiceContainer implements ServiceContainer
 		networkMonitor = allowNetworkMonitoring;
 		this.udpOnly = udpOnly;
 		disruptionBufferTimeout = Duration.of(0, ChronoUnit.SECONDS);
+		this.baosSupport = baosSupport;
 	}
 
 	@Override
@@ -177,4 +180,9 @@ public class DefaultServiceContainer implements ServiceContainer
 	{
 		return new int[] { disruptionBufferLowerPort, disruptionBufferUpperPort };
 	}
+
+	/**
+	 * @return <code>true</code> iff service container should serve BAOS connections, <code>false</code> otherwise
+	 */
+	boolean baosSupport() { return baosSupport; }
 }

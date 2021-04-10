@@ -96,6 +96,8 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.baos.BaosLink;
+import tuwien.auto.calimero.baos.BaosService;
 import tuwien.auto.calimero.cemi.AdditionalInfo;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIBusMon;
@@ -131,6 +133,7 @@ import tuwien.auto.calimero.link.KNXNetworkLink;
 import tuwien.auto.calimero.link.KNXNetworkLinkIP;
 import tuwien.auto.calimero.link.KNXNetworkLinkUsb;
 import tuwien.auto.calimero.link.KNXNetworkMonitor;
+import tuwien.auto.calimero.link.LinkEvent;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.log.LogService;
@@ -322,8 +325,28 @@ public class KnxServerGateway implements Runnable
 
 			if (!(conn instanceof KNXnetIPDevMgmt)) {
 				final AutoCloseable subnetLink = connector.getSubnetLink();
-				final AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
+				AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
 				try {
+					if (type == ConnectionType.Baos) {
+						final String format = connector.format();
+						if (!"baos".equals(format))
+							return false;
+						connector.requestBaos(true);
+
+						if (!(rawLink instanceof BaosLink)) {
+							// TODO closeLink has a delay, which we hit twice now (here and below)
+							closeLink(subnetLink);
+							rawLink = null;
+						}
+					}
+					else {
+						connector.requestBaos(false);
+						if (rawLink instanceof BaosLink) {
+							closeLink(subnetLink);
+							rawLink = null;
+						}
+					}
+
 					if (rawLink instanceof VirtualLink) {
 						/* no-op */
 					}
@@ -477,6 +500,12 @@ public class KnxServerGateway implements Runnable
 			// stored in this frame event, e.g., when using a buffered link.
 			// Therefore, I store the svcContainer in here for re-association.
 			if (!subnetEvents.offer(new FrameEvent(scid, e.getFrame())))
+				incMsgQueueOverflow(false);
+		}
+
+		@LinkEvent
+		void baosService(final BaosService svc) {
+			if (!subnetEvents.offer(new FrameEvent(scid, svc.toByteArray())))
 				incMsgQueueOverflow(false);
 		}
 
@@ -1056,6 +1085,11 @@ public class KnxServerGateway implements Runnable
 		final String s = "server-side";
 		final CEMI frame = fe.getFrame();
 
+		if (frame == null) {
+			checkBaosService(fe);
+			return;
+		}
+
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData) {
 			final var ldata = (CEMILData) frame;
@@ -1193,6 +1227,30 @@ public class KnxServerGateway implements Runnable
 		logger.warn("received {} {} - ignored", s, frame);
 	}
 
+	private void checkBaosService(final FrameEvent fe) {
+		final var source = fe.getSource();
+		if (!(source instanceof DataEndpoint && ((DataEndpoint) source).type() == ConnectionType.Baos))
+			return;
+
+		for (final var connector : connectors) {
+			// we assume there is only one service container with baos support
+			if ("baos".equals(connector.format())) {
+				final var link = ((Link<?>) connector.getSubnetLink()).target();
+				if (link != null && link instanceof BaosLink) {
+					try {
+						final var baosService = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
+						logger.trace("send baos {}", baosService);
+						((BaosLink) link).send(baosService);
+					}
+					catch (final KNXException e) {
+						logger.warn("forwarding client baos service", e);
+					}
+				}
+				return;
+			}
+		}
+	}
+
 	private void onSubnetFrameReceived(final FrameEvent fe) {
 		final String s = "subnet";
 		final CEMI frame = fe.getFrame();
@@ -1250,6 +1308,32 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 			return;
+		}
+
+		if (frame == null) {
+			final var connector = getSubnetConnector((String) fe.getSource());
+			if ("baos".equals(connector.format())) {
+				try {
+					final var svc = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
+					final var serviceContainer = connector.getServiceContainer();
+
+					final var connections = server.dataConnections(serviceContainer);
+					for (final var c : connections.values()) {
+						if (c.type() == ConnectionType.Baos) {
+							logger.trace("{}: send baos {}", c, svc);
+							c.send(svc);
+						}
+					}
+
+					final int oi = objectInstance(serviceContainer.getName());
+					setNetworkState(oi, false, false);
+					incMsgTransmitted(oi, false);
+				}
+				catch (final Exception e) {
+					logger.warn("forwarding baos service", e);
+				}
+				return;
+			}
 		}
 
 		logger.warn("received {} {} - ignored", s, frame);

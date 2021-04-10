@@ -426,11 +426,13 @@ public class Launcher implements Runnable, AutoCloseable
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = addr.isEmpty() ? interfaceType + "-" + subnet : addr;
+						final boolean baosSupport = "baos".equals(msgFormat);
 						if (routing)
 							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, udpOnly,
-									routingMcast, Duration.ofMillis(latencyTolerance));
+									routingMcast, Duration.ofMillis(latencyTolerance), baosSupport);
 						else
-							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, udpOnly);
+							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, udpOnly,
+									baosSupport);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);

@@ -147,6 +147,8 @@ final class ControlEndpointService extends ServiceLooper
 	private boolean secureSvcInProgress;
 
 	private final Closeable tcpLooper;
+	private final Closeable baosLooper;
+
 
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
@@ -167,7 +169,15 @@ final class ControlEndpointService extends ServiceLooper
 		logger.info("{} secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
 
 		try {
-			tcpLooper = TcpLooper.start(this, (InetSocketAddress) s.getLocalSocketAddress());
+			final var ctrlEndpoint = (InetSocketAddress) s.getLocalSocketAddress();
+			tcpLooper = TcpLooper.start(this, ctrlEndpoint, false);
+			final boolean baosConnections = ((DefaultServiceContainer) sc).baosSupport();
+			if (baosConnections) {
+				final var baosEndpoint = new InetSocketAddress(ctrlEndpoint.getAddress(), 12004);
+				baosLooper = TcpLooper.start(this, baosEndpoint, true);
+			}
+			else
+				baosLooper = () -> {};
 		}
 		catch (final Exception e) {
 			if (e instanceof InterruptedException)
@@ -206,6 +216,7 @@ final class ControlEndpointService extends ServiceLooper
 		closeDataConnections();
 		try {
 			tcpLooper.close();
+			baosLooper.close();
 		}
 		catch (final IOException ignore) {}
 		super.quit();
@@ -340,10 +351,10 @@ final class ControlEndpointService extends ServiceLooper
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
 			useNat = false;
 			final ConnectRequest req = new ConnectRequest(data, offset);
-			int status = ErrorCodes.NO_ERROR;
 
-			if (!checkVersion(h))
-				status = ErrorCodes.VERSION_NOT_SUPPORTED;
+			final int connType = req.getCRI().getConnectionType();
+			final int expectedVersion = connType == ObjectServerProtocol ? 0x20 : KNXnetIPConnection.KNXNETIP_VERSION_10;
+			int status = checkVersion(h, expectedVersion);
 
 			final HPAI controlEndpoint = req.getControlEndpoint();
 			final boolean tcp = controlEndpoint.getHostProtocol() == HPAI.IPV4_TCP;
@@ -370,12 +381,12 @@ final class ControlEndpointService extends ServiceLooper
 							svcCont.getName(), channelId, ctrlEndpt, tcp ? "tcp" : "udp");
 					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
-					buf = PacketHelper.toPacket(res);
+					buf = PacketHelper.toPacket(expectedVersion, res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
 				}
 			}
 			if (buf == null)
-				buf = PacketHelper.toPacket(errorResponse(status, ctrlEndpt.toString()));
+				buf = PacketHelper.toPacket(expectedVersion, errorResponse(status, ctrlEndpt.toString()));
 
 			send(sessionId, channelId, buf, ctrlEndpt);
 			if (established)
@@ -427,15 +438,18 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
-			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+			int status = ErrorCodes.NO_ERROR;
 
-			if (status == ErrorCodes.NO_ERROR) {
-				final var endpoint = connections.get(csr.getChannelID());
-				if (endpoint == null)
-					status = ErrorCodes.CONNECTION_ID;
-				else {
+			final var endpoint = connections.get(csr.getChannelID());
+			int protocolVersion = KNXnetIPConnection.KNXNETIP_VERSION_10;
+			if (endpoint == null)
+				status = ErrorCodes.CONNECTION_ID;
+			else {
+				protocolVersion = endpoint.protocolVersion();
+				status = checkVersion(h, protocolVersion);
+				if (status == ErrorCodes.NO_ERROR) {
 					logger.trace("received connection state request from {} for channel {}", endpoint.getRemoteAddress(),
-							csr.getChannelID());
+						csr.getChannelID());
 					endpoint.updateLastMsgTimestamp();
 				}
 			}
@@ -446,7 +460,8 @@ final class ControlEndpointService extends ServiceLooper
 				logger.warn("received invalid connection state request for channel {}: {}", csr.getChannelID(),
 						ErrorCodes.getErrorMessage(status));
 
-			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
+			final byte[] buf = PacketHelper.toPacket(protocolVersion,
+					new ConnectionstateResponse(csr.getChannelID(), status));
 			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
@@ -456,8 +471,18 @@ final class ControlEndpointService extends ServiceLooper
 			try {
 				// to get the channel id, we are just interested in connection header
 				// which has the same layout for request and ack
-				final int channelId = ServiceRequest.from(h, data, offset).getChannelID();
-				endpoint = connections.get(channelId);
+				final int channelId = ServiceRequest.from(h, data, offset, buf -> null).getChannelID();
+
+				// baos tcp connections don't have channel id
+				if (channelId == 0 && TcpLooper.connections.containsKey(src)
+						&& (h.getServiceType() == KNXnetIPHeader.ObjectServerRequest
+								|| h.getServiceType() == KNXnetIPHeader.ObjectServerAck)) {
+					endpoint = connections.values().stream()
+							.filter(c -> c.type() == ConnectionType.Baos && src.equals(c.getRemoteAddress()))
+							.findFirst().orElse(null);
+				}
+				else
+					endpoint = connections.get(channelId);
 			}
 			catch (final KNXFormatException e) {}
 			if (endpoint != null)
@@ -721,6 +746,8 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
+	private static final int ObjectServerProtocol = 0xf0;
+
 	private IndividualAddress device;
 
 	private ConnectResponse initNewConnection(final ConnectRequest req, final InetSocketAddress ctrlEndpt,
@@ -730,7 +757,6 @@ final class ControlEndpointService extends ServiceLooper
 		final String endpoint = ctrlEndpt.toString();
 
 		ConnectionType cType = ConnectionType.LinkLayer;
-		boolean busmonitor = false;
 		IndividualAddress device = null;
 		CRD crd = null;
 
@@ -756,8 +782,7 @@ final class ControlEndpointService extends ServiceLooper
 			if (knxLayer != TunnelingLayer.LinkLayer && knxLayer != TunnelingLayer.BusMonitorLayer)
 				return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
 
-			busmonitor = knxLayer == TunnelingLayer.BusMonitorLayer;
-			if (busmonitor) {
+			if (knxLayer == TunnelingLayer.BusMonitorLayer) {
 				// check if service container has busmonitor allowed
 				if (!svcCont.isNetworkMonitoringAllowed())
 					return errorResponse(ErrorCodes.TUNNELING_LAYER, endpoint);
@@ -766,8 +791,7 @@ final class ControlEndpointService extends ServiceLooper
 				// supported, only one tunneling connection is allowed per subnetwork,
 				// i.e., if there are any active link-layer connections, we don't
 				// allow tunneling on busmonitor.
-				final List<DataEndpoint> active = connections.values().stream()
-						.filter(h -> !h.isMonitor()).collect(toList());
+				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.LinkLayer);
 				if (active.size() > 0) {
 					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
 							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
@@ -777,7 +801,7 @@ final class ControlEndpointService extends ServiceLooper
 				// but we can allow several monitor connections at the same time (not spec-conform)
 				final boolean allowMultiMonitorConnections = true;
 				if (allowMultiMonitorConnections) {
-					final long monitoring = activeMonitorConnections().size();
+					final long monitoring = activeConnectionsOfType(ConnectionType.Monitor).size();
 					logger.info("{}: active monitor connections: {}, 1 connect request", svcCont.getName(), monitoring);
 				}
 
@@ -787,12 +811,19 @@ final class ControlEndpointService extends ServiceLooper
 				// KNX specification says that if tunneling on busmonitor is supported, only one tunneling connection
 				// is allowed per subnetwork, i.e., if there is an active bus monitor connection, we don't
 				// allow any other tunneling connections.
-				final List<DataEndpoint> active = activeMonitorConnections();
+				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
 				if (active.size() > 0) {
 					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
 							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
+			}
+
+			final List<DataEndpoint> baos = activeConnectionsOfType(ConnectionType.Baos);
+			if (baos.size() > 0) {
+				logger.warn("{}: connect request denied for tunneling (active baos "
+						+ "connections)\n\tcurrently connected: {}", svcCont.getName(), baos);
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 
 			final int userId;
@@ -830,6 +861,24 @@ final class ControlEndpointService extends ServiceLooper
 
 			cType = ConnectionType.DevMgmt;
 			crd = CRD.createResponse(DEVICE_MGMT_CONNECTION);
+		}
+		else if (connType == ObjectServerProtocol && ((DefaultServiceContainer) svcCont).baosSupport()) {
+			final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
+			if (active.size() > 0) {
+				logger.warn("{}: connect request denied for baos connection (active tunneling on "
+						+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
+			}
+			final List<DataEndpoint> linkLayer = activeConnectionsOfType(ConnectionType.LinkLayer);
+			if (linkLayer.size() > 0) {
+				logger.warn("{}: baos connection currently not allowed (active connections "
+						+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), linkLayer);
+				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
+			}
+
+			logger.info("setup baos connection with channel ID {}", channelId);
+			cType = ConnectionType.Baos;
+			crd = CRD.createResponse(ObjectServerProtocol);
 		}
 		else
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
@@ -884,8 +933,8 @@ final class ControlEndpointService extends ServiceLooper
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}
 
-	private List<DataEndpoint> activeMonitorConnections() {
-		return connections.values().stream().filter(DataEndpoint::isMonitor).collect(toList());
+	private List<DataEndpoint> activeConnectionsOfType(final ConnectionType type) {
+		return connections.values().stream().filter(c -> c.type() == type).collect(toList());
 	}
 
 	private ConnectResponse errorResponse(final int status, final String endpoint)
@@ -1147,5 +1196,45 @@ final class ControlEndpointService extends ServiceLooper
 		final var ios = server.getInterfaceObjectServer();
 		final byte[] data = ios.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.MANUFACTURER_DATA, 1, Integer.MAX_VALUE);
 		return new ManufacturerDIB(mfrId, data);
+	}
+
+	private int checkVersion(final KNXnetIPHeader h, final int version) {
+		final int status = h.getVersion() == version ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
+		if (status == ErrorCodes.VERSION_NOT_SUPPORTED)
+			logger.warn("KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
+					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
+		return status;
+	}
+
+	boolean setupBaosTcpEndpoint(final InetSocketAddress remote) {
+		try {
+			final var svcLoop = new DataEndpointService(server, s, svcCont.getName());
+
+			final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
+			final var newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), remote, remote, 0, device,
+					ConnectionType.Baos, false, sessions, 0, bc.andThen(this::connectionClosed), __ -> {});
+			svcLoop.svcHandler = newDataEndpoint;
+
+			final var looperTask = new LooperTask(server,
+					svcCont.getName() + " data endpoint " + hostPort(newDataEndpoint.getRemoteAddress()), 0,
+					() -> svcLoop);
+
+			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos)) {
+				// don't use sh.close() here, we would initiate tunneling disconnect sequence
+				// but we have to call svcLoop.quit() to close local data socket
+				svcLoop.quit();
+				return false;
+			}
+
+			connections.put(0, newDataEndpoint);
+			LooperTask.execute(looperTask);
+			looperTasks.add(looperTask);
+			connectionEstablished(svcCont, newDataEndpoint);
+			return true;
+		}
+		catch (final RuntimeException e) {
+			logger.warn("error setting up baos tcp endpoint for {}", hostPort(remote), e);
+			return false;
+		}
 	}
 }
