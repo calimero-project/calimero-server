@@ -148,6 +148,7 @@ import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.ServerConfiguration;
 import tuwien.auto.calimero.server.VirtualLink;
 import tuwien.auto.calimero.server.knxnetip.DataEndpoint;
+import tuwien.auto.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import tuwien.auto.calimero.server.knxnetip.DefaultServiceContainer;
 import tuwien.auto.calimero.server.knxnetip.KNXnetIPServer;
 import tuwien.auto.calimero.server.knxnetip.RoutingServiceContainer;
@@ -313,10 +314,8 @@ public class KnxServerGateway implements Runnable
 		private final Set<ServiceContainer> verifiedSubnetInterfaceAddress = Collections.synchronizedSet(new HashSet<>());
 
 		@Override
-		public boolean acceptDataConnection(final ServiceContainer svcContainer,
-			final KNXnetIPConnection conn, final IndividualAddress assignedDeviceAddress,
-			final boolean networkMonitor)
-		{
+		public boolean acceptDataConnection(final ServiceContainer svcContainer, final KNXnetIPConnection conn,
+				final IndividualAddress assignedDeviceAddress, final ConnectionType type) {
 			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
 			if (connector == null)
 				return false;
@@ -328,11 +327,11 @@ public class KnxServerGateway implements Runnable
 					if (rawLink instanceof VirtualLink) {
 						/* no-op */
 					}
-					else if (!networkMonitor && !(rawLink instanceof KNXNetworkLink)) {
+					else if (type != ConnectionType.Monitor && !(rawLink instanceof KNXNetworkLink)) {
 						closeLink(subnetLink);
 						connector.openNetworkLink();
 					}
-					else if (networkMonitor && !(rawLink instanceof KNXNetworkMonitor)) {
+					else if (type == ConnectionType.Monitor && !(rawLink instanceof KNXNetworkMonitor)) {
 						closeLink(subnetLink);
 						connector.openMonitorLink();
 					}

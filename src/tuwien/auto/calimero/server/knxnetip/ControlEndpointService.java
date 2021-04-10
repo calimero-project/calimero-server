@@ -115,6 +115,7 @@ import tuwien.auto.calimero.knxnetip.util.TunnelingDib;
 import tuwien.auto.calimero.knxnetip.util.TunnelingDib.SlotStatus;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
+import tuwien.auto.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
 
 final class ControlEndpointService extends ServiceLooper
@@ -728,7 +729,7 @@ final class ControlEndpointService extends ServiceLooper
 		// information about remote endpoint in case of error response
 		final String endpoint = ctrlEndpt.toString();
 
-		boolean tunnel = true;
+		ConnectionType cType = ConnectionType.LinkLayer;
 		boolean busmonitor = false;
 		IndividualAddress device = null;
 		CRD crd = null;
@@ -779,6 +780,8 @@ final class ControlEndpointService extends ServiceLooper
 					final long monitoring = activeMonitorConnections().size();
 					logger.info("{}: active monitor connections: {}, 1 connect request", svcCont.getName(), monitoring);
 				}
+
+				cType = ConnectionType.Monitor;
 			}
 			else {
 				// KNX specification says that if tunneling on busmonitor is supported, only one tunneling connection
@@ -825,7 +828,7 @@ final class ControlEndpointService extends ServiceLooper
 				++activeMgmtConnections;
 			}
 
-			tunnel = false;
+			cType = ConnectionType.DevMgmt;
 			crd = CRD.createResponse(DEVICE_MGMT_CONNECTION);
 		}
 		else
@@ -837,8 +840,8 @@ final class ControlEndpointService extends ServiceLooper
 
 		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
-			newDataEndpoint = new DataEndpoint(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, tunnel,
-					busmonitor, useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
+			newDataEndpoint = new DataEndpoint(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
+					useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
 			try {
@@ -846,7 +849,7 @@ final class ControlEndpointService extends ServiceLooper
 
 				final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
 				newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
-						tunnel, busmonitor, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
+						cType, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
 						((DataEndpointService) svcLoop)::resetRequest);
 				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
@@ -860,7 +863,7 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 
-		if (!acceptConnection(svcCont, newDataEndpoint, device, busmonitor)) {
+		if (!acceptConnection(svcCont, newDataEndpoint, device, cType)) {
 			// don't use sh.close() here, we would initiate tunneling disconnect sequence
 			// but we have to call svcLoop.quit() to close local data socket
 			svcLoop.quit();
@@ -1093,10 +1096,10 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private boolean acceptConnection(final ServiceContainer sc, final KNXnetIPConnection conn,
-		final IndividualAddress addr, final boolean busmonitor)
+		final IndividualAddress addr, final ConnectionType ctype)
 	{
 		final List<ServerListener> l = server.listeners().listeners();
-		return l.stream().allMatch(e -> e.acceptDataConnection(sc, conn, addr, busmonitor));
+		return l.stream().allMatch(e -> e.acceptDataConnection(sc, conn, addr, ctype));
 	}
 
 	private void connectionEstablished(final ServiceContainer sc, final KNXnetIPConnection conn)

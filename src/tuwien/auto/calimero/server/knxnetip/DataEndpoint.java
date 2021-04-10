@@ -105,8 +105,7 @@ public final class DataEndpoint extends ConnectionBase
 	private final Consumer<DataEndpoint> resetRequest;
 
 	private final IndividualAddress device;
-	private final boolean tunnel;
-	private final boolean monitor;
+	private final ConnectionType ctype;
 
 	private volatile boolean shutdown;
 
@@ -124,19 +123,35 @@ public final class DataEndpoint extends ConnectionBase
 	private boolean featureInfoServiceEnabled;
 	private boolean tunnelingAddressChanged;
 
+	public enum ConnectionType {
+		LinkLayer(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
+		Monitor(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
+		DevMgmt(KNXnetIPHeader.DEVICE_CONFIGURATION_REQ, KNXnetIPHeader.DEVICE_CONFIGURATION_ACK, 4, CONFIGURATION_REQ_TIMEOUT),
+		Baos(KNXnetIPHeader.ObjectServerRequest, KNXnetIPHeader.ObjectServerAck, 2, TUNNELING_REQ_TIMEOUT);
+
+		private final int req;
+		private final int ack;
+		private final int maxSendAttempts;
+		private final int timeout;
+
+		ConnectionType(final int req, final int ack, final int maxSendAttempts, final int timeout) {
+			this.req = req;
+			this.ack = ack;
+			this.maxSendAttempts = maxSendAttempts;
+			this.timeout = timeout;
+		}
+	}
+
 	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
-		final IndividualAddress assigned, final boolean tunneling, final boolean busmonitor, final boolean useNAT,
+		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
 		final SecureSession sessions, final int sessionId,
 		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
 		final Consumer<DataEndpoint> resetRequest)
 	{
-		super(tunneling ? KNXnetIPHeader.TUNNELING_REQ : KNXnetIPHeader.DEVICE_CONFIGURATION_REQ,
-				tunneling ? KNXnetIPHeader.TUNNELING_ACK : KNXnetIPHeader.DEVICE_CONFIGURATION_ACK,
-				tunneling ? 2 : 4, tunneling ? TUNNELING_REQ_TIMEOUT : CONFIGURATION_REQ_TIMEOUT);
+		super(type.req, type.ack, type.maxSendAttempts, type.timeout);
 		device = assigned;
-		tunnel = tunneling;
-		monitor = busmonitor;
+		this.ctype = type;
 		this.channelId = channelId;
 
 		ctrlSocket = localCtrlEndpt;
@@ -206,11 +221,7 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		final String lock = new String(Character.toChars(0x1F512));
 		final String prefix = "KNX IP " + (sessionId > 0 ? lock + " " : "");
-		if (tunnel && monitor)
-			return prefix + "Monitor " + super.getName();
-		if (tunnel)
-			return prefix + "Tunneling " + super.getName();
-		return prefix + "DevMgmt " + super.getName();
+		return prefix + ctype + " " + super.getName();
 	}
 
 	@Override
@@ -276,8 +287,10 @@ public final class DataEndpoint extends ConnectionBase
 	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 
+		final boolean tunnel = ctype == ConnectionType.LinkLayer || ctype == ConnectionType.Monitor;
 		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
 		final boolean configAck = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_ACK;
+
 		if (tunnel && (configReq || configAck)) {
 			final int recvChannelId = configReq ? ServiceRequest.from(h, data, offset).getChannelID()
 					: new ServiceAck(svc, data, offset).getChannelID();
@@ -551,13 +564,15 @@ public final class DataEndpoint extends ConnectionBase
 
 	boolean isDeviceMgmt()
 	{
-		return !tunnel;
+		return ctype == ConnectionType.DevMgmt;
 	}
 
 	boolean isMonitor()
 	{
-		return monitor;
+		return ctype == ConnectionType.Monitor;
 	}
+
+	public ConnectionType type() { return ctype; }
 
 	private boolean checkVersion(final KNXnetIPHeader h)
 	{
@@ -571,7 +586,7 @@ public final class DataEndpoint extends ConnectionBase
 	private void checkNotifyTunnelingCEMI(final CEMI cemi)
 	{
 		final int mc = cemi.getMessageCode();
-		if (monitor)
+		if (ctype == ConnectionType.Monitor)
 			logger.warn("client is not allowed to send cEMI messages in busmonitor mode - ignored");
 		else if (mc == CEMILData.MC_LDATA_REQ) {
 			CEMILData ldata = (CEMILData) cemi;
@@ -639,15 +654,13 @@ public final class DataEndpoint extends ConnectionBase
 
 	private void checkFrameType(final CEMI frame)
 	{
-		if (tunnel) {
-			if (monitor) {
-				if (!(frame instanceof CEMIBusMon))
-					throw new KNXIllegalArgumentException("bus monitor requires cEMI bus monitor frame type");
-			}
-			else if (!(frame instanceof CEMILData))
-				throw new KNXIllegalArgumentException("link layer requires cEMI L-Data frame type");
-		}
-		else if (!(frame instanceof CEMIDevMgmt))
+		if (ctype == ConnectionType.LinkLayer && !(frame instanceof CEMILData))
+			throw new KNXIllegalArgumentException("link layer requires cEMI L-Data frame type");
+
+		if (ctype == ConnectionType.Monitor && !(frame instanceof CEMIBusMon))
+			throw new KNXIllegalArgumentException("bus monitor requires cEMI bus monitor frame type");
+
+		if (ctype == ConnectionType.DevMgmt && !(frame instanceof CEMIDevMgmt))
 			throw new KNXIllegalArgumentException("expect cEMI device management frame type");
 	}
 }

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2016 B. Malinowsky
+    Copyright (c) 2010, 2021 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@ package tuwien.auto.calimero.server.knxnetip;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServerListener;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
+import tuwien.auto.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 
 /**
  * A listener for use with a {@link KNXnetIPServer}.
@@ -66,12 +67,12 @@ public interface ServerListener extends InterfaceObjectServerListener
 	 * @param connection the new connection to be accepted or rejected, the callee can store a reference to it for later
 	 *        use
 	 * @param assignedDeviceAddress the KNX device address assigned to this connection
-	 * @param networkMonitor the new connection requests KNX subnet monitoring (busmonitor)
+	 * @param type connection type
 	 * @return <code>true</code> to accept the connect, <code>false</code> to reject
 	 * @see #connectionEstablished(ServiceContainer, KNXnetIPConnection) if connection was successfully accepted
 	 */
 	boolean acceptDataConnection(ServiceContainer svcContainer, KNXnetIPConnection connection,
-		IndividualAddress assignedDeviceAddress, boolean networkMonitor);
+		IndividualAddress assignedDeviceAddress, ConnectionType type);
 
 	/**
 	 * A new KNXnet/IP connection to a client was established.
