@@ -1037,6 +1037,8 @@ public class KNXnetIPServer
 			if ((caps >> bit & 0x1) == 1)
 				supported.put(familyId, serviceVersion[bit]);
 		}
+		if (((DefaultServiceContainer) sc).baosSupport())
+			supported.put(ServiceFamily.Baos, 2);
 		return new ServiceFamiliesDIB(supported);
 	}
 

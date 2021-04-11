@@ -353,7 +353,8 @@ final class ControlEndpointService extends ServiceLooper
 			final ConnectRequest req = new ConnectRequest(data, offset);
 
 			final int connType = req.getCRI().getConnectionType();
-			final int expectedVersion = connType == ObjectServerProtocol ? 0x20 : KNXnetIPConnection.KNXNETIP_VERSION_10;
+			final int expectedVersion = connType == ObjectServerProtocol
+					? ObjectServerVersion : KNXnetIPConnection.KNXNETIP_VERSION_10;
 			int status = checkVersion(h, expectedVersion);
 
 			final HPAI controlEndpoint = req.getControlEndpoint();
@@ -556,6 +557,8 @@ final class ControlEndpointService extends ServiceLooper
 		final Set<Integer> set = new TreeSet<>();
 		for (final byte dibType : requestedDibs)
 			set.add(dibType & 0xff);
+		if (((DefaultServiceContainer) svcCont).baosSupport())
+			set.add(DIB.MFR_DATA);
 		final List<DIB> dibs = new ArrayList<>();
 		set.forEach(dibType -> createDib(dibType, dibs, ext));
 
@@ -577,6 +580,9 @@ final class ControlEndpointService extends ServiceLooper
 			return true;
 		case DIB.TunnelingInfo:
 			createTunnelingDib().ifPresent(dibs::add);
+			return true;
+		case DIB.MFR_DATA:
+			dibs.add(new ManufacturerDIB(0x00c5, new byte[] { 1, 4, (byte) ObjectServerProtocol, ObjectServerVersion }));
 			return true;
 		}
 		return false;
@@ -747,6 +753,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private static final int ObjectServerProtocol = 0xf0;
+	private static final int ObjectServerVersion = 0x20;
 
 	private IndividualAddress device;
 
