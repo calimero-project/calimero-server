@@ -54,7 +54,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -259,6 +263,18 @@ public class KNXnetIPServer
 	final KnxDeviceServiceLogic logic = new KnxDeviceServiceLogic() {
 		private static final int pidIpSbcControl = 120;
 
+		private final ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, r -> {
+			final var t = new Thread(r, "IP SBC routing mode timeout");
+			t.setDaemon(true);
+			return t;
+		});
+		{
+			scheduler.setKeepAliveTime(1, TimeUnit.MINUTES);
+			scheduler.allowCoreThreadTimeOut(true);
+		}
+
+		private volatile Future<?> disableSbcFuture = CompletableFuture.completedFuture(Void.TYPE);
+
 		@Override
 		public void updateDatapointValue(final Datapoint ofDp, final DPTXlator update) {}
 
@@ -269,7 +285,8 @@ public class KNXnetIPServer
 		public ServiceResult<byte[]> functionPropertyCommand(final Destination remote, final int objectIndex,
 				final int propertyId, final byte[] command) {
 			final int serviceId = command[1] & 0xff;
-			final int objectType = device.getInterfaceObjectServer().getInterfaceObjects()[objectIndex].getType();
+			final var ios = device.getInterfaceObjectServer();
+			final int objectType = ios.getInterfaceObjects()[objectIndex].getType();
 
 			if (objectType == InterfaceObject.ROUTER_OBJECT) {
 				if (propertyId == pidIpSbcControl) {
@@ -277,9 +294,11 @@ public class KNXnetIPServer
 					if (serviceId == 0) {
 						final int info = command[2] & 0xff;
 						if (info == 0 || info == 1) {
-							logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
-							device.getInterfaceObjectServer().setProperty(objectIndex, propertyId, 1, 1, (byte) info);
-							// NYI if enabled, (re-)schedule disable SBC 20 seconds from now
+							disableSbcFuture.cancel(false);
+							setSbcMode(objectIndex, info);
+							if (info == 1)
+								disableSbcFuture = scheduler.schedule(() -> setSbcMode(objectIndex, (byte) 0), 20,
+										TimeUnit.SECONDS);
 						}
 						else
 							returnCode = ReturnCode.DataVoid;
@@ -290,6 +309,11 @@ public class KNXnetIPServer
 				}
 			}
 			return super.functionPropertyCommand(remote, objectIndex, propertyId, command);
+		}
+
+		private void setSbcMode(final int objectIndex, final int info) {
+			logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
+			ios.setProperty(objectIndex, pidIpSbcControl, 1, 1, (byte) info);
 		}
 	};
 
