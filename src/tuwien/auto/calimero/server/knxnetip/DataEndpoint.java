@@ -450,7 +450,6 @@ public final class DataEndpoint extends ConnectionBase
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
 		final int svc = h.getServiceType();
 		// NYI detect data type conflict (wrong sized value) and respond with ReturnCode.DataTypeConflict
-		// NYI for an unknown interface feature, respond with ReturnCode.AddressVoid
 		final var req = ServiceRequest.from(h, buffer.array(), buffer.position());
 		final TunnelingFeature feat = req.service();
 		logger.debug("received {}", feat);
