@@ -302,6 +302,8 @@ public class Launcher implements Runnable, AutoCloseable
 			String msgFormat = "";
 			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
 			byte[] subnetDoA = null;
+			String overrideSrcAddr = "";
+
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = KNXNetworkLinkIP.DefaultMulticast;
@@ -350,6 +352,7 @@ public class Launcher implements Runnable, AutoCloseable
 								subnetDoA[i] = (byte) l;
 						}
 
+						overrideSrcAddr = attr(r, "knxAddress").orElse("");
 						if (interfaceType.equals("ip")) {
 							subnetKnxipNetif = getNetIf(r);
 							useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
@@ -439,7 +442,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 						++objectInstance;
 						final var connector = subnetConnector(sc, objectInstance, interfaceType, addr, msgFormat,
-								subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
+								overrideSrcAddr, subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
@@ -475,18 +478,19 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		private SubnetConnector subnetConnector(final ServiceContainer sc, final int objectInstance,
-				final String interfaceType, final String subnetArgs, final String msgFormat, final NetworkInterface netif,
+				final String interfaceType, final String subnetArgs, final String msgFormat,
+				final String overrideSrcAddress, final NetworkInterface netif,
 				final boolean useNat, final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
 
 			switch (interfaceType) {
 			case "knxip": return SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
-			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, subnetArgs);
-			case "tpuart": return SubnetConnector.newWithTpuartLink(sc, subnetArgs);
-			case "user-supplied": return SubnetConnector.newWithUserLink(sc, subnetLinkClass, subnetArgs);
+			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, overrideSrcAddress, subnetArgs);
+			case "tpuart": return SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
+			case "user-supplied": return SubnetConnector.newWithUserLink(sc, overrideSrcAddress, subnetLinkClass, subnetArgs);
 			case "emulate":
 				return datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
 						: SubnetConnector.newCustom(sc, "emulate");
-			default: return SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, subnetArgs);
+			default: return SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, overrideSrcAddress, subnetArgs);
 			}
 		}
 

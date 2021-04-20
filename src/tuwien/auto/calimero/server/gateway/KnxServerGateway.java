@@ -1271,6 +1271,9 @@ public class KnxServerGateway implements Runnable
 						if (connector.getInterfaceType().equals("usb"))
 							logger.debug("received from subnet using usb interface {}, don't intercept frame",
 									connector.getName());
+						else if (connector.interfaceAddress().isPresent())
+							logger.trace("received from subnet interface {}, don't intercept frame",
+									connector.getName());
 						else {
 							deviceListeners.forEach(l -> l.indication(fe));
 							return;
@@ -1531,16 +1534,17 @@ public class KnxServerGateway implements Runnable
 					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
 					send(sc, c, f);
 				}
-				// 2. workaround for usb interfaces: allow assigning additional addresses to client connections,
-				// even though we always have the same destination (i.e., the address of the usb interface)
+				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
+				// addresses to client connections,
+				// even though we always have the same destination (e.g., the address of the usb interface)
 				else if (subnet.getInterfaceType().equals("usb")
-						&& f.getDestination().equals(localInterface)) {
+						&& f.getDestination().equals(localInterface) || subnet.interfaceAddress().isPresent()) {
 					for (final var entry : connections.entrySet()) {
 						final var connection = entry.getValue();
 						final IndividualAddress assignedAddress = connection.deviceAddress();
 						// skip devmgmt connections
 						if (assignedAddress != null) {
-							logger.debug("dispatch {}->{} using {}", f.getSource(), assignedAddress, connection);
+							logger.debug("dispatch {}->{} ({}) using {}", f.getSource(), assignedAddress, f.getDestination(), connection);
 							send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
 						}
 					}
@@ -1772,7 +1776,9 @@ public class KnxServerGateway implements Runnable
 				subnetLink = ((Link<?>) subnetLink).target();
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
 			final boolean usb = subnetLink instanceof KNXNetworkLinkUsb;
-			final IndividualAddress source = usb ? new IndividualAddress(0) : null;
+			IndividualAddress source = usb ? new IndividualAddress(0) : null;
+			source = subnet.interfaceAddress().orElse(source);
+			final boolean overrideSrcAddress = subnet.interfaceAddress().isPresent();
 
 			// we can't forward secure services if we change the source address
 			if (usb) {
@@ -1791,7 +1797,7 @@ public class KnxServerGateway implements Runnable
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
 				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
-			else if (usb)
+			else if (usb || overrideSrcAddress)
 				ldata = CEMIFactory.create(source, null, f, false);
 			else
 				ldata = f;

@@ -51,6 +51,7 @@ import tuwien.auto.calimero.DataUnitBuilder;
 import tuwien.auto.calimero.IndividualAddress;
 import tuwien.auto.calimero.KNXAddress;
 import tuwien.auto.calimero.KNXException;
+import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Priority;
 import tuwien.auto.calimero.baos.Baos;
@@ -93,6 +94,7 @@ public final class SubnetConnector
 	private final ServiceContainer sc;
 	private final String interfaceType;
 	private final String msgFormat;
+	private final IndividualAddress overrideInterfaceAddress;
 	private final String linkArgs;
 	private final NetworkInterface netif;
 	private final String className;
@@ -118,7 +120,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "knxip", "", routingNetif, null, subnetArgs);
+		return new SubnetConnector(container, "knxip", "", "", routingNetif, null, subnetArgs);
 	}
 
 	/**
@@ -128,17 +130,19 @@ public final class SubnetConnector
 	 * @param netif the network interface used for the tunneling connection
 	 * @param useNat use network address translation (NAT)
 	 * @param msgFormat messaging formt, one of "" (default), "cemi", "baos"
+	 * @param overrideSrcAddress force specific address (or absence) of knx source address
 	 * @param subnetArgs the arguments to create the KNX link
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
-		final boolean useNat, final String msgFormat, final String subnetArgs)
+		final boolean useNat, final String msgFormat, final String overrideSrcAddress, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "ip", msgFormat, netif, null, subnetArgs, useNat);
+		return new SubnetConnector(container, "ip", msgFormat, overrideSrcAddress, netif, null, subnetArgs, useNat);
 	}
 
-	public static SubnetConnector newWithTpuartLink(final ServiceContainer container, final String subnetArgs) {
-		return new SubnetConnector(container, "tpuart", "", null, null, subnetArgs);
+	public static SubnetConnector newWithTpuartLink(final ServiceContainer container, final String overrideSrcAddress,
+			final String subnetArgs) {
+		return new SubnetConnector(container, "tpuart", "", overrideSrcAddress, null, null, subnetArgs);
 	}
 
 	/**
@@ -146,13 +150,14 @@ public final class SubnetConnector
 	 *
 	 * @param container service container
 	 * @param className the class name of to the user subnet link
+	 * @param overrideSrcAddress force specific address (or absence) of knx source address
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithUserLink(final ServiceContainer container,
-		final String className, final String subnetArgs)
+		final String className, final String overrideSrcAddress, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "user-supplied", "", null, className, subnetArgs);
+		return new SubnetConnector(container, "user-supplied", "", overrideSrcAddress, null, className, subnetArgs);
 	}
 
 	/**
@@ -166,7 +171,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
 		final String subnetArgs)
 	{
-		return newWithInterfaceType(container, interfaceType, "", subnetArgs);
+		return newWithInterfaceType(container, interfaceType, "", "", subnetArgs);
 	}
 
 	/**
@@ -175,13 +180,14 @@ public final class SubnetConnector
 	 * @param container service container
 	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
 	 * @param msgFormat one of "" (default), "cemi", "baos"
+	 * @param overrideSrcAddress force specific address (or absence) of knx source address
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
-			final String msgFormat, final String subnetArgs)
+			final String msgFormat, final String overrideSrcAddress, final String subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, msgFormat, null, null, subnetArgs);
+		return new SubnetConnector(container, interfaceType, msgFormat, overrideSrcAddress, null, null, subnetArgs);
 	}
 
 	/**
@@ -195,15 +201,22 @@ public final class SubnetConnector
 	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
 		final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, "", null, null, interfaceType, subnetArgs);
+		return new SubnetConnector(container, interfaceType, "", "", null, null, interfaceType, subnetArgs);
 	}
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType, final String msgFormat,
+		final String overrideSrcAddress,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
 	{
 		sc = container;
 		this.interfaceType = interfaceType;
 		this.msgFormat = msgFormat;
+		try {
+			this.overrideInterfaceAddress = overrideSrcAddress.isEmpty() ? null : new IndividualAddress(overrideSrcAddress);
+		}
+		catch (final KNXFormatException e) {
+			throw new KNXIllegalArgumentException(overrideSrcAddress + " is not a valid KNX individual address");
+		}
 		netif = routingNetif;
 		this.className = className;
 		linkArgs = subnetArgs;
@@ -246,7 +259,7 @@ public final class SubnetConnector
 
 	public KNXNetworkLink openNetworkLink() throws KNXException, InterruptedException
 	{
-		final KNXMediumSettings settings = sc.getMediumSettings();
+		final KNXMediumSettings settings = mediumSettings();
 		final TSupplier<KNXNetworkLink> ts;
 		// can cause a delay of connection timeout in the worst case
 		if ("ip".equals(interfaceType)) {
@@ -284,7 +297,8 @@ public final class SubnetConnector
 		}
 		else if ("usb".equals(interfaceType)) {
 			// ignore configured device address with USB on TP1 and always use 0.0.0
-			final var adjustForTP1 = settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
+			final var adjustForTP1 = settings instanceof ReplaceInterfaceAddressProxy ? settings
+					: settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
 			if (requestBaos)
 				ts = () -> Baos.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
 			else
@@ -391,6 +405,8 @@ public final class SubnetConnector
 
 	public String format() { return msgFormat; }
 
+	Optional<IndividualAddress> interfaceAddress() { return Optional.ofNullable(overrideInterfaceAddress); }
+
 	String getInterfaceType()
 	{
 		return interfaceType;
@@ -459,6 +475,27 @@ public final class SubnetConnector
 		private final KNXMediumSettings delegate;
 
 		UsbSettingsProxy(final KNXMediumSettings settings) {
+			this.delegate = settings;
+		}
+
+		@Override
+		public void setMaxApduLength(final int maxApduLength) {
+			super.setMaxApduLength(maxApduLength);
+			delegate.setMaxApduLength(maxApduLength);
+		}
+	}
+
+	private KNXMediumSettings mediumSettings() {
+		final var settings = sc.getMediumSettings();
+		return interfaceAddress().map(ia -> (KNXMediumSettings) new ReplaceInterfaceAddressProxy(settings, ia))
+				.orElse(settings);
+	}
+
+	private static final class ReplaceInterfaceAddressProxy extends TPSettings {
+		private final KNXMediumSettings delegate;
+
+		ReplaceInterfaceAddressProxy(final KNXMediumSettings settings, final IndividualAddress replacement) {
+			super(replacement);
 			this.delegate = settings;
 		}
 
