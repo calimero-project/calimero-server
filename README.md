@@ -19,6 +19,10 @@ _Optional_ dependencies, required for communication over serial ports:
 * Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
 * For KNX USB or KNX RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
 
+### Docker image
+
+Pre-built Docker images for running the server are available on [Docker Hub](https://hub.docker.com/r/calimeroproject/knxserver).
+
 Supported Features
 ------------------
 
