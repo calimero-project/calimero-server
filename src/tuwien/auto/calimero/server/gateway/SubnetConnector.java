@@ -54,7 +54,8 @@ import tuwien.auto.calimero.KNXException;
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.Priority;
-import tuwien.auto.calimero.baos.Baos;
+import tuwien.auto.calimero.baos.BaosLinkAdapter;
+import tuwien.auto.calimero.baos.ip.BaosLinkIp;
 import tuwien.auto.calimero.buffer.Configuration;
 import tuwien.auto.calimero.buffer.NetworkBuffer;
 import tuwien.auto.calimero.buffer.StateFilter;
@@ -271,7 +272,7 @@ public final class SubnetConnector
 
 			final var server = parseRemoteEndpoint();
 			if (requestBaos)
-				ts = () -> Baos.newUdpLink(local, server);
+				ts = () -> BaosLinkIp.newUdpLink(local, server);
 			else
 				ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
 		}
@@ -282,7 +283,7 @@ public final class SubnetConnector
 			final var server = parseRemoteEndpoint();
 
 			if (requestBaos)
-				ts = () -> Baos.newTcpLink(Connection.newTcpConnection(local, server));
+				ts = () -> BaosLinkIp.newTcpLink(Connection.newTcpConnection(local, server));
 			else
 				ts = () -> KNXNetworkLinkIP.newTunnelingLink(Connection.newTcpConnection(local, server), settings);
 		}
@@ -300,7 +301,7 @@ public final class SubnetConnector
 			final var adjustForTP1 = settings instanceof ReplaceInterfaceAddressProxy ? settings
 					: settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
 			if (requestBaos)
-				ts = () -> Baos.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
+				ts = () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
 			else
 				ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
 		}
@@ -308,7 +309,7 @@ public final class SubnetConnector
 			if ("cemi".equals(msgFormat))
 				ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
 			else if (requestBaos)
-				ts = () -> Baos.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
+				ts = () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
 			else
 				ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
 		}
