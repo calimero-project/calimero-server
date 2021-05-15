@@ -1,5 +1,7 @@
 plugins {
   id "com.github.ben-manes.versions" version "0.38.0"
+  id 'maven-publish'
+  id 'signing'
 }
 
 repositories {
@@ -18,6 +20,23 @@ version = '2.5-M1'
 
 sourceCompatibility = 11
 targetCompatibility = 11
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.withType(Jar) {
+	from("${projectDir}") {
+        include 'LICENSE.txt'
+        into "META-INF"
+    }
+    if (name.equals('sourcesJar')) {
+    	from("${projectDir}") {
+		    include 'README.md'
+        }
+    }
+}
 
 compileJava.options.encoding = 'UTF-8'
 compileTestJava.options.encoding = 'UTF-8'
@@ -75,4 +94,48 @@ dependencies {
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
 	testCompileOnly 'junit:junit:4.13.2'
 	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = rootProject.name
+            from components.java
+            pom {
+                name = 'Calimero KNXnet/IP Server'
+                description = 'Calimero KNXnet/IP server is a free KNX network server'
+                url = 'https://github.com/calimero-project/calimero-server'
+                inceptionYear = '2006'
+                licenses {
+                    license {
+                        name = "GNU General Public License, version 2, with the Classpath Exception"
+                        url = 'LICENSE.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        name = "Boris Malinowsky"
+                        email = "b.malinowsky@gmail.com"
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com:calimero-project/calimero-server.git'
+                    url = 'https://github.com/calimero-project/calimero-server.git'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name 'maven'
+            def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            def snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            credentials(PasswordCredentials)
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
 }
