@@ -55,7 +55,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -188,6 +187,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 		private URI uri;
 		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
+		private Path appData;
 
 
 		public static ServerConfiguration from(final URI serverConfigUri) {
@@ -206,7 +206,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final var serverName = attr(r, XmlConfiguration.attrName).orElseThrow();
 			final String friendly = attr(r, XmlConfiguration.attrFriendly).orElseThrow();
-			final Path appData = attr(r, "appData").map(expandHome).map(Paths::get).orElse(Path.of(""));
+			appData = attr(r, "appData").map(expandHome).map(Path::of).orElse(Path.of("")).toAbsolutePath();
 
 			logger = LoggerFactory.getLogger("calimero.server." + serverName);
 
@@ -290,9 +290,9 @@ public class Launcher implements Runnable, AutoCloseable
 			final NetworkInterface netif = getNetIf(r);
 
 			// look for a server keyfile
-			final Path keyfile = attr(r, "keyfile").map(expandHome).map(Paths::get).orElse(null);
+			final Path keyfile = attr(r, "keyfile").map(file -> appData.resolve(file)).orElse(null);
 			// look for a keyring configuration
-			final var keyring = attr(r, "keyring").map(expandHome).map(Keyring::load).orElse(null);
+			final var keyring = attr(r, "keyring").map(file -> appData.resolve(file).toString()).map(Keyring::load).orElse(null);
 
 			final var secureServices = toEnumSet(attr(r, "securedServices").map(Integer::decode).orElse(0x3f));
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
