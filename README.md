@@ -138,7 +138,7 @@ Optional attributes for secure routing:
 
 * `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1.
 
-* `<timeServer>`: Cyclically transmit date (11.001), time (10.001), or date+time (19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements.
+* `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements.
 
 ### Configuration Examples for KNX subnets
 
