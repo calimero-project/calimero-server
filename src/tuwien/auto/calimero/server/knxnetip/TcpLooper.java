@@ -171,7 +171,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	@Override
 	public void run() {
 		final String name = ctrlEndpoint.server.getName() + " " + ctrlEndpoint.getServiceContainer().getName()
-				+ (baos ? " baos" : "") + " tcp connection " + socket.getRemoteSocketAddress();
+				+ (baos ? " baos" : "") + " tcp connection " + hostPort((InetSocketAddress) socket.getRemoteSocketAddress());
 		Thread.currentThread().setName(name);
 
 		try (InputStream in = socket.getInputStream()) {
@@ -238,7 +238,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		}
 		catch (IOException | RuntimeException e) {
 			if (!socket.isClosed())
-				logger.error("tcp connection error to {}", socket.getRemoteSocketAddress(), e);
+				logger.error("tcp connection error to {}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), e);
 		}
 		finally {
 			close();
@@ -265,7 +265,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private void close(final String reason) {
 		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
-		logger.info("close tcp connection to {}{}", socket.getRemoteSocketAddress(), suffix);
+		logger.info("close tcp connection to {}{}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), suffix);
 		try {
 			socket.close();
 		}
