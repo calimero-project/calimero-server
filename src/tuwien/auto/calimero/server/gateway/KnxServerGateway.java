@@ -250,7 +250,7 @@ public class KnxServerGateway implements Runnable
 				level = LogLevel.WARN;
 				update = true;
 			}
-			LogService.log(logger, level, "device {} sent {}", e.sender(), e.get());
+			LogService.log(logger, level, "device {} sent {}", hostPort(e.sender()), e.get());
 
 			// increment random wait scaling iff >= 10 ms have passed since the last counted routing busy
 			if (now.isAfter(lastRoutingBusy.plusMillis(10))) {
@@ -278,6 +278,10 @@ public class KnxServerGateway implements Runnable
 			decrement.cancel(false);
 			decrement = busyCounterDecrementor.scheduleAtFixedRate(this::decrementBusyCounter, initialDelay, 5,
 					TimeUnit.MILLISECONDS);
+		}
+
+		String hostPort(final InetSocketAddress addr) {
+			return addr.getAddress().getHostAddress() + ":" + addr.getPort();
 		}
 
 		private void decrementBusyCounter()
