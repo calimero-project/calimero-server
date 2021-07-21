@@ -114,8 +114,7 @@ Optional attributes for secure routing:
       - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
       - `knxip`: the KNX subnet is connected via KNX IP or KNXnet/IP routing
       - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
-      - `ft12`: use a FT1.2 protocol connection with EMI2 format
-      - `ft12-cemi`: use a FT1.2 protocol connection with cEMI format
+      - `ft12`: use a FT1.2 protocol connection with EMI2 format (specify the `format` attribute for cEMI exchange format)
       - `tpuart`: use a TP-UART adapter to connect to a KNX TP1 network
       - `virtual`: run KNX subnet and enable the connection of virtual and real devices
       - `emulate`: emulates the behaviour of a KNX subnet for process communication. KNX datapoints may be specified in an accompanying datapoint XML file.
@@ -125,6 +124,8 @@ Optional attributes for secure routing:
       - `pl110`: use power-line to connect
       - `knxip`: access via Ethernet
       - `rf`: Wireless connection via 868 MHz
+    - `format` (optional): useful for knx interfaces which support different exchange formats; recognized values are "" (default), "baos", or "cemi"
+    - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
     - `netif` (tunneling only, optional): server network interface for tunneling to KNX subnet
     - `useNat` (tunneling only, optional): use network address translation (NAT)
     - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
