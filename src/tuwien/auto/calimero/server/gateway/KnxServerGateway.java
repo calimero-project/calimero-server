@@ -1376,8 +1376,10 @@ public class KnxServerGateway implements Runnable
 //			}
 //			return con;
 		}
-		return new CEMILData(CEMILData.MC_LDATA_CON, original.getSource(),
+		final var con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
 				original.getDestination(), data, original.getPriority(), error);
+		con.setHopCount(original.getHopCount());
+		return con;
 	}
 
 	// Using the sending link for identification does not always work,
