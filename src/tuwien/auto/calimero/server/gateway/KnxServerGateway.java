@@ -744,28 +744,6 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	/**
-	 * @deprecated Use {@link #KnxServerGateway(KNXnetIPServer, ServerConfiguration)}.
-	 *
-	 * @param gatewayName descriptive name to use for this gateway
-	 * @param s KNXnet/IP server representing the server side
-	 * @param subnetConnectors list of {@link SubnetConnector} objects, which specify the
-	 *        associations between the connections from either side of the gateway
-	 */
-	@Deprecated(forRemoval = true)
-	public KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final SubnetConnector[] subnetConnectors)
-	{
-		this(gatewayName, s, Arrays.asList(subnetConnectors));
-
-		try {
-			server.device().setDeviceLink(deviceLinkProxy);
-		}
-		catch (final KNXLinkClosedException e) {
-			throw new KnxRuntimeException("setting device link", e);
-		}
-
-	}
-
 	private KnxServerGateway(final String gatewayName, final KNXnetIPServer s, final List<SubnetConnector> subnetConnectors) {
 		name = gatewayName;
 		server = s;

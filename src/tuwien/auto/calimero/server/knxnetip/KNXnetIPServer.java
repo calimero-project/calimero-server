@@ -118,9 +118,7 @@ import tuwien.auto.calimero.server.ServerConfiguration;
  * Therefore, every KNXnet/IP server maintains an
  * interface object server (IOS). The IOS is initialized with basic information by adding KNX
  * properties, allowing the server to run properly. A user can access the IOS by calling
- * {@link #getInterfaceObjectServer()} to query or modify KNXnet/IP server properties, or
- * replace the IOS with another one by calling
- * {@link #setInterfaceObjectServer(InterfaceObjectServer)}.
+ * {@link #getInterfaceObjectServer()} to query or modify KNXnet/IP server properties.
  * Different services will update certain KNX properties in the IOS during runtime.
  * <p>
  * Note, that if data required by the server is not available in the IOS (e.g., due to deletion of
@@ -317,59 +315,6 @@ public class KNXnetIPServer
 		}
 	};
 
-
-	/**
-	 * @deprecated Use {@link #KNXnetIPServer(ServerConfiguration)}.
-	 *
-	 * @param localName name of this server as shown to the owner/user of this server
-	 * @param friendlyName a friendly, descriptive name used for discovery and description, consisting of
-	 *        ISO-8859-1 characters only, with string length &lt; 30 characters, <code>friendlyName</code> might be of
-	 *        length 0
-	 */
-	@Deprecated(forRemoval = true)
-	public KNXnetIPServer(final String localName, final String friendlyName)
-	{
-		serverName = localName;
-		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
-			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
-		this.friendlyName = friendlyName;
-		logger = LogService.getLogger("calimero.server." + getName());
-
-		device = new BaseKnxDevice(localName, DD0.TYPE_091A, null, logic, null, new char[0]);
-		ios = device.getInterfaceObjectServer();
-		listeners = new EventListeners<>(logger);
-
-		logger.info("{} v{} \'{}\'", serverName, Settings.getLibraryVersion(), friendlyName);
-
-		ios.addServerListener(this::onPropertyValueChanged);
-
-		// server KNX device address, since we don't know about routing at this time
-		// address is always 15.15.0; might be updated later or by routing configuration
-		final byte[] device1 = defKnxAddress.toByteArray();
-		// equal to PID.KNX_INDIVIDUAL_ADDRESS
-		setProperty(DEVICE_OBJECT, objectInstance, PID.SUBNET_ADDRESS, device1[0]);
-		setProperty(DEVICE_OBJECT, objectInstance, PID.DEVICE_ADDRESS, device1[1]);
-	}
-
-	/**
-	 * @deprecated Use {@link #KNXnetIPServer(ServerConfiguration)}.
-	 *
-	 * @param serverName both the local and friendly name of this server instance, see
-	 *        {@link #KNXnetIPServer(String, String)}
-	 * @param serviceContainers list holding {@link ServiceContainer} entries to be hosted by this
-	 *        server
-	 * @see #KNXnetIPServer(String, String)
-	 */
-	@Deprecated(forRemoval = true)
-	public KNXnetIPServer(final String serverName, final List<ServiceContainer> serviceContainers)
-	{
-		this(serverName, serverName);
-		for (final Iterator<ServiceContainer> i = serviceContainers.iterator(); i.hasNext();) {
-			final ServiceContainer sc = i.next();
-			addServiceContainer(sc);
-		}
-	}
-
 	/**
 	 * Creates a new KNXnet/IP server instance using the supplied configuration.
 	 * <p>
@@ -506,14 +451,6 @@ public class KNXnetIPServer
 	{
 		return endpoints.stream().map(ep -> ep.serviceContainer).toArray(ServiceContainer[]::new);
 	}
-
-	/**
-	 * @deprecated No replacement.
-	 *
-	 * @param server the Interface Object Server
-	 */
-	@Deprecated(forRemoval = true)
-	public final void setInterfaceObjectServer(final InterfaceObjectServer server) {}
 
 	/**
 	 * Returns the Interface Object Server currently set (and used) by this server.

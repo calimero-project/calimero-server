@@ -185,7 +185,7 @@ public class Launcher implements Runnable, AutoCloseable
 		private static final Function<String, String> expandHome = v -> v.replaceFirst("^~",
 				System.getProperty("user.home"));
 
-		private URI uri;
+		private final URI uri;
 		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
 		private Path appData;
 
@@ -193,9 +193,6 @@ public class Launcher implements Runnable, AutoCloseable
 		public static ServerConfiguration from(final URI serverConfigUri) {
 			return new XmlConfiguration(serverConfigUri).load();
 		}
-
-		@Deprecated(forRemoval = true)
-		public XmlConfiguration() {}
 
 		private XmlConfiguration(final URI serverConfigUri) { uri = serverConfigUri; }
 
@@ -235,44 +232,6 @@ public class Launcher implements Runnable, AutoCloseable
 
 		private static Optional<String> attr(final XmlReader r, final String name) {
 			return Optional.ofNullable(r.getAttributeValue(null, name));
-		}
-
-		@Deprecated(forRemoval = true)
-		public Map<String, String> load(final String serverConfigUri) throws KNXMLException
-		{
-			final XmlReader r = XmlInputFactory.newInstance().createXMLReader(serverConfigUri);
-
-			if (r.nextTag() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.knxServer))
-				throw new KNXMLException("no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
-
-			final Map<String, String> m = new HashMap<>();
-			put(m, r, XmlConfiguration.attrName);
-			put(m, r, XmlConfiguration.attrFriendly);
-			logger = LoggerFactory.getLogger("calimero.server." + r.getAttributeValue(null, XmlConfiguration.attrName));
-
-			while (r.next() != XmlReader.END_DOCUMENT) {
-				if (r.getEventType() == XmlReader.START_ELEMENT) {
-					final String name = r.getLocalName();
-					if (name.equals(XmlConfiguration.discovery)) {
-						put(m, r, XmlConfiguration.attrListenNetIf);
-						put(m, r, XmlConfiguration.attrOutgoingNetIf);
-						put(m, r, XmlConfiguration.attrActivate);
-					}
-					else if (name.equals(XmlConfiguration.propDefs)) {
-						final String res = r.getAttributeValue(null, XmlConfiguration.attrRef);
-						if (res != null) {
-							if (m.containsKey(XmlConfiguration.attrRef))
-								logger.warn("multiple property definition resources, ignore {}, "
-										+ "line {}", res, r.getLocation().getLineNumber());
-							else
-								m.put(XmlConfiguration.attrRef, res);
-						}
-					}
-					else if (name.equals(XmlConfiguration.svcCont))
-						readServiceContainer(r);
-				}
-			}
-			return m;
 		}
 
 		private void readServiceContainer(final XmlReader r) throws KNXMLException
@@ -561,11 +520,6 @@ public class Launcher implements Runnable, AutoCloseable
 			while (r.nextTag() != XmlReader.END_ELEMENT && !r.getLocalName().equals("user"))
 				addresses.add(new IndividualAddress(r));
 			return addresses;
-		}
-
-		private static void put(final Map<String, String> m, final XmlReader r, final String attr)
-		{
-			m.put(attr, r.getAttributeValue(null, attr));
 		}
 
 		private static NetworkInterface getNetIf(final XmlReader r)
