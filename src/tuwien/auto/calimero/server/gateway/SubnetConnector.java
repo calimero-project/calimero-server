@@ -65,7 +65,7 @@ import tuwien.auto.calimero.datapoint.DatapointMap;
 import tuwien.auto.calimero.datapoint.DatapointModel;
 import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
-import tuwien.auto.calimero.knxnetip.Connection;
+import tuwien.auto.calimero.knxnetip.TcpConnection;
 import tuwien.auto.calimero.link.Connector;
 import tuwien.auto.calimero.link.Connector.TSupplier;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -283,9 +283,9 @@ public final class SubnetConnector
 			final var server = parseRemoteEndpoint();
 
 			if (requestBaos)
-				ts = () -> BaosLinkIp.newTcpLink(Connection.newTcpConnection(local, server));
+				ts = () -> BaosLinkIp.newTcpLink(TcpConnection.newTcpConnection(local, server));
 			else
-				ts = () -> KNXNetworkLinkIP.newTunnelingLink(Connection.newTcpConnection(local, server), settings);
+				ts = () -> KNXNetworkLinkIP.newTunnelingLink(TcpConnection.newTcpConnection(local, server), settings);
 		}
 		else if ("knxip".equals(interfaceType)) {
 			try {
