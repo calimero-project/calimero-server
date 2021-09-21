@@ -147,6 +147,7 @@ import tuwien.auto.calimero.secure.SecureApplicationLayer;
 import tuwien.auto.calimero.secure.Security;
 import tuwien.auto.calimero.secure.SecurityControl;
 import tuwien.auto.calimero.secure.SecurityControl.DataSecurity;
+import tuwien.auto.calimero.serial.ConnectionStatus;
 import tuwien.auto.calimero.serial.usb.UsbConnection;
 import tuwien.auto.calimero.server.ServerConfiguration;
 import tuwien.auto.calimero.server.VirtualLink;
@@ -520,6 +521,7 @@ public class KnxServerGateway implements Runnable
 			logger.info("KNX subnet link closed (" + e.getReason() + ")");
 		}
 
+		// connection status notification of the link (closed/open)
 		void connectionStatus(final boolean connected) {
 			final var sc = getSubnetConnector(scid).getServiceContainer();
 			final byte[] data = bytesFromWord(sc.getMediumSettings().maxApduLength());
@@ -538,6 +540,12 @@ public class KnxServerGateway implements Runnable
 
 		private void subnetConnected(final boolean connected) {
 			setNetworkState(objectInstance(scid), true, !connected);
+		}
+
+		// connection status for serial connections (knx network offline/online)
+		@LinkEvent
+		void connectionStatus(final ConnectionStatus status) {
+			logger.info("KNX connection {}", status);
 		}
 	}
 
