@@ -147,7 +147,7 @@ final class RoutingService extends ServiceLooper
 		try {
 			final NetworkInterface netif = networkInterface();
 			if (secure) {
-				inst = (KNXnetIPRouting) SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
+				inst = SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
 				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback) {
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
