@@ -207,7 +207,8 @@ public final class DataEndpoint extends ConnectionBase
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, dst, DataUnitBuilder.toHex(buf, " "));
+			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, ServiceLooper.hostPort(dst),
+					DataUnitBuilder.toHex(buf, " "));
 		}
 
 		if (TcpLooper.send(buf, dst))
@@ -440,7 +441,7 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private void respondToFeature(final KNXnetIPHeader h, final byte[] data, final int offset, final int svc)
-		throws KNXFormatException, IOException {
+			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		logger.debug("respond with {}", res);

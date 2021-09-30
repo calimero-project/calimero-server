@@ -37,6 +37,7 @@
 package tuwien.auto.calimero.server.knxnetip;
 
 import static tuwien.auto.calimero.DataUnitBuilder.toHex;
+import static tuwien.auto.calimero.server.knxnetip.ServiceLooper.hostPort;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -189,7 +190,7 @@ final class SecureSession {
 						try {
 							sessionAuth(session, knxipPacket, 6);
 							status = AuthSuccess;
-							logger.debug("client {} authorized for session {} with user ID {}", session.client,
+							logger.debug("client {} authorized for session {} with user ID {}", hostPort(session.client),
 									sessionId, session.userId);
 						}
 						catch (final KnxSecureException e) {
@@ -288,7 +289,8 @@ final class SecureSession {
 			socket.send(new DatagramPacket(data, data.length, address));
 	}
 
-	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data, final int offset) {
+	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data,
+			final int offset) {
 
 		final byte[] clientKey = Arrays.copyOfRange(data, offset + 8, h.getTotalLength());
 		final byte[] publicKey;
@@ -307,7 +309,7 @@ final class SecureSession {
 			sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
 		}
 		catch (final Throwable e) {
-			throw new KnxSecureException("error creating secure session keys for " + remote, e);
+			throw new KnxSecureException("error creating secure session keys for " + hostPort(remote), e);
 		}
 
 		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
@@ -316,7 +318,7 @@ final class SecureSession {
 		final Session session = new Session(sessionId, remote, secretKey);
 		session.xorClientServer = xor(clientKey, 0, publicKey, 0, keyLength);
 		sessions.put(sessionId, session);
-		logger.debug("establish secure session {} for {}", sessionId, remote);
+		logger.debug("establish secure session {} for {}", sessionId, hostPort(remote));
 
 		return sessionResponse(sessionId, publicKey, clientKey);
 	}
@@ -381,7 +383,7 @@ final class SecureSession {
 			send(packet, address);
 		}
 		catch (IOException | RuntimeException e) {
-			logger.error("sending session {} status {} to {}", sessionId, statusMsg(status), address, e);
+			logger.error("sending session {} status {} to {}", sessionId, statusMsg(status), hostPort(address), e);
 		}
 	}
 

@@ -379,7 +379,7 @@ final class ControlEndpointService extends ServiceLooper
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
 					logger.info("{}: setup data endpoint (channel {}) for connection request from {} ({})",
-							svcCont.getName(), channelId, ctrlEndpt, tcp ? "tcp" : "udp");
+							svcCont.getName(), channelId, hostPort(ctrlEndpt), tcp ? "tcp" : "udp");
 					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(expectedVersion, res);
@@ -644,7 +644,7 @@ final class ControlEndpointService extends ServiceLooper
 			final long seq = session.sendSeq.getAndIncrement();
 			final int msgTag = 0;
 			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
-			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, dst);
+			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, hostPort(dst));
 		}
 
 		if (!TcpLooper.send(buf, dst))
