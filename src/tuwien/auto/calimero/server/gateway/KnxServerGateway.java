@@ -557,7 +557,7 @@ public class KnxServerGateway implements Runnable
 	private final List<SubnetConnector> connectors = new ArrayList<>();
 	private final List<KNXnetIPConnection> serverConnections = new CopyOnWriteArrayList<>();
 
-	private final int maxEventQueueSize = 1000;
+	private final int maxEventQueueSize = 250;
 	private final BlockingQueue<FrameEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
 	private final BlockingQueue<FrameEvent> subnetEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
 
@@ -619,12 +619,22 @@ public class KnxServerGateway implements Runnable
 
 		private void checkRoutingBusy()
 		{
-			final Duration observationPeriod = Duration.ofMillis(100);
-			// TODO adjust for KNX subnet capacity
-			final int maxMsgsPerSecond = 200;
+			final var subnet = connectors.get(0);
+			final var settings = subnet.getServiceContainer().getMediumSettings();
+			final int medium = settings.getMedium();
+
+			final int maxMsgsPerSecond;
+			switch (medium) {
+			case KNXMediumSettings.MEDIUM_TP1: maxMsgsPerSecond = 50; break;
+			case KNXMediumSettings.MEDIUM_PL110: maxMsgsPerSecond = 6; break;
+			case KNXMediumSettings.MEDIUM_RF: maxMsgsPerSecond = 50; break;
+			case KNXMediumSettings.MEDIUM_KNXIP: maxMsgsPerSecond = 50; break;
+			default: throw new KnxRuntimeException("unsupported KNX medium");
+			}
 
 			ipMsgCount++;
 			final int msgs = ipEvents.size();
+			final Duration observationPeriod = Duration.ofMillis(500);
 			final double seconds = ((double) observationPeriod.toMillis()) / 1000;
 			final int msgsPerPeriod = (int) (maxMsgsPerSecond * seconds);
 			if (msgs >= msgsPerPeriod)
