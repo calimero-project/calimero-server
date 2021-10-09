@@ -413,8 +413,8 @@ final class ControlEndpointService extends ServiceLooper
 			// issue a warning
 			final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
 			if (!ctrlEndpt.equals(src)) {
-				logger.warn("disconnect request: sender control endpoint changed from " + ctrlEndpt + " to " + src
-						+ ", not recommended");
+				logger.warn("disconnect request: sender control endpoint changed from " + hostPort(ctrlEndpt) + " to "
+						+ src + ", not recommended");
 			}
 
 			conn.updateLastMsgTimestamp();
@@ -449,8 +449,8 @@ final class ControlEndpointService extends ServiceLooper
 				protocolVersion = endpoint.protocolVersion();
 				status = checkVersion(h, protocolVersion);
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.trace("received connection state request from {} for channel {}", endpoint.getRemoteAddress(),
-						csr.getChannelID());
+					logger.trace("received connection state request from {} for channel {}",
+							hostPort(endpoint.getRemoteAddress()), csr.getChannelID());
 					endpoint.updateLastMsgTimestamp();
 				}
 			}
