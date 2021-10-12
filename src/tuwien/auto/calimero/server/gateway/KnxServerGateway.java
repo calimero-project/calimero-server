@@ -395,7 +395,7 @@ public class KnxServerGateway implements Runnable
 			catch (KNXException | InterruptedException | RuntimeException e) {
 				String msg = e.getMessage();
 				msg = msg != null && msg.length() > 0 ? msg : e.getClass().getSimpleName();
-				logger.error("skip verifying knx address of '{}' subnet interface ({})", svcContainer.getName(), msg);
+				logger.warn("skip verifying knx address of '{}' subnet interface ({})", svcContainer.getName(), msg);
 			}
 
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
@@ -1354,7 +1354,7 @@ public class KnxServerGateway implements Runnable
 				throw new CompletionException(e);
 			}
 		}).exceptionally(t -> {
-			logger.error("sending on {} failed: {} ({}->{} L_Data.con {})", c, t.getCause().getMessage(),
+			logger.warn("sending on {} failed: {} ({}->{} L_Data.con {})", c, t.getCause().getMessage(),
 					f.getSource(), f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 			return null;
 		});
@@ -1754,7 +1754,7 @@ public class KnxServerGateway implements Runnable
 				buffer.completeEvent(c, recordFrameEvent);
 		}
 		catch (final KNXTimeoutException e) {
-			logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+			logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
 			setNetworkState(oi, false, true);
 		}
 		catch (final KNXConnectionClosedException e) {
@@ -1984,7 +1984,7 @@ public class KnxServerGateway implements Runnable
 				c.send(dm, WaitForAck);
 			}
 			catch (KNXException | InterruptedException e) {
-				logger.error("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
