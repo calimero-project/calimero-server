@@ -104,7 +104,8 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {
 				final int svc = h.getServiceType();
 				if (!ignoreServices.contains(svc))
-					logger.info("received packet from {} with unknown service type 0x{} - ignored", source, Integer.toHexString(svc));
+					logger.info("received packet from {} with unknown service type 0x{} - ignored", source,
+							Integer.toHexString(svc));
 			}
 		}
 		catch (final KNXFormatException e) {
@@ -193,7 +194,8 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	private boolean sanitize(final KNXnetIPHeader h, final int length)
 	{
 		if (h.getTotalLength() > length)
-			logger.warn("received frame length does not match - ignored");
+			logger.warn("received frame with expected length {} does not match actual length {} - ignored",
+					h.getTotalLength(), length);
 		else if (h.getServiceType() == 0)
 			// check service type for 0 (invalid type), so unused service types of us can stay 0 by default
 			logger.warn("received frame with service type 0 - ignored");
