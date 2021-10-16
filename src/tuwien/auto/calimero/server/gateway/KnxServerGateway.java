@@ -1165,13 +1165,14 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 
-				// see if the frame is also of interest to us, or addressed to us
 				final var dst = ldata.getDestination();
-				if (dst instanceof GroupAddress && dst.getRawAddress() == 0) {
-					deviceListeners.forEach(l -> l.indication(fe));
+				if (dst instanceof GroupAddress) {
+					// broadcasts are of interest to us
+					if (dst.getRawAddress() == 0)
+						deviceListeners.forEach(l -> l.indication(fe));
 
 					// send to all clients except sender
-					logger.trace("forward broadcast {} to all tunneling clients (except {})", ldata, ldata.getSource());
+					logger.trace("forward {} to all tunneling clients (except {})", ldata, ldata.getSource());
 					final var svcCont = connectorFor(ldata.getSource()).map(SubnetConnector::getServiceContainer);
 					if (svcCont.isPresent()) {
 						for (final var conn : serverConnections) {
@@ -1197,6 +1198,7 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				else if (dst instanceof IndividualAddress) {
+					// see if the frame is addressed to us
 					final var ia = (IndividualAddress) dst;
 					final Optional<SubnetConnector> connector = connectorFor(ia);
 					if (connector.isPresent()) {
