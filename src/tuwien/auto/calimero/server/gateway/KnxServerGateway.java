@@ -1345,6 +1345,12 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
+		try {
+			applyRoutingFlowControl(c);
+		}
+		catch (final InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
 		CompletableFuture.runAsync(() -> {
 			try {
 				// TODO check for reasons to send negative L-Data.con
@@ -1715,7 +1721,7 @@ public class KnxServerGateway implements Runnable
 	// check whether we have to slow down or pause sending for routing flow control
 	private void applyRoutingFlowControl(final KNXnetIPConnection c) throws InterruptedException
 	{
-		if (!(c instanceof KNXnetIPRouting) || routingBusyCounter.get() == 0)
+		if (routingBusyCounter.get() == 0)
 			return;
 
 		// we have to loop because a new arrival of routing busy might update timings
