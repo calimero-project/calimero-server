@@ -14,7 +14,7 @@ keyfile_enc="keyfile.enc"
 keyfile_dec="/dev/shm/calimero-server-keyfile"
 
 server_config_path="resources/server-config.xml"
-run_server="./build/distributions/calimero-server-2.5-rc1/bin/calimero-server"
+run_server="./build/distributions/calimero-server-2.5-rc2/bin/calimero-server"
 
 # openssl option is not recognized on some platforms
 sslOptionPbkdf2="-pbkdf2"
@@ -25,7 +25,7 @@ if [ "$1" = "-?" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ];then
 	echo Usage $0 "[-e keyfile]"
 	echo "      -e    encrypt a cleartext keyfile"
 	echo "Note: default settings assume you ran './gradlew build' and"
-	echo "      extracted './build/distributions/calimero-server-2.5-rc1.[tar|zip]'"
+	echo "      extracted './build/distributions/calimero-server-2.5-rc2.[tar|zip]'"
 	exit 0
 fi
 

@@ -73,7 +73,7 @@ Make sure all required `jar` packages are available, and any referenced files in
 java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.5-rc1.jar:calimero-core-2.5-rc1.jar:calimero-device-2.5-rc1.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-2.5-rc2.jar:calimero-core-2.5-rc2.jar:calimero-device-2.5-rc2.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
 ~~~
 
 
