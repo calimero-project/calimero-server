@@ -737,8 +737,8 @@ public class Launcher implements Runnable, AutoCloseable
 		if (sc instanceof RoutingServiceContainer) {
 			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
 			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().equals(rsc.routingMulticastAddress()));
-			if (backbone.isPresent()) {
-				final var enc = backbone.get().groupKey();
+			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
+				final var enc = backbone.get().groupKey().get();
 				final var groupKey = keyring.decryptKey(enc, pwd);
 				decrypted.put("group.key", groupKey);
 			}
