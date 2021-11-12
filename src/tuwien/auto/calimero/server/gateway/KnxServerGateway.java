@@ -921,7 +921,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				final var xlator = TranslatorTypes.createTranslator(dpt);
 
-				timeServerCyclicTransmitter.scheduleAtFixedRate(
+				timeServerCyclicTransmitter.scheduleWithFixedDelay(
 						() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
 						5, sendInterval, TimeUnit.SECONDS);
 			}
@@ -933,8 +933,59 @@ public class KnxServerGateway implements Runnable
 
 	private void transmitCurrentTime(final SubnetConnector connector, final DPTXlator xlator, final GroupAddress dst,
 			final Priority p) {
+		final ServiceContainer sc = connector.getServiceContainer();
+		final var src = sc.getMediumSettings().getDeviceAddress();
+		try {
+			// dispatch to subnet
+			try {
+				final var apdu = prepareTimestamp(connector, xlator, src, dst, p);
+				final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
+				dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
+			}
+			catch (final RuntimeException e) {
+				logger.warn("time server error {} {}", dst, xlator, e);
+			}
+
+			// dispatch to server-side clients
+			try {
+				logger.debug("dispatch {}->{} to all server-side connections", src, dst);
+				final long eventId = new FrameEvent(this, (CEMI) null).id();
+				for (final var conn : serverConnections) {
+					final String type = conn.getName().toLowerCase();
+					if (type.contains("devmgmt"))
+						continue;
+
+					// always create new timestamp, so we don't send an outdated timestamp if a previous client
+					// connection was not responsive
+					final var apdu = prepareTimestamp(connector, xlator, src, dst, p);
+					final var f = new CEMILDataEx(CEMILData.MC_LDATA_IND, src, dst, apdu, p);
+					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
+					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
+					final boolean monitoring = type.contains("monitor");
+					final CEMI send = monitoring ? convertToBusmon(f, eventId, connector) : f;
+					try {
+						send(sc, conn, send);
+					}
+					catch (final KNXIllegalArgumentException e) {
+						// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
+						// frames. Catch here, so we can continue serving other open connections.
+						logger.warn("frame not accepted by {} ({}): {}", conn.getName(), e.getMessage(), send, e);
+					}
+				}
+			}
+			catch (final RuntimeException e) {
+				logger.warn("time server error {} {}", dst, xlator, e);
+			}
+		}
+		catch (final InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private byte[] prepareTimestamp(final SubnetConnector connector, final DPTXlator xlator, final IndividualAddress src,
+			final GroupAddress dst, final Priority p) throws InterruptedException {
 		final long millis = System.currentTimeMillis();
-		final var src = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
+
 		if (xlator instanceof DPTXlatorDate)
 			((DPTXlatorDate) xlator).setValue(millis);
 		else if (xlator instanceof DPTXlatorTime)
@@ -946,17 +997,8 @@ public class KnxServerGateway implements Runnable
 		}
 		final var plainApdu = DataUnitBuilder.createAPDU(0x80, xlator.getData());
 		final var sal = ((BaseKnxDevice) server.device()).secureApplicationLayer();
-		try {
-			final var apdu = sal.secureGroupObject(src, dst, plainApdu).orElse(plainApdu);
-			final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
-			dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
-		}
-		catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-		catch (final RuntimeException e) {
-			logger.warn("time server error {} {}", dst, xlator, e);
-		}
+		// this might incur some time overhead that will outdate the timestamp
+		return sal.secureGroupObject(src, dst, plainApdu).orElse(plainApdu);
 	}
 
 	@Override
