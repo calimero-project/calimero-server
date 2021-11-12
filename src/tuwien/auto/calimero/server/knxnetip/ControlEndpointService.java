@@ -158,8 +158,18 @@ final class ControlEndpointService extends ServiceLooper
 		sessions = new SecureSession(this);
 
 		final InetAddress addr = s.getLocalAddress();
+
+		final byte[] empty = new byte[4];
+		byte[] data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.IP_ADDRESS, empty);
+		if (Arrays.equals(data, empty))
+			server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.IP_ADDRESS, addr.getAddress());
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
+
+		data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.SUBNET_MASK, empty);
+		if (Arrays.equals(data, empty))
+			server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.SUBNET_MASK, subnetMaskOf(addr));
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
+
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.MAC_ADDRESS, macAddress(addr));
 
 		final boolean secureMgmt = isSecuredService(DeviceManagement);
