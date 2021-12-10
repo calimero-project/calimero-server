@@ -205,8 +205,6 @@ public class Launcher implements Runnable, AutoCloseable
 			final String friendly = attr(r, XmlConfiguration.attrFriendly).orElseThrow();
 			appData = attr(r, "appData").map(expandHome).map(Path::of).orElse(Path.of("")).toAbsolutePath();
 
-			logger = LoggerFactory.getLogger("calimero.server." + serverName);
-
 			boolean discovery = true;
 			var listen = "";
 			var outgoing = "";
@@ -532,7 +530,7 @@ public class Launcher implements Runnable, AutoCloseable
 						return netIf;
 				}
 				catch (final SocketException se) {
-					logger.error("while searching for network interface '{}'", attr, se);
+					throw new KnxRuntimeException("while searching for network interface '" + attr + "'", se);
 				}
 				throw new KNXIllegalArgumentException(
 						"no network interface found with the specified name '" + attr + "'");
@@ -541,7 +539,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 	}
 
-	private static Logger logger = LoggerFactory.getLogger("calimero.server");
+	private final Logger logger;
 
 	private final ServerConfiguration config;
 
@@ -564,11 +562,21 @@ public class Launcher implements Runnable, AutoCloseable
 	public static void main(final String[] args)
 	{
 		if (args.length == 0) {
-			logger.info("supply file name/URI for the KNX server configuration");
+			System.out.println("supply file name/URI for the KNX server configuration");
 			return;
 		}
+
+		// we have to set the command-line option for log level before first logger lookup
+		int optIdx = 0;
+		if (args.length > 0 && args[0].startsWith("-v")) {
+			final String vs = args[0];
+			final String level = vs.startsWith("-vvv") ? "trace" : vs.startsWith("-vv") ? "debug" : "info";
+			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", level);
+			optIdx++;
+		}
+
 		final String configUri = args[args.length - 1];
-		final boolean detached = "--no-stdin".equals(args[0]);
+		final boolean detached = "--no-stdin".equals(args[optIdx]);
 		try (var launcher = new Launcher(configUri)) {
 			launcher.terminal = !detached;
 			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
@@ -584,6 +592,7 @@ public class Launcher implements Runnable, AutoCloseable
 	public Launcher(final String configUri)
 	{
 		config = XmlConfiguration.from(URI.create(configUri));
+		logger = LoggerFactory.getLogger("calimero.server." + config.name());
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
