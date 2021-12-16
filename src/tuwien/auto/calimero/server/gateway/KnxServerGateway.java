@@ -1885,6 +1885,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 
+			logger.trace("dispatch to subnet {}: {}", subnet.getName(), send);
 			link.send(send, true);
 			setNetworkState(oi, true, false);
 			incMsgTransmitted(oi, true);
