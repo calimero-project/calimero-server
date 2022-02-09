@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2020, 2021 B. Malinowsky
+    Copyright (c) 2020, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -172,6 +172,9 @@ public class ServerConfiguration {
 		this.name = name;
 		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
 			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
+		if (friendlyName.length() > 29)
+			throw new IllegalArgumentException("Friendly name '" + friendlyName + "' > 29 characters");
+
 		friendly = friendlyName;
 		this.discovery = discovery;
 		this.discoveryNetifs = List.copyOf(discoveryNetifs);
