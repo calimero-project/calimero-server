@@ -96,8 +96,8 @@ Elements and attributes of `server-config.xml`:
 	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
 	-  `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available (non-loopback) network adapter is chosen depending on your OS network setup (or localhost setting). 
     - `reuseCtrlEP` (optional): reuse the KNXnet/IP control endpoint (UDP/IP) for subsequent tunneling connections, `false` by default. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
-    - `keyfile="~/.knx/keyfile"` (required for KNX IP Secure): path to a keyfile containing the KNX IP Secure keys, alternatively specify a `keyring`
-    - `keyring="/path/to/keyring.knxkeys"` (required for KNX IP Secure): path to a keyring containing the KNX IP Secure keys
+    - `keyfile="~/.knx/keyfile"` (required for KNX IP Secure): path to a keyfile containing the KNX IP Secure keys, alternatively specify a `keyring`. See [below](#knx-ip-secure) for the keyfile layout.
+    - `keyring="/path/to/keyring.knxkeys"` (required for KNX IP Secure): path to a keyring exported from ETS containing the KNX IP Secure keys. The _keyfile_ typically contains the password to decrypt the keyring, otherwise the server will try to query the keyring password from the system console during startup.
 
 * `<knxAddress type="individual">7.1.0</knxAddress>`: the individual address of the service container (has to match the KNX subnet!)
     - `type="individual"`: indicates a device address.
@@ -139,7 +139,7 @@ Optional attributes for secure routing:
 
 * `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1.
 
-* `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements.
+* `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements. Time server values are sent secured if the datapoint destination is in the keyring.
 
 ### Configuration Examples for KNX subnets
 
@@ -160,12 +160,12 @@ Optional attributes for secure routing:
 	`<knxSubnet type="usb" medium="rf" domainAddress="000000004b01">0409:005a</knxSubnet>`
 
 ### KNX IP Secure 
-Running the server with KNX IP Secure requires a keyring (*.knxkeys); alternatively, a keyfile can be used which contains 
+Running the server with KNX IP Secure requires a keyring (*.knxkeys) exported from ETS, or a keyfile. A keyfile contains 
 
 * a _group key_ if the server should use KNX IP Secure multicast communication
 * a _device key_ and _user keys_ if the server should use KNX IP Secure unicast communication (tunneling on link-layer and busmonitor-layer, device management)
 
-Example keyfile (note, the layout might still change):
+Example keyfile:
 
 ```
 // group key is a 16 byte hex value 
@@ -178,6 +178,12 @@ user[1].key=
 user[2].key=d6da71bd89f7e8426250fe5657da900c
 user[3].pwd=Joshua
 user[4].key=...
+```
+
+Keyfile holding the keyring password:
+
+```
+keyring.pwd=Joshua
 ```
 
 ### Launcher Code
