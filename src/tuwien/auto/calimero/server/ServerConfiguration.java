@@ -46,6 +46,7 @@ import java.util.Optional;
 
 import tuwien.auto.calimero.GroupAddress;
 import tuwien.auto.calimero.IndividualAddress;
+import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.secure.Keyring;
@@ -266,9 +267,9 @@ public class ServerConfiguration {
 			final URI iosResource, final char[] iosResourcePwd) {
 		this.name = Objects.requireNonNull(name);
 		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
-			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
+			throw new KNXIllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		if (friendlyName.length() > 29)
-			throw new IllegalArgumentException("Friendly name '" + friendlyName + "' > 29 characters");
+			throw new KNXIllegalArgumentException("Friendly name '" + friendlyName + "' > 29 characters");
 
 		friendly = friendlyName;
 		this.discovery = discovery;
