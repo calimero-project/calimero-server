@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -329,7 +329,7 @@ public class KNXnetIPServer
 		friendlyName = config.friendlyName();
 		logger = LogService.getLogger("calimero.server." + getName());
 
-		final char[] iosPwd = new char[0]; //config.iosResourcePassword();
+		final char[] iosPwd = config.iosResourcePassword();
 		device = new BaseKnxDevice(serverName, DD0.TYPE_091A, null, logic, config.iosResource().orElse(null), iosPwd);
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);

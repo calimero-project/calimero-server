@@ -41,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import tuwien.auto.calimero.GroupAddress;
@@ -78,15 +79,76 @@ public class ServerConfiguration {
 
 		private final SubnetConnector connector;
 		private final List<GroupAddress> groupAddressFilter;
+
+		// both sides
+
 		private final List<StateDP> timeServer;
 
 
+		/**
+		 * Creates a new service container configuration without any security.
+		 *
+		 * @param additionalAddresses additional addresses assigned to tunneling connections.
+		 * @param connector subnet connector for that conainer
+		 * @param groupAddressFilter group address filter
+		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
+		 *        functionality
+		 */
 		public Container(final List<IndividualAddress> additionalAddresses, final SubnetConnector connector,
 				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
-			this(additionalAddresses, EnumSet.noneOf(ServiceFamily.class), Map.of(), null, Map.of(), connector,
-					groupAddressFilter, timeServerDatapoints);
+			this(additionalAddresses, Map.of(), connector, groupAddressFilter, timeServerDatapoints,
+					EnumSet.noneOf(ServiceFamily.class), Map.of());
 		}
 
+		/**
+		 * Creates a new service container configuration with security.
+		 *
+		 * @param additionalAddresses additional addresses assigned to tunneling connections.
+		 * @param connector subnet connector for that conainer
+		 * @param groupAddressFilter group address filter
+		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
+		 *        functionality
+		 * @param securedServices set of service families that should use KNX IP Secure
+		 * @param keyfile map with KNX IP Secure keys/passwords, e.g., loaded from a keyfile
+		 */
+		public Container(final List<IndividualAddress> additionalAddresses,
+				final Map<Integer, List<IndividualAddress>> tunnelingUsers, final SubnetConnector connector,
+				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints,
+				final EnumSet<ServiceFamily> securedServices, final Map<String, byte[]> keyfile) {
+
+			this(additionalAddresses, tunnelingUsers, connector, groupAddressFilter, timeServerDatapoints,
+					securedServices, keyfile, null);
+		}
+
+		/**
+		 * Creates a new service container configuration with security and a keyring resource.
+		 *
+		 * @param additionalAddresses additional addresses assigned to tunneling connections.
+		 * @param connector subnet connector for that conainer
+		 * @param groupAddressFilter group address filter
+		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
+		 *        functionality
+		 * @param securedServices set of service families that should use KNX IP Secure
+		 * @param keyfile map with KNX IP Secure keys/passwords, e.g., loaded from a keyfile
+		 * @param keyring keyring to use for this container, <code>keyfile</code> can contain the keyring password
+		 */
+		public Container(final List<IndividualAddress> additionalAddresses,
+			final Map<Integer, List<IndividualAddress>> tunnelingUsers, final SubnetConnector connector,
+			final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints,
+			final EnumSet<ServiceFamily> securedServices, final Map<String, byte[]> keyfile, final Keyring keyring) {
+
+			this.additionalAddresses = List.copyOf(additionalAddresses);
+			this.tunnelingUsers = Map.copyOf(tunnelingUsers);
+			this.securedServices = EnumSet.copyOf(securedServices);
+			this.keyring = keyring;
+			this.keyfile = Map.copyOf(keyfile);
+
+			this.connector = connector;
+			this.groupAddressFilter = List.copyOf(groupAddressFilter);
+			this.timeServer = List.copyOf(timeServerDatapoints);
+		}
+
+		@Deprecated
 		Container(final List<IndividualAddress> additionalAddresses,
 				final EnumSet<ServiceFamily> securedServices, final Map<Integer, List<IndividualAddress>> tunnelingUsers,
 				final Keyring keyring, final Map<String, byte[]> keyfile, final SubnetConnector connector,
@@ -162,14 +224,47 @@ public class ServerConfiguration {
 	private final boolean discovery;
 	private final List<String> discoveryNetifs;
 	private final List<String> outgoingNetifs;
-	private final URI iosResource;
 	private final List<Container> containers;
+	private final URI iosResource;
+	private final char[] iosResourcePwd;
 
 
+	/**
+	 * Creates a new server configuration.
+	 *
+	 * @param name server name, used for logging etc.
+	 * @param friendlyName friendly name used for KNXnet/IP discovery, {@code friendlyName.length < 30} ISO-8859-1 characters
+	 * @param discovery enable discovery
+	 * @param discoveryNetifs list of names for network interfaces KNXnet/IP discovery will listen on, also allowed are
+	 *        "all" and "any"
+	 * @param outgoingNetifs list of names for network interfaces KNXnet/IP discovery will send out discovery responses,
+	 *        also allowed are "all" and "any"
+	 * @param containers list with service container configurations
+	 */
 	public ServerConfiguration(final String name, final String friendlyName, final boolean discovery,
-			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final URI iosResource,
-			final List<Container> containers) {
-		this.name = name;
+			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final List<Container> containers) {
+		this(name, friendlyName, discovery, discoveryNetifs, outgoingNetifs, containers, null, new char[0]);
+	}
+
+	/**
+	 * Creates a new server configuration, also pointing to an interface object server resource.
+	 *
+	 * @param name server name, used for logging etc.
+	 * @param friendlyName friendly name used for KNXnet/IP discovery, {@code friendlyName.length < 30} ISO-8859-1 characters
+	 * @param discovery enable discovery
+	 * @param discoveryNetifs list of names for network interfaces KNXnet/IP discovery will listen on, also allowed are
+	 *        "all" and "any"
+	 * @param outgoingNetifs list of names for network interfaces KNXnet/IP discovery will send out discovery responses,
+	 *        also allowed are "all" and "any"
+	 * @param containers list with service container configurations
+	 * @param iosResource interface object server resource to be loaded by the KNXnet/IP server
+	 * @param iosResourcePwd password for an encrypted interface object server resource, use {@code char[0]} if no
+	 *        password is required
+	 */
+	public ServerConfiguration(final String name, final String friendlyName, final boolean discovery,
+			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final List<Container> containers,
+			final URI iosResource, final char[] iosResourcePwd) {
+		this.name = Objects.requireNonNull(name);
 		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
 			throw new IllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
 		if (friendlyName.length() > 29)
@@ -179,8 +274,16 @@ public class ServerConfiguration {
 		this.discovery = discovery;
 		this.discoveryNetifs = List.copyOf(discoveryNetifs);
 		this.outgoingNetifs = List.copyOf(outgoingNetifs);
-		this.iosResource = iosResource;
 		this.containers = List.copyOf(containers);
+		this.iosResource = iosResource;
+		this.iosResourcePwd = iosResourcePwd.clone();
+	}
+
+	@Deprecated
+	public ServerConfiguration(final String name, final String friendlyName, final boolean discovery,
+			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final URI iosResource,
+			final List<Container> containers) {
+		this(name, friendlyName, discovery, discoveryNetifs, outgoingNetifs, containers, iosResource, new char[0]);
 	}
 
 	public String name() { return name; }
@@ -194,6 +297,8 @@ public class ServerConfiguration {
 	public List<String> outgoingNetifs() { return outgoingNetifs; }
 
 	public Optional<URI> iosResource() { return Optional.ofNullable(iosResource); }
+
+	public char[] iosResourcePassword() { return iosResourcePwd.clone(); }
 
 	public List<Container> containers() { return containers; }
 

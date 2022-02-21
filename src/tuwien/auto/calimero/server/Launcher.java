@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -225,7 +225,7 @@ public class Launcher implements Runnable, AutoCloseable
 			}
 			final URI iosResource = appData.resolve(serverName + "-ios.xml").normalize().toUri();
 			return new ServerConfiguration(serverName, friendly, discovery, List.of(listen.split(",")),
-					List.of(outgoing.split(",")), iosResource, containers);
+					List.of(outgoing.split(",")), containers, iosResource, new char[0]);
 		}
 
 		private static Optional<String> attr(final XmlReader r, final String name) {
@@ -247,7 +247,8 @@ public class Launcher implements Runnable, AutoCloseable
 			final NetworkInterface netif = getNetIf(r);
 
 			// look for a server keyfile
-			final Path keyfile = attr(r, "keyfile").map(file -> appData.resolve(file)).orElse(null);
+			final var keyfile = attr(r, "keyfile").map(file -> appData.resolve(file)).map(XmlConfiguration::readKeyfile)
+					.orElse(Map.of());
 			// look for a keyring configuration
 			final var keyring = attr(r, "keyring").map(file -> appData.resolve(file).toString()).map(Keyring::load).orElse(null);
 
@@ -410,15 +411,12 @@ public class Launcher implements Runnable, AutoCloseable
 								tunnelingUserToAddresses.computeIfAbsent(iface.user(), ArrayList::new).add(iface.address());
 								indAddressPool.add(iface.address());
 							}
+							config = new Container(indAddressPool, tunnelingUserToAddresses, connector, filter,
+									timeServerDatapoints, secureServices, keyfile, keyring);
 						}
-
-						Map<String, byte[]> readKeyfile = null;
-						if (keyfile != null)
-							readKeyfile = readKeyfile(keyfile);
-
-						if (keyring != null || readKeyfile != null)
-							config = new Container(indAddressPool, secureServices, tunnelingUserToAddresses, keyring,
-									Optional.ofNullable(readKeyfile).orElse(Map.of()), connector, filter, timeServerDatapoints);
+						else
+							config = new Container(indAddressPool, tunnelingUserToAddresses, connector, filter,
+									timeServerDatapoints, secureServices, keyfile);
 						containers.add(config);
 						return;
 					}

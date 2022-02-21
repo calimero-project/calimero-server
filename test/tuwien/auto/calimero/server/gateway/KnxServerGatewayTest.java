@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.net.InetAddress;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -92,7 +91,7 @@ class KnxServerGatewayTest
 
 		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
 		final var config = new ServerConfiguration("gateway", "friendly server name", true, List.of(), List.of(),
-				URI.create(""), List.of(container));
+				List.of(container));
 
 		gw = new KnxServerGateway(server, config);
 	}
@@ -102,7 +101,7 @@ class KnxServerGatewayTest
 
 	private KNXnetIPServer setupServer(final String name)
 	{
-		final var config = new ServerConfiguration(name, "friendly server name", true, List.of(), List.of(), null, List.of());
+		final var config = new ServerConfiguration(name, "friendly server name", true, List.of(), List.of(), List.of());
 		final KNXnetIPServer s = new KNXnetIPServer(config);
 		final InterfaceObjectServer ios = s.getInterfaceObjectServer();
 		ios.addInterfaceObject(InterfaceObject.ROUTER_OBJECT);
@@ -129,7 +128,7 @@ class KnxServerGatewayTest
 
 		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
 		final var config = new ServerConfiguration("test GW 2", "friendly test GW 2", true, List.of(), List.of(),
-				URI.create(""), List.of(container));
+				List.of(container));
 
 		final KnxServerGateway gw2 = new KnxServerGateway(s, config);
 		Thread t = new Thread(gw2);
@@ -187,7 +186,7 @@ class KnxServerGatewayTest
 			table[idx++] = (byte) (ga.getRawAddress() >> 8);
 			table[idx++] = (byte) ga.getRawAddress();
 		}
-		final var config = new ServerConfiguration("calimero-server", "", false, List.of(), List.of(), null, List.of());
+		final var config = new ServerConfiguration("calimero-server", "", false, List.of(), List.of(), List.of());
 		final KNXnetIPServer server = new KNXnetIPServer(config);
 		ios = server.getInterfaceObjectServer();
 		// create interface object and set the address table object property
