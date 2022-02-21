@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -459,7 +459,7 @@ final class ControlEndpointService extends ServiceLooper
 				protocolVersion = endpoint.protocolVersion();
 				status = checkVersion(h, protocolVersion);
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.trace("received connection state request from {} for channel {}",
+					logger.trace("received connection state request from {} channel {}",
 							hostPort(endpoint.getRemoteAddress()), csr.getChannelID());
 					endpoint.updateLastMsgTimestamp();
 				}
@@ -467,9 +467,14 @@ final class ControlEndpointService extends ServiceLooper
 
 			if (status == ErrorCodes.NO_ERROR)
 				status = subnetStatus();
-			else
-				logger.warn("received invalid connection state request for channel {}: {}", csr.getChannelID(),
+			else {
+				final var ctrlEp = csr.getControlEndpoint().endpoint();
+				final var addr = endpoint != null ? endpoint.getRemoteAddress()
+						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
+				logger.warn("received invalid connection state request from {} channel {}: {}",
+						hostPort(addr), csr.getChannelID(),
 						ErrorCodes.getErrorMessage(status));
+			}
 
 			final byte[] buf = PacketHelper.toPacket(protocolVersion,
 					new ConnectionstateResponse(csr.getChannelID(), status));
