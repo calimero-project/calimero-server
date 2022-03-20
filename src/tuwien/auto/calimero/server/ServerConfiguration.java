@@ -268,8 +268,8 @@ public class ServerConfiguration {
 		this.name = Objects.requireNonNull(name);
 		if (!StandardCharsets.ISO_8859_1.newEncoder().canEncode(friendlyName))
 			throw new KNXIllegalArgumentException("Cannot encode '" + friendlyName + "' using ISO-8859-1 charset");
-		if (friendlyName.length() > 29)
-			throw new KNXIllegalArgumentException("Friendly name '" + friendlyName + "' > 29 characters");
+		if (friendlyName.length() > 30)
+			throw new KNXIllegalArgumentException("Friendly name '" + friendlyName + "' > 30 characters");
 
 		friendly = friendlyName;
 		this.discovery = discovery;
