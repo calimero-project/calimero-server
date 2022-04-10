@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -279,7 +279,7 @@ public final class SubnetConnector
 		else if ("tcp".equals(interfaceType)) {
 			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
 					.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
-				final InetSocketAddress local = new InetSocketAddress(ia, 0);
+			final InetSocketAddress local = new InetSocketAddress(ia, 0);
 			final var server = parseRemoteEndpoint();
 
 			if (requestBaos)
