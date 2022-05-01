@@ -252,7 +252,7 @@ public class Launcher implements Runnable, AutoCloseable
 			// look for a keyring configuration
 			final var keyring = attr(r, "keyring").map(file -> appData.resolve(file).toString()).map(Keyring::load).orElse(null);
 
-			final var secureServices = toEnumSet(attr(r, "securedServices").map(Integer::decode).orElse(0x3f));
+			final var secureServices = decodeSecuredServicecs(attr(r, "securedServices").orElse("0"));
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String addr = "";
@@ -421,6 +421,34 @@ public class Launcher implements Runnable, AutoCloseable
 						return;
 					}
 				}
+			}
+		}
+
+		private static EnumSet<ServiceFamily> decodeSecuredServicecs(final String svcs) {
+			try {
+				return toEnumSet(Integer.decode(svcs));
+			}
+			catch (final NumberFormatException e) {
+				final String[] split = svcs.replaceAll(" +", "").split(",| +", 0);
+				final var set = EnumSet.noneOf(ServiceFamily.class);
+				for (final var s : split) {
+					switch (s) {
+					case "optional":
+						return EnumSet.of(ServiceFamily.Security);
+					case "tunneling":
+						set.add(ServiceFamily.Tunneling);
+						break;
+					case "devmgmt":
+						set.add(ServiceFamily.DeviceManagement);
+						break;
+					case "routing":
+						set.add(ServiceFamily.Routing);
+						break;
+					default:
+						throw new KNXIllegalArgumentException("unknown secure service '" + s + "'");
+					}
+				}
+				return set;
 			}
 		}
 

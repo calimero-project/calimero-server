@@ -576,37 +576,70 @@ public class KNXnetIPServer
 
 	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys,
 			final EnumSet<ServiceFamily> securedServices) {
-		final var secure = EnumSet.<ServiceFamily>noneOf(ServiceFamily.class);
-
 		final int objectInstance = objectInstance(sc);
 		final var endpoint = endpointFor(sc);
 		final int objIndex = endpoint.get().knxipParameters.getIndex();
 
+		// option to not require secured services only, but also allow plain (mainly for testing)
+		boolean setSecuredServices = true;
+		if (securedServices.size() == 1 && securedServices.contains(ServiceFamily.Security)) {
+			securedServices.clear();
+			setSecuredServices = false;
+		}
+
+		// if securedServices is empty, by default we secure what is configured in the keys map;
+		// otherwise, we specifically follow the securedServices set
+		final boolean configureDefault = securedServices.isEmpty();
+		final var secure = EnumSet.<ServiceFamily>noneOf(ServiceFamily.class);
+
+		final boolean useSecureDevMgmtTunneling = securedServices.contains(ServiceFamily.DeviceManagement)
+				|| securedServices.contains(ServiceFamily.Tunneling);
+		final boolean configureSecureUnicast = configureDefault || useSecureDevMgmtTunneling;
+
 		// if we setup secure unicast services, we need at least device authentication
-		if (keys.containsKey("device.key")) {
-			secure.add(ServiceFamily.DeviceManagement);
-			secure.add(ServiceFamily.Tunneling);
+		if (configureSecureUnicast && keys.containsKey("device.key")) {
+			if (configureDefault || securedServices.contains(ServiceFamily.DeviceManagement))
+				secure.add(ServiceFamily.DeviceManagement);
+			if (configureDefault || securedServices.contains(ServiceFamily.Tunneling)) {
+				if (!configureDefault && !securedServices.contains(ServiceFamily.DeviceManagement))
+					throw new KnxSecureException("KNX IP secure tunneling requires secure device management");
+				secure.add(ServiceFamily.Tunneling);
+			}
 
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
 			setProperty(knxObject, objectInstance, SecureSession.pidDeviceAuth, keys.get("device.key"));
 
+			boolean mgmtUser = false;
+			boolean tunnelingUser = false;
 			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			for (int user = 1; keys.containsKey("user[" + user + "].key"); user++) {
 				final byte[] userPwdHash = keys.get("user[" + user + "].key");
 				baos.write(userPwdHash.length == 0 ? SecureSession.emptyPwdHash : userPwdHash, 0, 16);
+
+				if (user == 1)
+					mgmtUser = true;
+				else
+					tunnelingUser = true;
 			}
+
+			if (!mgmtUser)
+				throw new KnxSecureException("KNX IP secure device management requires a configured user 1");
+			if (secure.contains(ServiceFamily.Tunneling) && !tunnelingUser)
+				throw new KnxSecureException("KNX IP secure tunneling requires at least one configured tunneling user");
 			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidUserPwdHashes, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 2, 127, 0, 0), true);
 			final byte[] userPwdHashes = baos.toByteArray();
 			final int users = userPwdHashes.length / 16;
-			if (users == 0)
-				throw new KnxSecureException("user 1 is mandatory, but not configured");
 			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
 		}
+		else if (useSecureDevMgmtTunneling)
+			throw new KnxSecureException("KNX IP Secure device management requires a device key");
 
+		final boolean useSecureRouting = securedServices.contains(ServiceFamily.Routing);
+		final boolean configureSecureRouting = configureDefault || useSecureRouting;
 		final byte[] groupKey = keys.get("group.key");
-		if (sc instanceof RoutingServiceContainer && groupKey != null) {
+		if (configureSecureRouting && sc instanceof RoutingServiceContainer && groupKey != null) {
 			secure.add(ServiceFamily.Routing);
 
 			try {
@@ -632,6 +665,8 @@ public class KNXnetIPServer
 				throw new KnxRuntimeException("configure secure routing", e);
 			}
 		}
+		else if (useSecureRouting)
+			throw new KnxSecureException("KNX IP Secure routing requires a routing configuration");
 
 		if (!secure.isEmpty()) {
 			final byte[] caps = getProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES,
@@ -640,13 +675,9 @@ public class KNXnetIPServer
 			setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, caps);
 		}
 
-		final var orig = EnumSet.copyOf(secure);
-		final boolean changed = secure.retainAll(securedServices);
-		if (changed) {
-			orig.addAll(securedServices);
-			orig.removeAll(secure);
-			logger.info("KNX IP Secure is disabled for {}", orig);
-		}
+		if (!setSecuredServices)
+			secure.clear();
+
 		final int bits = secure.stream().mapToInt(sf -> 1 << sf.id()).sum();
 		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
 				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
