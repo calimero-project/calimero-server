@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1719,9 +1719,6 @@ public class KnxServerGateway implements Runnable
 
 	private static final int DomainAddressSerialNumberRead =  0b1111101100;
 	private static final int DomainAddressSerialNumberWrite = 0b1111101110;
-	private static final int SecureService = 0b1111110001;
-
-	private static final int SecureSyncResponse = 3;
 
 	private static final int pidIpSbcControl = 120;
 
@@ -1734,7 +1731,7 @@ public class KnxServerGateway implements Runnable
 		if (sbc == 0)
 			return false;
 
-		return RoutingSystemBroadcast.isSystemBroadcast(f);
+		return RoutingSystemBroadcast.isSubnetSystemBroadcast(f);
 	}
 
 	// checks if received server-side frame qualifies as subnet broadcast
@@ -1744,22 +1741,7 @@ public class KnxServerGateway implements Runnable
 		if (sbc == 0)
 			return false;
 
-		final byte[] tpdu = f.getPayload();
-		final ByteBuffer asdu = ByteBuffer.wrap(DataUnitBuilder.extractASDU(tpdu));
-		final int svc = DataUnitBuilder.getAPDUService(tpdu);
-		switch (svc) {
-		case SystemNetworkParamResponse:
-			return asdu.getShort() == InterfaceObject.DEVICE_OBJECT && (asdu.getShort() >> 4) == PID.SERIAL_NUMBER
-					&& asdu.get() == 1; // TODO toolaccess bit
-		case SecureService: // we look for sync response, and require tool access, system broadcast, A+C
-			final int scf = asdu.get() & 0xff;
-			final boolean toolAccess = (scf & 128) == 128;
-			final int algorithmId = (scf >> 4) & 0x7;
-			final boolean systemBroadcast = (scf & 0x8) == 0x8;
-			final int service = scf & 0x3;
-			return service == SecureSyncResponse && toolAccess && systemBroadcast && algorithmId == 1;
-		}
-		return false;
+		return RoutingSystemBroadcast.isIpSystemBroadcast(f);
 	}
 
 	private Optional<KNXnetIPConnection> findRoutingConnection()
