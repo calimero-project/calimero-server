@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -94,7 +94,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
-	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DefaultMulticast}
 	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
 	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
