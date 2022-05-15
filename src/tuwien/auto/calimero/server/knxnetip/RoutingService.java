@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@ import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.cemi.CEMI;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILDataEx;
-import tuwien.auto.calimero.device.ios.InterfaceObject;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
@@ -65,6 +65,7 @@ import tuwien.auto.calimero.knxnetip.servicetype.RoutingLostMessage;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
+import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 
 final class RoutingService extends ServiceLooper
 {
@@ -132,16 +133,18 @@ final class RoutingService extends ServiceLooper
 	private final RoutingServiceContainer svcCont;
 	private final boolean secure;
 
-	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final InetAddress mcGroup,
-		final boolean enableLoopback)
-	{
+	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final boolean enableLoopback)	{
 		super(server, null, false, 512, 0);
 		svcCont = sc;
 
 		final int pidGroupKey = 91;
 		final int oi = server.objectInstance(sc);
-		final byte[] groupKey = server.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, oi, pidGroupKey, new byte[0]);
+		final byte[] groupKey = server.getProperty(KNXNETIP_PARAMETER_OBJECT, oi, pidGroupKey, new byte[0]);
 		secure = isSecuredService(ServiceFamily.Routing) && groupKey.length == 16;
+
+		final var ios = server.getInterfaceObjectServer();
+		final var knxipObject = KnxipParameterObject.lookup(ios, oi);
+		final var mcGroup = knxipObject.inetAddress(PID.ROUTING_MULTICAST_ADDRESS);
 
 		final KNXnetIPRouting inst;
 		try {

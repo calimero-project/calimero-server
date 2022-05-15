@@ -83,6 +83,7 @@ import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
@@ -235,7 +236,7 @@ public class KNXnetIPServer
 				final InetAddress mcast = routingContainer.routingMulticastAddress();
 				routingEndpoint = new LooperTask(KNXnetIPServer.this,
 						serverName + " routing service " + mcast.getHostAddress(), -1,
-						() -> new RoutingService(KNXnetIPServer.this, routingContainer, mcast, multicastLoopback));
+						() -> new RoutingService(KNXnetIPServer.this, routingContainer, multicastLoopback));
 				LooperTask.scheduleWithRetry(routingEndpoint);
 			}
 		}
@@ -978,19 +979,8 @@ public class KNXnetIPServer
 
 	DeviceDIB createDeviceDIB(final ServiceContainer sc)
 	{
-		byte[] name;
-		try {
-			// friendly name property entry is an array of 30 characters
-			name = ios.getProperty(knxObject, objectInstance(sc), PID.FRIENDLY_NAME, 1, 30);
-		}
-		catch (final KnxPropertyException e) {
-			name = new byte[30];
-			System.arraycopy(defFriendlyName, 0, name, 0, defFriendlyName.length);
-		}
-		final StringBuilder sb = new StringBuilder(30);
-		for (int i = 0; i < name.length && name[i] > 0; ++i)
-			sb.append((char) (name[i] & 0xff));
-		final String friendly = sb.toString();
+		final var knxipObject = KnxipParameterObject.lookup(ios, objectInstance(sc));
+		final String friendly = knxipObject.friendlyName();
 
 		final var deviceObject = DeviceObject.lookup(ios);
 		final int deviceStatus = deviceObject.programmingMode() ? 1 : 0;

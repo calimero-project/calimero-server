@@ -87,6 +87,7 @@ import tuwien.auto.calimero.datapoint.StateDP;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
@@ -931,14 +932,12 @@ public class Launcher implements Runnable, AutoCloseable
 	private List<KNXAddress> acknowledgeOnTp(final ServiceContainer sc, final int objectInstance) {
 		final var ack = new ArrayList<KNXAddress>();
 		ack.add(sc.getMediumSettings().getDeviceAddress());
-		final var ios = server.getInterfaceObjectServer();
-		try {
-			var buf = ByteBuffer.wrap(ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE));
-			while (buf.hasRemaining())
-				ack.add(new IndividualAddress(buf.getShort() & 0xffff));
 
-			buf = ByteBuffer
+		final var ios = server.getInterfaceObjectServer();
+		final var knxipObject = KnxipParameterObject.lookup(ios, objectInstance);
+		ack.addAll(knxipObject.additionalAddresses());
+		try {
+			final var buf = ByteBuffer
 					.wrap(ios.getProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, Integer.MAX_VALUE));
 			while (buf.hasRemaining())
 				ack.add(new GroupAddress(buf.getShort() & 0xffff));

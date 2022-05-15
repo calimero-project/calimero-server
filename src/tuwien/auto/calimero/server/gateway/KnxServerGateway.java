@@ -50,7 +50,6 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -111,6 +110,7 @@ import tuwien.auto.calimero.device.BaseKnxDevice;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.device.ios.PropertyEvent;
 import tuwien.auto.calimero.dptxlator.DPTXlator;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
@@ -1032,10 +1032,10 @@ public class KnxServerGateway implements Runnable
 							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
 				}
 
-				final InetAddress ip = InetAddress.getByAddress(
-						ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objInst, PID.CURRENT_IP_ADDRESS, 1, 1));
-				final InetAddress mask = InetAddress.getByAddress(
-						ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objInst, PID.CURRENT_SUBNET_MASK, 1, 1));
+				final var knxipObject = KnxipParameterObject.lookup(ios, objInst);
+
+				final InetAddress ip = knxipObject.inetAddress(PID.CURRENT_IP_ADDRESS);
+				final InetAddress mask = knxipObject.inetAddress(PID.CURRENT_SUBNET_MASK);
 				info.append(format("\tserver IP %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
 						NetworkInterface.getByInetAddress(ip)));
 
@@ -1100,12 +1100,8 @@ public class KnxServerGateway implements Runnable
 
 	private String friendlyName() {
 		try {
-			// friendly name property entry is an array of 30 characters
-			final var data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, 1,
-					PID.FRIENDLY_NAME, 1, 30);
-			final String s = new String(data, StandardCharsets.ISO_8859_1);
-			final int end = s.indexOf(0);
-			return s.substring(0, end == -1 ? data.length : end);
+			final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), 1);
+			return knxipObject.friendlyName();
 		}
 		catch (final KnxPropertyException e) {
 			return name;
@@ -1938,18 +1934,8 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private List<IndividualAddress> additionalAddresses(final int objectInstance) {
-		final List<IndividualAddress> list = new ArrayList<>();
-		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance,
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE);
-			final ByteBuffer buf = ByteBuffer.wrap(data);
-			while (buf.hasRemaining())
-				list.add(new IndividualAddress(buf.getShort() & 0xffff));
-		}
-		catch (final KnxPropertyException e) {
-			logger.warn(e.getMessage());
-		}
-		return list;
+		final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance);
+		return knxipObject.additionalAddresses();
 	}
 
 	private boolean checkPropertyAccess(final int objectType, final int objectInstance, final int pid,

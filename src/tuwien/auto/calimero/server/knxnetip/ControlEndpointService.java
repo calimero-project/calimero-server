@@ -81,6 +81,7 @@ import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.device.ios.DeviceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel;
 import tuwien.auto.calimero.knxnetip.KNXnetIPTunnel.TunnelingLayer;
@@ -159,11 +160,13 @@ final class ControlEndpointService extends ServiceLooper
 
 		final InetAddress addr = s.getLocalAddress();
 
+		final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
+
 		final byte[] empty = new byte[4];
 		byte[] data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.IP_ADDRESS, empty);
 		if (Arrays.equals(data, empty))
-			server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.IP_ADDRESS, addr.getAddress());
-		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_IP_ADDRESS, addr.getAddress());
+			knxipObject.setInetAddress(PID.IP_ADDRESS, addr);
+		knxipObject.setInetAddress(PID.CURRENT_IP_ADDRESS, addr);
 
 		data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.SUBNET_MASK, empty);
 		if (Arrays.equals(data, empty))
@@ -967,18 +970,8 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	List<IndividualAddress> additionalAddresses() {
-		final List<IndividualAddress> list = new ArrayList<>();
-		try {
-			final byte[] data = server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-					PID.ADDITIONAL_INDIVIDUAL_ADDRESSES, 1, Integer.MAX_VALUE);
-			final ByteBuffer buf = ByteBuffer.wrap(data);
-			while (buf.hasRemaining())
-				list.add(new IndividualAddress(buf.getShort() & 0xffff));
-		}
-		catch (final KnxPropertyException e) {
-			logger.warn(e.getMessage());
-		}
-		return list;
+		final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
+		return knxipObject.additionalAddresses();
 	}
 
 	private static final int pidTunnelingAddresses = 79;
