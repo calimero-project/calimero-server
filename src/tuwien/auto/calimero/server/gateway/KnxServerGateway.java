@@ -136,6 +136,7 @@ import tuwien.auto.calimero.link.KNXNetworkMonitor;
 import tuwien.auto.calimero.link.LinkEvent;
 import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
+import tuwien.auto.calimero.link.medium.KnxIPSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
@@ -725,7 +726,9 @@ public class KnxServerGateway implements Runnable
 		public void setKNXMedium(final KNXMediumSettings settings) {}
 
 		@Override
-		public KNXMediumSettings getKNXMedium() { return connectors.get(0).getServiceContainer().getMediumSettings(); }
+		public KNXMediumSettings getKNXMedium() {
+			return new KnxIPSettings(server.device().getAddress());
+		}
 
 		@Override
 		public void setHopCount(final int count) {}
