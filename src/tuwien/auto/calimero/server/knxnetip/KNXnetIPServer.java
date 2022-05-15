@@ -259,6 +259,27 @@ public class KNXnetIPServer
 
 	private final EventListeners<ServerListener> listeners;
 
+	private final class KnxServerDevice extends BaseKnxDevice {
+
+		KnxServerDevice(final ServerConfiguration config, final KnxDeviceServiceLogic logic) {
+			super(config.name(), DD0.TYPE_091A, null, logic, config.iosResource().orElse(null),
+					config.iosResourcePassword());
+		}
+
+		@Override
+		protected void ipRoutingConfigChanged(final RoutingConfig config) {
+			for (final var ep : endpoints) {
+				final var rep = ep.routingEndpoint();
+				if (rep.isPresent()) {
+					// TODO support >1 routing services
+					final var routingService = rep.get();
+					routingService.quit();
+					return;
+				}
+			}
+		}
+	}
+
 	final KnxDeviceServiceLogic logic = new KnxDeviceServiceLogic() {
 		private static final int pidIpSbcControl = 120;
 
@@ -330,8 +351,7 @@ public class KNXnetIPServer
 		friendlyName = config.friendlyName();
 		logger = LogService.getLogger("calimero.server." + getName());
 
-		final char[] iosPwd = config.iosResourcePassword();
-		device = new BaseKnxDevice(serverName, DD0.TYPE_091A, null, logic, config.iosResource().orElse(null), iosPwd);
+		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();
 		listeners = new EventListeners<>(logger);
 
