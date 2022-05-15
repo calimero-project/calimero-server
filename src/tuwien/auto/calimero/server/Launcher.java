@@ -102,7 +102,6 @@ import tuwien.auto.calimero.link.medium.RFSettings;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.secure.Keyring;
-import tuwien.auto.calimero.secure.KnxSecureException;
 import tuwien.auto.calimero.secure.Security;
 import tuwien.auto.calimero.server.ServerConfiguration.Container;
 import tuwien.auto.calimero.server.gateway.KnxServerGateway;
@@ -405,9 +404,7 @@ public class Launcher implements Runnable, AutoCloseable
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
-							final var interfaces = keyring.interfaces().get(subnet);
-							if (interfaces == null)
-								throw new KnxSecureException("no interfaces found in keyring for host " + subnet);
+							final var interfaces = keyring.interfaces().getOrDefault(subnet, List.of());
 							for (final var iface : interfaces) {
 								tunnelingUserToAddresses.computeIfAbsent(iface.user(), ArrayList::new).add(iface.address());
 								indAddressPool.add(iface.address());
@@ -764,11 +761,14 @@ public class Launcher implements Runnable, AutoCloseable
 
 		final var host = sc.getMediumSettings().getDeviceAddress();
 		final var device = keyring.devices().get(host);
-		final var authKey = SecureConnection
-				.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication().get(), pwd));
-		decrypted.put("device.key", authKey);
-		final var mgmtKey = SecureConnection.hashUserPassword(keyring.decryptPassword(device.password().get(), pwd));
-		decrypted.put("user[1].key", mgmtKey);
+		if (device != null) {
+			final var authKey = SecureConnection
+					.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication().get(), pwd));
+			decrypted.put("device.key", authKey);
+			final var mgmtKey = SecureConnection
+					.hashUserPassword(keyring.decryptPassword(device.password().get(), pwd));
+			decrypted.put("user[1].key", mgmtKey);
+		}
 
 		if (sc instanceof RoutingServiceContainer) {
 			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
@@ -782,7 +782,7 @@ public class Launcher implements Runnable, AutoCloseable
 				logger.warn("KNX IP routing is not secured");
 		}
 
-		final var interfaces = keyring.interfaces().get(host);
+		final var interfaces = keyring.interfaces().getOrDefault(host, List.of());
 		for (final var iface : interfaces) {
 			if (iface.password().isEmpty())
 				continue;
