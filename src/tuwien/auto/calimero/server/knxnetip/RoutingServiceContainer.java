@@ -70,7 +70,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
 	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
-	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DEFAULT_MULTICAST}
+	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DefaultMulticast}
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,

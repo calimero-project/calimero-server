@@ -73,7 +73,6 @@ import tuwien.auto.calimero.KNXIllegalArgumentException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.Settings;
-import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.datapoint.Datapoint;
 import tuwien.auto.calimero.device.BaseKnxDevice;
 import tuwien.auto.calimero.device.KnxDevice;
@@ -91,7 +90,6 @@ import tuwien.auto.calimero.dptxlator.DPTXlator8BitUnsigned;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
-import tuwien.auto.calimero.knxnetip.KNXnetIPRouting;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
@@ -100,6 +98,7 @@ import tuwien.auto.calimero.link.medium.PLSettings;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.mgmt.Description;
 import tuwien.auto.calimero.mgmt.Destination;
+import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.secure.KnxSecureException;
 import tuwien.auto.calimero.server.ServerConfiguration;
@@ -209,11 +208,11 @@ public class KNXnetIPServer
 
 	class Endpoint {
 		final ServiceContainer serviceContainer;
-		final InterfaceObject knxipParameters;
+		final KnxipParameterObject knxipParameters;
 		private final LooperTask controlEndpoint;
 		private volatile LooperTask routingEndpoint;
 
-		Endpoint(final ServiceContainer sc, final InterfaceObject knxipParameters, final LooperTask controlEndpoint) {
+		Endpoint(final ServiceContainer sc, final KnxipParameterObject knxipParameters, final LooperTask controlEndpoint) {
 			serviceContainer = sc;
 			this.knxipParameters = knxipParameters;
 			this.controlEndpoint = controlEndpoint;
@@ -233,8 +232,9 @@ public class KNXnetIPServer
 			LooperTask.scheduleWithRetry(controlEndpoint);
 			if (serviceContainer instanceof RoutingServiceContainer) {
 				final var routingContainer = (RoutingServiceContainer) serviceContainer;
-				final InetAddress mcast = routingContainer.routingMulticastAddress();
+				final var mcast = knxipParameters.inetAddress(PropertyAccess.PID.ROUTING_MULTICAST_ADDRESS);
 				routingEndpoint = new LooperTask(KNXnetIPServer.this,
+						// TODO mcast address might change
 						serverName + " routing service " + mcast.getHostAddress(), -1,
 						() -> new RoutingService(KNXnetIPServer.this, routingContainer, multicastLoopback));
 				LooperTask.scheduleWithRetry(routingEndpoint);
@@ -394,7 +394,7 @@ public class KNXnetIPServer
 		}
 
 		// add new KNXnet/IP parameter object for this service container
-		final var knxipParameters = findOrAddInterfaceObject(endpoints.size() + 1, knxObject);
+		final var knxipParameters = (KnxipParameterObject) findOrAddInterfaceObject(endpoints.size() + 1, knxObject);
 
 		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
 		final var controlEndpoint = new LooperTask(this, serverName + " control endpoint " + sc.getName(), -1, builder);
@@ -909,30 +909,11 @@ public class KNXnetIPServer
 	private void setRoutingConfiguration(final RoutingServiceContainer endpoint, final int objectInstance)
 		throws KnxPropertyException
 	{
-		final InetAddress multicastAddr = endpoint.routingMulticastAddress();
-
-		InetAddress mcast = null;
-		try {
-			if (multicastAddr != null)
-				mcast = multicastAddr;
-			else {
-				final byte[] data = getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, null);
-				if (data == null || Arrays.equals(new byte[4], data))
-					mcast = DefaultMulticast;
-				else
-					mcast = InetAddress.getByAddress(data);
-
-				if (!KNXnetIPRouting.isValidRoutingMulticast(mcast))
-					throw new KnxPropertyException(mcast + " is not a valid routing multicast address",
-							CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
-			}
+		final byte[] data = getProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, null);
+		if (data == null || Arrays.equals(new byte[4], data)) {
+			final var multicastAddr = endpoint.routingMulticastAddress();
+			setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, multicastAddr.getAddress());
 		}
-		catch (final UnknownHostException e) {
-			// possible data corruption in IOS
-			throw new KnxPropertyException("routing multicast property value is no IP address",
-					CEMIDevMgmt.ErrorCodes.UNSPECIFIED_ERROR);
-		}
-		setProperty(knxObject, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, mcast.getAddress());
 	}
 
 	private void resetRoutingConfiguration(final int objectInstance)
