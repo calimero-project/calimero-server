@@ -44,6 +44,7 @@ import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -262,7 +263,7 @@ public class KNXnetIPServer
 	private final class KnxServerDevice extends BaseKnxDevice {
 
 		KnxServerDevice(final ServerConfiguration config, final KnxDeviceServiceLogic logic) {
-			super(config.name(), DD0.TYPE_091A, null, logic, config.iosResource().orElse(null),
+			super(config.name(), DD0.TYPE_091A, null, logic, config.iosResource().orElse(URI.create("")),
 					config.iosResourcePassword());
 		}
 
