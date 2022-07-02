@@ -904,7 +904,7 @@ public class KnxServerGateway implements Runnable
 	 */
 	public final List<SubnetConnector> getSubnetConnectors()
 	{
-		return new ArrayList<>(connectors);
+		return List.copyOf(connectors);
 	}
 
 	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) {
