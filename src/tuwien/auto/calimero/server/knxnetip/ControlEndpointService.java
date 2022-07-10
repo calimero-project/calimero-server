@@ -303,7 +303,7 @@ final class ControlEndpointService extends ServiceLooper
 				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, 1);
 				final byte[] buf = PacketHelper
 						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
-				s.send(new DatagramPacket(buf, buf.length, ctrlEndpt));
+				send(0, 0, buf, ctrlEndpt);
 			}
 			else
 				return acceptControlService(0, h, data, offset, src);
