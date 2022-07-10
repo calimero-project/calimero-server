@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -219,7 +219,7 @@ final class DiscoveryService extends ServiceLooper
 			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
-			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs);
+			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs, 0);
 			if (res.isPresent()) {
 				final var buf = res.get();
 				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));

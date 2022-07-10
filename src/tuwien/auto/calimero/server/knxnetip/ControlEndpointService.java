@@ -527,7 +527,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
 			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
-		final var res = createSearchResponse(true, macFilter, requestedServices, requestedDibs);
+		final var res = createSearchResponse(true, macFilter, requestedServices, requestedDibs, sessionId);
 		if (res.isPresent()) {
 			send(sessionId, 0, res.get(), dst);
 			final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
@@ -537,7 +537,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	Optional<byte[]> createSearchResponse(final boolean ext, final byte[] macFilter,
-			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+			final byte[] requestedServices, final byte[] requestedDibs, final int sessionId) throws IOException {
 
 		// we create our own HPAI from the actual socket, since
 		// the service container might have opted for ephemeral port use
@@ -578,14 +578,14 @@ final class ControlEndpointService extends ServiceLooper
 		if (((DefaultServiceContainer) svcCont).baosSupport())
 			set.add(DIB.MFR_DATA);
 		final List<DIB> dibs = new ArrayList<>();
-		set.forEach(dibType -> createDib(dibType, dibs, ext));
+		set.forEach(dibType -> createDib(dibType, dibs, ext, sessionId));
 
 		final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
 		final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 		return Optional.of(buf);
 	}
 
-	private boolean createDib(final int dibType, final List<DIB> dibs, final boolean extended) {
+	private boolean createDib(final int dibType, final List<DIB> dibs, final boolean extended, final int sessionId) {
 		switch (dibType) {
 		case DIB.DEVICE_INFO:
 			return dibs.add(server.createDeviceDIB(svcCont));
@@ -597,7 +597,7 @@ final class ControlEndpointService extends ServiceLooper
 			createSecureServiceFamiliesDib().ifPresent(dibs::add);
 			return true;
 		case DIB.TunnelingInfo:
-			createTunnelingDib().ifPresent(dibs::add);
+			createTunnelingDib(sessionId).ifPresent(dibs::add);
 			return true;
 		case DIB.MFR_DATA:
 			dibs.add(new ManufacturerDIB(0x00c5, new byte[] { 1, 4, (byte) ObjectServerProtocol, ObjectServerVersion }));
@@ -624,14 +624,13 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.of(ServiceFamiliesDIB.newSecureServiceFamilies(supported));
 	}
 
-	private Optional<TunnelingDib> createTunnelingDib() {
+	private Optional<TunnelingDib> createTunnelingDib(final int sessionId) {
 		final List<IndividualAddress> addresses = additionalAddresses();
 		if (addresses.isEmpty() && svcCont.reuseControlEndpoint())
 			addresses.add(svcCont.getMediumSettings().getDeviceAddress());
 		if (addresses.isEmpty())
 			return Optional.empty();
 
-		final boolean authorized = true; // TODO check for secure session / plain access
 		final boolean subnetOk = subnetStatus() == ErrorCodes.NO_ERROR;
 
 		final var slots = new HashMap<IndividualAddress, EnumSet<SlotStatus>>();
@@ -639,8 +638,14 @@ final class ControlEndpointService extends ServiceLooper
 			final var status = EnumSet.noneOf(SlotStatus.class);
 			if (!addressInUse(addr))
 				status.add(SlotStatus.Free);
-			if (authorized)
+			if (secureSvcInProgress && sessionId > 0) {
+				final var session = sessions.sessions.get(sessionId);
+				if (session != null && addressAuthorizedForUser(session.userId, addr))
+					status.add(SlotStatus.Authorized);
+			}
+			else if (!isSecuredService(ServiceFamily.Tunneling))
 				status.add(SlotStatus.Authorized);
+
 			if (subnetOk)
 				status.add(SlotStatus.Usable);
 			slots.put(addr, status);
@@ -1089,12 +1094,35 @@ final class ControlEndpointService extends ServiceLooper
 			return true;
 		final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
 		for (int i = 0; i < userToAddrIdx.length; i += 2) {
-			final var user = userToAddrIdx[i];
+			final var user = userToAddrIdx[i] & 0xff;
 			if (user > userId)
 				return false;
 
 			if (userId == user)
 				return true;
+		}
+		return false;
+	}
+
+	private boolean addressAuthorizedForUser(final int userId, final IndividualAddress addr) {
+		if (userId == 1)
+			return true;
+		final var additionalAddresses = additionalAddresses();
+		final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
+		for (int i = 0; i < userToAddrIdx.length; i += 2) {
+			final var user = userToAddrIdx[i] & 0xff;
+			if (user > userId)
+				return false;
+
+			if (userId == user) {
+				final int tunAddrIdx = userToAddrIdx[i + 1] & 0xff;
+				if (tunAddrIdx == 0) {
+					if (addr.equals(serverAddress()))
+						return true;
+				}
+				else if (addr.equals(additionalAddresses.get(tunAddrIdx - 1)))
+					return true;
+			}
 		}
 		return false;
 	}
