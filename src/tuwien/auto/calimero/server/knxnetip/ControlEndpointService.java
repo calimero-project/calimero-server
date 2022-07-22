@@ -129,6 +129,7 @@ final class ControlEndpointService extends ServiceLooper
 
 
 	private final ServiceContainer svcCont;
+	private final KnxipParameterObject knxipObject;
 
 	// channel -> data endpoint
 	private final Map<Integer, DataEndpoint> connections = new ConcurrentHashMap<>();
@@ -155,20 +156,19 @@ final class ControlEndpointService extends ServiceLooper
 	{
 		super(server, null, 512, 10000);
 		svcCont = sc;
+		knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
 		s = createSocket();
 		sessions = new SecureSession(this);
 
 		final InetAddress addr = s.getLocalAddress();
 
-		final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
-
 		final byte[] empty = new byte[4];
-		byte[] data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.IP_ADDRESS, empty);
+		byte[] data = knxipObject.getOrDefault(PID.IP_ADDRESS, empty);
 		if (Arrays.equals(data, empty))
 			knxipObject.setInetAddress(PID.IP_ADDRESS, addr);
 		knxipObject.setInetAddress(PID.CURRENT_IP_ADDRESS, addr);
 
-		data = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.SUBNET_MASK, empty);
+		data = knxipObject.getOrDefault(PID.SUBNET_MASK, empty);
 		if (Arrays.equals(data, empty))
 			server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.SUBNET_MASK, subnetMaskOf(addr));
 		server.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), PID.CURRENT_SUBNET_MASK, subnetMaskOf(addr));
@@ -351,7 +351,7 @@ final class ControlEndpointService extends ServiceLooper
 			final DeviceDIB device = server.createDeviceDIB(svcCont);
 			final ServiceFamiliesDIB svcFamilies = server.createServiceFamiliesDIB(svcCont, false);
 			final ManufacturerDIB mfr = createManufacturerDIB();
-			final List<IndividualAddress> addresses = additionalAddresses();
+			final List<IndividualAddress> addresses = knxipObject.additionalAddresses();
 			final DescriptionResponse description = addresses.isEmpty()
 					? new DescriptionResponse(device, svcFamilies, mfr)
 					: new DescriptionResponse(device, svcFamilies, new KnxAddressesDIB(addresses), mfr);
@@ -625,7 +625,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private Optional<TunnelingDib> createTunnelingDib(final int sessionId) {
-		final List<IndividualAddress> addresses = additionalAddresses();
+		final List<IndividualAddress> addresses = knxipObject.additionalAddresses();
 		if (addresses.isEmpty() && svcCont.reuseControlEndpoint())
 			addresses.add(svcCont.getMediumSettings().getDeviceAddress());
 		if (addresses.isEmpty())
@@ -766,8 +766,7 @@ final class ControlEndpointService extends ServiceLooper
 	private IndividualAddress serverAddress()
 	{
 		try {
-			return new IndividualAddress(server.getInterfaceObjectServer().getProperty(KNXNETIP_PARAMETER_OBJECT,
-					objectInstance(), PID.KNX_INDIVIDUAL_ADDRESS, 1, 1));
+			return new IndividualAddress(knxipObject.get(PID.KNX_INDIVIDUAL_ADDRESS));
 		}
 		catch (final KnxPropertyException e) {
 			logger.error("no server device address set in KNXnet/IP parameter object!");
@@ -975,16 +974,12 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	List<IndividualAddress> additionalAddresses() {
-		final var knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
 		return knxipObject.additionalAddresses();
 	}
 
-	private static final int pidTunnelingAddresses = 79;
-	private static final int pidTunnelingUsers = 97;
-
 	private int extendedConnectRequest(final int userId, final IndividualAddress addr) {
-		final byte[] indices = allPropertyValues(pidTunnelingAddresses);
-		final var additionalAddresses = additionalAddresses();
+		final byte[] indices = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingAddresses, new byte[0]);
+		final var additionalAddresses = knxipObject.additionalAddresses();
 		boolean tunnelingAddress = false;
 
 		for (int i = 0; i < indices.length; i++) {
@@ -1011,7 +1006,7 @@ final class ControlEndpointService extends ServiceLooper
 		boolean addrAuthorized = false;
 		if (userId > 0) {
 			// n:m mapping user -> tunneling address index
-			final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
+			final byte[] userToAddrIdx = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingUsers, new byte[0]);
 			// users satisfy <= order, indices per user satisfy <= order
 			for (int i = 0; i < userToAddrIdx.length; i += 2) {
 				final var user = userToAddrIdx[i] & 0xff;
@@ -1039,15 +1034,15 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private int basicConnectRequest(final int userId) {
-		final byte[] addressIndices = allPropertyValues(pidTunnelingAddresses);
-		final var additionalAddresses = additionalAddresses();
+		final byte[] addressIndices = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingAddresses, new byte[0]);
+		final var additionalAddresses = knxipObject.additionalAddresses();
 
 		IndividualAddress assigned = null;
 		// exclude mgmt user, it always has access and is not stored in tunneling users
 		if (userId > 1 && isSecuredService(Tunneling)) {
 			// n:m mapping user -> tunneling address index
 			// user is stored in natural order, idx per user is stored in natural order
-			final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
+			final byte[] userToAddrIdx = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingUsers, new byte[0]);
 
 			for (int i = 0; i < userToAddrIdx.length; i += 2) {
 				final var user = userToAddrIdx[i];
@@ -1092,7 +1087,7 @@ final class ControlEndpointService extends ServiceLooper
 	private boolean userAuthorizedForTunneling(final int userId) {
 		if (userId == 1)
 			return true;
-		final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
+		final byte[] userToAddrIdx = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingUsers, new byte[0]);
 		for (int i = 0; i < userToAddrIdx.length; i += 2) {
 			final var user = userToAddrIdx[i] & 0xff;
 			if (user > userId)
@@ -1107,8 +1102,8 @@ final class ControlEndpointService extends ServiceLooper
 	private boolean addressAuthorizedForUser(final int userId, final IndividualAddress addr) {
 		if (userId == 1)
 			return true;
-		final var additionalAddresses = additionalAddresses();
-		final byte[] userToAddrIdx = allPropertyValues(pidTunnelingUsers);
+		final var additionalAddresses = knxipObject.additionalAddresses();
+		final byte[] userToAddrIdx = knxipObject.getOrDefault(KnxipParameterObject.Pid.TunnelingUsers, new byte[0]);
 		for (int i = 0; i < userToAddrIdx.length; i += 2) {
 			final var user = userToAddrIdx[i] & 0xff;
 			if (user > userId)
@@ -1128,19 +1123,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private boolean isSecuredService(final ServiceFamily serviceFamily) {
-		final int securedServices = server.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(),
-				SecureSession.pidSecuredServices, 1, (byte) 0);
-		final boolean secured = ((securedServices >> serviceFamily.id()) & 0x01) == 0x01;
-		return secured;
-	}
-
-	private byte[] allPropertyValues(final int propertyId) {
-		final var ios = server.getInterfaceObjectServer();
-		try {
-			return ios.getProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance(), propertyId, 1, Integer.MAX_VALUE);
-		}
-		catch (final KnxPropertyException ignore) {}
-		return new byte[0];
+		return knxipObject.securedService(serviceFamily);
 	}
 
 	private boolean matchesSubnet(final IndividualAddress addr, final IndividualAddress subnetMask)

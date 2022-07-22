@@ -83,6 +83,7 @@ import tuwien.auto.calimero.SerialNumber;
 import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.InterfaceObjectServer;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
+import tuwien.auto.calimero.device.ios.KnxipParameterObject;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
@@ -104,11 +105,6 @@ final class SecureSession {
 	private final DatagramSocket socket;
 	private final Logger logger;
 
-	static final int pidDeviceAuth = 92; // PDT generic 16
-	static final int pidUserPwdHashes = 93; // PDT generic 16
-	static final int pidSecuredServices = 94;
-	static final int pidLatencyTolerance = 95;
-	static final int pidSyncLatencyTolerance = 96;
 
 	static final byte[] emptyPwdHash = { (byte) 0xe9, (byte) 0xc3, 0x04, (byte) 0xb9, 0x14, (byte) 0xa3, 0x51, 0x75, (byte) 0xfd,
 		0x7d, 0x1c, 0x67, 0x3a, (byte) 0xb5, 0x2f, (byte) 0xe1 };
@@ -454,7 +450,8 @@ final class SecureSession {
 
 	private Key deviceAuthKey() {
 		try {
-			return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pidDeviceAuth, 1, 1));
+			return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+					KnxipParameterObject.Pid.DeviceAuth, 1, 1));
 		}
 		catch (final KnxPropertyException e) {
 			final byte[] key = new byte[16];
@@ -464,7 +461,8 @@ final class SecureSession {
 	}
 
 	private Key userPwdHash(final int userId) {
-		return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, pidUserPwdHashes, userId, 1));
+		return createSecretKey(ios.getProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance,
+				KnxipParameterObject.Pid.UserPwdHashes, userId, 1));
 	}
 
 	byte[] newSecurePacket(final int sessionId, final long seq, final int msgTag, final byte[] knxipPacket) {

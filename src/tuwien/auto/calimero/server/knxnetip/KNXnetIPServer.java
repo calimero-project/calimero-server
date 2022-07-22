@@ -164,9 +164,6 @@ public class KNXnetIPServer
 
 	// Values used for device DIB
 
-	// PID.FRIENDLY_NAME
-	private static final byte[] defFriendlyName = new byte[] { 'C', 'a', 'l', 'i', 'm', 'e', 'r',
-		'o', ' ', 'K', 'N', 'X', ' ', 'I', 'P', ' ', 's', 'e', 'r', 'v', 'e', 'r' };
 	// PID.PROJECT_INSTALLATION_ID
 	private static final int defProjectInstallationId = 0;
 	// PID.KNX_INDIVIDUAL_ADDRESS
@@ -628,9 +625,9 @@ public class KNXnetIPServer
 				secure.add(ServiceFamily.Tunneling);
 			}
 
-			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidDeviceAuth, 0,
+			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, KnxipParameterObject.Pid.DeviceAuth, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
-			setProperty(knxObject, objectInstance, SecureSession.pidDeviceAuth, keys.get("device.key"));
+			setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.DeviceAuth, keys.get("device.key"));
 
 			boolean mgmtUser = false;
 			boolean tunnelingUser = false;
@@ -649,11 +646,11 @@ public class KNXnetIPServer
 				throw new KnxSecureException("KNX IP secure device management requires a configured user 1");
 			if (secure.contains(ServiceFamily.Tunneling) && !tunnelingUser)
 				throw new KnxSecureException("KNX IP secure tunneling requires at least one configured tunneling user");
-			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, SecureSession.pidUserPwdHashes, 0,
+			ios.setDescription(new Description(objIndex, KNXNETIP_PARAMETER_OBJECT, KnxipParameterObject.Pid.UserPwdHashes, 0,
 					PropertyTypes.PDT_GENERIC_16, false, 2, 127, 0, 0), true);
 			final byte[] userPwdHashes = baos.toByteArray();
 			final int users = userPwdHashes.length / 16;
-			ios.setProperty(knxObject, objectInstance, SecureSession.pidUserPwdHashes, 1, users, userPwdHashes);
+			ios.setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.UserPwdHashes, 1, users, userPwdHashes);
 		}
 		else if (useSecureDevMgmtTunneling)
 			throw new KnxSecureException("KNX IP Secure device management requires a device key");
@@ -665,23 +662,22 @@ public class KNXnetIPServer
 			secure.add(ServiceFamily.Routing);
 
 			try {
-				final int pidGroupKey = 91;
-				ios.setDescription(new Description(objIndex, knxObject, pidGroupKey, 0, PropertyTypes.PDT_GENERIC_16,
-						false, 1, 1, 0, 0), true);
-				setProperty(knxObject, objectInstance, pidGroupKey, groupKey);
+				ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.BackboneKey, 0,
+						PropertyTypes.PDT_GENERIC_16, false, 1, 1, 0, 0), true);
+				setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.BackboneKey, groupKey);
 
 				// DPT 7.002
 				final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
 				t.setTimePeriod(((RoutingServiceContainer) sc).latencyTolerance().toMillis());
-				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidLatencyTolerance, 0,
+				ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.LatencyTolerance, 0,
 						PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
-				setProperty(knxObject, objectInstance, SecureSession.pidLatencyTolerance, t.getData());
+				setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.LatencyTolerance, t.getData());
 
 				final DPTXlator8BitUnsigned scaling = new DPTXlator8BitUnsigned(DPTXlator8BitUnsigned.DPT_SCALING);
 				scaling.setValue(10);
-				ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSyncLatencyTolerance, 0,
+				ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.SyncLatencyFraction, 0,
 						PropertyTypes.PDT_SCALING, false, 1, 1, 3, 0), true);
-				setProperty(knxObject, objectInstance, SecureSession.pidSyncLatencyTolerance, scaling.getData());
+				setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.SyncLatencyFraction, scaling.getData());
 			}
 			catch (final KNXFormatException e) {
 				throw new KnxRuntimeException("configure secure routing", e);
@@ -701,9 +697,9 @@ public class KNXnetIPServer
 			secure.clear();
 
 		final int bits = secure.stream().mapToInt(sf -> 1 << sf.id()).sum();
-		ios.setDescription(new Description(objIndex, knxObject, SecureSession.pidSecuredServices, 0,
+		ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.SecuredServiceFamilies, 0,
 				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
-		setProperty(knxObject, objectInstance, SecureSession.pidSecuredServices, (byte) 0, (byte) bits);
+		setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.SecuredServiceFamilies, (byte) 0, (byte) bits);
 	}
 
 	private NetworkInterface[] parseNetworkInterfaces(final String optionKey, final String value)
