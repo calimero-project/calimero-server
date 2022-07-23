@@ -759,6 +759,13 @@ public class KnxServerGateway implements Runnable
 
 		try {
 			server.device().setDeviceLink(deviceLinkProxy);
+
+			// setting the device link also sets the medium of our link proxy (KNX IP), so restore the correct
+			// value of the first service container
+			final var serviceContainer = config.containers().get(0).subnetConnector().getServiceContainer();
+			final int medium = serviceContainer.getMediumSettings().getMedium();
+			server.getInterfaceObjectServer().setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance,
+					PID.MEDIUM_TYPE, 1, 1, (byte) 0, (byte) medium);
 		}
 		catch (final KNXLinkClosedException e) {
 			throw new KnxRuntimeException("setting device link", e);
