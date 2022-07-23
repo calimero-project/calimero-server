@@ -117,7 +117,7 @@ import tuwien.auto.calimero.knxnetip.util.TunnelingDib.SlotStatus;
 import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.server.knxnetip.DataEndpoint.ConnectionType;
-import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
+import tuwien.auto.calimero.server.knxnetip.SecureSessions.Session;
 
 final class ControlEndpointService extends ServiceLooper
 {
@@ -145,7 +145,7 @@ final class ControlEndpointService extends ServiceLooper
 	private static final int MAX_CHANNEL_ID = 255;
 	private int lastChannelId;
 
-	final SecureSession sessions;
+	final SecureSessions sessions;
 	private boolean secureSvcInProgress;
 
 	private final Closeable tcpLooper;
@@ -158,7 +158,7 @@ final class ControlEndpointService extends ServiceLooper
 		svcCont = sc;
 		knxipObject = KnxipParameterObject.lookup(server.getInterfaceObjectServer(), objectInstance());
 		s = createSocket();
-		sessions = new SecureSession(this);
+		sessions = new SecureSessions(this);
 
 		final InetAddress addr = s.getLocalAddress();
 

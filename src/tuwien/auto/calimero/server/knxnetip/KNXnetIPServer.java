@@ -634,7 +634,7 @@ public class KNXnetIPServer
 			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			for (int user = 1; keys.containsKey("user[" + user + "].key"); user++) {
 				final byte[] userPwdHash = keys.get("user[" + user + "].key");
-				baos.write(userPwdHash.length == 0 ? SecureSession.emptyPwdHash : userPwdHash, 0, 16);
+				baos.write(userPwdHash.length == 0 ? SecureSessions.emptyPwdHash : userPwdHash, 0, 16);
 
 				if (user == 1)
 					mgmtUser = true;

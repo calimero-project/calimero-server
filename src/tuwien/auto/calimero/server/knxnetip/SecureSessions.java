@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2021 B. Malinowsky
+    Copyright (c) 2018, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.secure.KnxSecureException;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
-final class SecureSession {
+final class SecureSessions {
 
 	private static final int SecureSvc = 0x0950;
 	private static final int SessionReq = 0x0951; // 1. client -> server
@@ -136,7 +136,7 @@ final class SecureSession {
 	final Map<Integer, Session> sessions = new ConcurrentHashMap<>();
 
 
-	SecureSession(final ControlEndpointService ctrlEndpoint) {
+	SecureSessions(final ControlEndpointService ctrlEndpoint) {
 		socket = ctrlEndpoint.getSocket();
 		final String lock = new String(Character.toChars(0x1F512));
 		final String name = ctrlEndpoint.getServiceContainer().getName();

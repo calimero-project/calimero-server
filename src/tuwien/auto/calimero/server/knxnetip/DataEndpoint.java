@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.secure.SecurityControl;
 import tuwien.auto.calimero.secure.SecurityControl.DataSecurity;
-import tuwien.auto.calimero.server.knxnetip.SecureSession.Session;
+import tuwien.auto.calimero.server.knxnetip.SecureSessions.Session;
 
 /**
  * Server-side implementation of KNX IP (secure) tunneling and device management protocol.
@@ -115,7 +115,7 @@ public final class DataEndpoint extends ConnectionBase
 	// updated on every correctly received message
 	private long lastMsgTimestamp;
 
-	private final SecureSession sessions;
+	private final SecureSessions sessions;
 	private final int sessionId;
 
 	private final boolean tcp;
@@ -148,7 +148,7 @@ public final class DataEndpoint extends ConnectionBase
 	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
-		final SecureSession sessions, final int sessionId,
+		final SecureSessions sessions, final int sessionId,
 		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
 		final Consumer<DataEndpoint> resetRequest)
 	{
