@@ -697,8 +697,6 @@ public class KNXnetIPServer
 			secure.clear();
 
 		final int bits = secure.stream().mapToInt(sf -> 1 << sf.id()).sum();
-		ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.SecuredServiceFamilies, 0,
-				PropertyTypes.PDT_FUNCTION, true, 1, 1, 3, 2), true);
 		setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.SecuredServiceFamilies, (byte) 0, (byte) bits);
 	}
 
