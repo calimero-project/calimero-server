@@ -10,7 +10,7 @@ repositories {
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.8.1'
+ext.junitJupiterVersion = '5.9.1'
 
 apply plugin: 'java-library'
 apply plugin: 'application'
@@ -90,8 +90,8 @@ dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
 
-    implementation 'org.slf4j:slf4j-api:1.7.30'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.7.30'
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'
 
     runtimeOnly "com.github.calimero:calimero-rxtx:${version}"
 
