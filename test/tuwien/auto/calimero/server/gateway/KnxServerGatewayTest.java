@@ -117,7 +117,7 @@ class KnxServerGatewayTest
 	}
 
 	@Test
-	void testRun() throws InterruptedException
+	void run() throws InterruptedException
 	{
 		final KNXnetIPServer s = setupServer("test 2");
 		final var lo = InetAddress.getLoopbackAddress();
@@ -145,7 +145,7 @@ class KnxServerGatewayTest
 	}
 
 	@Test
-	void testQuit() throws InterruptedException
+	void quit() throws InterruptedException
 	{
 		final Thread t = new Thread(gw);
 		t.start();
@@ -157,7 +157,7 @@ class KnxServerGatewayTest
 	}
 
 	@Test
-	void testGetName()
+	void getName()
 	{
 		assertEquals("gateway", gw.getName());
 	}
@@ -167,7 +167,7 @@ class KnxServerGatewayTest
 	private InterfaceObjectServer ios;
 
 	@Test
-	void testAddressLookupPerformance()
+	void addressLookupPerformance()
 	{
 		// load address table for group address filtering
 		for (int i = 1; i < 100; i++)

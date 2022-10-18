@@ -97,8 +97,6 @@ dependencies {
 
 	testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-	testCompileOnly 'junit:junit:4.13.2'
-	testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${junitJupiterVersion}"
 }
 
 publishing {
