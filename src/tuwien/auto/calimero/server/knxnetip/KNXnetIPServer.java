@@ -58,7 +58,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -90,6 +89,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlator2ByteUnsigned;
 import tuwien.auto.calimero.dptxlator.DPTXlator8BitUnsigned;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.internal.EventListeners;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.util.DeviceDIB;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB;
@@ -281,16 +281,6 @@ public class KNXnetIPServer
 	final KnxDeviceServiceLogic logic = new KnxDeviceServiceLogic() {
 		private static final int pidIpSbcControl = 120;
 
-		private final ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, r -> {
-			final var t = new Thread(r, "IP SBC routing mode timeout");
-			t.setDaemon(true);
-			return t;
-		});
-		{
-			scheduler.setKeepAliveTime(1, TimeUnit.MINUTES);
-			scheduler.allowCoreThreadTimeOut(true);
-		}
-
 		private volatile Future<?> disableSbcFuture = CompletableFuture.completedFuture(Void.TYPE);
 
 		@Override
@@ -315,8 +305,8 @@ public class KNXnetIPServer
 							disableSbcFuture.cancel(false);
 							setSbcMode(objectIndex, info);
 							if (info == 1)
-								disableSbcFuture = scheduler.schedule(() -> setSbcMode(objectIndex, (byte) 0), 20,
-										TimeUnit.SECONDS);
+								disableSbcFuture = Executor.scheduledExecutor()
+										.schedule(() -> setSbcMode(objectIndex, (byte) 0), 20, TimeUnit.SECONDS);
 						}
 						else
 							returnCode = ReturnCode.DataVoid;
@@ -330,6 +320,7 @@ public class KNXnetIPServer
 		}
 
 		private void setSbcMode(final int objectIndex, final int info) {
+			Thread.currentThread().setName("IP SBC routing mode timeout");
 			logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
 			ios.setProperty(objectIndex, pidIpSbcControl, 1, 1, (byte) info);
 		}

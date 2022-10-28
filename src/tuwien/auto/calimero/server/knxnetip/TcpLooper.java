@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2021 B. Malinowsky
+    Copyright (c) 2018, 2022 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -50,8 +50,6 @@ import java.time.Duration;
 import java.util.AbstractQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -59,32 +57,27 @@ import org.slf4j.Logger;
 
 import tuwien.auto.calimero.KNXFormatException;
 import tuwien.auto.calimero.KnxRuntimeException;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
 final class TcpLooper implements Runnable, AutoCloseable {
 
 	private static final Duration inactiveConnectionTimeout = Duration.ofSeconds(10);
 
-	private final ControlEndpointService ctrlEndpoint;
-	private final Socket socket;
-	private final Logger logger;
-
 	static final ConcurrentHashMap<InetSocketAddress, TcpLooper> connections = new ConcurrentHashMap<>();
 
-	private static final ExecutorService pool = Executors.newCachedThreadPool(r -> {
-		final Thread t = new Thread(r);
-		t.setDaemon(true);
-		return t;
-	});
-
+	private final ControlEndpointService ctrlEndpoint;
+	private final Socket socket;
 	private final boolean baos;
+	private final Logger logger;
 
 	// impl note: we cannot simply return the future of ExecutorService::submit, because Future::cancel is
 	// interrupt-based, and the server socket does not honor interrupts; we have to close the socket directly
 	public static Closeable start(final ControlEndpointService ctrlEndpoint, final InetSocketAddress endpoint,
 			final boolean baos) throws InterruptedException {
 		final var serverSocket = new ArrayBlockingQueue<Closeable>(1);
-		final Future<?> task = pool.submit(() -> runTcpServerEndpoint(ctrlEndpoint, endpoint, baos, serverSocket));
+		final Future<?> task = Executor.executor()
+				.submit(() -> runTcpServerEndpoint(ctrlEndpoint, endpoint, baos, serverSocket));
 		while (!task.isDone()) {
 			final var v = serverSocket.poll(1, TimeUnit.SECONDS);
 			if (v != null)
@@ -111,8 +104,10 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private static void runTcpServerEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint,
 			final boolean baos, final AbstractQueue<Closeable> serverSocket) {
-		final String name = ces.server.getName() + " " + ces.getServiceContainer().getName() + (baos ? " baos" : "")
-				+ " tcp service";
+
+		final String namePrefix = ces.server.getName() + " " + ces.getServiceContainer().getName() + (baos ? " baos" : "")
+				+ " tcp ";
+		final String name = namePrefix + "service";
 		Thread.currentThread().setName(name);
 
 		ServerSocket localRef = null;
@@ -127,7 +122,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 				conn.setTcpNoDelay(true);
 				final TcpLooper looper = new TcpLooper(ces, conn, baos);
 				connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
-				pool.execute(looper);
+
+				Executor.execute(looper, namePrefix + "connection "
+						+ hostPort((InetSocketAddress) conn.getRemoteSocketAddress()));
 			}
 		}
 		catch (final InterruptedIOException e) {
@@ -139,9 +136,6 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			if (localRef == null || !localRef.isClosed())
 				ces.logger.error("socket error in tcp service {}:{}", endpoint.getAddress().getHostAddress(),
 						endpoint.getPort(), e);
-		}
-		finally {
-			Thread.currentThread().setName("idle tcp looper");
 		}
 	}
 
@@ -170,9 +164,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	@Override
 	public void run() {
-		final String name = ctrlEndpoint.server.getName() + " " + ctrlEndpoint.getServiceContainer().getName()
-				+ (baos ? " baos" : "") + " tcp connection " + hostPort((InetSocketAddress) socket.getRemoteSocketAddress());
-		Thread.currentThread().setName(name);
+		final String name = Thread.currentThread().getName();
 
 		try (InputStream in = socket.getInputStream()) {
 			if (baos) {
@@ -242,7 +234,6 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		}
 		finally {
 			close();
-			Thread.currentThread().setName("idle tcp looper");
 		}
 	}
 

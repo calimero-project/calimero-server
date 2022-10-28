@@ -92,6 +92,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorDate;
 import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.SecureConnection;
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
@@ -635,7 +636,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final String name = server.getName();
 			if (terminal) {
-				new Thread(gw, name).start();
+				Executor.execute(gw, name);
 				waitForTermination();
 				quit();
 			}

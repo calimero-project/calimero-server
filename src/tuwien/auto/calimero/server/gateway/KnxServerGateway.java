@@ -72,8 +72,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -118,6 +116,7 @@ import tuwien.auto.calimero.dptxlator.DPTXlatorDateTime;
 import tuwien.auto.calimero.dptxlator.DPTXlatorTime;
 import tuwien.auto.calimero.dptxlator.PropertyTypes;
 import tuwien.auto.calimero.dptxlator.TranslatorTypes;
+import tuwien.auto.calimero.internal.Executor;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.KNXnetIPDevMgmt;
@@ -190,18 +189,7 @@ public class KnxServerGateway implements Runnable
 	private volatile Instant throttleUntil = Instant.EPOCH;
 
 	private final AtomicInteger routingBusyCounter = new AtomicInteger();
-	private static final ScheduledExecutorService busyCounterDecrementor = Executors.newScheduledThreadPool(0, r -> {
-		final Thread t = new Thread(r, "Calimero routing busy counter");
-		t.setDaemon(true);
-		return t;
-	});
 
-	private static final ScheduledExecutorService timeServerCyclicTransmitter = Executors
-			.newSingleThreadScheduledExecutor(r -> {
-				final var t = new Thread(r, "Calimero time server");
-				t.setDaemon(true);
-				return t;
-			});
 
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
@@ -211,7 +199,7 @@ public class KnxServerGateway implements Runnable
 
 		private Instant lastRoutingBusy = Instant.EPOCH;
 		// avoid null, assign bogus future
-		private volatile ScheduledFuture<?> decrement = busyCounterDecrementor.schedule(() -> {}, 0, TimeUnit.SECONDS);
+		private volatile ScheduledFuture<?> decrement = Executor.scheduledExecutor().schedule(() -> {}, 0, TimeUnit.SECONDS);
 
 		ConnectionListener(final ServiceContainer svcContainer, final String connectionName,
 			final IndividualAddress device)
@@ -278,7 +266,7 @@ public class KnxServerGateway implements Runnable
 
 			final long initialDelay = Duration.between(now, throttleUntil).toMillis() + 5;
 			decrement.cancel(false);
-			decrement = busyCounterDecrementor.scheduleAtFixedRate(this::decrementBusyCounter, initialDelay, 5,
+			decrement = Executor.scheduledExecutor().scheduleAtFixedRate(this::decrementBusyCounter, initialDelay, 5,
 					TimeUnit.MILLISECONDS);
 		}
 
@@ -594,7 +582,7 @@ public class KnxServerGateway implements Runnable
 	// 2 = block all, 3 = use filter table (default for addresses <= 0x6fff)
 
 
-	private final Thread dispatcher = new Thread() {
+	private final Runnable dispatcher = new Runnable() {
 		// threshold for multicasting routing busy msg is 10 incoming routing indications
 		private static final int routingBusyMsgThreshold = 10;
 		private int ipMsgCount;
@@ -779,7 +767,6 @@ public class KnxServerGateway implements Runnable
 		logger = LogService.getLogger("calimero.server.gateway." + name);
 		connectors.addAll(subnetConnectors);
 		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-		dispatcher.setName(name + " subnet dispatcher");
 
 		final var ios = server.getInterfaceObjectServer();
 		for (final var entry : ios.propertyDefinitions().entrySet()) {
@@ -846,7 +833,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		trucking = true;
-		dispatcher.start();
+		final var dispatcherThread = Executor.execute(dispatcher, name + " subnet dispatcher");
 		while (trucking) {
 			try {
 				// although we possibly run in a dedicated thread so to not delay any
@@ -873,7 +860,7 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 
-		dispatcher.interrupt();
+		dispatcherThread.interrupt();
 	}
 
 	/**
@@ -931,7 +918,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				final var xlator = TranslatorTypes.createTranslator(dpt);
 
-				timeServerCyclicTransmitter.scheduleWithFixedDelay(
+				Executor.scheduledExecutor().scheduleWithFixedDelay(
 						() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
 						5, sendInterval, TimeUnit.SECONDS);
 			}
@@ -943,6 +930,7 @@ public class KnxServerGateway implements Runnable
 
 	private void transmitCurrentTime(final SubnetConnector connector, final DPTXlator xlator, final GroupAddress dst,
 			final Priority p) {
+		Thread.currentThread().setName("Calimero time server");
 		final ServiceContainer sc = connector.getServiceContainer();
 		final var src = sc.getMediumSettings().getDeviceAddress();
 		try {
@@ -1409,9 +1397,9 @@ public class KnxServerGateway implements Runnable
 			catch (final Exception e) {
 				throw new CompletionException(e);
 			}
-		}).exceptionally(t -> {
-			logger.warn("sending on {} failed: {} ({}->{} L_Data.con {})", c, t.getCause().getMessage(),
-					f.getSource(), f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
+		}, Executor.executor()).exceptionally(t -> {
+			logger.warn("sending on {} failed: {} ({}->{} L_Data.con {})", c, t.getCause().getMessage(), f.getSource(),
+					f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 			return null;
 		});
 	}
