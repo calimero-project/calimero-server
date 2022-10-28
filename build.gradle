@@ -51,8 +51,7 @@ run {
 }
 
 compileJava.options*.compilerArgs = [
-	'-Xlint:all',
-	'-Xlint:-options',
+	'-Xlint:all,-serial'
 ]
 
 compileTestJava.options*.compilerArgs = [
