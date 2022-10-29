@@ -1117,7 +1117,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void onClientFrameReceived(final FrameEvent fe) {
+	private void onClientFrameReceived(final FrameEvent fe) throws InterruptedException {
 		final String s = "server-side";
 		final CEMI frame = fe.getFrame();
 
@@ -1148,7 +1148,7 @@ public class KnxServerGateway implements Runnable
 									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 							send(server.getServiceContainers()[0], c, ind);
 						}
-						catch (KNXFormatException | InterruptedException | RuntimeException e) {
+						catch (KNXFormatException | RuntimeException e) {
 							e.printStackTrace();
 						}
 					}
@@ -1170,9 +1170,6 @@ public class KnxServerGateway implements Runnable
 									final var ind = CEMIFactory.create(null, null,
 											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 									send(svcContainer, dataEndpoint, ind, true);
-								}
-								catch (final InterruptedException e) {
-									Thread.currentThread().interrupt();
 								}
 								catch (KNXFormatException | RuntimeException e) {
 									e.printStackTrace();
@@ -1223,9 +1220,6 @@ public class KnxServerGateway implements Runnable
 								final var ind = CEMIFactory.create(null, null,
 										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 								send(svcCont.get(), conn, ind, true);
-							}
-							catch (final InterruptedException e) {
-								Thread.currentThread().interrupt();
 							}
 							catch (KNXFormatException | RuntimeException e) {
 								e.printStackTrace();
@@ -1380,13 +1374,8 @@ public class KnxServerGateway implements Runnable
 		logger.warn("received {} {} - ignored", s, frame);
 	}
 
-	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
-		try {
-			applyRoutingFlowControl(c);
-		}
-		catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
+	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) throws InterruptedException {
+		applyRoutingFlowControl(c);
 		CompletableFuture.runAsync(() -> {
 			try {
 				// TODO check for reasons to send negative L-Data.con
@@ -1960,8 +1949,8 @@ public class KnxServerGateway implements Runnable
 		return "";
 	}
 
-	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f, final SecurityControl securityControl)
-	{
+	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f,
+			final SecurityControl securityControl) throws InterruptedException {
 		final int mc = f.getMessageCode();
 		if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ) {
 			final boolean read = mc == CEMIDevMgmt.MC_PROPREAD_REQ;
@@ -2007,7 +1996,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				c.send(dm, WaitForAck);
 			}
-			catch (KNXException | InterruptedException e) {
+			catch (final KNXException e) {
 				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
 			}
 		}

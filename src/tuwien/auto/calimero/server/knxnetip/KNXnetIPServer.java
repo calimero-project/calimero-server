@@ -146,21 +146,8 @@ public class KNXnetIPServer
 	// But if the first connection is monitoring, then don't allow any more connections
 	// on that subnetwork.
 
-	// NYI cEMI server in full transparent mode (server without an own Individual
-	// Address), shall send back negative confirmation (Confirm Flag set to 1 in
-	// L_Data.con, if corresponding L-data.req message has its source address set to 0.
-
-	// NYI the following KNX properties are not used by now...
-	// private static final int PID_SERVICE_CONTROL = 8;
-	// private static final int PID_DEVICE_CONTROL = 14;
-
 	// TODO limit routing indications to <= 50 messages per seconds as required by the KNX spec
 
-	/*
-	  KNX property default values
-	  The following values are used to initialize the device objects and as fallback if
-	  querying a property from the IOS fails to ensure minimum functionality.
-	*/
 
 	// Values used for device DIB
 
