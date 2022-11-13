@@ -146,8 +146,6 @@ public class KNXnetIPServer
 	// But if the first connection is monitoring, then don't allow any more connections
 	// on that subnetwork.
 
-	// TODO limit routing indications to <= 50 messages per seconds as required by the KNX spec
-
 
 	// Values used for device DIB
 

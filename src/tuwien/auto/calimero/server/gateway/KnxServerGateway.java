@@ -47,14 +47,11 @@ import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,9 +69,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -137,7 +132,6 @@ import tuwien.auto.calimero.link.NetworkLinkListener;
 import tuwien.auto.calimero.link.medium.KNXMediumSettings;
 import tuwien.auto.calimero.link.medium.KnxIPSettings;
 import tuwien.auto.calimero.log.LogService;
-import tuwien.auto.calimero.log.LogService.LogLevel;
 import tuwien.auto.calimero.mgmt.LocalDeviceManagementUsb;
 import tuwien.auto.calimero.mgmt.PropertyAccess;
 import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
@@ -180,26 +174,12 @@ import tuwien.auto.calimero.server.knxnetip.ShutdownEvent;
  */
 public class KnxServerGateway implements Runnable
 {
-	// KNX IP routing busy flow control
-	// currently only 1 routing service is supported per server
-	private static final Duration randomWaitScale = Duration.ofMillis(50);
-	private static final Duration throttleScale = Duration.ofMillis(100);
-	private volatile Instant currentWaitUntil = Instant.EPOCH;
-	private volatile Instant pauseSendingUntil = Instant.EPOCH;
-	private volatile Instant throttleUntil = Instant.EPOCH;
-
-	private final AtomicInteger routingBusyCounter = new AtomicInteger();
-
-
 	// Connection listener for accepted KNXnet/IP connections
 	private final class ConnectionListener implements RoutingListener
 	{
 		final ServiceContainer sc;
 		final String name;
 
-		private Instant lastRoutingBusy = Instant.EPOCH;
-		// avoid null, assign bogus future
-		private volatile ScheduledFuture<?> decrement = Executor.scheduledExecutor().schedule(() -> {}, 0, TimeUnit.SECONDS);
 
 		ConnectionListener(final ServiceContainer svcContainer, final String connectionName,
 			final IndividualAddress device)
@@ -224,75 +204,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void routingBusy(final RoutingBusyEvent e)
-		{
-			// in case we sent the routing busy notification, ignore it
-			if (sentByUs(e.sender()))
-				return;
-
-			// setup timing for routing busy flow control
-			final Instant now = Instant.now();
-			final Instant waitUntil = now.plus(e.waitTime());
-			LogLevel level = LogLevel.TRACE;
-			boolean update = false;
-			if (waitUntil.isAfter(currentWaitUntil)) {
-				currentWaitUntil = waitUntil;
-				level = LogLevel.WARN;
-				update = true;
-			}
-			LogService.log(logger, level, "device {} sent {}", hostPort(e.sender()), e.get());
-
-			// increment random wait scaling iff >= 10 ms have passed since the last counted routing busy
-			if (now.isAfter(lastRoutingBusy.plusMillis(10))) {
-				lastRoutingBusy = now;
-				routingBusyCounter.incrementAndGet();
-				update = true;
-			}
-
-			if (!update)
-				return;
-
-			final double rand = Math.random();
-			final long randomWait = Math.round(rand * routingBusyCounter.get() * randomWaitScale.toMillis());
-
-			// invariant on instants: throttle >= pause sending >= current wait
-			pauseSendingUntil = currentWaitUntil.plusMillis(randomWait);
-			final long throttle = routingBusyCounter.get() * throttleScale.toMillis();
-			throttleUntil = pauseSendingUntil.plusMillis(throttle);
-
-			final long continueIn = Duration.between(now, pauseSendingUntil).toMillis();
-			logger.info("set routing busy counter = {}, random wait = {} ms, continue sending in {} ms, throttle {} ms",
-					routingBusyCounter, randomWait, continueIn, throttle);
-
-			final long initialDelay = Duration.between(now, throttleUntil).toMillis() + 5;
-			decrement.cancel(false);
-			decrement = Executor.scheduledExecutor().scheduleAtFixedRate(this::decrementBusyCounter, initialDelay, 5,
-					TimeUnit.MILLISECONDS);
-		}
-
-		String hostPort(final InetSocketAddress addr) {
-			return addr.getAddress().getHostAddress() + ":" + addr.getPort();
-		}
-
-		private void decrementBusyCounter()
-		{
-			// decrement iff counter > 0, otherwise cancel decrementing
-			if (routingBusyCounter.accumulateAndGet(0, (v, u) -> v > 0 ? --v : v) == 0)
-				decrement.cancel(false);
-		}
-
-		// this will give a false positive if sending device and server are on same host
-		private boolean sentByUs(final InetSocketAddress sender)
-		{
-			try {
-				final NetworkInterface netif = NetworkInterface.getByName(sc.networkInterface());
-				return Optional.ofNullable(netif).map(ni -> (List<InetAddress>) Collections.list(ni.getInetAddresses()))
-						.orElse(Arrays.asList(InetAddress.getLocalHost())).contains(sender.getAddress());
-			}
-			catch (UnknownHostException | SocketException e) {
-				return false;
-			}
-		}
+		public void routingBusy(final RoutingBusyEvent e) {}
 
 		@Override
 		public void connectionClosed(final CloseEvent e)
@@ -1169,7 +1081,7 @@ public class KnxServerGateway implements Runnable
 								try {
 									final var ind = CEMIFactory.create(null, null,
 											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-									send(svcContainer, dataEndpoint, ind, true);
+									send(svcContainer, dataEndpoint, ind);
 								}
 								catch (KNXFormatException | RuntimeException e) {
 									e.printStackTrace();
@@ -1219,7 +1131,7 @@ public class KnxServerGateway implements Runnable
 							try {
 								final var ind = CEMIFactory.create(null, null,
 										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-								send(svcCont.get(), conn, ind, true);
+								send(svcCont.get(), conn, ind);
 							}
 							catch (KNXFormatException | RuntimeException e) {
 								e.printStackTrace();
@@ -1375,7 +1287,6 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) throws InterruptedException {
-		applyRoutingFlowControl(c);
 		CompletableFuture.runAsync(() -> {
 			try {
 				// TODO check for reasons to send negative L-Data.con
@@ -1641,7 +1552,7 @@ public class KnxServerGateway implements Runnable
 							if (conn instanceof KNXnetIPRouting) {
 								final KNXnetIPRouting rc = (KNXnetIPRouting) conn;
 								if (sentOnNetif.add(rc.networkInterface()))
-									send(sc, rc, bcast, false);
+									send(sc, rc, bcast);
 							}
 						}
 						return;
@@ -1732,39 +1643,8 @@ public class KnxServerGateway implements Runnable
 		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
 	}
 
-	// check whether we have to slow down or pause sending for routing flow control
-	private void applyRoutingFlowControl(final KNXnetIPConnection c) throws InterruptedException
-	{
-		if (routingBusyCounter.get() == 0)
-			return;
-
-		// we have to loop because a new arrival of routing busy might update timings
-		while (true) {
-			final Instant now = Instant.now();
-			final long sleep = Duration.between(now, pauseSendingUntil).toMillis();
-			if (sleep > 0) {
-				logger.info("applying routing flow control for {}, wait {} ms ...",
-						c.getRemoteAddress().getAddress().getHostAddress(), sleep);
-				Thread.sleep(sleep);
-			}
-			else if (now.isBefore(throttleUntil)) {
-				Thread.sleep(5);
-				break;
-			}
-			else
-				break;
-		}
-	}
-
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
 			throws InterruptedException {
-		send(svcContainer, c, f, true);
-	}
-
-	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
-		final boolean applyRoutingFlowControl) throws InterruptedException {
-		if (applyRoutingFlowControl)
-			applyRoutingFlowControl(c);
 		final int oi = objectInstance(svcContainer.getName());
 		try {
 			c.send(f, WaitForAck);
