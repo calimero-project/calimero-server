@@ -184,6 +184,10 @@ final class RoutingService extends ServiceLooper
 		catch (SocketException | KNXException e) {
 			throw wrappedException(e);
 		}
+		catch (final InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw wrappedException(e);
+		}
 
 		s = r.channel().socket();
 		fireRoutingServiceStarted(svcCont, inst);
