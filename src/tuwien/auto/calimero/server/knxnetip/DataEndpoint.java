@@ -654,6 +654,8 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		if (cemi.getMessageCode() == CEMIDevMgmt.MC_PROPREAD_REQ
 				|| cemi.getMessageCode() == CEMIDevMgmt.MC_PROPWRITE_REQ
+				|| cemi.getMessageCode() == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ
+				|| cemi.getMessageCode() == CEMIDevMgmt.MC_FUNCPROP_READ_REQ
 				|| cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ) {
 			fireDeviceMgmtFrameReceived(cemi);
 			if (cemi.getMessageCode() == CEMIDevMgmt.MC_RESET_REQ)

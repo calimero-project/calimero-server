@@ -88,6 +88,7 @@ import tuwien.auto.calimero.KNXRemoteException;
 import tuwien.auto.calimero.KNXTimeoutException;
 import tuwien.auto.calimero.KnxRuntimeException;
 import tuwien.auto.calimero.Priority;
+import tuwien.auto.calimero.ReturnCode;
 import tuwien.auto.calimero.baos.BaosLink;
 import tuwien.auto.calimero.baos.BaosService;
 import tuwien.auto.calimero.cemi.AdditionalInfo;
@@ -121,6 +122,7 @@ import tuwien.auto.calimero.knxnetip.RoutingBusyEvent;
 import tuwien.auto.calimero.knxnetip.RoutingListener;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingBusy;
 import tuwien.auto.calimero.knxnetip.servicetype.RoutingSystemBroadcast;
+import tuwien.auto.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import tuwien.auto.calimero.link.Connector.Link;
 import tuwien.auto.calimero.link.KNXLinkClosedException;
 import tuwien.auto.calimero.link.KNXNetworkLink;
@@ -1160,7 +1162,9 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 		}
-		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ || mc == CEMIDevMgmt.MC_RESET_REQ) {
+		else if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ
+				|| mc == CEMIDevMgmt.MC_RESET_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ
+				|| mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
 			logger.trace("{} {}: {}", s, fe.getSource(), frame);
 
 			final var securityControl = fe.security().orElse(SecurityControl.Plain);
@@ -1873,6 +1877,72 @@ public class KnxServerGateway implements Runnable
 					f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, data)
 					: new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(),
 							f.getStartIndex(), elems);
+			try {
+				c.send(dm, WaitForAck);
+			}
+			catch (final KNXException e) {
+				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+			}
+		}
+		else if (mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
+			final boolean read = mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ;
+			byte[] data = {};
+
+			var returnCode = ReturnCode.Error;
+
+			final int objectType = f.getObjectType();
+			final int objInst = f.getObjectInstance();
+			final int propertyId = f.getPID();
+
+			final CEMIDevMgmt dm;
+			if (!functionProperties.contains(new PropertyKey(f.getObjectType(), f.getPID()))) {
+				dm = CEMIDevMgmt.newFunctionPropertyService(CEMIDevMgmt.MC_FUNCPROP_CON, objectType, objInst,
+						propertyId);
+			}
+			else {
+				final byte[] functionInput = f.getPayload();
+				if (functionInput.length > 1) {
+					final int rc = functionInput[0] & 0xff;
+					final int serviceId = functionInput[1] & 0xff;
+					if (rc != 0) // received return code shall be 0
+						returnCode = ReturnCode.DataVoid;
+					else {
+						if (read) {
+							final var ios = server.getInterfaceObjectServer();
+
+							if (objectType == InterfaceObject.KNXNETIP_PARAMETER_OBJECT) {
+								if (propertyId == KnxipParameterObject.Pid.SecuredServiceFamilies) {
+									if (serviceId == 0) {
+										if (functionInput.length == 3) {
+											final int famId = functionInput[2];
+											if (famId > 2 && famId < 6) {
+												final var serviceFamily = famId == 3 ? ServiceFamily.DeviceManagement
+														: famId == 4 ? ServiceFamily.Tunneling : ServiceFamily.Routing;
+												final boolean secured = KnxipParameterObject.lookup(ios, objInst)
+														.securedService(serviceFamily);
+												data = new byte[] { (byte) famId, (byte) (secured ? 1 : 0) };
+											}
+											else
+												returnCode = ReturnCode.DataVoid;
+										}
+										else
+											returnCode = ReturnCode.DataVoid;
+									}
+									else
+										returnCode = ReturnCode.InvalidServiceCommand;
+								}
+							}
+						}
+						else { // write
+							returnCode = ReturnCode.InvalidServiceCommand;
+						}
+					}
+					dm = CEMIDevMgmt.newFunctionPropertyService(CEMIDevMgmt.MC_FUNCPROP_CON, objectType,
+							objInst, propertyId, returnCode, serviceId, data);
+				}
+				else // function input length too short, ignore
+					return;
+			}
 			try {
 				c.send(dm, WaitForAck);
 			}

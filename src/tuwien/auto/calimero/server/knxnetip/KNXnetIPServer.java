@@ -162,9 +162,6 @@ public class KNXnetIPServer
 	// 4 Remote Configuration and Diagnosis, 5 Object Server
 	private static final int defDeviceCaps = 1 + 2 + 4;
 
-	// Values used for manufacturer data DIB
-
-	// from init KNX properties
 
 	// unmodifiable name assigned by user, used in getName() and logger
 	private final String serverName;
@@ -291,7 +288,7 @@ public class KNXnetIPServer
 							setSbcMode(objectIndex, info);
 							if (info == 1)
 								disableSbcFuture = Executor.scheduledExecutor()
-										.schedule(() -> setSbcMode(objectIndex, (byte) 0), 20, TimeUnit.SECONDS);
+										.schedule(() -> sbcRoutingModeTimeout(objectIndex, (byte) 0), 20, TimeUnit.SECONDS);
 						}
 						else
 							returnCode = ReturnCode.DataVoid;
@@ -304,10 +301,41 @@ public class KNXnetIPServer
 			return super.functionPropertyCommand(remote, objectIndex, propertyId, command);
 		}
 
+		public ServiceResult<byte[]> readFunctionPropertyState(final Destination remote, final int objectIndex,
+				final int propertyId, final byte[] functionInput) {
+			final int rc = functionInput[0] & 0xff;
+			final int serviceId = functionInput[1] & 0xff;
+			if (rc != 0) {
+				return ServiceResult.of((byte) ReturnCode.DataVoid.code(), (byte) serviceId);
+			}
+			final int objectType = ios.getInterfaceObjects()[objectIndex].getType();
+			if (objectType == InterfaceObject.ROUTER_OBJECT) {
+				if (propertyId == pidIpSbcControl) {
+					if (serviceId == 0) {
+						if (functionInput.length == 2) {
+							final byte[] data = ios.getProperty(objectIndex, pidIpSbcControl, 1, 1);
+							return new ServiceResult<>((byte) ReturnCode.Success.code(), (byte) serviceId, data[0]);
+						}
+						else {
+							return ServiceResult.of((byte) ReturnCode.DataVoid.code(), (byte) serviceId);
+						}
+					}
+					else {
+						return ServiceResult.of((byte) ReturnCode.InvalidServiceCommand.code(), (byte) serviceId);
+					}
+				}
+			}
+			return super.readFunctionPropertyState(remote, objectIndex, propertyId, functionInput);
+		}
+
 		private void setSbcMode(final int objectIndex, final int info) {
-			Thread.currentThread().setName("IP SBC routing mode timeout");
 			logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
 			ios.setProperty(objectIndex, pidIpSbcControl, 1, 1, (byte) info);
+		}
+
+		private void sbcRoutingModeTimeout(final int objectIndex, final int info) {
+			Thread.currentThread().setName("IP SBC routing mode timeout");
+			setSbcMode(objectIndex, info);
 		}
 	};
 
