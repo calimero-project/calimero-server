@@ -285,7 +285,7 @@ public class KNXnetIPServer
 						final int info = command[2] & 0xff;
 						if (info == 0 || info == 1) {
 							disableSbcFuture.cancel(false);
-							setSbcMode(objectIndex, info);
+							setSbcRoutingMode(objectIndex, info);
 							if (info == 1)
 								disableSbcFuture = Executor.scheduledExecutor()
 										.schedule(() -> sbcRoutingModeTimeout(objectIndex, (byte) 0), 20, TimeUnit.SECONDS);
@@ -328,14 +328,14 @@ public class KNXnetIPServer
 			return super.readFunctionPropertyState(remote, objectIndex, propertyId, functionInput);
 		}
 
-		private void setSbcMode(final int objectIndex, final int info) {
+		private void setSbcRoutingMode(final int objectIndex, final int info) {
 			logger.info("{} IP system broadcast routing mode", info == 1 ? "enable" : "disable");
 			ios.setProperty(objectIndex, pidIpSbcControl, 1, 1, (byte) info);
 		}
 
 		private void sbcRoutingModeTimeout(final int objectIndex, final int info) {
 			Thread.currentThread().setName("IP SBC routing mode timeout");
-			setSbcMode(objectIndex, info);
+			setSbcRoutingMode(objectIndex, info);
 		}
 	};
 
