@@ -13,7 +13,7 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 
 ### Dependencies
 
-The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`.
+The Calimero KNXnet/IP server requires `calimero-core` and `calimero-device`.
 _Optional_ dependencies, required for communication over serial ports:
 
 * Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
@@ -73,7 +73,7 @@ Make sure all required `jar` packages are available, and any referenced files in
 java -cp "./*" io.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.6-SNAPSHOT.jar:calimero-core-2.6-SNAPSHOT.jar:calimero-device-2.6-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" io.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-2.6-SNAPSHOT.jar:calimero-core-2.6-SNAPSHOT.jar:calimero-device-2.6-SNAPSHOT.jar" io.calimero.server.Launcher server-config.xml
 ~~~
 
 
@@ -196,4 +196,4 @@ To run the KNXnet/IP server and gateway directly in Java code, see the implement
 Logging
 -------
 
-Calimero KNXnet/IP server uses the [Simple Logging Facade for Java (slf4j)](http://www.slf4j.org/). Bind any desired logging frameworks of your choice. The default gradle/maven dependency is the [Simple Logger](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html). It logs everything to standard output. The simple logger can be configured via the file `simplelogger.properties`, JVM system properties, or `java` command line options, e.g., `-Dorg.slf4j.simpleLogger.defaultLogLevel=warn`.
+Calimero KNXnet/IP server uses the [System.Logger](https://docs.oracle.com/en/java/javase/19/docs/api/java.base/java/lang/System.Logger.html). Bind any desired logging frameworks of your choice.

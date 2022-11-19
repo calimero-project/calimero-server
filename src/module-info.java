@@ -38,8 +38,6 @@ module io.calimero.server {
 	requires transitive io.calimero.core;
 	requires transitive io.calimero.device;
 
-	requires org.slf4j;
-
 	exports io.calimero.server;
 	exports io.calimero.server.gateway;
 	exports io.calimero.server.knxnetip;

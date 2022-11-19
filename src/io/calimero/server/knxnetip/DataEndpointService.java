@@ -36,7 +36,11 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -46,7 +50,6 @@ import java.net.SocketException;
 import io.calimero.CloseEvent;
 import io.calimero.KNXFormatException;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
-import io.calimero.log.LogService.LogLevel;
 
 final class DataEndpointService extends ServiceLooper
 {
@@ -60,7 +63,7 @@ final class DataEndpointService extends ServiceLooper
 	{
 		super(server, newSocket(localCtrlEndpt.getLocalAddress(), 0), 512, MAX_RECEIVE_INTERVAL * 1000);
 		this.svcContName = svcContName;
-		logger.debug("created socket on " + s.getLocalSocketAddress());
+		logger.log(DEBUG, "created socket on " + s.getLocalSocketAddress());
 	}
 
 	void resetRequest(final DataEndpoint endpoint)
@@ -81,13 +84,13 @@ final class DataEndpointService extends ServiceLooper
 		// the meantime and updated the last msg timestamp
 		final long now = System.currentTimeMillis();
 		if (now - svcHandler.getLastMsgTimestamp() >= MAX_RECEIVE_INTERVAL * 1000)
-			svcHandler.close(CloseEvent.SERVER_REQUEST, "server connection timeout", LogLevel.WARN, null);
+			svcHandler.close(CloseEvent.SERVER_REQUEST, "server connection timeout", WARNING, null);
 		else
 			setTimeout();
 	}
 
 	@Override
-	void cleanup(final LogLevel level, final Throwable t)
+	void cleanup(final Level level, final Throwable t)
 	{
 		if (t != null)
 			svcHandler.cleanup(CloseEvent.INTERNAL, "communication failure", level, t);
@@ -114,7 +117,7 @@ final class DataEndpointService extends ServiceLooper
 		svcHandler.setSocket(s);
 		reboundSocket = true;
 		old.close();
-		logger.warn("{} (channel {}): rebound socket {} to use UDP port {}", svcHandler.getName(),
+		logger.log(WARNING, "{0} (channel {1}): rebound socket {2} to use UDP port {3}", svcHandler.getName(),
 				svcHandler.getChannelId(), oldAddress, port);
 	}
 

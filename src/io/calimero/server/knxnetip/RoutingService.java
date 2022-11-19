@@ -36,7 +36,10 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -62,7 +65,6 @@ import io.calimero.knxnetip.servicetype.PacketHelper;
 import io.calimero.knxnetip.servicetype.RoutingLostMessage;
 import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import io.calimero.log.LogService;
-import io.calimero.log.LogService.LogLevel;
 import io.calimero.mgmt.PropertyAccess.PID;
 
 final class RoutingService extends ServiceLooper
@@ -117,7 +119,7 @@ final class RoutingService extends ServiceLooper
 		}
 
 		@Override
-		protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t)
+		protected void close(final int initiator, final String reason, final Level level, final Throwable t)
 		{
 			// quit routing service before, so the UdpSocketLooper has its quit flag set and won't re-throw
 			// any I/O or socket exception while exiting
@@ -153,14 +155,14 @@ final class RoutingService extends ServiceLooper
 					@Override
 					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
 						// NYI sending routing lost message
-						logger.warn("NYI sending routing lost message");
+						logger.log(WARNING, "NYI sending routing lost message");
 					}
 
 					@Override
 					public String getName() { return inst.getName(); }
 
 					@Override
-					protected void close(final int initiator, final String reason, final LogLevel level,
+					protected void close(final int initiator, final String reason, final Level level,
 							final Throwable t) {
 						closing = true;
 						inst.close();

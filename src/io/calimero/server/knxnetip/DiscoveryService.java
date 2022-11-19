@@ -36,6 +36,11 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.Inet4Address;
@@ -85,7 +90,7 @@ final class DiscoveryService extends ServiceLooper
 	private MulticastSocket createSocket(final NetworkInterface[] joinOn)
 	{
 		final String p = System.getProperties().getProperty("java.net.preferIPv4Stack");
-		logger.trace("network stack uses IPv4 addresses: " + (p == null ? "unknown" : p));
+		logger.log(TRACE, "network stack uses IPv4 addresses: " + (p == null ? "unknown" : p));
 		final MulticastSocket s;
 		try {
 			s = new MulticastSocket(Discoverer.SEARCH_PORT);
@@ -123,7 +128,7 @@ final class DiscoveryService extends ServiceLooper
 		for (final var ni : nifs) {
 			final Enumeration<InetAddress> addrs = ni.getInetAddresses();
 			if (!addrs.hasMoreElements()) {
-				logger.warn("KNXnet/IP discovery join fails with no IP address bound to interface " + ni.getName());
+				logger.log(WARNING, "KNXnet/IP discovery join fails with no IP address bound to interface " + ni.getName());
 				continue;
 			}
 			var nifInfo = ni.getName();
@@ -139,14 +144,14 @@ final class DiscoveryService extends ServiceLooper
 					catch (final IOException e) {
 						if (thrown == null)
 							thrown = e;
-						logger.warn("KNXnet/IP discovery could not join on interface " + ni.getName(), e);
+						logger.log(WARNING, "KNXnet/IP discovery could not join on interface " + ni.getName(), e);
 					}
 					break;
 				}
 			}
 			found.add(nifInfo);
 		}
-		logger.trace("found network interfaces {}", found);
+		logger.log(TRACE, "found network interfaces {0}", found);
 		if (!joinedAny)
 			throw Objects.requireNonNull(thrown);
 	}
@@ -163,7 +168,7 @@ final class DiscoveryService extends ServiceLooper
 				return true;
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			if (sr.getEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
-				logger.warn("search requests to a discovery endpoint are only supported for UDP/IP");
+				logger.log(WARNING, "search requests to a discovery endpoint are only supported for UDP/IP");
 				return true;
 			}
 
@@ -224,7 +229,7 @@ final class DiscoveryService extends ServiceLooper
 				final var buf = res.get();
 				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));
 				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
-				logger.debug("KNXnet/IP discovery: identify as '{}' for container {} to {} on {}", deviceDib.getName(),
+				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
 						sc.getName(), hostPort(dst), sentOn);
 			}
 		}
@@ -251,7 +256,7 @@ final class DiscoveryService extends ServiceLooper
 					sentOn.add(nameOf(nif));
 				}
 				catch (final IOException e) {
-					logger.info("failure sending on interface " + nameOf(nif));
+					logger.log(INFO, "failure sending on interface " + nameOf(nif));
 				}
 			}
 		}

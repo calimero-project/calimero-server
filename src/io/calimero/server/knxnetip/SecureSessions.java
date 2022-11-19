@@ -38,8 +38,14 @@ package io.calimero.server.knxnetip;
 
 import static io.calimero.DataUnitBuilder.toHex;
 import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
 
 import java.io.IOException;
+import java.lang.System.Logger;
 import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -74,9 +80,6 @@ import javax.crypto.KeyAgreement;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.calimero.KNXFormatException;
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.SerialNumber;
@@ -87,6 +90,7 @@ import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.knxnetip.KNXnetIPDevMgmt;
 import io.calimero.knxnetip.SecureConnection;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
+import io.calimero.log.LogService;
 import io.calimero.secure.KnxSecureException;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
@@ -140,7 +144,7 @@ final class SecureSessions {
 		socket = ctrlEndpoint.getSocket();
 		final String lock = new String(Character.toChars(0x1F512));
 		final String name = ctrlEndpoint.getServiceContainer().getName();
-		logger = LoggerFactory.getLogger("io.calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
+		logger = LogService.getLogger("io.calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
 		ios = ctrlEndpoint.server.getInterfaceObjectServer();
 		objectInstance = ctrlEndpoint.server.objectInstance(ctrlEndpoint.getServiceContainer());
 		sno = deriveSerialNumber(ctrlEndpoint.getSocket().getLocalAddress());
@@ -156,14 +160,14 @@ final class SecureSessions {
 				final ByteBuffer res = establishSession(remote, h, data, offset);
 				send(res.array(), remote);
 				final int size = sessions.size();
-				logger.trace("{} session{} currently open {}", size, size == 1 ? "" : "s", sessions.keySet());
+				logger.log(TRACE, "{0} session{1} currently open {2}", size, size == 1 ? "" : "s", sessions.keySet());
 				return true;
 			}
 			if (h.getServiceType() == SecureSvc) {
 				sessionId = ((data[offset] & 0xff) << 8) | (data[offset + 1] & 0xff);
 				final Session session = sessions.get(sessionId);
 				if (session == null) {
-					logger.warn("reject secure service with invalid session ID {}", sessionId);
+					logger.log(WARNING, "reject secure service with invalid session ID {0}", sessionId);
 					return true;
 				}
 				final Key secretKey = session.secretKey;
@@ -175,7 +179,7 @@ final class SecureSessions {
 				final byte[] knxipPacket = (byte[]) fields[4];
 
 				final KNXnetIPHeader svcHeader = new KNXnetIPHeader(knxipPacket, 0);
-				logger.debug("received session {} seq {} (S/N {} tag {}) {}: {}", sid, seq, sno, tag, svcHeader,
+				logger.log(DEBUG, "received session {0} seq {1} (S/N {2} tag {3}) {4}: {5}", sid, seq, sno, tag, svcHeader,
 						toHex(knxipPacket, " "));
 				session.lastUpdate = System.nanoTime() / 1_000_000L;
 
@@ -186,11 +190,11 @@ final class SecureSessions {
 						try {
 							sessionAuth(session, knxipPacket, 6);
 							status = AuthSuccess;
-							logger.debug("client {} authorized for session {} with user ID {}", hostPort(session.client),
+							logger.log(DEBUG, "client {0} authorized for session {1} with user ID {2}", hostPort(session.client),
 									sessionId, session.userId);
 						}
 						catch (final KnxSecureException e) {
-							logger.info("secure session {}: {}", sessionId, e.getMessage());
+							logger.log(INFO, "secure session {0}: {1}", sessionId, e.getMessage());
 						}
 					}
 					sendStatusInfo(sessionId, session.sendSeq.getAndIncrement(), status, remote);
@@ -199,7 +203,7 @@ final class SecureSessions {
 				}
 				else if (svcHeader.getServiceType() == SessionStatus) {
 					final int status = sessionStatus(svcHeader, knxipPacket, svcHeader.getStructLength());
-					logger.info("secure session {}: {}", sid, statusMsg(status));
+					logger.log(INFO, "secure session {0}: {1}", sid, statusMsg(status));
 					if (status == Close)
 						closeSession(sessionId, session);
 					else if (status == KeepAlive) {
@@ -235,7 +239,7 @@ final class SecureSessions {
 			}
 		}
 		catch (KnxSecureException | KnxPropertyException e) {
-			logger.error("error processing {}, {}", h, e.getMessage());
+			logger.log(ERROR, "error processing {0}, {1}", h, e.getMessage());
 			if (sessionId > 0)
 				sendStatusInfo(sessionId, 0, Unauthorized, remote);
 			return true;
@@ -250,7 +254,7 @@ final class SecureSessions {
 		final int sid = connections.getOrDefault(ctrlEndpt, 0);
 		// only session with user id 1 has proper access level for management access
 		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).userId > 1) {
-			logger.warn("refuse management connection to user {}", sessions.get(sid).userId);
+			logger.log(WARNING, "refuse management connection to user {0}", sessions.get(sid).userId);
 			return 0;
 		}
 		return sid;
@@ -267,7 +271,7 @@ final class SecureSessions {
 	void removeConnection(final int sessionId) {
 		final Session session = sessions.get(sessionId);
 		if (session != null && session.connectionCount.decrementAndGet() <= 0) {
-			logger.debug("remove secure session {}", sessionId);
+			logger.log(DEBUG, "remove secure session {0}", sessionId);
 			sessions.remove(sessionId);
 		}
 	}
@@ -314,7 +318,7 @@ final class SecureSessions {
 		final Session session = new Session(sessionId, remote, secretKey);
 		session.xorClientServer = xor(clientKey, 0, publicKey, 0, keyLength);
 		sessions.put(sessionId, session);
-		logger.debug("establish secure session {} for {}", sessionId, hostPort(remote));
+		logger.log(DEBUG, "establish secure session {0} for {1}", sessionId, hostPort(remote));
 
 		return sessionResponse(sessionId, publicKey, clientKey);
 	}
@@ -379,7 +383,7 @@ final class SecureSessions {
 			send(packet, address);
 		}
 		catch (IOException | RuntimeException e) {
-			logger.error("sending session {} status {} to {}", sessionId, statusMsg(status), hostPort(address), e);
+			logger.log(ERROR, "sending session {0} status {1} to {2}", sessionId, statusMsg(status), hostPort(address), e);
 		}
 	}
 
@@ -428,7 +432,7 @@ final class SecureSessions {
 		final long now = System.nanoTime() / 1_000_000;
 		final Duration dormant = Duration.ofMillis(now - session.lastUpdate);
 		if (dormant.compareTo(sessionTimeout) > 0) {
-			logger.info("secure session {} timed out after {} seconds - close session", sessionId, dormant.toSeconds());
+			logger.log(INFO, "secure session {0} timed out after {1} seconds - close session", sessionId, dormant.toSeconds());
 			sessionTimeout(sessionId, session);
 		}
 	}
@@ -482,7 +486,7 @@ final class SecureSessions {
 
 	private byte[] cbcMacSimple(final Key secretKey, final byte[] data, final int offset, final int length) {
 		final byte[] log = Arrays.copyOfRange(data, offset, offset + length);
-		logger.trace("authenticating (length {}): {}", length, toHex(log, " "));
+		logger.log(TRACE, "authenticating (length {0}): {1}", length, toHex(log, " "));
 
 		try {
 			final Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");

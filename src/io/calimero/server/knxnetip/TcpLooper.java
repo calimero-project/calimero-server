@@ -36,11 +36,16 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.lang.System.Logger;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
@@ -52,8 +57,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
 
 import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
@@ -115,7 +118,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			serverSocket.add(s);
 			localRef = s;
 			final var netif = NetworkInterface.getByInetAddress(s.getInetAddress());
-			ces.logger.info("{} ({} {}) is up and running", name, netif.getName(),
+			ces.logger.log(INFO, "{0} ({1} {2}) is up and running", name, netif.getName(),
 					hostPort((InetSocketAddress) s.getLocalSocketAddress()));
 			while (true) {
 				final Socket conn = s.accept();
@@ -128,13 +131,13 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			}
 		}
 		catch (final InterruptedIOException e) {
-			ces.logger.info("tcp service {}:{} interrupted", endpoint.getAddress().getHostAddress(),
+			ces.logger.log(INFO, "tcp service {0}:{1} interrupted", endpoint.getAddress().getHostAddress(),
 					endpoint.getPort());
 			Thread.currentThread().interrupt();
 		}
 		catch (final IOException e) {
 			if (localRef == null || !localRef.isClosed())
-				ces.logger.error("socket error in tcp service {}:{}", endpoint.getAddress().getHostAddress(),
+				ces.logger.log(ERROR, "socket error in tcp service {0}:{1}", endpoint.getAddress().getHostAddress(),
 						endpoint.getPort(), e);
 		}
 	}
@@ -172,7 +175,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 					return;
 			}
 
-			logger.info("accepted {}", name);
+			logger.log(INFO, "accepted {0}", name);
 
 			final int rcvBufferSize = 512;
 			final byte[] data = new byte[rcvBufferSize];
@@ -202,7 +205,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 						}
 					}
 					catch (final KNXFormatException e) {
-						logger.warn("received invalid frame", e);
+						logger.log(WARNING, "received invalid frame", e);
 						offset = 0;
 						break;
 					}
@@ -226,11 +229,11 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			Thread.currentThread().interrupt();
 		}
 		catch (final KnxRuntimeException e) {
-			logger.warn("{} error", name, e);
+			logger.log(WARNING, "{0} error", name, e);
 		}
 		catch (IOException | RuntimeException e) {
 			if (!socket.isClosed())
-				logger.error("tcp connection error to {}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), e);
+				logger.log(ERROR, "tcp connection error to {0}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), e);
 		}
 		finally {
 			close();
@@ -256,7 +259,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private void close(final String reason) {
 		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
-		logger.info("close tcp connection to {}{}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), suffix);
+		logger.log(INFO, "close tcp connection to {0}{1}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), suffix);
 		try {
 			socket.close();
 		}
@@ -269,18 +272,18 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
 		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote)) {
 			final int svc = h.getServiceType();
-			logger.info("received packet from {} with unknown service type 0x{} - ignored", remote,
+			logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", remote,
 					Integer.toHexString(svc));
 		}
 	}
 
 	private boolean sanitize(final KNXnetIPHeader h, final int length) {
 		if (h.getTotalLength() > length)
-			logger.warn("received frame with expected length {} does not match actual length {} - ignored",
+			logger.log(WARNING, "received frame with expected length {0} does not match actual length {1} - ignored",
 					h.getTotalLength(), length);
 		else if (h.getServiceType() == 0)
 			// check service type for 0 (invalid type), so unused service types of us can stay 0 by default
-			logger.warn("received frame with service type 0 - ignored");
+			logger.log(WARNING, "received frame with service type 0 - ignored");
 		else
 			return true;
 		return false;
