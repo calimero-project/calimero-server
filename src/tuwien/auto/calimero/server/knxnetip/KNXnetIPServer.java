@@ -237,7 +237,7 @@ public class KNXnetIPServer
 
 	private static final int objectInstance = 1;
 
-	private final EventListeners<ServerListener> listeners;
+	private final EventListeners<ServerListener> listeners = new EventListeners<>();
 
 	private final class KnxServerDevice extends BaseKnxDevice {
 
@@ -355,7 +355,6 @@ public class KNXnetIPServer
 
 		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();
-		listeners = new EventListeners<>(logger);
 
 		logger.info("{} v{}", friendlyName, Settings.getLibraryVersion());
 

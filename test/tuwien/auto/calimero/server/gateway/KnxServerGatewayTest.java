@@ -232,7 +232,7 @@ class KnxServerGatewayTest
 	// dummy link for setting up gateway
 	static class DummyLink implements KNXNetworkLink
 	{
-		private final EventListeners<NetworkLinkListener> listeners = new EventListeners<>(null);
+		private final EventListeners<NetworkLinkListener> listeners = new EventListeners<>();
 
 		// has to be public for creation by subnet connector
 		public DummyLink(final Object[] s) {}
