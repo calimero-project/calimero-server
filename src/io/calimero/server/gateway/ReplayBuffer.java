@@ -54,7 +54,7 @@ import io.calimero.knxnetip.KNXnetIPConnection;
 
 class ReplayBuffer<T extends FrameEvent>
 {
-	private static final Logger logger = LoggerFactory.getLogger("calimero.server.gateway.ReplayBuffer");
+	private static final Logger logger = LoggerFactory.getLogger("io.calimero.server.gateway.ReplayBuffer");
 
 	private final Map<KNXnetIPConnection, Object[]> connectionToKey = Collections.synchronizedMap(new HashMap<>());
 	private final Map<KNXnetIPConnection, Long> completedEvent = Collections.synchronizedMap(new HashMap<>());

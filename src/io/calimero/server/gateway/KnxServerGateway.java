@@ -678,7 +678,7 @@ public class KnxServerGateway implements Runnable
 		name = gatewayName;
 		server = s;
 		server.addServerListener(new KNXnetIPServerListener());
-		logger = LogService.getLogger("calimero.server.gateway." + name);
+		logger = LogService.getLogger("io.calimero.server.gateway." + name);
 		connectors.addAll(subnetConnectors);
 		startTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 

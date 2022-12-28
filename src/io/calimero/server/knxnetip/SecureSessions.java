@@ -140,7 +140,7 @@ final class SecureSessions {
 		socket = ctrlEndpoint.getSocket();
 		final String lock = new String(Character.toChars(0x1F512));
 		final String name = ctrlEndpoint.getServiceContainer().getName();
-		logger = LoggerFactory.getLogger("calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
+		logger = LoggerFactory.getLogger("io.calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
 		ios = ctrlEndpoint.server.getInterfaceObjectServer();
 		objectInstance = ctrlEndpoint.server.objectInstance(ctrlEndpoint.getServiceContainer());
 		sno = deriveSerialNumber(ctrlEndpoint.getSocket().getLocalAddress());

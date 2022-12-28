@@ -169,7 +169,7 @@ public final class DataEndpoint extends ConnectionBase
 		this.connectionClosed = connectionClosed;
 		this.resetRequest = resetRequest;
 
-		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+		logger = LogService.getLogger("io.calimero.server.knxnetip." + getName());
 
 		tcp = TcpLooper.connections.containsKey(remoteDataEndpt);
 

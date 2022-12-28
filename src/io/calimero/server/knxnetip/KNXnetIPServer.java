@@ -351,7 +351,7 @@ public class KNXnetIPServer
 	public KNXnetIPServer(final ServerConfiguration config) {
 		serverName = config.name();
 		friendlyName = config.friendlyName();
-		logger = LogService.getLogger("calimero.server." + getName());
+		logger = LogService.getLogger("io.calimero.server." + getName());
 
 		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();

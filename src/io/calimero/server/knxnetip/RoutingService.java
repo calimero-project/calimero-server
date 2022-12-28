@@ -75,7 +75,7 @@ final class RoutingService extends ServiceLooper
 			final boolean enableLoopback) throws KNXException {
 			super(mcGroup);
 			init(netif, enableLoopback, false);
-			logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+			logger = LogService.getLogger("io.calimero.server.knxnetip." + getName());
 		}
 
 		// forwarder for RoutingService dispatch, called from handleServiceType
