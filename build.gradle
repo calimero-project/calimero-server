@@ -55,8 +55,6 @@ application {
 }
 
 run {
-    // for passing program arguments, use -Dexec.args="..."
-    args System.getProperty("exec.args", "").split() 
     standardInput = System.in
 }
 
