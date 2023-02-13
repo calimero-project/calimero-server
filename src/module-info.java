@@ -43,4 +43,6 @@ module io.calimero.server {
 	exports io.calimero.server;
 	exports io.calimero.server.gateway;
 	exports io.calimero.server.knxnetip;
+
+	opens io.calimero.server.gateway to io.calimero.core; // @LinkEvent
 }

@@ -96,9 +96,8 @@ test {
 tasks.withType(JavaExec) { 
     jvmArgs += [ 
             "--add-reads", "io.calimero.core=io.calimero.server", // @LinkEvent
-            "--add-opens", "io.calimero.server/io.calimero.server.gateway=io.calimero.core", // @LinkEvent
             "--add-reads", "io.calimero.serial.provider.rxtx=ALL-UNNAMED",
-            "--add-reads", "io.calimero.usb=ALL-UNNAMED" ] 
+            "--add-reads", "io.calimero.usb=ALL-UNNAMED" ]
 }
 
 dependencies {
