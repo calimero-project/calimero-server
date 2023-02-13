@@ -109,6 +109,7 @@ dependencies {
     runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'
 
 	serialRuntimeOnly "io.calimero:calimero-rxtx:${version}"
+	serialRuntimeOnly "io.calimero:serial-native:${version}"
 	usbRuntimeOnly "io.calimero:calimero-usb:${version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
