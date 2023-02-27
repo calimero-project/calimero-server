@@ -1,5 +1,5 @@
 plugins {
-  id "com.github.ben-manes.versions" version "0.44.0"
+  id "com.github.ben-manes.versions" version "0.46.0"
   id 'java-library'
   id 'application'
   id 'maven-publish'
@@ -13,7 +13,7 @@ repositories {
     maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.9.1'
+ext.junitJupiterVersion = '5.9.2'
 
 group = 'com.github.calimero'
 version = '2.6-SNAPSHOT'
