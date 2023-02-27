@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2022 B. Malinowsky
+    Copyright (c) 2016, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -452,7 +452,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
-			int status = ErrorCodes.NO_ERROR;
+			int status;
 
 			final var endpoint = connections.get(csr.getChannelID());
 			int protocolVersion = KNXnetIPConnection.KNXNETIP_VERSION_10;
@@ -537,7 +537,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	Optional<byte[]> createSearchResponse(final boolean ext, final byte[] macFilter,
-			final byte[] requestedServices, final byte[] requestedDibs, final int sessionId) throws IOException {
+			final byte[] requestedServices, final byte[] requestedDibs, final int sessionId) {
 
 		// we create our own HPAI from the actual socket, since
 		// the service container might have opted for ephemeral port use
@@ -677,7 +677,7 @@ final class ControlEndpointService extends ServiceLooper
 	private DatagramSocket createSocket()
 	{
 		final HPAI ep = svcCont.getControlEndpoint();
-		InetAddress ip = null;
+		InetAddress ip;
 		try {
 			final DatagramSocket s = new DatagramSocket(null);
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
@@ -787,7 +787,7 @@ final class ControlEndpointService extends ServiceLooper
 
 		ConnectionType cType = ConnectionType.LinkLayer;
 		IndividualAddress device = null;
-		CRD crd = null;
+		CRD crd;
 
 		int sessionId = 0;
 		final int connType = req.getCRI().getConnectionType();
@@ -982,15 +982,14 @@ final class ControlEndpointService extends ServiceLooper
 		final var additionalAddresses = knxipObject.additionalAddresses();
 		boolean tunnelingAddress = false;
 
-		for (int i = 0; i < indices.length; i++) {
-			final var idx = indices[i] & 0xff;
+		for (byte index : indices) {
+			final var idx = index & 0xff;
 			if (idx == 0) {
 				if (addr.equals(serverAddress())) {
 					tunnelingAddress = true;
 					break;
 				}
-			}
-			else if (addr.equals(additionalAddresses.get(idx - 1))) {
+			} else if (addr.equals(additionalAddresses.get(idx - 1))) {
 				tunnelingAddress = true;
 				break;
 			}
@@ -1063,9 +1062,8 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 		else {
-			for (int i = 0; i < addressIndices.length; i++) {
+			for (final byte idx : addressIndices) {
 				// indices are 1-based
-				final var idx = addressIndices[i];
 				final var addr = idx == 0 ? serverAddress() : additionalAddresses.get(idx - 1);
 				if (checkAndSetDeviceAddress(addr, addr.equals(serverAddress()))) {
 					assigned = addr;
@@ -1180,7 +1178,7 @@ final class ControlEndpointService extends ServiceLooper
 	private void connectionEstablished(final ServiceContainer sc, final KNXnetIPConnection conn)
 	{
 		final List<ServerListener> l = server.listeners().listeners();
-		l.stream().forEach(e -> e.connectionEstablished(sc, conn));
+		l.forEach(e -> e.connectionEstablished(sc, conn));
 	}
 
 	// workaround to find the correct looper/connection when ETS sends to the wrong UDP port

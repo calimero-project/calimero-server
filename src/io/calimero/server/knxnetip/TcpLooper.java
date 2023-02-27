@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2022 B. Malinowsky
+    Copyright (c) 2018, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -157,9 +157,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private boolean inactive() {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
-		if (!ctrlEndpoint.sessions.anyMatch(remote) && !ctrlEndpoint.anyMatchDataConnection(remote))
-			return true;
-		return false;
+		return !ctrlEndpoint.sessions.anyMatch(remote) && !ctrlEndpoint.anyMatchDataConnection(remote);
 	}
 
 	@Override
@@ -185,10 +183,9 @@ final class TcpLooper implements Runnable, AutoCloseable {
 					try {
 						final KNXnetIPHeader h = new KNXnetIPHeader(data, 0);
 						if (sanitize(h, offset)) {
-							final int length = offset - h.getStructLength();
 							final var leftover = offset - h.getTotalLength();
 							offset = leftover;
-							onReceive(h, data, h.getStructLength(), length);
+							onReceive(h, data, h.getStructLength());
 							if (leftover > 0) {
 								System.arraycopy(data, h.getTotalLength(), data, 0, leftover);
 								continue;
@@ -203,7 +200,6 @@ final class TcpLooper implements Runnable, AutoCloseable {
 					}
 					catch (final KNXFormatException e) {
 						logger.warn("received invalid frame", e);
-						offset = 0;
 						break;
 					}
 				}
@@ -264,7 +260,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		connections.remove(socket.getRemoteSocketAddress());
 	}
 
-	private void onReceive(final KNXnetIPHeader h, final byte[] data, final int offset, final int length)
+	private void onReceive(final KNXnetIPHeader h, final byte[] data, final int offset)
 		throws IOException, KNXFormatException {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
 		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote)) {

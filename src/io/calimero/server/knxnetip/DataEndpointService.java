@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -91,9 +91,9 @@ final class DataEndpointService extends ServiceLooper
 	{
 		if (t != null)
 			svcHandler.cleanup(CloseEvent.INTERNAL, "communication failure", level, t);
-	};
+	}
 
-	@Override
+    @Override
 	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
 			throws KNXFormatException, IOException {
 		try {

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,9 +67,7 @@ import org.slf4j.Logger;
 import io.calimero.CloseEvent;
 import io.calimero.DeviceDescriptor.DD0;
 import io.calimero.IndividualAddress;
-import io.calimero.KNXException;
 import io.calimero.KNXFormatException;
-import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.ReturnCode;
 import io.calimero.Settings;
@@ -103,6 +101,7 @@ import io.calimero.mgmt.PropertyAccess;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.KnxSecureException;
 import io.calimero.server.ServerConfiguration;
+import io.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
 /**
  * Provides server-side functionality of KNXnet/IP protocols.
@@ -269,7 +268,7 @@ public class KNXnetIPServer
 		public void updateDatapointValue(final Datapoint ofDp, final DPTXlator update) {}
 
 		@Override
-		public DPTXlator requestDatapointValue(final Datapoint ofDp) throws KNXException { return null; }
+		public DPTXlator requestDatapointValue(final Datapoint ofDp) { return null; }
 
 		@Override
 		public ServiceResult<byte[]> functionPropertyCommand(final Destination remote, final int objectIndex,
@@ -551,23 +550,6 @@ public class KNXnetIPServer
 	 */
 	public static final String OPTION_OUTGOING_INTERFACE = "discovery.outoingInterface";
 
-	synchronized String getOption(final String optionKey)
-	{
-		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
-			return Boolean.toString(runDiscovery);
-		}
-		if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
-			return Boolean.toString(multicastLoopback);
-		}
-		if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
-			return join(discoveryIfs, NetworkInterface::getName, ",");
-		}
-		if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
-			return join(outgoingIf, NetworkInterface::getName, ",");
-		}
-		logger.warn("option \"" + optionKey + "\" not supported or unknown");
-		throw new KNXIllegalArgumentException("unknown KNXnet/IP server option " + optionKey);
-	}
 
 	/**
 	 * Sets or modifies KNXnet/IP server behavior.
@@ -578,13 +560,13 @@ public class KNXnetIPServer
 	public synchronized void setOption(final String optionKey, final String value)
 	{
 		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
-			runDiscovery = Boolean.valueOf(value).booleanValue();
+			runDiscovery = Boolean.valueOf(value);
 			stopDiscoveryService();
 			if (runDiscovery && running)
 				startDiscoveryService(outgoingIf, discoveryIfs, -1);
 		}
 		else if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
-			multicastLoopback = Boolean.valueOf(value).booleanValue();
+			multicastLoopback = Boolean.valueOf(value);
 		}
 		else if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
 			discoveryIfs = parseNetworkInterfaces(optionKey, value);
@@ -612,7 +594,7 @@ public class KNXnetIPServer
 		// if securedServices is empty, by default we secure what is configured in the keys map;
 		// otherwise, we specifically follow the securedServices set
 		final boolean configureDefault = securedServices.isEmpty();
-		final var secure = EnumSet.<ServiceFamily>noneOf(ServiceFamily.class);
+		final var secure = EnumSet.noneOf(ServiceFamily.class);
 
 		final boolean useSecureDevMgmtTunneling = securedServices.contains(ServiceFamily.DeviceManagement)
 				|| securedServices.contains(ServiceFamily.Tunneling);
@@ -719,7 +701,7 @@ public class KNXnetIPServer
 			if (ni != null)
 				l.add(ni);
 		}
-		return l.toArray(new NetworkInterface[l.size()]);
+		return l.toArray(new NetworkInterface[0]);
 	}
 
 	private NetworkInterface getNetworkInterfaceByName(final String option, final String ifname)
@@ -890,7 +872,7 @@ public class KNXnetIPServer
 		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_CAPABILITIES, bytesFromWord(deviceCaps));
 
 		//
-		// set properties used in manufacturer data DIB for discovery self description
+		// set properties used in manufacturer data DIB for discovery self-description
 		//
 		final byte[] zero = new byte[1];
 		// we don't indicate any capabilities here, since executing the respective tasks
@@ -939,16 +921,6 @@ public class KNXnetIPServer
 		catch (final KnxPropertyException e) {
 			return def;
 		}
-	}
-
-	// returns the current number of property elements, or 0 if property is not found
-	int getPropertyElems(final int objectType, final int objectInstance, final int propertyId)
-	{
-		try {
-			return toInt(ios.getProperty(objectType, objectInstance, propertyId, 0, 1));
-		}
-		catch (final KnxPropertyException e) {}
-		return 0;
 	}
 
 	byte[] getProperty(final int objectType, final int objectInstance, final int propertyId, final byte[] defaultData)

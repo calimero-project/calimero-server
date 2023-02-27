@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -112,8 +112,7 @@ class KnxServerGatewayTest
 	}
 
 	@AfterEach
-	void tearDown() throws Exception
-	{
+	void tearDown() {
 		server.shutdown();
 	}
 
@@ -179,8 +178,7 @@ class KnxServerGatewayTest
 		final int size = addrList.size();
 		final byte[] table = new byte[size * 2];
 		int idx = 0;
-		for (int i = 0; i < size; i++) {
-			final GroupAddress ga = addrList.get(i);
+		for (final GroupAddress ga : addrList) {
 			table[idx++] = (byte) (ga.getRawAddress() >> 8);
 			table[idx++] = (byte) ga.getRawAddress();
 		}

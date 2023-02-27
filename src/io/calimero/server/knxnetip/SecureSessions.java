@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2022 B. Malinowsky
+    Copyright (c) 2018, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -115,7 +115,7 @@ final class SecureSessions {
 	private final SerialNumber sno;
 	private final Key deviceAuthKey;
 
-	private static AtomicLong sessionCounter = new AtomicLong();
+	private static final AtomicLong sessionCounter = new AtomicLong();
 
 	static final class Session {
 		private final InetSocketAddress client;
@@ -128,7 +128,7 @@ final class SecureSessions {
 		final AtomicLong sendSeq = new AtomicLong();
 		private volatile long lastUpdate = System.nanoTime() / 1_000_000;
 
-		private Session(final int sessionId, final InetSocketAddress client, final Key secretKey) {
+		private Session(final InetSocketAddress client, final Key secretKey) {
 			this.client = client;
 			this.secretKey = secretKey;
 		}
@@ -311,7 +311,7 @@ final class SecureSessions {
 		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
 
 		final int sessionId = newSessionId();
-		final Session session = new Session(sessionId, remote, secretKey);
+		final Session session = new Session(remote, secretKey);
 		session.xorClientServer = xor(clientKey, 0, publicKey, 0, keyLength);
 		sessions.put(sessionId, session);
 		logger.debug("establish secure session {} for {}", sessionId, hostPort(remote));

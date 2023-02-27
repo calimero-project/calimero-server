@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,7 +40,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -277,13 +276,6 @@ public final class DataEndpoint extends ConnectionBase
 			sessions.removeConnection(sessionId);
 	}
 
-	void init(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt)
-	{
-		ctrlSocket = localCtrlEndpt;
-		socket = localDataEndpt;
-		setState(OK);
-	}
-
 	void setSocket(final DatagramSocket socket) {
 		this.socket = socket;
 	}
@@ -368,7 +360,7 @@ public final class DataEndpoint extends ConnectionBase
 				updateLastMsgTimestamp();
 
 				if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-					respondToFeature(h, data, offset, svc);
+					respondToFeature(h, data, offset);
 					if (tunnelingAddressChanged) {
 						tunnelingAddressChanged = false;
 						sendFeatureInfo(InterfaceFeature.IndividualAddress, device.toByteArray());
@@ -441,7 +433,7 @@ public final class DataEndpoint extends ConnectionBase
 		return true;
 	}
 
-	private void respondToFeature(final KNXnetIPHeader h, final byte[] data, final int offset, final int svc)
+	private void respondToFeature(final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
@@ -592,11 +584,6 @@ public final class DataEndpoint extends ConnectionBase
 	int getChannelId()
 	{
 		return channelId;
-	}
-
-	SocketAddress getCtrlSocketAddress()
-	{
-		return ctrlSocket.getLocalSocketAddress();
 	}
 
 	boolean isDeviceMgmt()
