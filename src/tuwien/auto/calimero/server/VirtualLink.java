@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2018 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -155,8 +155,7 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 			final KNXAddress dst = msg.getDestination();
 			if (dst instanceof GroupAddress)
 				return true;
-			if (!dst.equals(uplink.getKNXMedium().getDeviceAddress()))
-				return false;
+			return dst.equals(uplink.getKNXMedium().getDeviceAddress());
 		}
 		return true;
 	}

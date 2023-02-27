@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -280,8 +280,6 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final var timeServerDatapoints = new ArrayList<StateDP>();
 
-			int objectInstance = 0;
-
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
 				final String name = r.getLocalName();
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
@@ -399,8 +397,7 @@ public class Launcher implements Runnable, AutoCloseable
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
-						++objectInstance;
-						final var connector = subnetConnector(sc, objectInstance, interfaceType, addr, msgFormat,
+						final var connector = subnetConnector(sc, interfaceType, addr, msgFormat,
 								overrideSrcAddr, subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
@@ -459,8 +456,8 @@ public class Launcher implements Runnable, AutoCloseable
 			return set;
 		}
 
-		private SubnetConnector subnetConnector(final ServiceContainer sc, final int objectInstance,
-				final String interfaceType, final String subnetArgs, final String msgFormat,
+		private SubnetConnector subnetConnector(final ServiceContainer sc,
+												final String interfaceType, final String subnetArgs, final String msgFormat,
 				final String overrideSrcAddress, final NetworkInterface netif,
 				final boolean useNat, final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
 
@@ -593,7 +590,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 		// we have to set the command-line option for log level before first logger lookup
 		int optIdx = 0;
-		if (args.length > 0 && args[0].startsWith("-v")) {
+		if (args[0].startsWith("-v")) {
 			final String vs = args[0];
 			final String level = vs.startsWith("-vvv") ? "trace" : vs.startsWith("-vv") ? "debug" : "info";
 			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", level);
@@ -818,7 +815,7 @@ public class Launcher implements Runnable, AutoCloseable
 		catch (final IOException e) {}
 	}
 
-	private enum RoutingConfig { Reserved, All, None, Table };
+	private enum RoutingConfig { Reserved, All, None, Table }
 
 	private static void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
 			final List<GroupAddress> filter) throws KnxPropertyException {
@@ -845,8 +842,8 @@ public class Launcher implements Runnable, AutoCloseable
 	private static void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
 		final int interfaceType, final int instance)
 	{
-		long l = Arrays.asList(ios.getInterfaceObjects()).stream()
-				.filter((io) -> io.getType() == interfaceType).collect(Collectors.counting());
+		long l = Arrays.stream(ios.getInterfaceObjects())
+				.filter((io) -> io.getType() == interfaceType).count();
 		// create interface object and set the address table object property
 		while (l++ < instance)
 			ios.addInterfaceObject(interfaceType);
@@ -877,7 +874,7 @@ public class Launcher implements Runnable, AutoCloseable
 		final IndividualAddress ctrlEndpoint) {
 
 		// address indices are sorted in natural order
-		final var addrIndices = userToAddresses.entrySet().stream().map(Entry::getValue).flatMap(List::stream)
+		final var addrIndices = userToAddresses.values().stream().flatMap(List::stream)
 				.map(addr -> addressIndex(addr, additionalAddresses, ctrlEndpoint)).sorted().distinct()
 				.collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (r1, r2) -> {}).toByteArray();
 		setTunnelingAddresses(ios, objectInstance, addrIndices);

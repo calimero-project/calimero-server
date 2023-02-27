@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2022 B. Malinowsky
+    Copyright (c) 2016, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -151,7 +151,7 @@ final class RoutingService extends ServiceLooper
 				inst = SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
 				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback) {
 					@Override
-					public void send(final RoutingLostMessage lost) throws KNXConnectionClosedException {
+					public void send(final RoutingLostMessage lost) {
 						// NYI sending routing lost message
 						logger.warn("NYI sending routing lost message");
 					}
@@ -209,11 +209,6 @@ final class RoutingService extends ServiceLooper
 		if (netif == null)
 			throw new KnxRuntimeException("no network interface with the specified name '" + name + "'");
 		return netif;
-	}
-
-	ServiceContainer getServiceContainer()
-	{
-		return svcCont;
 	}
 
 	@Override

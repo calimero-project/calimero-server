@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2020, 2022 B. Malinowsky
+    Copyright (c) 2020, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ public class ServerConfiguration {
 		 * Creates a new service container configuration without any security.
 		 *
 		 * @param additionalAddresses additional addresses assigned to tunneling connections.
-		 * @param connector subnet connector for that conainer
+		 * @param connector subnet connector for that container
 		 * @param groupAddressFilter group address filter
 		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
 		 *        functionality
@@ -105,7 +105,7 @@ public class ServerConfiguration {
 		 * Creates a new service container configuration with security.
 		 *
 		 * @param additionalAddresses additional addresses assigned to tunneling connections.
-		 * @param connector subnet connector for that conainer
+		 * @param connector subnet connector for that container
 		 * @param groupAddressFilter group address filter
 		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
 		 *        functionality
@@ -125,7 +125,7 @@ public class ServerConfiguration {
 		 * Creates a new service container configuration with security and a keyring resource.
 		 *
 		 * @param additionalAddresses additional addresses assigned to tunneling connections.
-		 * @param connector subnet connector for that conainer
+		 * @param connector subnet connector for that container
 		 * @param groupAddressFilter group address filter
 		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
 		 *        functionality

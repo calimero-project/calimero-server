@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -183,8 +183,7 @@ public class KnxServerGateway implements Runnable
 		final String name;
 
 
-		ConnectionListener(final ServiceContainer svcContainer, final String connectionName,
-			final IndividualAddress device)
+		ConnectionListener(final ServiceContainer svcContainer, final String connectionName)
 		{
 			sc = svcContainer;
 			// same as calling ((KNXnetIPConnection) getSource()).getName()
@@ -279,7 +278,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 
-			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName(), assignedDeviceAddress));
+			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName()));
 			return true;
 		}
 
@@ -335,7 +334,7 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer sc = sce.getContainer();
 			if (event == ServiceContainerEvent.ROUTING_SVC_STARTED) {
 				final KNXnetIPConnection conn = sce.getConnection();
-				conn.addConnectionListener(new ConnectionListener(sc, conn.getName(), null));
+				conn.addConnectionListener(new ConnectionListener(sc, conn.getName()));
 				serverConnections.add(conn);
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
@@ -518,7 +517,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 			catch (final InterruptedException e) {}
-		};
+		}
 
 		private void checkRoutingBusy()
 		{
@@ -592,8 +591,8 @@ public class KnxServerGateway implements Runnable
 				for (final var c : serverConnections) {
 					// device mgmt endpoints don't have a device address assigned
 					if (c instanceof DataEndpoint && ((DataEndpoint) c).deviceAddress() == null) {
-						final var deviceMgmtEndpoint = (DataEndpoint) c;
-						// send cEMI T-Data
+//						final var deviceMgmtEndpoint = (DataEndpoint) c;
+						// NYI send cEMI T-Data
 					}
 				}
 			}
@@ -613,8 +612,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void send(final CEMILData msg, final boolean waitForCon)
-				throws KNXTimeoutException, KNXLinkClosedException {
+		public void send(final CEMILData msg, final boolean waitForCon) {
 			// TODO support > 1 service containers
 			final SubnetConnector connector = connectors.get(0);
 			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
@@ -698,7 +696,7 @@ public class KnxServerGateway implements Runnable
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
 			if (!timeout.isZero()) {
 				final int[] portRange = ((DefaultServiceContainer) sc).disruptionBufferPortRange();
-				logger.info("activate \'{}\' disruption buffer on ports [{}-{}], disruption timeout {} s", sc.getName(),
+				logger.info("activate '{}' disruption buffer on ports [{}-{}], disruption timeout {} s", sc.getName(),
 						portRange[0], portRange[1], timeout.getSeconds());
 				subnetEventBuffers.put(sc, new ReplayBuffer<>(timeout));
 			}
@@ -850,7 +848,7 @@ public class KnxServerGateway implements Runnable
 		try {
 			// dispatch to subnet
 			try {
-				final var apdu = prepareTimestamp(connector, xlator, src, dst, p);
+				final var apdu = prepareTimestamp(xlator, src, dst);
 				final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
 				dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
 			}
@@ -869,7 +867,7 @@ public class KnxServerGateway implements Runnable
 
 					// always create new timestamp, so we don't send an outdated timestamp if a previous client
 					// connection was not responsive
-					final var apdu = prepareTimestamp(connector, xlator, src, dst, p);
+					final var apdu = prepareTimestamp(xlator, src, dst);
 					final var f = new CEMILDataEx(CEMILData.MC_LDATA_IND, src, dst, apdu, p);
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
@@ -894,8 +892,8 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private byte[] prepareTimestamp(final SubnetConnector connector, final DPTXlator xlator, final IndividualAddress src,
-			final GroupAddress dst, final Priority p) throws InterruptedException {
+	private byte[] prepareTimestamp(final DPTXlator xlator, final IndividualAddress src,
+									final GroupAddress dst) throws InterruptedException {
 		final long millis = System.currentTimeMillis();
 
 		if (xlator instanceof DPTXlatorDate)
@@ -950,10 +948,6 @@ public class KnxServerGateway implements Runnable
 				final InetAddress mask = knxipObject.inetAddress(PID.CURRENT_SUBNET_MASK);
 				info.append(format("\tserver IP %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
 						NetworkInterface.getByInetAddress(ip)));
-
-				AutoCloseable link = c.getSubnetLink();
-				if (link instanceof Link<?>)
-					link = ((Link<?>) link).target();
 
 				info.append(format("\tsubnet %s%n", c.getSubnetLink()));
 
@@ -1184,7 +1178,7 @@ public class KnxServerGateway implements Runnable
 			// we assume there is only one service container with baos support
 			if ("baos".equals(connector.format())) {
 				final var link = ((Link<?>) connector.getSubnetLink()).target();
-				if (link != null && link instanceof BaosLink) {
+				if (link instanceof BaosLink) {
 					try {
 						final var baosService = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
 						logger.trace("send baos {}", baosService);
@@ -1215,7 +1209,7 @@ public class KnxServerGateway implements Runnable
 				if (connector != null) {
 					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
 					if (ldata.getDestination().equals(containerAddr)) {
-						// with a usb interface, device is always our own address, so we always exclude it for now
+						// with an usb interface, device is always our own address, so we always exclude it for now
 						if (connector.getInterfaceType().equals("usb"))
 							logger.debug("received from subnet using usb interface {}, don't intercept frame",
 									connector.getName());
@@ -1290,7 +1284,7 @@ public class KnxServerGateway implements Runnable
 		logger.warn("received {} {} - ignored", s, frame);
 	}
 
-	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) throws InterruptedException {
+	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
 		CompletableFuture.runAsync(() -> {
 			try {
 				// TODO check for reasons to send negative L-Data.con
@@ -1334,11 +1328,10 @@ public class KnxServerGateway implements Runnable
 	// see listener indication for the reason of using the container name
 	private SubnetConnector getSubnetConnector(final String containerName)
 	{
-		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
-			final SubnetConnector b = i.next();
-			if (b.getServiceContainer().getName().equals(containerName))
-				return b;
-		}
+        for (final SubnetConnector b : connectors) {
+            if (b.getServiceContainer().getName().equals(containerName))
+                return b;
+        }
 		logger.error("dispatch to server: no subnet connector found!");
 		return null;
 	}
@@ -1449,24 +1442,23 @@ public class KnxServerGateway implements Runnable
 
 	private KNXNetworkLink findSubnetLink(final IndividualAddress dst)
 	{
-		for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
-			final SubnetConnector b = i.next();
-			final ServiceContainer c = b.getServiceContainer();
-			if (c.isActivated()) {
-				final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
-				if (matchesSubnet(dst, subnet)) {
-					if (!isNetworkLink(b))
-						break;
-					final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
-					logger.trace("dispatch to KNX subnet {} ({} in service container '{}')",
-							subnet, link.getName(), b.getName());
-					// assuming a proper address assignment of area/line coupler
-					// addresses, this has to be the correct knx subnet link
-					return link;
-				}
-				logger.trace("subnet=" + subnet + " dst=" + dst);
-			}
-		}
+        for (final SubnetConnector b : connectors) {
+            final ServiceContainer c = b.getServiceContainer();
+            if (c.isActivated()) {
+                final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
+                if (matchesSubnet(dst, subnet)) {
+                    if (!isNetworkLink(b))
+                        break;
+                    final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
+                    logger.trace("dispatch to KNX subnet {} ({} in service container '{}')",
+                            subnet, link.getName(), b.getName());
+                    // assuming a proper address assignment of area/line coupler
+                    // addresses, this has to be the correct knx subnet link
+                    return link;
+                }
+                logger.trace("subnet=" + subnet + " dst=" + dst);
+            }
+        }
 		return null;
 	}
 
@@ -1567,7 +1559,7 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		catch (KnxPropertyException | InterruptedException e) {
-			logger.error("send to server-side failed for " + f.toString(), e);
+			logger.error("send to server-side failed for " + f, e);
 		}
 	}
 
@@ -1746,7 +1738,7 @@ public class KnxServerGateway implements Runnable
 		catch (final KNXFormatException | KNXLinkClosedException e) {
 			logger.error("error sending to {} on subnet {}: {}", f.getDestination(), link.getName(), e.getMessage());
 			if (e.getCause() != null)
-				logger.info("{}, caused by:", e.toString(), e.getCause());
+				logger.info("{}, caused by:", e, e.getCause());
 		}
 	}
 
@@ -1881,7 +1873,7 @@ public class KnxServerGateway implements Runnable
 				c.send(dm, WaitForAck);
 			}
 			catch (final KNXException e) {
-				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f);
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
@@ -1947,7 +1939,7 @@ public class KnxServerGateway implements Runnable
 				c.send(dm, WaitForAck);
 			}
 			catch (final KNXException e) {
-				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
+				logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f);
 			}
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {

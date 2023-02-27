@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2022 B. Malinowsky
+    Copyright (c) 2016, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ final class DiscoveryService extends ServiceLooper
 	private static final InetAddress systemSetupMulticast = KNXnetIPRouting.DefaultMulticast;
 
 	private final NetworkInterface[] outgoing;
-	private final ArrayList<String> joined = new ArrayList<String>();
+	private final ArrayList<String> joined = new ArrayList<>();
 
 	DiscoveryService(final KNXnetIPServer server, final NetworkInterface[] outgoing, final NetworkInterface[] joinOn)
 	{

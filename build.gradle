@@ -33,14 +33,14 @@ java {
     }
 }
 
-tasks.withType(Jar) {
-	from("${projectDir}") {
+tasks.withType(Jar).configureEach {
+    from("${projectDir}") {
         include 'LICENSE.txt'
         into "META-INF"
     }
     if (name.equals('sourcesJar')) {
-    	from("${projectDir}") {
-		    include 'README.md'
+        from("${projectDir}") {
+            include 'README.md'
         }
     }
 }
@@ -76,7 +76,7 @@ sourceSets {
     }
 }
 
-tasks.withType(Javadoc) {
+tasks.withType(Javadoc).configureEach {
     options.addStringOption("Xdoclint:-missing", '-quiet')
 }
 
@@ -97,8 +97,8 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:1.7.36'
     runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'
 
-	serialRuntimeOnly "com.github:calimero-rxtx:${version}"
-	serialRuntimeOnly "com.github:serial-native:${version}"
+	serialRuntimeOnly "com.github.calimero:calimero-rxtx:${version}"
+	serialRuntimeOnly "com.github.calimero:serial-native:${version}"
 	usbRuntimeOnly "io.calimero:calimero-usb:${version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"

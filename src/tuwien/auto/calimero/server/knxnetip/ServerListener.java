@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -100,7 +100,7 @@ public interface ServerListener extends InterfaceObjectServerListener
 	void onResetRequest(ShutdownEvent se);
 
 	/**
-	 * Notifies that the server will shutdown.
+	 * Notifies that the server will shut down.
 	 *
 	 * @param se contains details about the shutdown event
 	 */
