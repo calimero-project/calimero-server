@@ -16,7 +16,7 @@ repositories {
 ext.junitJupiterVersion = '5.9.2'
 
 group = 'io.calimero'
-version = '2.6-SNAPSHOT'
+version = '3.0-SNAPSHOT'
 
 sourceCompatibility = 11
 targetCompatibility = 11
