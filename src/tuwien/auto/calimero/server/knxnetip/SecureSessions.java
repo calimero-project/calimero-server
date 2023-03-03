@@ -228,8 +228,8 @@ final class SecureSessions {
 						final ControlEndpointService ces = (ControlEndpointService) svcHandler;
 						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote);
 					}
-					else
-						return ((DataEndpoint) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
+
+					return ((DataEndpoint) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
 				}
 				return true;
 			}
@@ -391,7 +391,7 @@ final class SecureSessions {
 		return newSecurePacket(sessionId, seq, msgTag, packet.array());
 	}
 
-	private int sessionStatus(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException {
+	private static int sessionStatus(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException {
 		if (h.getServiceType() != SessionStatus)
 			throw new KNXIllegalArgumentException("no secure session status");
 		if (h.getTotalLength() != 8)
@@ -476,7 +476,7 @@ final class SecureSessions {
 		return newSecurePacket(sessionId, seq, msgTag, knxipPacket);
 	}
 
-	private void encrypt(final byte[] mac, final Key secretKey) {
+	private static void encrypt(final byte[] mac, final Key secretKey) {
 		SecureConnection.encrypt(mac, 0, secretKey, securityInfo(new byte[16], 0, 0xff00));
 	}
 
