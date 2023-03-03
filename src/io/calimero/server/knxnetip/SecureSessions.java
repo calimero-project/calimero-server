@@ -221,11 +221,10 @@ final class SecureSessions {
 					}
 					// forward to service handler
 					final int start = svcHeader.getStructLength();
-					if (svcHandler instanceof ControlEndpointService) {
+					if (svcHandler instanceof final ControlEndpointService ces) {
 						if (svcHeader.getServiceType() == KNXnetIPHeader.CONNECT_REQ) {
 							connections.put(remote, sessionId);
 						}
-						final ControlEndpointService ces = (ControlEndpointService) svcHandler;
 						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote);
 					}
 

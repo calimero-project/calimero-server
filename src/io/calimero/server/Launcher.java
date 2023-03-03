@@ -213,14 +213,12 @@ public class Launcher implements Runnable, AutoCloseable
 			while (r.next() != XmlReader.END_DOCUMENT) {
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					switch (r.getLocalName()) {
-					case XmlConfiguration.discovery:
-						discovery = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
-						listen = attr(r, XmlConfiguration.attrListenNetIf).orElse("");
-						outgoing = attr(r, XmlConfiguration.attrOutgoingNetIf).orElse("");
-						break;
-					case XmlConfiguration.svcCont:
-						readServiceContainer(r);
-						break;
+						case XmlConfiguration.discovery -> {
+							discovery = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
+							listen = attr(r, XmlConfiguration.attrListenNetIf).orElse("");
+							outgoing = attr(r, XmlConfiguration.attrOutgoingNetIf).orElse("");
+						}
+						case XmlConfiguration.svcCont -> readServiceContainer(r);
 					}
 				}
 			}
@@ -283,90 +281,83 @@ public class Launcher implements Runnable, AutoCloseable
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
 				final String name = r.getLocalName();
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
-					if (name.equals(XmlConfiguration.datapoints)) {
-						final DatapointMap<Datapoint> dps = new DatapointMap<>();
-						final XmlReader dpReader = attr(r, XmlConfiguration.attrRef)
-								.map(XmlInputFactory.newInstance()::createXMLReader).orElse(r);
-						dps.load(dpReader);
-						datapoints = dps;
-					}
-					else if (name.equals(XmlConfiguration.subnet)) {
-						interfaceType = r.getAttributeValue(null, XmlConfiguration.attrType);
-						msgFormat = attr(r, "format").orElse("");
-						String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
-						if (interfaceType.equals("knxip"))
-							medium = "knxip";
-						else if (medium == null)
-							medium = "tp1";
-						subnetMedium = KNXMediumSettings.getMedium(medium);
-
-						final String doa = r.getAttributeValue(null, XmlConfiguration.attrDoA);
-						if (doa != null) {
-							long l = Long.parseLong(doa, 16);
-							final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
-							subnetDoA = new byte[bytes];
-							for (int i = subnetDoA.length; i-- > 0; l >>>= 8)
-								subnetDoA[i] = (byte) l;
+					switch (name) {
+						case XmlConfiguration.datapoints -> {
+							final DatapointMap<Datapoint> dps = new DatapointMap<>();
+							final XmlReader dpReader = attr(r, XmlConfiguration.attrRef)
+									.map(XmlInputFactory.newInstance()::createXMLReader).orElse(r);
+							dps.load(dpReader);
+							datapoints = dps;
 						}
-
-						overrideSrcAddr = attr(r, "knxAddress").orElse("");
-						if (interfaceType.equals("ip")) {
-							subnetKnxipNetif = getNetIf(r);
-							useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
+						case XmlConfiguration.subnet -> {
+							interfaceType = r.getAttributeValue(null, XmlConfiguration.attrType);
+							msgFormat = attr(r, "format").orElse("");
+							String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
+							if (interfaceType.equals("knxip"))
+								medium = "knxip";
+							else if (medium == null)
+								medium = "tp1";
+							subnetMedium = KNXMediumSettings.getMedium(medium);
+							final String doa = r.getAttributeValue(null, XmlConfiguration.attrDoA);
+							if (doa != null) {
+								long l = Long.parseLong(doa, 16);
+								final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
+								subnetDoA = new byte[bytes];
+								for (int i = subnetDoA.length; i-- > 0; l >>>= 8)
+									subnetDoA[i] = (byte) l;
+							}
+							overrideSrcAddr = attr(r, "knxAddress").orElse("");
+							switch (interfaceType) {
+								case "ip" -> {
+									subnetKnxipNetif = getNetIf(r);
+									useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
+								}
+								case "knxip" -> subnetKnxipNetif = getNetIf(r);
+								case "user-supplied" ->
+										subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
+							}
+							addr = r.getElementText();
 						}
-						else if (interfaceType.equals("knxip"))
-							subnetKnxipNetif = getNetIf(r);
-						else if (interfaceType.equals("user-supplied"))
-							subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
-						addr = r.getElementText();
-					}
-					else if (name.equals(XmlConfiguration.grpAddrFilter))
-						filter = readGroupAddressFilter(r);
-					else if (name.equals(XmlConfiguration.addAddresses))
-						indAddressPool = readAdditionalAddresses(r);
-					else if (name.equals("tunnelingUsers"))
-						tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
-					else if (name.equals("routing")) {
-						try {
-							latencyTolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(2000);
-							final String mcast = r.getElementText();
-							if (!mcast.isEmpty())
-								routingMcast = InetAddress.getByName(mcast);
+						case XmlConfiguration.grpAddrFilter -> filter = readGroupAddressFilter(r);
+						case XmlConfiguration.addAddresses -> indAddressPool = readAdditionalAddresses(r);
+						case "tunnelingUsers" -> tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
+						case "routing" -> {
+							try {
+								latencyTolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(2000);
+								final String mcast = r.getElementText();
+								if (!mcast.isEmpty())
+									routingMcast = InetAddress.getByName(mcast);
+							} catch (final UnknownHostException uhe) {
+								throw new KNXMLException(uhe.getMessage(), r);
+							} catch (final NumberFormatException e) {
+								throw new KNXMLException("invalid latency tolerance", r);
+							}
 						}
-						catch (final UnknownHostException uhe) {
-							throw new KNXMLException(uhe.getMessage(), r);
+						case XmlConfiguration.routingMcast -> {
+							try {
+								routingMcast = InetAddress.getByName(r.getElementText());
+							} catch (final UnknownHostException uhe) {
+								throw new KNXMLException(uhe.getMessage(), r);
+							}
 						}
-						catch (final NumberFormatException e) {
-							throw new KNXMLException("invalid latency tolerance", r);
+						case XmlConfiguration.disruptionBuffer -> {
+							expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
+							final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
+							disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
+							disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
 						}
-					}
-					else if (name.equals(XmlConfiguration.routingMcast)) {
-						try {
-							routingMcast = InetAddress.getByName(r.getElementText());
+						case "timeServer" -> {
+							final var formats = List.of(DPTXlatorDate.DPT_DATE.getID(),
+									DPTXlatorTime.DPT_TIMEOFDAY.getID(), DPTXlatorDateTime.DPT_DATE_TIME.getID());
+							while (r.nextTag() == XmlReader.START_ELEMENT) {
+								final var datapoint = new StateDP(r);
+								if (!formats.contains(datapoint.getDPT()))
+									throw new KNXMLException("invalid time server datapoint type '" + datapoint.getDPT()
+											+ "', supported are " + formats);
+								timeServerDatapoints.add(datapoint);
+							}
 						}
-						catch (final UnknownHostException uhe) {
-							throw new KNXMLException(uhe.getMessage(), r);
-						}
-					}
-					else if (name.equals(XmlConfiguration.disruptionBuffer)) {
-						expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
-						final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
-						disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
-						disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
-					}
-					else if (name.equals("timeServer")) {
-						final var formats = List.of(DPTXlatorDate.DPT_DATE.getID(),
-								DPTXlatorTime.DPT_TIMEOFDAY.getID(), DPTXlatorDateTime.DPT_DATE_TIME.getID());
-						while (r.nextTag() == XmlReader.START_ELEMENT) {
-							final var datapoint = new StateDP(r);
-							if (!formats.contains(datapoint.getDPT()))
-								throw new KNXMLException("invalid time server datapoint type '" + datapoint.getDPT()
-										+ "', supported are " + formats);
-							timeServerDatapoints.add(datapoint);
-						}
-					}
-					else {
-						subnet = new IndividualAddress(r);
+						default -> subnet = new IndividualAddress(r);
 					}
 				}
 				else if (r.getEventType() == XmlReader.END_ELEMENT) {
@@ -429,19 +420,13 @@ public class Launcher implements Runnable, AutoCloseable
 				final var set = EnumSet.noneOf(ServiceFamily.class);
 				for (final var s : split) {
 					switch (s) {
-					case "optional":
-						return EnumSet.of(ServiceFamily.Security);
-					case "tunneling":
-						set.add(ServiceFamily.Tunneling);
-						break;
-					case "devmgmt":
-						set.add(ServiceFamily.DeviceManagement);
-						break;
-					case "routing":
-						set.add(ServiceFamily.Routing);
-						break;
-					default:
-						throw new KNXIllegalArgumentException("unknown secure service '" + s + "'");
+						case "optional" -> {
+							return EnumSet.of(ServiceFamily.Security);
+						}
+						case "tunneling" -> set.add(ServiceFamily.Tunneling);
+						case "devmgmt" -> set.add(ServiceFamily.DeviceManagement);
+						case "routing" -> set.add(ServiceFamily.Routing);
+						default -> throw new KNXIllegalArgumentException("unknown secure service '" + s + "'");
 					}
 				}
 				return set;
@@ -461,16 +446,15 @@ public class Launcher implements Runnable, AutoCloseable
 				final NetworkInterface netif, final boolean useNat, final String subnetLinkClass,
 				final DatapointModel<Datapoint> datapoints) {
 
-			switch (interfaceType) {
-			case "knxip": return SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
-			case "ip": return SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, overrideSrcAddress, subnetArgs);
-			case "tpuart": return SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
-			case "user-supplied": return SubnetConnector.newWithUserLink(sc, overrideSrcAddress, subnetLinkClass, subnetArgs);
-			case "emulate":
-				return datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
+			return switch (interfaceType) {
+				case "knxip" -> SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
+				case "ip" -> SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, overrideSrcAddress, subnetArgs);
+				case "tpuart" -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
+				case "user-supplied" -> SubnetConnector.newWithUserLink(sc, overrideSrcAddress, subnetLinkClass, subnetArgs);
+				case "emulate" -> datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
 						: SubnetConnector.newCustom(sc, "emulate");
-			default: return SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, overrideSrcAddress, subnetArgs);
-			}
+				default -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, overrideSrcAddress, subnetArgs);
+			};
 		}
 
 		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
@@ -768,8 +752,7 @@ public class Launcher implements Runnable, AutoCloseable
 			decrypted.put("user[1].key", mgmtKey);
 		}
 
-		if (sc instanceof RoutingServiceContainer) {
-			final RoutingServiceContainer rsc = (RoutingServiceContainer) sc;
+		if (sc instanceof final RoutingServiceContainer rsc) {
 			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().equals(rsc.routingMulticastAddress()));
 			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
 				final var enc = backbone.get().groupKey().get();
