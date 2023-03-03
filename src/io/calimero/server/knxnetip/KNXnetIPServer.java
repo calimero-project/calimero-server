@@ -209,8 +209,7 @@ public class KNXnetIPServer
 			if (!serviceContainer.isActivated())
 				return;
 			LooperTask.scheduleWithRetry(controlEndpoint);
-			if (serviceContainer instanceof RoutingServiceContainer) {
-				final var routingContainer = (RoutingServiceContainer) serviceContainer;
+			if (serviceContainer instanceof final RoutingServiceContainer routingContainer) {
 				final var mcast = knxipParameters.inetAddress(PropertyAccess.PID.ROUTING_MULTICAST_ADDRESS);
 				routingEndpoint = new LooperTask(KNXnetIPServer.this,
 						// TODO mcast address might change
@@ -556,13 +555,13 @@ public class KNXnetIPServer
 	public synchronized void setOption(final String optionKey, final String value)
 	{
 		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
-			runDiscovery = Boolean.valueOf(value);
+			runDiscovery = Boolean.parseBoolean(value);
 			stopDiscoveryService();
 			if (runDiscovery && running)
 				startDiscoveryService(outgoingIf, discoveryIfs, -1);
 		}
 		else if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
-			multicastLoopback = Boolean.valueOf(value);
+			multicastLoopback = Boolean.parseBoolean(value);
 		}
 		else if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
 			discoveryIfs = parseNetworkInterfaces(optionKey, value);

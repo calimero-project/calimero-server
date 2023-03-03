@@ -449,24 +449,16 @@ public final class DataEndpoint extends ConnectionBase
 		logger.debug("received {}", feat);
 
 		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
-			switch (feat.featureId()) {
-			case SupportedEmiTypes:
-				return responseForFeature(feat, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)
-			case IndividualAddress:
-				return responseForFeature(feat, device.toByteArray());
-			case MaxApduLength:
-				return responseForFeature(feat, (byte) 0, (byte) maxApduLength());
-			case DeviceDescriptorType0:
-				return responseForFeature(feat, DD0.TYPE_091A.toByteArray());
-			case ConnectionStatus:
-				return responseForFeature(feat, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
-			case Manufacturer:
-				return responseForFeature(feat, (byte) 0, (byte) 0);
-			case ActiveEmiType:
-				return responseForFeature(feat, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
-			case EnableFeatureInfoService:
-				return responseForFeature(feat, (byte) (featureInfoServiceEnabled ? 1 : 0));
-			}
+			return switch (feat.featureId()) {
+				case SupportedEmiTypes -> responseForFeature(feat, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)
+				case IndividualAddress -> responseForFeature(feat, device.toByteArray());
+				case MaxApduLength -> responseForFeature(feat, (byte) 0, (byte) maxApduLength());
+				case DeviceDescriptorType0 -> responseForFeature(feat, DD0.TYPE_091A.toByteArray());
+				case ConnectionStatus -> responseForFeature(feat, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
+				case Manufacturer -> responseForFeature(feat, (byte) 0, (byte) 0);
+				case ActiveEmiType -> responseForFeature(feat, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
+				case EnableFeatureInfoService -> responseForFeature(feat, (byte) (featureInfoServiceEnabled ? 1 : 0));
+			};
 		}
 		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
 			final byte[] value = feat.featureValue().get();
@@ -622,17 +614,10 @@ public final class DataEndpoint extends ConnectionBase
 		}
 		else {
 			switch (mc) {
-			case CEMILData.MC_LDATA_CON:
-				logger.warn("received L-Data confirmation - ignored");
-				break;
-			case CEMILData.MC_LDATA_IND:
-				logger.warn("received L-Data indication - ignored");
-				break;
-			case CEMIBusMon.MC_BUSMON_IND:
-				logger.warn("received L-Busmon indication - ignored");
-				break;
-			default:
-				logger.warn("unsupported cEMI message code " + mc + " - ignored");
+				case CEMILData.MC_LDATA_CON -> logger.warn("received L-Data confirmation - ignored");
+				case CEMILData.MC_LDATA_IND -> logger.warn("received L-Data indication - ignored");
+				case CEMIBusMon.MC_BUSMON_IND -> logger.warn("received L-Busmon indication - ignored");
+				default -> logger.warn("unsupported cEMI message code " + mc + " - ignored");
 			}
 		}
 	}
@@ -650,20 +635,11 @@ public final class DataEndpoint extends ConnectionBase
 		}
 		else {
 			switch (cemi.getMessageCode()) {
-			case CEMIDevMgmt.MC_PROPREAD_CON:
-				logger.warn("received property read confirmation - ignored");
-				break;
-			case CEMIDevMgmt.MC_PROPWRITE_CON:
-				logger.warn("received property write confirmation - ignored");
-				break;
-			case CEMIDevMgmt.MC_PROPINFO_IND:
-				logger.warn("received property info indication - ignored");
-				break;
-			case CEMIDevMgmt.MC_RESET_IND:
-				logger.warn("received reset indication - ignored");
-				break;
-			default:
-				logger.warn("unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode()) + " - ignored");
+				case CEMIDevMgmt.MC_PROPREAD_CON -> logger.warn("received property read confirmation - ignored");
+				case CEMIDevMgmt.MC_PROPWRITE_CON -> logger.warn("received property write confirmation - ignored");
+				case CEMIDevMgmt.MC_PROPINFO_IND -> logger.warn("received property info indication - ignored");
+				case CEMIDevMgmt.MC_RESET_IND -> logger.warn("received reset indication - ignored");
+				default -> logger.warn("unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode()) + " - ignored");
 			}
 		}
 	}

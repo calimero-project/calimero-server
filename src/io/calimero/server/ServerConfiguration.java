@@ -210,9 +210,11 @@ public class ServerConfiguration {
 					: "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
 			// @formatter:off
-			return String.format("%s%s:\n"
-					+ "\tlisten on %s (%sport %s), KNX IP %srouting %s\n"
-					+ "\t%s connection: %s%s",
+			return String.format(
+     				"""
+					%s%s:
+						listen on %s (%sport %s), KNX IP %srouting %s
+						%s connection: %s%s""",
 					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secureRouting, mcast, type,
 					sc.getMediumSettings(), filter);
 			// @formatter:on

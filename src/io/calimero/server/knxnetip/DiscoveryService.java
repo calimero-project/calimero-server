@@ -53,7 +53,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 
 import io.calimero.KNXFormatException;
 import io.calimero.device.ios.DeviceObject;
@@ -191,8 +190,7 @@ final class DiscoveryService extends ServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
-			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream)
-					.collect(Collectors.toList());
+			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
 				sendSearchResponse(addr, ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
@@ -272,7 +270,7 @@ final class DiscoveryService extends ServiceLooper
 	public void quit()
 	{
 		try {
-			((MulticastSocket) s).leaveGroup(new InetSocketAddress(systemSetupMulticast, 0), null);
+			s.leaveGroup(new InetSocketAddress(systemSetupMulticast, 0), null);
 		}
 		catch (final IOException ignore) {}
 		super.quit();

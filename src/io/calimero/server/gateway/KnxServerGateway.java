@@ -525,14 +525,13 @@ public class KnxServerGateway implements Runnable
 			final var settings = subnet.getServiceContainer().getMediumSettings();
 			final int medium = settings.getMedium();
 
-			final int maxMsgsPerSecond;
-			switch (medium) {
-			case KNXMediumSettings.MEDIUM_TP1: maxMsgsPerSecond = 50; break;
-			case KNXMediumSettings.MEDIUM_PL110: maxMsgsPerSecond = 6; break;
-			case KNXMediumSettings.MEDIUM_RF: maxMsgsPerSecond = 50; break;
-			case KNXMediumSettings.MEDIUM_KNXIP: maxMsgsPerSecond = 50; break;
-			default: throw new KnxRuntimeException("unsupported KNX medium");
-			}
+			final int maxMsgsPerSecond = switch (medium) {
+				case KNXMediumSettings.MEDIUM_TP1 -> 50;
+				case KNXMediumSettings.MEDIUM_PL110 -> 6;
+				case KNXMediumSettings.MEDIUM_RF -> 50;
+				case KNXMediumSettings.MEDIUM_KNXIP -> 50;
+				default -> throw new KnxRuntimeException("unsupported KNX medium");
+			};
 
 			ipMsgCount++;
 			final int msgs = ipEvents.size();
@@ -900,8 +899,7 @@ public class KnxServerGateway implements Runnable
 			((DPTXlatorDate) xlator).setValue(millis);
 		else if (xlator instanceof DPTXlatorTime)
 			((DPTXlatorTime) xlator).setValue(millis);
-		else if (xlator instanceof DPTXlatorDateTime) {
-			final DPTXlatorDateTime dateTime = (DPTXlatorDateTime) xlator;
+		else if (xlator instanceof final DPTXlatorDateTime dateTime) {
 			dateTime.setValue(millis);
 			dateTime.setClockSync(true);
 		}
@@ -936,8 +934,7 @@ public class KnxServerGateway implements Runnable
 			info.append(format("service container '%s'%n", c.getName()));
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			try {
-				if (c.getServiceContainer() instanceof RoutingServiceContainer) {
-					final RoutingServiceContainer rsc = (RoutingServiceContainer) c.getServiceContainer();
+				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
 					info.append(format("\trouting multicast %s netif %s%n",
 							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
 				}
@@ -1035,8 +1032,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		final int mc = frame.getMessageCode();
-		if (frame instanceof CEMILData) {
-			final var ldata = (CEMILData) frame;
+		if (frame instanceof final CEMILData ldata) {
 
 			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
@@ -1062,8 +1058,7 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 
-				if (ldata.getDestination() instanceof IndividualAddress) {
-					final IndividualAddress dst = (IndividualAddress) ldata.getDestination();
+				if (ldata.getDestination() instanceof final IndividualAddress dst) {
 					final Optional<SubnetConnector> connector = connectorFor(dst);
 					if (connector.isPresent() && localDeviceManagement(connector.get(), ldata))
 						return;
@@ -1135,9 +1130,8 @@ public class KnxServerGateway implements Runnable
 						}
 					}
 				}
-				else if (dst instanceof IndividualAddress) {
+				else if (dst instanceof final IndividualAddress ia) {
 					// see if the frame is addressed to us
-					final var ia = (IndividualAddress) dst;
 					final Optional<SubnetConnector> connector = connectorFor(ia);
 					if (connector.isPresent()) {
 						final IndividualAddress localInterface = connector.get().getServiceContainer()
@@ -1197,8 +1191,7 @@ public class KnxServerGateway implements Runnable
 		final String s = "subnet";
 		final CEMI frame = fe.getFrame();
 
-		if (frame instanceof CEMILData) {
-			final var ldata = (CEMILData) frame;
+		if (frame instanceof final CEMILData ldata) {
 			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
 
@@ -1380,7 +1373,7 @@ public class KnxServerGateway implements Runnable
 		final boolean systemBroadcast)
 	{
 		final int objinst = objectInstance(subnet);
-		if (f.getDestination() instanceof GroupAddress && rawAddress > 0 && rawAddress <= 0x6fff) {
+		if (f.getDestination() instanceof final GroupAddress d && rawAddress > 0 && rawAddress <= 0x6fff) {
 			// get forwarding settings for group destination address
 			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.MAIN_LCGROUPCONFIG, 3);
 			final int subGroupAddressConfig = value & 0x03;
@@ -1388,7 +1381,6 @@ public class KnxServerGateway implements Runnable
 				logger.debug("no frames shall be routed to subnet {} - discard {}", subnet.getName(), f);
 				return;
 			}
-			final GroupAddress d = (GroupAddress) f.getDestination();
 			if (subGroupAddressConfig == 3 && !inGroupAddressTable(d, objinst)) {
 				logger.info("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
 				return;
@@ -1404,8 +1396,7 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 			// std frames have the SB flag already removed when adjusting the hop count
-			if (f instanceof CEMILDataEx) {
-				final CEMILDataEx cemilDataEx = (CEMILDataEx) f;
+			if (f instanceof final CEMILDataEx cemilDataEx) {
 				cemilDataEx.setBroadcast(true);
 			}
 		}
@@ -1545,8 +1536,7 @@ public class KnxServerGateway implements Runnable
 
 						final var sentOnNetif = new HashSet<NetworkInterface>();
 						for (final var conn : serverConnections) {
-							if (conn instanceof KNXnetIPRouting) {
-								final KNXnetIPRouting rc = (KNXnetIPRouting) conn;
+							if (conn instanceof final KNXnetIPRouting rc) {
 								if (sentOnNetif.add(rc.networkInterface()))
 									send(sc, rc, bcast);
 							}
@@ -2235,8 +2225,7 @@ public class KnxServerGateway implements Runnable
 
 		byte[] doa = null;
 		final CEMILData copy = (CEMILData) CEMIFactory.copy(ldata);
-		if (copy instanceof CEMILDataEx) {
-			final CEMILDataEx ex = (CEMILDataEx) copy;
+		if (copy instanceof final CEMILDataEx ex) {
 			doa = ex.getAdditionalInfo(AdditionalInfo.PlMedium);
 			ex.additionalInfo().clear();
 		}

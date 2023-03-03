@@ -585,25 +585,15 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.of(buf);
 	}
 
-	private boolean createDib(final int dibType, final List<DIB> dibs, final boolean extended, final int sessionId) {
+	private void createDib(final int dibType, final List<DIB> dibs, final boolean extended, final int sessionId) {
 		switch (dibType) {
-		case DIB.DEVICE_INFO:
-			return dibs.add(server.createDeviceDIB(svcCont));
-		case DIB.SUPP_SVC_FAMILIES:
-			return dibs.add(server.createServiceFamiliesDIB(svcCont, extended));
-		case DIB.AdditionalDeviceInfo:
-			return dibs.add(createAdditionalDeviceDib());
-		case DIB.SecureServiceFamilies:
-			createSecureServiceFamiliesDib().ifPresent(dibs::add);
-			return true;
-		case DIB.TunnelingInfo:
-			createTunnelingDib(sessionId).ifPresent(dibs::add);
-			return true;
-		case DIB.MFR_DATA:
-			dibs.add(new ManufacturerDIB(0x00c5, new byte[] { 1, 4, (byte) ObjectServerProtocol, ObjectServerVersion }));
-			return true;
+			case DIB.DEVICE_INFO -> dibs.add(server.createDeviceDIB(svcCont));
+			case DIB.SUPP_SVC_FAMILIES -> dibs.add(server.createServiceFamiliesDIB(svcCont, extended));
+			case DIB.AdditionalDeviceInfo -> dibs.add(createAdditionalDeviceDib());
+			case DIB.SecureServiceFamilies -> createSecureServiceFamiliesDib().ifPresent(dibs::add);
+			case DIB.TunnelingInfo -> createTunnelingDib(sessionId).ifPresent(dibs::add);
+			case DIB.MFR_DATA -> dibs.add(new ManufacturerDIB(0x00c5, new byte[]{1, 4, (byte) ObjectServerProtocol, ObjectServerVersion}));
 		}
-		return false;
 	}
 
 	private AdditionalDeviceDib createAdditionalDeviceDib() {
