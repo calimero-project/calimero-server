@@ -59,7 +59,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -101,7 +100,6 @@ import io.calimero.mgmt.PropertyAccess;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.KnxSecureException;
 import io.calimero.server.ServerConfiguration;
-import io.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
 /**
  * Provides server-side functionality of KNXnet/IP protocols.
@@ -315,13 +313,9 @@ public class KNXnetIPServer
 							final byte[] data = ios.getProperty(objectIndex, pidIpSbcControl, 1, 1);
 							return new ServiceResult<>((byte) ReturnCode.Success.code(), (byte) serviceId, data[0]);
 						}
-						else {
-							return ServiceResult.of((byte) ReturnCode.DataVoid.code(), (byte) serviceId);
-						}
+						return ServiceResult.of((byte) ReturnCode.DataVoid.code(), (byte) serviceId);
 					}
-					else {
-						return ServiceResult.of((byte) ReturnCode.InvalidServiceCommand.code(), (byte) serviceId);
-					}
+					return ServiceResult.of((byte) ReturnCode.InvalidServiceCommand.code(), (byte) serviceId);
 				}
 			}
 			return super.readFunctionPropertyState(remote, objectIndex, propertyId, functionInput);
@@ -718,15 +712,6 @@ public class KNXnetIPServer
 			logger.error("option " + option + " for interface " + ifname, e);
 		}
 		return null;
-	}
-
-	private static <T> String join(final T[] array, final Function<T, ?>  f, final String sep)
-	{
-		if (array == null)
-			return "default";
-		final StringBuilder sb = new StringBuilder();
-		Arrays.stream(array).forEach(ni -> sb.append(f.apply(ni)).append(sep));
-		return sb.toString();
 	}
 
 	/**

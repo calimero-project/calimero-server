@@ -489,12 +489,12 @@ public final class DataEndpoint extends ConnectionBase
 		return responseForFeature(feat, ReturnCode.AddressVoid);
 	}
 
-	private TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
+	private static TunnelingFeature responseForFeature(final TunnelingFeature req, final byte... featureValue) {
 		return responseForFeature(req, ReturnCode.Success, featureValue);
 	}
 
-	private TunnelingFeature responseForFeature(final TunnelingFeature req, final ReturnCode rc,
-		final byte... featureValue) {
+	private static TunnelingFeature responseForFeature(final TunnelingFeature req, final ReturnCode rc,
+			final byte... featureValue) {
 		return TunnelingFeature.newResponse(req.featureId(), rc, featureValue);
 	}
 

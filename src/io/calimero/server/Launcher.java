@@ -104,7 +104,6 @@ import io.calimero.mgmt.Description;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.Keyring;
 import io.calimero.secure.Security;
-import io.calimero.server.Launcher.XmlConfiguration;
 import io.calimero.server.ServerConfiguration.Container;
 import io.calimero.server.gateway.KnxServerGateway;
 import io.calimero.server.gateway.SubnetConnector;
@@ -457,10 +456,10 @@ public class Launcher implements Runnable, AutoCloseable
 			return set;
 		}
 
-		private SubnetConnector subnetConnector(final ServiceContainer sc,
-												final String interfaceType, final String subnetArgs, final String msgFormat,
-				final String overrideSrcAddress, final NetworkInterface netif,
-				final boolean useNat, final String subnetLinkClass, final DatapointModel<Datapoint> datapoints) {
+		private static SubnetConnector subnetConnector(final ServiceContainer sc, final String interfaceType,
+				final String subnetArgs, final String msgFormat, final String overrideSrcAddress,
+				final NetworkInterface netif, final boolean useNat, final String subnetLinkClass,
+				final DatapointModel<Datapoint> datapoints) {
 
 			switch (interfaceType) {
 			case "knxip": return SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
@@ -899,7 +898,7 @@ public class Launcher implements Runnable, AutoCloseable
 				userToAddrIdx.toByteArray());
 	}
 
-	private void setTunnelingAddresses(final InterfaceObjectServer ios, final int objectInstance,
+	private static void setTunnelingAddresses(final InterfaceObjectServer ios, final int objectInstance,
 			final byte[] addrIndices) {
 		final int idx = ios.lookup(KNXNETIP_PARAMETER_OBJECT, objectInstance).getIndex();
 		final var d = new Description(idx, KNXNETIP_PARAMETER_OBJECT, pidTunnelingAddresses, 0, 0, true, 0,
