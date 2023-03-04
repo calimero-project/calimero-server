@@ -24,6 +24,13 @@ targetCompatibility = 11
 java {
     withSourcesJar()
     withJavadocJar()
+
+    registerFeature('serial') {
+        usingSourceSet(sourceSets.main)
+    }
+    registerFeature('usb') {
+        usingSourceSet(sourceSets.main)
+    }
 }
 
 tasks.withType(Jar) {
@@ -92,7 +99,8 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:1.7.36'
     runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'
 
-    runtimeOnly "com.github.calimero:calimero-rxtx:${version}"
+	serialRuntimeOnly "com.github:calimero-rxtx:${version}"
+	usbRuntimeOnly "io.calimero:calimero-usb:${version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
 }
