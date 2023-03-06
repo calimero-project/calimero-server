@@ -104,6 +104,14 @@ dependencies {
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
 }
 
+distTar {
+    duplicatesStrategy = 'EXCLUDE'
+}
+
+distZip {
+    duplicatesStrategy = 'EXCLUDE'
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
