@@ -71,7 +71,7 @@ public interface ServiceContainer
 	String getName();
 
 	/**
-	 * @return the name of the network interface for this service container
+	 * {@return the name of the network interface for this service container}
 	 */
 	String networkInterface();
 
@@ -85,7 +85,7 @@ public interface ServiceContainer
 	HPAI getControlEndpoint();
 
 	/**
-	 * @return the KNX medium settings of the connected KNX subnet
+	 * {@return the KNX medium settings of the connected KNX subnet}
 	 */
 	KNXMediumSettings getMediumSettings();
 
