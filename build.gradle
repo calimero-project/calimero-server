@@ -67,6 +67,10 @@ compileTestJava.options*.compilerArgs = [
 	'-Xlint:-try',
 ]
 
+tasks.named('compileJava') {
+    options.javaModuleVersion = provider { project.version }
+}
+
 sourceSets {
     main {
         java.srcDir 'src'
