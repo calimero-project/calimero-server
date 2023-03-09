@@ -797,7 +797,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	/**
-	 * @return the KNXnet/IP server used by this gateway
+	 * {@return the KNXnet/IP server used by this gateway}
 	 */
 	public final KNXnetIPServer getServer()
 	{
@@ -805,7 +805,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	/**
-	 * @return the list of subnet connectors currently maintained by the gateway
+	 * {@return the list of subnet connectors currently maintained by the gateway}
 	 */
 	public final List<SubnetConnector> getSubnetConnectors()
 	{
