@@ -36,6 +36,11 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
 import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.toList;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
@@ -114,7 +119,6 @@ import io.calimero.knxnetip.util.TunnelCRD;
 import io.calimero.knxnetip.util.TunnelCRI;
 import io.calimero.knxnetip.util.TunnelingDib;
 import io.calimero.knxnetip.util.TunnelingDib.SlotStatus;
-import io.calimero.log.LogService.LogLevel;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import io.calimero.server.knxnetip.SecureSessions.Session;
@@ -179,7 +183,7 @@ final class ControlEndpointService extends ServiceLooper
 		final boolean secureTunneling = isSecuredService(Tunneling);
 		final String mgmt = secureMgmt ? "required" : "optional";
 		final String tunneling = secureTunneling ? "required" : "optional";
-		logger.info("{} secure mgmt/tunneling connections: {}/{}", sc.getName(), mgmt, tunneling);
+		logger.log(INFO, "{0} secure mgmt/tunneling connections: {1}/{2}", sc.getName(), mgmt, tunneling);
 
 		try {
 			final var ctrlEndpoint = (InetSocketAddress) s.getLocalSocketAddress();
@@ -260,7 +264,7 @@ final class ControlEndpointService extends ServiceLooper
 					.map(InetSocketAddress::getAddress).orElse(InetAddress.getByAddress(new byte[4]));
 			final List<InetAddress> addresses = usableIpAddresses().collect(toList());
 			if (!addresses.contains(ip)) {
-				logger.warn("{} control endpoint: interface {} updated its IP address from {} to {}",
+				logger.log(WARNING, "{0} control endpoint: interface {1} updated its IP address from {2} to {3}",
 						svcCont.getName(), svcCont.networkInterface(), ip.getHostAddress(), addresses);
 				quit();
 			}
@@ -299,7 +303,7 @@ final class ControlEndpointService extends ServiceLooper
 			final var typeString = tunneling ? "tunneling" : devmgmt ? "device management" : "0x" + connType;
 
 			if (tunneling && isSecuredService(Tunneling) || devmgmt && isSecuredService(DeviceManagement)) {
-				logger.warn("reject {}, secure services required for {}", h, typeString);
+				logger.log(WARNING, "reject {0}, secure services required for {1}", h, typeString);
 				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, 1);
 				final byte[] buf = PacketHelper
 						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
@@ -358,7 +362,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
-			logger.info("send KNXnet/IP description to {}: {}", responseAddress, description);
+			logger.log(INFO, "send KNXnet/IP description to {0}: {1}", responseAddress, description);
 			send(sessionId, 0, buf, responseAddress);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
@@ -377,7 +381,7 @@ final class ControlEndpointService extends ServiceLooper
 				final HPAI dataEndpoint = req.getDataEndpoint();
 				final var dataRouteBack = dataEndpoint.isRouteBack();
 				if (!ctrlRouteBack || !dataRouteBack) {
-					logger.info("connect request from {} does not contain route-back {} endpoint, ignore", hostPort(src),
+					logger.log(INFO, "connect request from {0} does not contain route-back {1} endpoint, ignore", hostPort(src),
 							ctrlRouteBack ? "data" : "control");
 					return true;
 				}
@@ -391,7 +395,7 @@ final class ControlEndpointService extends ServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
-					logger.info("{}: setup data endpoint (channel {}) for connection request from {} ({})",
+					logger.log(INFO, "{0}: setup data endpoint (channel {1}) for connection request from {2} ({3})",
 							svcCont.getName(), channelId, hostPort(ctrlEndpt), tcp ? "tcp" : "udp");
 					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
@@ -407,7 +411,7 @@ final class ControlEndpointService extends ServiceLooper
 				connectionEstablished(svcCont, connections.get(channelId));
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_RES)
-			logger.warn("received connect response - ignored");
+			logger.log(WARNING, "received connect response - ignored");
 		else if (svc == KNXnetIPHeader.DISCONNECT_REQ) {
 			final DisconnectRequest dr = new DisconnectRequest(data, offset);
 			// find connection based on channel id
@@ -416,7 +420,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			// requests with wrong channel ID are ignored (conforming to spec)
 			if (conn == null) {
-				logger.warn("received disconnect request with unknown channel id " + dr.getChannelID() + " - ignored");
+				logger.log(WARNING, "received disconnect request with unknown channel id " + dr.getChannelID() + " - ignored");
 				return true;
 			}
 
@@ -426,7 +430,7 @@ final class ControlEndpointService extends ServiceLooper
 			// issue a warning
 			final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
 			if (!ctrlEndpt.equals(src)) {
-				logger.warn("disconnect request: sender control endpoint changed from " + hostPort(ctrlEndpt) + " to "
+				logger.log(WARNING, "disconnect request: sender control endpoint changed from " + hostPort(ctrlEndpt) + " to "
 						+ src + ", not recommended");
 			}
 
@@ -437,16 +441,16 @@ final class ControlEndpointService extends ServiceLooper
 				send(sessionId, channelId, buf, ctrlEndpt);
 			}
 			catch (final IOException e) {
-				logger.error("communication failure", e);
+				logger.log(ERROR, "communication failure", e);
 			}
 			finally {
-				conn.cleanup(CloseEvent.CLIENT_REQUEST, "client request", LogLevel.DEBUG, null);
+				conn.cleanup(CloseEvent.CLIENT_REQUEST, "client request", DEBUG, null);
 			}
 		}
 		else if (svc == KNXnetIPHeader.DISCONNECT_RES) {
 			final DisconnectResponse res = new DisconnectResponse(data, offset);
 			if (res.getStatus() != ErrorCodes.NO_ERROR)
-				logger.warn("received disconnect response status 0x" + Integer.toHexString(res.getStatus()) + " ("
+				logger.log(WARNING, "received disconnect response status 0x" + Integer.toHexString(res.getStatus()) + " ("
 						+ ErrorCodes.getErrorMessage(res.getStatus()) + ")");
 			// finalize closing
 		}
@@ -462,7 +466,7 @@ final class ControlEndpointService extends ServiceLooper
 				protocolVersion = endpoint.protocolVersion();
 				status = checkVersion(h, protocolVersion);
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.trace("received connection state request from {} channel {}",
+					logger.log(TRACE, "received connection state request from {0} channel {1}",
 							hostPort(endpoint.getRemoteAddress()), csr.getChannelID());
 					endpoint.updateLastMsgTimestamp();
 				}
@@ -474,7 +478,7 @@ final class ControlEndpointService extends ServiceLooper
 				final var ctrlEp = csr.getControlEndpoint().endpoint();
 				final var addr = endpoint != null ? endpoint.getRemoteAddress()
 						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
-				logger.warn("received invalid connection state request from {} channel {}: {}",
+				logger.log(WARNING, "received invalid connection state request from {0} channel {1}: {2}",
 						hostPort(addr), csr.getChannelID(),
 						ErrorCodes.getErrorMessage(status));
 			}
@@ -484,7 +488,7 @@ final class ControlEndpointService extends ServiceLooper
 			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
-			logger.warn("received connection state response - ignored");
+			logger.log(WARNING, "received connection state response - ignored");
 		else {
 			DataEndpoint endpoint = null;
 			try {
@@ -522,7 +526,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	private void closeDataConnections() {
 		for (final DataEndpoint endpoint : connections.values())
-			endpoint.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), LogLevel.INFO, null);
+			endpoint.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), INFO, null);
 	}
 
 	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
@@ -531,7 +535,7 @@ final class ControlEndpointService extends ServiceLooper
 		if (res.isPresent()) {
 			send(sessionId, 0, res.get(), dst);
 			final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
-			logger.debug("KNXnet/IP discovery: identify as '{}' for container {} to {} on {}", deviceDib.getName(),
+			logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
 					svcCont.getName(), dst, svcCont.networkInterface());
 		}
 	}
@@ -544,7 +548,7 @@ final class ControlEndpointService extends ServiceLooper
 		// it can happen that our socket got closed and we get null
 		final InetSocketAddress local = (InetSocketAddress) getSocket().getLocalSocketAddress();
 		if (local == null) {
-			logger.warn("KNXnet/IP discovery unable to announce container '{}', problem with local endpoint: "
+			logger.log(WARNING, "KNXnet/IP discovery unable to announce container ''{0}'', problem with local endpoint: "
 					+ "socket bound={}, closed={}", svcCont.getName(), getSocket().isBound(), getSocket().isClosed());
 			return Optional.empty();
 		}
@@ -651,13 +655,13 @@ final class ControlEndpointService extends ServiceLooper
 		if (sessionId > 0) {
 			final Session session = sessions.sessions.get(sessionId);
 			if (session == null) {
-				logger.info("session {} got deallocated, channel {} no longer valid", sessionId, channelId);
+				logger.log(INFO, "session {0} got deallocated, channel {1} no longer valid", sessionId, channelId);
 				return;
 			}
 			final long seq = session.sendSeq.getAndIncrement();
 			final int msgTag = 0;
 			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
-			logger.debug("send session {} seq {} tag {} to {}", sessionId, seq, msgTag, hostPort(dst));
+			logger.log(DEBUG, "send session {0} seq {1} tag {2} to {3}", sessionId, seq, msgTag, hostPort(dst));
 		}
 
 		if (!TcpLooper.send(buf, dst))
@@ -676,7 +680,7 @@ final class ControlEndpointService extends ServiceLooper
 			ip = usableIpAddresses().findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, ep.getPort()));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
-			logger.trace("{} control endpoint bound to {}", svcCont.getName(), hostPort(boundTo));
+			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), hostPort(boundTo));
 			return s;
 		}
 		catch (final SocketException e) {
@@ -743,7 +747,7 @@ final class ControlEndpointService extends ServiceLooper
 		finally {
 			final long elapsed = System.nanoTime() - start;
 			if (elapsed > 3_000_000_000L)
-				logger.warn("slow local host resolution, took {} ms", elapsed / 1000 / 1000);
+				logger.log(WARNING, "slow local host resolution, took {0} ms", elapsed / 1000 / 1000);
 		}
 		return Optional.empty();
 	}
@@ -759,7 +763,7 @@ final class ControlEndpointService extends ServiceLooper
 			return new IndividualAddress(knxipObject.get(PID.KNX_INDIVIDUAL_ADDRESS));
 		}
 		catch (final KnxPropertyException e) {
-			logger.error("no server device address set in KNXnet/IP parameter object!");
+			logger.log(ERROR, "no server device address set in KNXnet/IP parameter object!");
 			return null;
 		}
 	}
@@ -784,7 +788,7 @@ final class ControlEndpointService extends ServiceLooper
 		if (secureSvcInProgress) {
 			sessionId = sessions.registerConnection(connType, ctrlEndpt, channelId);
 			if (sessionId == 0) {
-				logger.error("no valid secure session for connection request from {}", ctrlEndpt);
+				logger.log(ERROR, "no valid secure session for connection request from {0}", ctrlEndpt);
 				return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 			}
 		}
@@ -812,7 +816,7 @@ final class ControlEndpointService extends ServiceLooper
 				// allow tunneling on busmonitor.
 				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.LinkLayer);
 				if (active.size() > 0) {
-					logger.warn("{}: tunneling on busmonitor-layer currently not allowed (active connections "
+					logger.log(WARNING, "{0}: tunneling on busmonitor-layer currently not allowed (active connections "
 							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
@@ -821,7 +825,7 @@ final class ControlEndpointService extends ServiceLooper
 				final boolean allowMultiMonitorConnections = true;
 				if (allowMultiMonitorConnections) {
 					final long monitoring = activeConnectionsOfType(ConnectionType.Monitor).size();
-					logger.info("{}: active monitor connections: {}, 1 connect request", svcCont.getName(), monitoring);
+					logger.log(INFO, "{0}: active monitor connections: {1}, 1 connect request", svcCont.getName(), monitoring);
 				}
 
 				cType = ConnectionType.Monitor;
@@ -832,7 +836,7 @@ final class ControlEndpointService extends ServiceLooper
 				// allow any other tunneling connections.
 				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
 				if (active.size() > 0) {
-					logger.warn("{}: connect request denied for tunneling on link-layer (active tunneling on "
+					logger.log(WARNING, "{0}: connect request denied for tunneling on link-layer (active tunneling on "
 							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
@@ -840,7 +844,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			final List<DataEndpoint> baos = activeConnectionsOfType(ConnectionType.Baos);
 			if (baos.size() > 0) {
-				logger.warn("{}: connect request denied for tunneling (active baos "
+				logger.log(WARNING, "{0}: connect request denied for tunneling (active baos "
 						+ "connections)\n\tcurrently connected: {}", svcCont.getName(), baos);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
@@ -861,17 +865,17 @@ final class ControlEndpointService extends ServiceLooper
 
 			device = this.device;
 			final boolean isServerAddress = device.equals(serverAddress());
-			logger.info("assign {} address {} to channel {}",
+			logger.log(INFO, "assign {0} address {1} to channel {2}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
 			crd = new TunnelCRD(device);
 		}
 		else if (connType == DEVICE_MGMT_CONNECTION) {
-			logger.info("setup device management connection with channel ID {}", channelId);
+			logger.log(INFO, "setup device management connection with channel ID {0}", channelId);
 			// At first, check if we are allowed to open mgmt connection at all; if
 			// server assigned its own device address, we have to reject the request
 			synchronized (usedKnxAddresses) {
 				if (usedKnxAddresses.contains(serverAddress())) {
-					logger.warn("server device address is currently assigned to connection, "
+					logger.log(WARNING, "server device address is currently assigned to connection, "
 							+ "no management connections allowed");
 					return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 				}
@@ -884,18 +888,18 @@ final class ControlEndpointService extends ServiceLooper
 		else if (connType == ObjectServerProtocol && ((DefaultServiceContainer) svcCont).baosSupport()) {
 			final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
 			if (active.size() > 0) {
-				logger.warn("{}: connect request denied for baos connection (active tunneling on "
+				logger.log(WARNING, "{0}: connect request denied for baos connection (active tunneling on "
 						+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 			final List<DataEndpoint> linkLayer = activeConnectionsOfType(ConnectionType.LinkLayer);
 			if (linkLayer.size() > 0) {
-				logger.warn("{}: baos connection currently not allowed (active connections "
+				logger.log(WARNING, "{0}: baos connection currently not allowed (active connections "
 						+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), linkLayer);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 
-			logger.info("setup baos connection with channel ID {}", channelId);
+			logger.log(INFO, "setup baos connection with channel ID {0}", channelId);
 			cType = ConnectionType.Baos;
 			crd = CRD.createResponse(ObjectServerProtocol);
 		}
@@ -959,7 +963,7 @@ final class ControlEndpointService extends ServiceLooper
 	private ConnectResponse errorResponse(final int status, final String endpoint)
 	{
 		final ConnectResponse res = new ConnectResponse(status);
-		logger.warn("no data endpoint for remote endpoint {}, {}", endpoint, res.getStatusString());
+		logger.log(WARNING, "no data endpoint for remote endpoint {0}, {1}", endpoint, res.getStatusString());
 		return res;
 	}
 
@@ -1123,7 +1127,7 @@ final class ControlEndpointService extends ServiceLooper
 				return true;
 			}
 		}
-		logger.warn("additional individual address {} does not match KNX subnet {}", addr, subnetMask);
+		logger.log(WARNING, "additional individual address {0} does not match KNX subnet {1}", addr, subnetMask);
 		return false;
 	}
 
@@ -1133,11 +1137,11 @@ final class ControlEndpointService extends ServiceLooper
 			return false;
 		synchronized (usedKnxAddresses) {
 			if (isServerAddress && activeMgmtConnections > 0) {
-				logger.warn("active management connection, cannot assign server device address");
+				logger.log(WARNING, "active management connection, cannot assign server device address");
 				return false;
 			}
 			if (usedKnxAddresses.contains(device)) {
-				logger.debug("address {} already assigned", device);
+				logger.log(DEBUG, "address {0} already assigned", device);
 				return false;
 			}
 			usedKnxAddresses.add(device);
@@ -1215,7 +1219,7 @@ final class ControlEndpointService extends ServiceLooper
 	private int checkVersion(final KNXnetIPHeader h, final int version) {
 		final int status = h.getVersion() == version ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
 		if (status == ErrorCodes.VERSION_NOT_SUPPORTED)
-			logger.warn("KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
+			logger.log(WARNING, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
 		return status;
 	}
@@ -1247,7 +1251,7 @@ final class ControlEndpointService extends ServiceLooper
 			return true;
 		}
 		catch (final RuntimeException e) {
-			logger.warn("error setting up baos tcp endpoint for {}", hostPort(remote), e);
+			logger.log(WARNING, "error setting up baos tcp endpoint for {0}", hostPort(remote), e);
 			return false;
 		}
 	}

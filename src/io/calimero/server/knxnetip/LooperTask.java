@@ -36,16 +36,18 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.WARNING;
+
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import org.slf4j.Logger;
-
 import io.calimero.internal.Executor;
-import io.calimero.log.LogService;
-import io.calimero.log.LogService.LogLevel;
 
 // interrupt policy: cleanup and exit
 class LooperTask implements Runnable {
@@ -91,16 +93,16 @@ class LooperTask implements Runnable {
 			looper = supplier.get();
 			// reset for the next reconnection attempt
 			attempt = 0;
-			logger.info(looper.server.getName() + " " + looper + " is up and running");
+			logger.log(INFO, looper.server.getName() + " " + looper + " is up and running");
 			looper.run();
-			cleanup(LogLevel.INFO, null);
+			cleanup(INFO, null);
 		}
 		catch (final RuntimeException e) {
 			final String s = attempt > 0 ? " (attempt " + attempt + "/" + (maxRetries + 1) + ")" : "";
 			if (maxRetries == -1 || attempt <= maxRetries)
-				logger.warn("initialization of {} failed{}, retry in {} seconds", serviceName, s, retryDelay, e);
+				logger.log(WARNING, "initialization of {0} failed{1}, retry in {2} seconds", serviceName, s, retryDelay, e);
 			else {
-				logger.error("error initializing {}{}", serviceName, s, e);
+				logger.log(ERROR, "error initializing {0}{1}", serviceName, s, e);
 				quit();
 			}
 		}
@@ -117,11 +119,11 @@ class LooperTask implements Runnable {
 
 	void quit() {
 		// only call cleanup if there is no looper, otherwise cleanup is called in run()
-		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(LogLevel.INFO, null));
+		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(INFO, null));
 		scheduledFuture.cancel(true);
 	}
 
-	void cleanup(final LogLevel level, final Throwable t) {
-		LogService.log(logger, level, serviceName + " closed", t);
+	void cleanup(final Level level, final Throwable t) {
+		logger.log(level, serviceName + " closed", t);
 	}
 }

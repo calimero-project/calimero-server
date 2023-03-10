@@ -36,6 +36,9 @@
 
 package io.calimero.server;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -105,7 +108,7 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 	@Override
 	protected void onSend(final CEMILData msg, final boolean waitForCon)
 	{
-		logger.debug("send {}{}", (waitForCon ? "(wait for confirmation) " : ""), msg);
+		logger.log(DEBUG, "send {0}{1}", (waitForCon ? "(wait for confirmation) " : ""), msg);
 		for (final VirtualLink l : deviceLinks)
 			send(msg, notifier.getListeners(), l);
 	}
@@ -139,7 +142,7 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 			uplink.notifier.getListeners().fire(l -> l.indication(e));
 		}
 		catch (final KNXFormatException e) {
-			logger.error("create cEMI for KNX link {} using: {}", uplink.getName(), msg, e);
+			logger.log(ERROR, "create cEMI for KNX link {0} using: {1}", uplink.getName(), msg, e);
 		}
 	}
 

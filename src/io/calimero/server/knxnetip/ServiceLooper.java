@@ -36,13 +36,19 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.Set;
-
-import org.slf4j.Logger;
 
 import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
@@ -51,8 +57,6 @@ import io.calimero.knxnetip.KNXnetIPConnection;
 import io.calimero.knxnetip.servicetype.ErrorCodes;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.util.HPAI;
-import io.calimero.log.LogService;
-import io.calimero.log.LogService.LogLevel;
 
 abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 {
@@ -81,15 +85,15 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	{
 		try {
 			loop();
-			cleanup(LogLevel.DEBUG, null);
+			cleanup(DEBUG, null);
 		}
 		catch (IOException | UncheckedIOException e) {
-			cleanup(LogLevel.ERROR, e);
+			cleanup(ERROR, e);
 		}
 		catch (final RuntimeException e) {
 			final Object id = s != null && !s.isClosed() ? s.getLocalSocketAddress() : Thread.currentThread().getName();
-			logger.error("runtime exception in service loop of {}", id, e);
-			cleanup(LogLevel.INFO, null);
+			logger.log(ERROR, "runtime exception in service loop of {0}", id, e);
+			cleanup(INFO, null);
 		}
 	}
 
@@ -104,12 +108,12 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {
 				final int svc = h.getServiceType();
 				if (!ignoreServices.contains(svc))
-					logger.info("received packet from {} with unknown service type 0x{} - ignored", source,
+					logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", source,
 							Integer.toHexString(svc));
 			}
 		}
 		catch (final KNXFormatException e) {
-			logger.warn("received invalid frame", e);
+			logger.log(WARNING, "received invalid frame", e);
 		}
 	}
 
@@ -120,14 +124,14 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	@Override
 	protected void onTimeout()
 	{
-		logger.error("socket timeout - ignored, but should not happen");
+		logger.log(ERROR, "socket timeout - ignored, but should not happen");
 	}
 
 	boolean checkVersion(final KNXnetIPHeader h)
 	{
 		final boolean ok = h.getVersion() == KNXnetIPConnection.KNXNETIP_VERSION_10;
 		if (!ok)
-			logger.warn("KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
+			logger.log(WARNING, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
 		return ok;
 	}
@@ -135,9 +139,9 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, InetSocketAddress src)
 		throws KNXFormatException, IOException;
 
-	void cleanup(final LogLevel level, final Throwable t)
+	void cleanup(final Level level, final Throwable t)
 	{
-		LogService.log(logger, level, "cleanup {}", Thread.currentThread().getName(), t);
+		logger.log(level, "cleanup {0}", Thread.currentThread().getName(), t);
 	}
 
 	DatagramSocket getSocket()
@@ -154,7 +158,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		// regardless whether subsequent HPAIs contain useful information
 		if (useNat) {
 			if (logEndpointType != 0)
-				logger.debug("responses use route back {} endpoint {}", type, sender);
+				logger.log(DEBUG, "responses use route back {0} endpoint {1}", type, sender);
 			return sender;
 		}
 
@@ -163,12 +167,12 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		if (endpoint.getAddress().isAnyLocalAddress() || endpoint.getPort() == 0) {
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.debug("responses to client use route back {} endpoint {}", type, sender);
+				logger.log(DEBUG, "responses to client use route back {0} endpoint {1}", type, sender);
 			return sender;
 		}
 
 		if (logEndpointType == 2)
-			logger.trace("using client-assigned {} endpoint {} for responses", type, endpoint.endpoint());
+			logger.log(TRACE, "using client-assigned {0} endpoint {1} for responses", type, endpoint.endpoint());
 		return endpoint.endpoint();
 	}
 
@@ -194,11 +198,11 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	private boolean sanitize(final KNXnetIPHeader h, final int length)
 	{
 		if (h.getTotalLength() > length)
-			logger.warn("received frame with expected length {} does not match actual length {} - ignored",
+			logger.log(WARNING, "received frame with expected length {0} does not match actual length {1} - ignored",
 					h.getTotalLength(), length);
 		else if (h.getServiceType() == 0)
 			// check service type for 0 (invalid type), so unused service types of us can stay 0 by default
-			logger.warn("received frame with service type 0 - ignored");
+			logger.log(WARNING, "received frame with service type 0 - ignored");
 		else
 			return true;
 		return false;

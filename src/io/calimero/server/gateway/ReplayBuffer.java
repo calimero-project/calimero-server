@@ -36,6 +36,13 @@
 
 package io.calimero.server.gateway;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
+
+import java.lang.System.Logger;
+import java.lang.invoke.MethodHandles;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -46,15 +53,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.calimero.FrameEvent;
 import io.calimero.knxnetip.KNXnetIPConnection;
+import io.calimero.log.LogService;
 
-class ReplayBuffer<T extends FrameEvent>
+final class ReplayBuffer<T extends FrameEvent>
 {
-	private static final Logger logger = LoggerFactory.getLogger("io.calimero.server.gateway.ReplayBuffer");
+	private static final Logger logger = LogService.getLogger(MethodHandles.lookup().lookupClass());
 
 	private final Map<KNXnetIPConnection, Object[]> connectionToKey = Collections.synchronizedMap(new HashMap<>());
 	private final Map<KNXnetIPConnection, Long> completedEvent = Collections.synchronizedMap(new HashMap<>());
@@ -80,7 +85,7 @@ class ReplayBuffer<T extends FrameEvent>
 		synchronized (connectionToKey) {
 			final List<KNXnetIPConnection> exactMatch = find(c, key, 2);
 			if (!exactMatch.isEmpty()) {
-				logger.info("found exact match for {} in disrupted connections: {}", key, exactMatch);
+				logger.log(INFO, "found exact match for {0} in disrupted connections: {1}", key, exactMatch);
 				return exactMatch;
 			}
 			final List<KNXnetIPConnection> matchedHosts = find(c, key, 1);
@@ -88,7 +93,7 @@ class ReplayBuffer<T extends FrameEvent>
 			final List<KNXnetIPConnection> closedOnly = new ArrayList<>(matchedHosts);
 			closedOnly.removeIf(e -> e.getState() != KNXnetIPConnection.CLOSED);
 			if (!closedOnly.isEmpty()) {
-				logger.info("found match for {} in closed disrupted connections: {}", key, closedOnly);
+				logger.log(INFO, "found match for {0} in closed disrupted connections: {1}", key, closedOnly);
 				return closedOnly;
 			}
 
@@ -100,7 +105,7 @@ class ReplayBuffer<T extends FrameEvent>
 
 			// we matched open connections by host, check if any connection is missing events
 			matchedHosts.removeIf(e -> !isMissingEvents(e));
-			logger.info("match for {} in open connections with missing events: {}", key, matchedHosts);
+			logger.log(INFO, "match for {0} in open connections with missing events: {1}", key, matchedHosts);
 			return matchedHosts;
 		}
 	}
@@ -122,7 +127,7 @@ class ReplayBuffer<T extends FrameEvent>
 			final long timestamp = (Long) e.getValue()[2];
 			final KNXnetIPConnection conn = e.getKey();
 			if ((timestamp + keepDisruptedConnection) < System.currentTimeMillis()) {
-				logger.info("remove expired disrupted connection {}", conn);
+				logger.log(INFO, "remove expired disrupted connection {0}", conn);
 				remove.add(conn);
 			}
 			else if (conn != c) { // we ignore c itself in the entry set, otherwise it would always show up in found
@@ -136,7 +141,7 @@ class ReplayBuffer<T extends FrameEvent>
 
 	public void add(final KNXnetIPConnection c)
 	{
-		logger.debug("activate replay buffer for {}", c);
+		logger.log(DEBUG, "activate replay buffer for {0}", c);
 		connectionToKey.put(c, keyFor(c));
 	}
 
@@ -147,7 +152,7 @@ class ReplayBuffer<T extends FrameEvent>
 				buffer.remove(0);
 			buffer.add(e);
 		}
-		logger.trace("record {} as event '{}'", e, e.id());
+		logger.log(TRACE, "record {0} as event ''{1}''", e, e.id());
 	}
 
 	// returns list of pending events for connection
@@ -174,11 +179,11 @@ class ReplayBuffer<T extends FrameEvent>
 			final int fromIndex = findEvent(last) + 1;
 			final int events = buffer.size() - fromIndex;
 			if (fromIndex == 0) {
-				logger.warn("{} has ≥ {} events pending with a buffer size of {}, up to {} events "
+				logger.log(WARNING, "{0} has ≥ {1} events pending with a buffer size of {2}, up to {3} events "
 						+ "will be missing", conn, events, buffer.size(), buffer.get(0).id() - last);
 			}
 
-			logger.info("{} has {} pending events for replay: ({}..{}]", conn, events, last, latestEventCount());
+			logger.log(INFO, "{0} has {1} pending events for replay: ({2}..{3}]", conn, events, last, latestEventCount());
 			return new ArrayList<>(buffer.subList(fromIndex, buffer.size()));
 		}
 	}
@@ -201,7 +206,7 @@ class ReplayBuffer<T extends FrameEvent>
 			key[2] = System.currentTimeMillis();
 		}
 		completedEvent.put(c, e.id());
-		logger.debug("{} successfully completed event '{}/{}'", c, e.id(), latestEventCount());
+		logger.log(DEBUG, "{0} successfully completed event ''{1}/{2}''", c, e.id(), latestEventCount());
 	}
 
 	private long latestEventCount()
@@ -215,7 +220,7 @@ class ReplayBuffer<T extends FrameEvent>
 	{
 		completedEvent.remove(c);
 		final Object[] key = connectionToKey.remove(c);
-		logger.trace("remove {} (ID {})", c, key);
+		logger.log(TRACE, "remove {0} (ID {1})", c, key);
 	}
 
 	private static Object[] keyFor(final KNXnetIPConnection c)

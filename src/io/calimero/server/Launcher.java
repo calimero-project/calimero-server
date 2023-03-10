@@ -39,11 +39,16 @@ package io.calimero.server;
 import static io.calimero.device.ios.InterfaceObject.ADDRESSTABLE_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static io.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.WARNING;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.System.Logger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -71,9 +76,6 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.calimero.DataUnitBuilder;
 import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
@@ -100,6 +102,7 @@ import io.calimero.link.KNXNetworkLinkIP;
 import io.calimero.link.medium.KNXMediumSettings;
 import io.calimero.link.medium.PLSettings;
 import io.calimero.link.medium.RFSettings;
+import io.calimero.log.LogService;
 import io.calimero.mgmt.Description;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.Keyring;
@@ -572,12 +575,13 @@ public class Launcher implements Runnable, AutoCloseable
 			return;
 		}
 
-		// we have to set the command-line option for log level before first logger lookup
+		// we have to set the command-line option for log format and level before first logger lookup
+		System.setProperty("jdk.system.logger.format", "%1$tT.%1$tL [%4$-7s] %3$s: %5$s%6$s%n");
 		int optIdx = 0;
 		if (args[0].startsWith("-v")) {
 			final String vs = args[0];
-			final String level = vs.startsWith("-vvv") ? "trace" : vs.startsWith("-vv") ? "debug" : "info";
-			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", level);
+			final String level = vs.startsWith("-vvv") ? "TRACE" : vs.startsWith("-vv") ? "DEBUG" : "INFO";
+			System.setProperty("jdk.system.logger.level", level);
 			optIdx++;
 		}
 
@@ -598,13 +602,13 @@ public class Launcher implements Runnable, AutoCloseable
 	public Launcher(final String configUri)
 	{
 		config = XmlConfiguration.from(URI.create(configUri));
-		logger = LoggerFactory.getLogger("io.calimero.server." + config.name());
+		logger = LogService.getLogger("io.calimero.server." + config.name());
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
-		logger.info("{}", config);
+		logger.log(INFO, "{0}", config);
 		for (final var contConfig : config.containers()) {
-			logger.info("{}", contConfig);
+			logger.log(INFO, "{0}", contConfig);
 		}
 	}
 
@@ -627,7 +631,7 @@ public class Launcher implements Runnable, AutoCloseable
 			}
 		}
 		catch (final RuntimeException e) {
-			logger.error("initialization of KNX server failed", e);
+			logger.log(ERROR, "initialization of KNX server failed", e);
 		}
 	}
 
@@ -688,7 +692,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final String subnetName = subnetArgs.isEmpty()
 					? subnetType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
-			logger.debug("setup {} subnet '{}'{}", subnetType, subnetName, activated);
+			logger.log(DEBUG, "setup {0} subnet ''{1}''{2}", subnetType, subnetName, activated);
 
 			if ("tpuart".equals(subnetType)) {
 				final int oi = objectInstance;
@@ -733,11 +737,11 @@ public class Launcher implements Runnable, AutoCloseable
 				pwd = console.readPassword("Keyring password: ");
 		}
 		if (pwd == null || pwd.length == 0) {
-			logger.error("no keyring password (not in keyfile nor via console) -- exit");
+			logger.log(ERROR, "no keyring password (not in keyfile nor via console) -- exit");
 			System.exit(-1);
 		}
 
-		logger.debug("decrypt knx secure keys...");
+		logger.log(DEBUG, "decrypt knx secure keys...");
 
 		final var decrypted = new HashMap<String, byte[]>();
 
@@ -760,7 +764,7 @@ public class Launcher implements Runnable, AutoCloseable
 				decrypted.put("group.key", groupKey);
 			}
 			else
-				logger.warn("KNX IP routing is not secured");
+				logger.log(WARNING, "KNX IP routing is not secured");
 		}
 
 		final var interfaces = keyring.interfaces().getOrDefault(host, List.of());
@@ -924,7 +928,7 @@ public class Launcher implements Runnable, AutoCloseable
 				ack.add(new GroupAddress(buf.getShort() & 0xffff));
 		}
 		catch (final KnxPropertyException e) {
-			logger.warn("querying default acknowledge addresses for TP-UART ({})", e.getMessage());
+			logger.log(WARNING, "querying default acknowledge addresses for TP-UART ({0})", e.getMessage());
 		}
 
 		return ack;

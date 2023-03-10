@@ -36,7 +36,14 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.TRACE;
+import static java.lang.System.Logger.Level.WARNING;
+
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -83,7 +90,6 @@ import io.calimero.knxnetip.servicetype.TunnelingFeature;
 import io.calimero.knxnetip.servicetype.TunnelingFeature.InterfaceFeature;
 import io.calimero.knxnetip.util.HPAI;
 import io.calimero.log.LogService;
-import io.calimero.log.LogService.LogLevel;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.SecurityControl;
 import io.calimero.secure.SecurityControl.DataSecurity;
@@ -200,13 +206,13 @@ public final class DataEndpoint extends ConnectionBase
 		if (sessionId > 0) {
 			final Session session = sessions.sessions.get(sessionId);
 			if (session == null) {
-				close(CloseEvent.INTERNAL, "session " + sessionId + " got deallocated", LogLevel.INFO, null);
+				close(CloseEvent.INTERNAL, "session " + sessionId + " got deallocated", INFO, null);
 				return;
 			}
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			logger.trace("send session {} seq {} tag {} to {} {}", sessionId, seq, msgTag, ServiceLooper.hostPort(dst),
+			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, ServiceLooper.hostPort(dst),
 					DataUnitBuilder.toHex(buf, " "));
 		}
 
@@ -229,7 +235,7 @@ public final class DataEndpoint extends ConnectionBase
 			send(buf, dataEndpt);
 		}
 		catch (final IOException e) {
-			close(CloseEvent.INTERNAL, "communication failure", LogLevel.ERROR, e);
+			close(CloseEvent.INTERNAL, "communication failure", ERROR, e);
 			throw new KNXConnectionClosedException("connection closed", e);
 		}
 	}
@@ -254,13 +260,13 @@ public final class DataEndpoint extends ConnectionBase
 	public Instant connectedSince() { return connectedSince; }
 
 	@Override
-	protected void close(final int initiator, final String reason, final LogLevel level, final Throwable t)
+	protected void close(final int initiator, final String reason, final Level level, final Throwable t)
 	{
 		super.close(initiator, reason, level, t);
 	}
 
 	@Override
-	protected void cleanup(final int initiator, final String reason, final LogLevel level, final Throwable t) {
+	protected void cleanup(final int initiator, final String reason, final Level level, final Throwable t) {
 		// we want close/shutdown be called only once
 		synchronized (this) {
 			if (shutdown)
@@ -268,7 +274,7 @@ public final class DataEndpoint extends ConnectionBase
 			shutdown = true;
 		}
 
-		LogService.log(logger, level, "close connection for channel " + channelId + " - " + reason, t);
+		logger.log(level, "close connection for channel " + channelId + " - " + reason, t);
 		connectionClosed.accept(this, device);
 		super.cleanup(initiator, reason, level, t);
 
@@ -289,7 +295,7 @@ public final class DataEndpoint extends ConnectionBase
 			return acceptDataService(h, data, offset);
 
 		if (!h.isSecure()) {
-			logger.warn("received non-secure packet {} - discard {}", h, DataUnitBuilder.toHex(data, " "));
+			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, DataUnitBuilder.toHex(data, " "));
 			return true;
 		}
 		return sessions.acceptService(h, data, offset, dataEndpt, this);
@@ -317,7 +323,7 @@ public final class DataEndpoint extends ConnectionBase
 			if (recvChannelId == channelId)
 				return false;
 			final int localPort = socket.getLocalPort();
-			logger.error("ETS 5 sends configuration requests for channel {} to wrong UDP port {} (channel {}), "
+			logger.log(ERROR, "ETS 5 sends configuration requests for channel {0} to wrong UDP port {1} (channel {2}), "
 					+ "try to find correct connection", recvChannelId, localPort, channelId);
 			final Optional<DataEndpointService> dataEndpointService = ControlEndpointService.findDataEndpoint(recvChannelId);
 			if (dataEndpointService.isPresent()) {
@@ -346,12 +352,12 @@ public final class DataEndpoint extends ConnectionBase
 				send(buf, dataEndpt);
 			}
 			else {
-				logger.warn(type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
+				logger.log(WARNING, type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
 				return true;
 			}
 
 			if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
-				close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
+				close(CloseEvent.INTERNAL, "protocol version changed", ERROR, null);
 				return true;
 			}
 
@@ -386,11 +392,11 @@ public final class DataEndpoint extends ConnectionBase
 				return true;
 
 			if (res.getSequenceNumber() != getSeqSend())
-				logger.warn("received " + type + " acknowledgment with wrong send-sequence " + res.getSequenceNumber() + ", expected "
+				logger.log(WARNING, "received " + type + " acknowledgment with wrong send-sequence " + res.getSequenceNumber() + ", expected "
 						+ getSeqSend() + " - ignored");
 			else {
 				if (!checkVersion(h)) {
-					close(CloseEvent.INTERNAL, "protocol version changed", LogLevel.ERROR, null);
+					close(CloseEvent.INTERNAL, "protocol version changed", ERROR, null);
 					return true;
 				}
 				incSeqSend();
@@ -398,11 +404,10 @@ public final class DataEndpoint extends ConnectionBase
 
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
-				if (logger.isTraceEnabled())
-					logger.trace("received service ack {} from " + ServiceLooper.hostPort(ctrlEndpt) + " (channel "
-							+ channelId + ")", res.getSequenceNumber());
+				logger.log(TRACE, "received service ack {0} from {1} (channel {2})", res.getSequenceNumber(),
+						ServiceLooper.hostPort(ctrlEndpt), channelId);
 				if (internalState == ACK_ERROR)
-					logger.warn("received service acknowledgment status " + res.getStatusString());
+					logger.log(WARNING, "received service acknowledgment status " + res.getStatusString());
 			}
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
@@ -418,12 +423,12 @@ public final class DataEndpoint extends ConnectionBase
 				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				logger.trace("data endpoint received connection state request from " + dataEndpt + " for channel " + csr.getChannelID());
+				logger.log(TRACE, "data endpoint received connection state request from " + dataEndpt + " for channel " + csr.getChannelID());
 				updateLastMsgTimestamp();
 				status = subnetStatus();
 			}
 			else
-				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
+				logger.log(WARNING, "received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
 			send(buf, ctrlEndpt);
@@ -437,7 +442,7 @@ public final class DataEndpoint extends ConnectionBase
 			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
-		logger.debug("respond with {}", res);
+		logger.log(DEBUG, "respond with {0}", res);
 		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dataEndpt);
 	}
 
@@ -446,7 +451,7 @@ public final class DataEndpoint extends ConnectionBase
 		// NYI detect data type conflict (wrong sized value) and respond with ReturnCode.DataTypeConflict
 		final var req = ServiceRequest.from(h, buffer.array(), buffer.position());
 		final TunnelingFeature feat = req.service();
-		logger.debug("received {}", feat);
+		logger.log(DEBUG, "received {0}", feat);
 
 		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
 			return switch (feat.featureId()) {
@@ -477,7 +482,7 @@ public final class DataEndpoint extends ConnectionBase
 			return responseForFeature(feat, ReturnCode.AccessReadOnly, value);
 		}
 
-		logger.warn("unknown or unsupported: {} {}", Integer.toHexString(svc), feat);
+		logger.log(WARNING, "unknown or unsupported: {0} {1}", Integer.toHexString(svc), feat);
 		return responseForFeature(feat, ReturnCode.AddressVoid);
 	}
 
@@ -553,12 +558,12 @@ public final class DataEndpoint extends ConnectionBase
 	private void sendFeatureInfo(final InterfaceFeature id, final byte... value) {
 		if (featureInfoServiceEnabled) {
 			final TunnelingFeature info = TunnelingFeature.newInfo(id, value);
-			logger.debug("send {}", info);
+			logger.log(DEBUG, "send {0}", info);
 			try {
 				send(PacketHelper.toPacket(new ServiceRequest<>(info.type(), channelId, getSeqSend(), info)), dataEndpt);
 			}
 			catch (final IOException e) {
-				logger.error("sending {}", info, e);
+				logger.log(ERROR, "sending {0}", info, e);
 			}
 		}
 	}
@@ -588,7 +593,7 @@ public final class DataEndpoint extends ConnectionBase
 	private boolean checkVersion(final KNXnetIPHeader h)
 	{
 		if (h.getVersion() != protocolVersion())
-			logger.warn("KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
+			logger.log(WARNING, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
 		return h.getVersion() == protocolVersion();
 	}
@@ -601,7 +606,7 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		final int mc = cemi.getMessageCode();
 		if (ctype == ConnectionType.Monitor)
-			logger.warn("client is not allowed to send cEMI messages in busmonitor mode - ignored");
+			logger.log(WARNING, "client is not allowed to send cEMI messages in busmonitor mode - ignored");
 		else if (mc == CEMILData.MC_LDATA_REQ) {
 			CEMILData ldata = (CEMILData) cemi;
 			if (ldata.getSource().equals(new IndividualAddress(0)))
@@ -614,10 +619,10 @@ public final class DataEndpoint extends ConnectionBase
 		}
 		else {
 			switch (mc) {
-				case CEMILData.MC_LDATA_CON -> logger.warn("received L-Data confirmation - ignored");
-				case CEMILData.MC_LDATA_IND -> logger.warn("received L-Data indication - ignored");
-				case CEMIBusMon.MC_BUSMON_IND -> logger.warn("received L-Busmon indication - ignored");
-				default -> logger.warn("unsupported cEMI message code " + mc + " - ignored");
+				case CEMILData.MC_LDATA_CON -> logger.log(WARNING, "received L-Data confirmation - ignored");
+				case CEMILData.MC_LDATA_IND -> logger.log(WARNING, "received L-Data indication - ignored");
+				case CEMIBusMon.MC_BUSMON_IND -> logger.log(WARNING, "received L-Busmon indication - ignored");
+				default -> logger.log(WARNING, "unsupported cEMI message code " + mc + " - ignored");
 			}
 		}
 	}
@@ -634,13 +639,14 @@ public final class DataEndpoint extends ConnectionBase
 				resetRequest.accept(this);
 		}
 		else {
-			switch (cemi.getMessageCode()) {
-				case CEMIDevMgmt.MC_PROPREAD_CON -> logger.warn("received property read confirmation - ignored");
-				case CEMIDevMgmt.MC_PROPWRITE_CON -> logger.warn("received property write confirmation - ignored");
-				case CEMIDevMgmt.MC_PROPINFO_IND -> logger.warn("received property info indication - ignored");
-				case CEMIDevMgmt.MC_RESET_IND -> logger.warn("received reset indication - ignored");
-				default -> logger.warn("unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode()) + " - ignored");
-			}
+			final String msgCode = switch (cemi.getMessageCode()) {
+				case CEMIDevMgmt.MC_PROPREAD_CON -> "property read confirmation";
+				case CEMIDevMgmt.MC_PROPWRITE_CON -> "property write confirmation";
+				case CEMIDevMgmt.MC_PROPINFO_IND -> "property info indication";
+				case CEMIDevMgmt.MC_RESET_IND -> "reset indication";
+				default -> "unsupported cEMI message code 0x" + Integer.toHexString(cemi.getMessageCode());
+			};
+			logger.log(WARNING, "received {0} - ignored", msgCode);
 		}
 	}
 
@@ -655,7 +661,7 @@ public final class DataEndpoint extends ConnectionBase
 	private void checkNotifyBaosService(final BaosService svc) {
 		if (svc.subService() == BaosService.DatapointValueIndication
 				|| svc.subService() == BaosService.ServerItemIndication || svc.isResponse()) {
-			logger.warn("unsupported baos service {}", svc);
+			logger.log(WARNING, "unsupported baos service {0}", svc);
 			return;
 		}
 		final FrameEvent fe = new FrameEvent(this, svc.toByteArray());
