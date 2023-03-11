@@ -89,12 +89,6 @@ tasks.withType(Javadoc).configureEach {
     options.addStringOption("Xdoclint:-missing", '-quiet')
 }
 
-jar {
-	manifest {
-		attributes 'Main-Class': application.mainClass
-	}
-}
-
 test {
 	useJUnitPlatform()
 }
@@ -117,6 +111,15 @@ dependencies {
 	usbRuntimeOnly "io.calimero:calimero-usb:${version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
+}
+
+jar {
+	manifest {
+		attributes(
+			'Main-Class': application.mainClass,
+			'Class-Path': configurations.runtimeClasspath.collect { it.getName() }.join(' ')
+		)
+	}
 }
 
 publishing {
