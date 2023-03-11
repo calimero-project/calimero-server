@@ -80,12 +80,6 @@ tasks.withType(Javadoc).configureEach {
     options.addStringOption("Xdoclint:-missing", '-quiet')
 }
 
-jar {
-	manifest {
-		attributes 'Main-Class': mainClassName
-	}
-}
-
 test {
 	useJUnitPlatform()
 }
@@ -110,6 +104,15 @@ distTar {
 
 distZip {
     duplicatesStrategy = 'EXCLUDE'
+}
+
+jar {
+	manifest {
+		attributes(
+			'Main-Class': application.mainClass,
+			'Class-Path': configurations.runtimeClasspath.collect { it.getName() }.join(' ')
+		)
+	}
 }
 
 publishing {
