@@ -62,6 +62,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -322,14 +323,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void onPropertyValueChanged(final PropertyEvent pe)
-		{
-			//logger.log(TRACE, "property id " + pe.getPropertyId() + " changed to ["
-			//		+ DataUnitBuilder.toHex(pe.getNewData(), " ") + "]");
-
-			if (pe.getNewData().length == 0)
-				return;
-		}
+		public void onPropertyValueChanged(final PropertyEvent pe) {}
 
 		@Override
 		public void onServiceContainerChange(final ServiceContainerEvent sce)
@@ -2071,7 +2065,7 @@ public class KnxServerGateway implements Runnable
 							response = new byte[] { (byte) objIndex, (byte) pid, (byte) propIndex, (byte) 0, 0, 0, 0 };
 						}
 						logger.log(DEBUG, "Local-DM {0} read property description {1}|{2} (idx {3}): {4}", localInterface,
-								objIndex, pid, propIndex, DataUnitBuilder.toHex(response, " "));
+								objIndex, pid, propIndex, HexFormat.ofDelimiter(" ").formatHex(response));
 					}
 					else {
 						try {
@@ -2085,7 +2079,7 @@ public class KnxServerGateway implements Runnable
 							for (final byte b : propData)
 								response[i++] = b;
 							logger.log(DEBUG, "Local-DM {0} read property values {1}|{2} (start {3}, {4} elements): {5}",
-									localInterface, objIndex, pid, start, elements, DataUnitBuilder.toHex(propData, " "));
+									localInterface, objIndex, pid, start, elements, HexFormat.ofDelimiter(" ").formatHex(propData));
 						}
 						catch (final KNXRemoteException e) {
 							response = new byte[] { (byte) objIndex, (byte) pid, (byte) (start >> 8), (byte) start };

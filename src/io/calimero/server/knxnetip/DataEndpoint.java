@@ -50,6 +50,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -57,7 +58,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.calimero.CloseEvent;
-import io.calimero.DataUnitBuilder;
 import io.calimero.DeviceDescriptor.DD0;
 import io.calimero.FrameEvent;
 import io.calimero.IndividualAddress;
@@ -213,7 +213,7 @@ public final class DataEndpoint extends ConnectionBase
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
 			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, ServiceLooper.hostPort(dst),
-					DataUnitBuilder.toHex(buf, " "));
+					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
 		if (TcpLooper.send(buf, dst))
@@ -295,7 +295,7 @@ public final class DataEndpoint extends ConnectionBase
 			return acceptDataService(h, data, offset);
 
 		if (!h.isSecure()) {
-			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, DataUnitBuilder.toHex(data, " "));
+			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, HexFormat.ofDelimiter(" ").formatHex(data));
 			return true;
 		}
 		return sessions.acceptService(h, data, offset, dataEndpt, this);

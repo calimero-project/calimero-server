@@ -66,6 +66,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -485,7 +486,7 @@ public class Launcher implements Runnable, AutoCloseable
 				return Map.entry("device.key", SecureConnection.hashDeviceAuthenticationPassword(chars));
 			if (key.endsWith("pwd"))
 				return Map.entry(key.replace(".pwd", ".key"), SecureConnection.hashUserPassword(chars));
-			return Map.entry(key, DataUnitBuilder.fromHex(value));
+			return Map.entry(key, HexFormat.of().parseHex(value));
 		}
 
 		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r) throws KNXMLException

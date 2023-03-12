@@ -36,7 +36,6 @@
 
 package io.calimero.server.knxnetip;
 
-import static io.calimero.DataUnitBuilder.toHex;
 import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
@@ -70,6 +69,7 @@ import java.security.spec.NamedParameterSpec;
 import java.security.spec.XECPublicKeySpec;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -180,7 +180,7 @@ final class SecureSessions {
 
 				final KNXnetIPHeader svcHeader = new KNXnetIPHeader(knxipPacket, 0);
 				logger.log(DEBUG, "received session {0} seq {1} (S/N {2} tag {3}) {4}: {5}", sid, seq, sno, tag, svcHeader,
-						toHex(knxipPacket, " "));
+						HexFormat.ofDelimiter(" ").formatHex(knxipPacket));
 				session.lastUpdate = System.nanoTime() / 1_000_000L;
 
 				if (svcHeader.getServiceType() == SessionAuth) {
@@ -369,7 +369,7 @@ final class SecureSessions {
 
 		final boolean authenticated = Arrays.equals(mac, verifyAgainst);
 		if (!authenticated) {
-			final String packet = toHex(Arrays.copyOfRange(data, offset - 6, offset - 6 + 0x18), " ");
+			final String packet = HexFormat.ofDelimiter(" ").formatHex(data, offset - 6, offset - 6 + 0x18);
 			throw new KnxSecureException("authentication failed for user " + userId + ", auth " + packet);
 		}
 
@@ -485,7 +485,7 @@ final class SecureSessions {
 
 	private byte[] cbcMacSimple(final Key secretKey, final byte[] data, final int offset, final int length) {
 		final byte[] log = Arrays.copyOfRange(data, offset, offset + length);
-		logger.log(TRACE, "authenticating (length {0}): {1}", length, toHex(log, " "));
+		logger.log(TRACE, "authenticating (length {0}): {1}", length, HexFormat.ofDelimiter(" ").formatHex(log));
 
 		try {
 			final Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
@@ -498,7 +498,7 @@ final class SecureSessions {
 			return mac;
 		}
 		catch (final GeneralSecurityException e) {
-			throw new KnxSecureException("calculating CBC-MAC of " + toHex(log, " "), e);
+			throw new KnxSecureException("calculating CBC-MAC of " + HexFormat.ofDelimiter(" ").formatHex(log), e);
 		}
 	}
 
