@@ -1,7 +1,7 @@
 Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml/badge.svg)](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml)
 =========================
 
-A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://www.oracle.com/technetwork/java/javase/downloads/index.html) (_java.base_).
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [JDK 17](https://www.oracle.com/java/technologies/downloads/) (_java.base_).
 
 * No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
@@ -14,10 +14,10 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 ### Dependencies
 
 The Calimero KNXnet/IP server requires `calimero-core` and `calimero-device`.
-_Optional_ dependencies, required for communication over serial ports:
+_Optional_ dependencies, required for serial communication:
 
-* Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
-* For KNX USB or KNX RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
+* TP-UART / FT1.2: `serial-native` (with its JNI libraries), or `calimero-rxtx` for using any RXTX descendant/compatible library on your platform. 
+* KNX USB or KNX RF USB: `calimero-usb` (and its transitive closure).
 
 ### Docker image
 
