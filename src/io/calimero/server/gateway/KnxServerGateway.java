@@ -1319,10 +1319,10 @@ public class KnxServerGateway implements Runnable
 	// see listener indication for the reason of using the container name
 	private SubnetConnector getSubnetConnector(final String containerName)
 	{
-        for (final SubnetConnector b : connectors) {
-            if (b.getServiceContainer().getName().equals(containerName))
-                return b;
-        }
+		for (final SubnetConnector b : connectors) {
+			if (b.getServiceContainer().getName().equals(containerName))
+				return b;
+		}
 		logger.log(ERROR, "dispatch to server: no subnet connector found!");
 		return null;
 	}
@@ -1431,23 +1431,23 @@ public class KnxServerGateway implements Runnable
 
 	private KNXNetworkLink findSubnetLink(final IndividualAddress dst)
 	{
-        for (final SubnetConnector b : connectors) {
-            final ServiceContainer c = b.getServiceContainer();
-            if (c.isActivated()) {
-                final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
-                if (matchesSubnet(dst, subnet)) {
-                    if (!isNetworkLink(b))
-                        break;
-                    final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
+		for (final SubnetConnector b : connectors) {
+			final ServiceContainer c = b.getServiceContainer();
+			if (c.isActivated()) {
+				final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
+				if (matchesSubnet(dst, subnet)) {
+					if (!isNetworkLink(b))
+						break;
+					final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
 					logger.log(TRACE, "dispatch to KNX subnet {0} ({1} in service container ''{2}'')",
-                            subnet, link.getName(), b.getName());
-                    // assuming a proper address assignment of area/line coupler
-                    // addresses, this has to be the correct knx subnet link
-                    return link;
-                }
+							subnet, link.getName(), b.getName());
+					// assuming a proper address assignment of area/line coupler
+					// addresses, this has to be the correct knx subnet link
+					return link;
+				}
 				logger.log(TRACE, "subnet=" + subnet + " dst=" + dst);
-            }
-        }
+			}
+		}
 		return null;
 	}
 
