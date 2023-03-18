@@ -93,11 +93,16 @@ test {
 	useJUnitPlatform()
 }
 
+def addReads = [ "--add-reads", "io.calimero.core=io.calimero.server", // @LinkEvent
+                 "--add-reads", "io.calimero.serial.provider.rxtx=ALL-UNNAMED",
+                 "--add-reads", "io.calimero.usb.provider.javax=ALL-UNNAMED" ]
+
 tasks.withType(JavaExec).configureEach {
-    jvmArgs += [
-            "--add-reads", "io.calimero.core=io.calimero.server", // @LinkEvent
-            "--add-reads", "io.calimero.serial.provider.rxtx=ALL-UNNAMED",
-            "--add-reads", "io.calimero.usb.provider.javax=ALL-UNNAMED"]
+    jvmArgs += addReads
+}
+
+startScripts {
+    defaultJvmOpts = addReads
 }
 
 dependencies {
