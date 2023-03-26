@@ -107,6 +107,7 @@ import io.calimero.log.LogService;
 import io.calimero.mgmt.Description;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.Keyring;
+import io.calimero.secure.KnxSecureException;
 import io.calimero.secure.Security;
 import io.calimero.server.ServerConfiguration.Container;
 import io.calimero.server.gateway.KnxServerGateway;
@@ -201,6 +202,10 @@ public class Launcher implements Runnable, AutoCloseable
 			return Optional.ofNullable(r.getAttributeValue(null, name));
 		}
 
+		private static int attr(final XmlReader r, final String name, final int def) {
+			return Optional.ofNullable(r.getAttributeValue(null, name)).map(Integer::parseInt).orElse(def);
+		}
+
 		private void readServiceContainer(final XmlReader r) throws KNXMLException
 		{
 			if (r.getEventType() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.svcCont))
@@ -230,6 +235,10 @@ public class Launcher implements Runnable, AutoCloseable
 			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
 			byte[] subnetDoA = null;
 			IndividualAddress overrideSrcAddress = null;
+			IndividualAddress tunnelingAddress = null;
+			IndividualAddress host = null;
+			int user = 0;
+			Duration subnetLatencyTolerance = Duration.ofMillis(0);
 
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
@@ -283,7 +292,18 @@ public class Launcher implements Runnable, AutoCloseable
 									subnetKnxipNetif = getNetIf(r);
 									useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
 								}
-								case "knxip" -> subnetKnxipNetif = getNetIf(r);
+								case "tcp" -> {
+									tunnelingAddress = indAddress(r, "tunnelingAddress");
+									host = indAddress(r, "host");
+									user = attr(r, "user", 0);
+									if (user < 0 || user > 127)
+										throw new KNXIllegalArgumentException(
+												"KNX IP Secure user ID " + user + " out of range [1..127]");
+								}
+								case "knxip" -> {
+									subnetKnxipNetif = getNetIf(r);
+									subnetLatencyTolerance = latencyTolerance(r);
+								}
 								case "user-supplied" ->
 										subnetLinkClass = r.getAttributeValue(null, "class");
 							}
@@ -359,8 +379,20 @@ public class Launcher implements Runnable, AutoCloseable
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
-						final var connector = subnetConnector(sc, interfaceType, subnetArgs, msgFormat,
-								overrideSrcAddress, subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
+						final var connector = switch (interfaceType) {
+							case "knxip"   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
+									subnetLatencyTolerance);
+							case "ip"      -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
+									msgFormat, overrideSrcAddress, subnetArgs);
+							case "tcp"     -> SubnetConnector.withTcp(sc, subnetArgs, tunnelingAddress, user, host);
+							case "tpuart"  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
+							case "emulate" -> datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
+									: SubnetConnector.newCustom(sc, "emulate");
+							case "user-supplied" ->
+									SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
+							default        -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat,
+									overrideSrcAddress, subnetArgs);
+						};
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
@@ -395,7 +427,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		private static Duration latencyTolerance(final XmlReader r) {
-			final int tolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(1000);
+			final int tolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(0);
 			return Duration.ofMillis(tolerance);
 		}
 
@@ -429,22 +461,6 @@ public class Launcher implements Runnable, AutoCloseable
 			return set;
 		}
 
-		private static SubnetConnector subnetConnector(final ServiceContainer sc, final String interfaceType,
-				final String subnetArgs, final String msgFormat, final IndividualAddress overrideSrcAddress,
-				final NetworkInterface netif, final boolean useNat, final String subnetLinkClass,
-				final DatapointModel<Datapoint> datapoints) {
-
-			return switch (interfaceType) {
-				case "knxip" -> SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
-				case "ip" -> SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, overrideSrcAddress, subnetArgs);
-				case "tpuart" -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
-				case "user-supplied" -> SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
-				case "emulate" -> datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
-						: SubnetConnector.newCustom(sc, "emulate");
-				default -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, overrideSrcAddress, subnetArgs);
-			};
-		}
-
 		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
 			try (var lines = Files.lines(keyfile)) {
 				// ignore comments, limit keys to words with dot separator, require '='
@@ -466,8 +482,8 @@ public class Launcher implements Runnable, AutoCloseable
 			final var chars = value.toCharArray();
 			if ("keyring.pwd".equals(key))
 				return Map.entry(key, value.getBytes(StandardCharsets.US_ASCII));
-			if ("device.pwd".equals(key))
-				return Map.entry("device.key", SecureConnection.hashDeviceAuthenticationPassword(chars));
+			if (key.endsWith("device.pwd"))
+				return Map.entry(key.replace(".pwd", ".key"), SecureConnection.hashDeviceAuthenticationPassword(chars));
 			if (key.endsWith("pwd"))
 				return Map.entry(key.replace(".pwd", ".key"), SecureConnection.hashUserPassword(chars));
 			return Map.entry(key, HexFormat.of().parseHex(value));
@@ -663,6 +679,26 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final var keyfile = container.keyring().map(keyring -> decodeKeyring(sc, container)).orElse(container.keyfile());
 			server.configureSecurity(sc, keyfile, container.securedServices());
+
+			// configure security for subnet if required
+			switch (connector.interfaceType()) {
+				case "tcp" -> {
+					if (connector.user().isPresent()) {
+						final var userKey = keyfile.get("subnet.tunneling.key");
+						final var deviceAuthCode = keyfile.get("subnet.device.key");
+						connector.setIpSecure(userKey, deviceAuthCode);
+					}
+				}
+				case "knxip" -> {
+					if (connector.knxipSecure()) {
+						final var groupKey = keyfile.get("subnet.group.key");
+						if (groupKey == null)
+							throw new KnxSecureException("KNX subnet " + connector.getName() + ": no group key configured");
+						connector.setGroupKey(groupKey);
+					}
+				}
+			}
+
 			keyfile.values().forEach(key -> Arrays.fill(key, (byte) 0));
 
 			final var additionalAddresses = container.additionalAddresses();
@@ -762,6 +798,39 @@ public class Launcher implements Runnable, AutoCloseable
 
 		for (final var entry : keyring.groups().entrySet())
 			Security.defaultInstallation().groupKeys().put(entry.getKey(), keyring.decryptKey(entry.getValue(), pwd));
+
+		// check subnet security configuration
+		final var connector = config.subnetConnector();
+		// tunneling
+		if (connector.user().isPresent()) {
+			final int user = connector.user().get();
+			final var subnetHost = connector.host().orElse(host);
+			final var iface = Optional.ofNullable(keyring.interfaces().get(subnetHost)).orElse(List.of()).stream()
+					.filter(intf -> intf.user() == user).findFirst().orElseThrow(() -> new KnxSecureException(
+							connector.getName() + ": no keyring interface found for host " + subnetHost + " user " + user));
+			if (iface.password().isEmpty())
+				throw new KnxSecureException(connector.getName() + ": keyring interface for host " + subnetHost + " user "
+						+ user + " does not have a password configured");
+			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password().get(), pwd));
+			decrypted.put("subnet.tunneling.key", key);
+
+			final var subnetDevice = keyring.devices().get(subnetHost);
+			if (subnetDevice != null) {
+				final var authKey = SecureConnection
+						.hashDeviceAuthenticationPassword(keyring.decryptPassword(subnetDevice.authentication().get(), pwd));
+				decrypted.put("subnet.device.key", authKey);
+			}
+			else
+				decrypted.put("subnet.device.key", new byte[0]);
+		}
+		if (connector.knxipSecure()) {
+			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().getHostAddress().equals(connector.linkArguments()));
+			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
+				final var enc = backbone.get().groupKey().get();
+				final var groupKey = keyring.decryptKey(enc, pwd);
+				decrypted.put("subnet.group.key", groupKey);
+			}
+		}
 
 		final var allKeys = new HashMap<>(keyfile);
 		allKeys.putAll(decrypted);

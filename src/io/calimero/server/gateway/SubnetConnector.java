@@ -109,6 +109,12 @@ public final class SubnetConnector
 	volatile long lastEventId;
 	long eventCounter;
 
+	private volatile boolean requestBaos;
+
+	private byte[] groupKey;
+	private byte[] userKey;
+	private byte[] deviceAuthCode;
+
 	/**
 	 * Creates a new subnet connector using a KNXnet/IP Routing or KNX IP subnet link.
 	 *
@@ -121,6 +127,12 @@ public final class SubnetConnector
 		final NetworkInterface routingNetif, final String subnetArgs)
 	{
 		return new SubnetConnector(container, "knxip", "", null, routingNetif, null, subnetArgs);
+	}
+
+	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
+		final NetworkInterface routingNetif, final String subnetArgs, final Duration latencyTolerance)
+	{
+		return new SubnetConnector(container, "knxip", "", null, routingNetif, null, subnetArgs, latencyTolerance);
 	}
 
 	/**
@@ -157,6 +169,12 @@ public final class SubnetConnector
 	public static SubnetConnector newWithUserLink(final ServiceContainer container, final String className,
 			final IndividualAddress overrideSrcAddress, final String subnetArgs) {
 		return new SubnetConnector(container, "user-supplied", "", overrideSrcAddress, null, className, subnetArgs);
+	}
+
+	public static SubnetConnector withTcp(final ServiceContainer container, final String subnetArgs,
+			final IndividualAddress tunnelingAddress, final int user, final IndividualAddress host) {
+		return new SubnetConnector(container, "tcp", "", new IndividualAddress(0), null, null, subnetArgs,
+				tunnelingAddress, user, host);
 	}
 
 	/**
@@ -254,103 +272,106 @@ public final class SubnetConnector
 	public KNXNetworkLink openNetworkLink() throws KNXException, InterruptedException
 	{
 		final KNXMediumSettings settings = mediumSettings();
-		final TSupplier<KNXNetworkLink> ts;
-		// can cause a delay of connection timeout in the worst case
-		if ("ip".equals(interfaceType)) {
-			// find IPv4 address for local socket address
-			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
-				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
-			final InetSocketAddress local = new InetSocketAddress(ia, 0);
-			final boolean useNat = (Boolean) this.args[0];
 
-			final var server = parseRemoteEndpoint();
-			if (requestBaos)
-				ts = () -> BaosLinkIp.newUdpLink(local, server);
-			else
-				ts = () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
-		}
-		else if ("tcp".equals(interfaceType)) {
-			final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
-					.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
-			final InetSocketAddress local = new InetSocketAddress(ia, 0);
-			final var server = parseRemoteEndpoint();
-
-			if (requestBaos)
-				ts = () -> BaosLinkIp.newTcpLink(TcpConnection.newTcpConnection(local, server));
-			else
-				ts = () -> KNXNetworkLinkIP.newTunnelingLink(TcpConnection.newTcpConnection(local, server), settings);
-		}
-		else if ("knxip".equals(interfaceType)) {
-			try {
-				final InetAddress mcGroup = InetAddress.getByName(linkArgs);
-				ts = () -> KNXNetworkLinkIP.newRoutingLink(netif, mcGroup, settings);
-			}
-			catch (final UnknownHostException e) {
-				throw new KNXException("open network link (KNXnet/IP routing): invalid multicast group " + linkArgs, e);
-			}
-		}
-		else if ("usb".equals(interfaceType)) {
-			// ignore configured device address with USB on TP1 and always use 0.0.0
-			final var adjustForTP1 = settings instanceof ReplaceInterfaceAddressProxy ? settings
-					: settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
-			if (requestBaos)
-				ts = () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
-			else
-				ts = () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
-		}
-		else if ("ft12".equals(interfaceType)) {
-			if ("cemi".equals(msgFormat))
-				ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
-			else if (requestBaos)
-				ts = () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
-			else
-				ts = () -> new KNXNetworkLinkFT12(linkArgs, settings);
-		}
-		else if ("ft12-cemi".equals(interfaceType))
-			ts = () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
-		else if ("tpuart".equals(interfaceType))
-			ts = () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
-		else if ("user-supplied".equals(interfaceType))
-			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
-		else if ("virtual".equals(interfaceType)) {
-			// if we use connector, we cannot cast link to VirtualLink for creating device links
+		// special-case virtual: if we use connector below, we cannot cast link to VirtualLink for creating device links
+		if ("virtual".equals(interfaceType)) {
 			final KNXNetworkLink link = new VirtualLink(linkArgs, settings);
 			setSubnetLink(link);
 			return link;
 		}
-		else if ("emulate".equals(interfaceType)) {
-			final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
-			final VirtualLink vl = new VirtualLink(sc.getName(), settings);
-			final Configuration config = nb.addConfiguration(vl);
-			config.setQueryBufferOnly(false);
 
-			if (args.length > 0 && args[0] instanceof DatapointModel) {
-				@SuppressWarnings("unchecked")
-				final DatapointModel<Datapoint> model = (DatapointModel<Datapoint>) args[0];
-				config.setDatapointModel(model);
+		final TSupplier<KNXNetworkLink> ts = switch (interfaceType) {
+			case "ip" -> {
+				// find IPv4 address for local socket address
+				final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
+						.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
+				final InetSocketAddress local = new InetSocketAddress(ia, 0);
+				final boolean useNat = (Boolean) this.args[0];
+				final var server = parseRemoteEndpoint();
+				if (requestBaos)
+					yield () -> BaosLinkIp.newUdpLink(local, server);
+				yield () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
 			}
-			final StateFilter f = new StateFilter();
-			config.setFilter(f, f);
-			config.activate(true);
-			// necessary to get .ind/.con notification for the buffer
-			final IndividualAddress device = new IndividualAddress(0);
-			vl.createDeviceLink(device);
+			case "tcp" -> {
+				if (requestBaos)
+					yield () -> BaosLinkIp.newTcpLink(newTcpConnection());
 
-			if (config.getDatapointModel() instanceof DatapointMap<?>) {
-				// init all emulated datapoints with their default value
-				for (final Datapoint dp : ((DatapointMap<?>) config.getDatapointModel()).getDatapoints()) {
-					final DPTXlator t = TranslatorTypes.createTranslator(dp.getDPT());
-					final byte[] tpdu = t.getTypeSize() == 0 ? DataUnitBuilder.createLengthOptimizedAPDU(0x80, t.getData())
-							: DataUnitBuilder.createAPDU(0x80, t.getData());
-					final CEMILData msg = new CEMILData(CEMILData.MC_LDATA_REQ, device, dp.getMainAddress(), tpdu, Priority.LOW);
-					config.getBufferedLink().send(msg, true);
+				// check if we have a tunneling address specified
+				KNXMediumSettings tunnelingSettings;
+				if (args.length > 0 && args[0] instanceof final IndividualAddress ia)
+					tunnelingSettings = new ReplaceInterfaceAddressProxy(settings, ia);
+				else
+					tunnelingSettings = settings;
+
+				if (args.length > 0 && args[1] instanceof final Integer user && userKey != null) {
+					yield () -> KNXNetworkLinkIP.newSecureTunnelingLink(
+							newTcpConnection().newSecureSession(user, userKey.clone(), deviceAuthCode.clone()),
+							tunnelingSettings);
+				}
+				yield () -> KNXNetworkLinkIP.newTunnelingLink(newTcpConnection(), tunnelingSettings);
+			}
+			case "knxip" -> {
+				try {
+					final InetAddress mcGroup = InetAddress.getByName(linkArgs);
+					if (args.length > 0 && args[0] instanceof final Duration latencyTolerance && groupKey != null)
+						yield () -> KNXNetworkLinkIP.newSecureRoutingLink(netif, mcGroup, groupKey.clone(),
+								latencyTolerance, settings);
+					yield () -> KNXNetworkLinkIP.newRoutingLink(netif, mcGroup, settings);
+				}
+				catch (final UnknownHostException e) {
+					throw new KNXException("open network link (KNXnet/IP routing): invalid multicast group " + linkArgs,
+							e);
 				}
 			}
-
-			ts = config::getBufferedLink;
-		}
-		else
-			throw new KNXException("network link: unknown KNX subnet specifier '" + interfaceType + "'");
+			case "usb" -> {
+				// ignore configured device address with USB on TP1 and always use 0.0.0
+				final var adjustForTP1 = settings instanceof ReplaceInterfaceAddressProxy ? settings
+						: settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
+				if (requestBaos)
+					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
+				yield () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
+			}
+			case "ft12" -> {
+				if ("cemi".equals(msgFormat))
+					yield () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
+				if (requestBaos)
+					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
+				yield () -> new KNXNetworkLinkFT12(linkArgs, settings);
+			}
+			case "tpuart" -> () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
+			case "user-supplied" -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			case "emulate" -> {
+				final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
+				final VirtualLink vl = new VirtualLink(sc.getName(), settings);
+				final Configuration config = nb.addConfiguration(vl);
+				config.setQueryBufferOnly(false);
+				if (args.length > 0 && args[0] instanceof DatapointModel) {
+					@SuppressWarnings("unchecked")
+					final DatapointModel<Datapoint> model = (DatapointModel<Datapoint>) args[0];
+					config.setDatapointModel(model);
+				}
+				final StateFilter f = new StateFilter();
+				config.setFilter(f, f);
+				config.activate(true);
+				// necessary to get .ind/.con notification for the buffer
+				final IndividualAddress device = new IndividualAddress(0);
+				vl.createDeviceLink(device);
+				if (config.getDatapointModel() instanceof DatapointMap<?>) {
+					// init all emulated datapoints with their default value
+					for (final Datapoint dp : ((DatapointMap<?>) config.getDatapointModel()).getDatapoints()) {
+						final DPTXlator t = TranslatorTypes.createTranslator(dp.getDPT());
+						final byte[] tpdu = t.getTypeSize() == 0
+								? DataUnitBuilder.createLengthOptimizedAPDU(0x80, t.getData())
+								: DataUnitBuilder.createAPDU(0x80, t.getData());
+						final CEMILData msg = new CEMILData(CEMILData.MC_LDATA_REQ, device, dp.getMainAddress(), tpdu,
+								Priority.LOW);
+						config.getBufferedLink().send(msg, true);
+					}
+				}
+				yield config::getBufferedLink;
+			}
+			default -> throw new KNXException("network link: unknown KNX subnet specifier '" + interfaceType + "'");
+		};
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
@@ -362,30 +383,35 @@ public final class SubnetConnector
 	public KNXNetworkMonitor openMonitorLink() throws KNXException, InterruptedException
 	{
 		final KNXMediumSettings settings = sc.getMediumSettings();
-		final TSupplier<KNXNetworkMonitor> ts;
-		// can cause a delay of connection timeout in the worst case
-		if ("ip".equals(interfaceType))
-			ts = () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
-		else if ("usb".equals(interfaceType))
-			ts = () -> new KNXNetworkMonitorUsb(linkArgs, settings);
-		else if ("ft12".equals(interfaceType))
-			ts = () -> new KNXNetworkMonitorFT12(linkArgs, settings);
-		else if ("ft12-cemi".equals(interfaceType))
-			ts = () -> KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings);
-		else if ("tpuart".equals(interfaceType))
-			ts = () -> new KNXNetworkMonitorTpuart(linkArgs, false);
-		else if ("user-supplied".equals(interfaceType))
-			ts = () -> newLinkUsing(className, linkArgs.split(",|\\|"));
-		else if ("virtual".equals(interfaceType) || "emulate".equals(interfaceType))
+
+		if ("virtual".equals(interfaceType) || "emulate".equals(interfaceType))
 			return null;
-		else
-			throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
+
+		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
+			case "ip" ->
+				() -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
+			case "tcp" -> () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), settings);
+			case "usb" -> () -> new KNXNetworkMonitorUsb(linkArgs, settings);
+			case "ft12" -> () -> "cemi".equals(msgFormat) ? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
+					: new KNXNetworkMonitorFT12(linkArgs, settings);
+			case "tpuart" -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
+			case "user-supplied" -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			default -> throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
+		};
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
 				.reconnectDelay(Duration.ofSeconds(10)).connectionStatusNotifier(this::connectionStatusChanged);
 		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
+	}
+
+	private TcpConnection newTcpConnection() {
+		final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
+				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
+		final InetSocketAddress local = new InetSocketAddress(ia, 0);
+		final var server = parseRemoteEndpoint();
+		return TcpConnection.newTcpConnection(local, server);
 	}
 
 	private InetSocketAddress parseRemoteEndpoint() {
@@ -412,6 +438,29 @@ public final class SubnetConnector
 		acknowledge = ackOnTp;
 	}
 
+	public void setIpSecure(final byte[] userKey, final byte[] deviceAuthCode) {
+		this.userKey = userKey.clone();
+		this.deviceAuthCode = deviceAuthCode.clone();
+	}
+
+	public void setGroupKey(final byte[] groupKey) { this.groupKey = groupKey.clone(); }
+
+	public Optional<Integer> user() {
+		if (args.length > 1 && args[1] instanceof final Integer i && i > 0)
+			return Optional.of(i);
+		return Optional.empty();
+	}
+
+	public Optional<IndividualAddress> host() {
+		if (args.length > 2 && args[2] instanceof final IndividualAddress ia)
+			return Optional.of(ia);
+		return Optional.empty();
+	}
+
+	public boolean knxipSecure() {
+		return args.length > 0 && args[0] instanceof Duration d && !d.isZero();
+	}
+
 	@Override
 	public String toString() {
 		final Object linkDesc = subnetLink != null ? subnetLink : (linkArgs + " " + msgFormat);
@@ -427,8 +476,6 @@ public final class SubnetConnector
 		if (link instanceof KNXNetworkMonitor)
 			((KNXNetworkMonitor) link).addMonitorListener(listener);
 	}
-
-	private volatile boolean requestBaos;
 
 	void requestBaos(final boolean baos) {
 		if ("baos".equals(msgFormat))
