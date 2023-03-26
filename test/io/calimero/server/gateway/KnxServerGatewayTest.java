@@ -87,7 +87,7 @@ class KnxServerGatewayTest
 				new HPAI((InetAddress) null, 5647),
 				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false, false);
 		server.addServiceContainer(sc);
-		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), "", "");
+		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), null, "");
 		connector.openNetworkLink();
 
 		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());

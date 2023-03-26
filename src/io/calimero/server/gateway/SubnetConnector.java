@@ -51,7 +51,6 @@ import io.calimero.DataUnitBuilder;
 import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
 import io.calimero.KNXException;
-import io.calimero.KNXFormatException;
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.Priority;
 import io.calimero.baos.BaosLinkAdapter;
@@ -121,7 +120,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "knxip", "", "", routingNetif, null, subnetArgs);
+		return new SubnetConnector(container, "knxip", "", null, routingNetif, null, subnetArgs);
 	}
 
 	/**
@@ -136,13 +135,13 @@ public final class SubnetConnector
 	 * @return the new subnet connector
 	 */
 	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
-		final boolean useNat, final String msgFormat, final String overrideSrcAddress, final String subnetArgs)
-	{
+			final boolean useNat, final String msgFormat, final IndividualAddress overrideSrcAddress,
+			final String subnetArgs) {
 		return new SubnetConnector(container, "ip", msgFormat, overrideSrcAddress, netif, null, subnetArgs, useNat);
 	}
 
-	public static SubnetConnector newWithTpuartLink(final ServiceContainer container, final String overrideSrcAddress,
-			final String subnetArgs) {
+	public static SubnetConnector newWithTpuartLink(final ServiceContainer container,
+			final IndividualAddress overrideSrcAddress, final String subnetArgs) {
 		return new SubnetConnector(container, "tpuart", "", overrideSrcAddress, null, null, subnetArgs);
 	}
 
@@ -155,9 +154,8 @@ public final class SubnetConnector
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the new subnet connector
 	 */
-	public static SubnetConnector newWithUserLink(final ServiceContainer container,
-		final String className, final String overrideSrcAddress, final String subnetArgs)
-	{
+	public static SubnetConnector newWithUserLink(final ServiceContainer container, final String className,
+			final IndividualAddress overrideSrcAddress, final String subnetArgs) {
 		return new SubnetConnector(container, "user-supplied", "", overrideSrcAddress, null, className, subnetArgs);
 	}
 
@@ -172,7 +170,7 @@ public final class SubnetConnector
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
 		final String subnetArgs)
 	{
-		return newWithInterfaceType(container, interfaceType, "", "", subnetArgs);
+		return newWithInterfaceType(container, interfaceType, "", null, subnetArgs);
 	}
 
 	/**
@@ -186,7 +184,7 @@ public final class SubnetConnector
 	 * @return the created subnet connector
 	 */
 	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
-			final String msgFormat, final String overrideSrcAddress, final String subnetArgs)
+			final String msgFormat, final IndividualAddress overrideSrcAddress, final String subnetArgs)
 	{
 		return new SubnetConnector(container, interfaceType, msgFormat, overrideSrcAddress, null, null, subnetArgs);
 	}
@@ -202,22 +200,17 @@ public final class SubnetConnector
 	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
 		final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, "", "", null, null, interfaceType, subnetArgs);
+		return new SubnetConnector(container, interfaceType, "", null, null, null, interfaceType, subnetArgs);
 	}
 
 	private SubnetConnector(final ServiceContainer container, final String interfaceType, final String msgFormat,
-		final String overrideSrcAddress,
+		final IndividualAddress overrideSrcAddress,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
 	{
 		sc = container;
 		this.interfaceType = interfaceType;
 		this.msgFormat = msgFormat;
-		try {
-			this.overrideInterfaceAddress = overrideSrcAddress.isEmpty() ? null : new IndividualAddress(overrideSrcAddress);
-		}
-		catch (final KNXFormatException e) {
-			throw new KNXIllegalArgumentException(overrideSrcAddress + " is not a valid KNX individual address");
-		}
+		this.overrideInterfaceAddress = overrideSrcAddress;
 		netif = routingNetif;
 		this.className = className;
 		linkArgs = subnetArgs;

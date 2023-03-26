@@ -729,8 +729,8 @@ public class KnxServerGateway implements Runnable
 				try {
 					connector.openNetworkLink();
 				}
-				catch (final KNXException e) {
-					logger.log(ERROR, "error opening network link for {0}", connector.getName(), e);
+				catch (KNXException | RuntimeException e) {
+					logger.log(ERROR, "error opening network link for " + connector.getName(), e);
 					server.shutdown();
 					return;
 				}

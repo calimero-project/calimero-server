@@ -77,10 +77,10 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import io.calimero.DataUnitBuilder;
 import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
+import io.calimero.KNXFormatException;
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.datapoint.Datapoint;
@@ -137,55 +137,21 @@ public class Launcher implements Runnable, AutoCloseable
 		/** */
 		public static final String knxServer = "knxServer";
 		/** */
-		public static final String propDefs = "propertyDefinitions";
-		/** */
 		public static final String svcCont = "serviceContainer";
-		/** */
-		public static final String datapoints = "datapoints";
-		/** */
-		public static final String subnet = "knxSubnet";
 		/** */
 		public static final String grpAddrFilter = "groupAddressFilter";
 		/** */
-		public static final String routingMcast = "routingMcast";
-		/** */
-		public static final String discovery = "discovery";
-		/** */
 		public static final String addAddresses = "additionalAddresses";
-		/** */
-		public static final String disruptionBuffer = "disruptionBuffer";
-
-		/** */
-		public static final String attrName = "name";
-		/** */
-		public static final String attrFriendly = "friendlyName";
 		/** */
 		public static final String attrActivate = "activate";
 		/** */
-		public static final String attrRouting = "routing";
-		/** */
 		public static final String attrListenNetIf = "listenNetIf";
 		/** */
-		public static final String attrOutgoingNetIf = "outgoingNetIf";
-		/** */
 		public static final String attrUdpPort = "udpPort";
-		/** */
-		public static final String attrClass = "class";
-		/** */
-		public static final String attrReuseEP = "reuseCtrlEP";
-		/** */
-		public static final String attrNetworkMonitoring = "networkMonitoring";
 		/** KNX subnet type: ["ip", "knxip", "usb", "ft12", "tpuart", "virtual", "user-supplied"]. */
 		public static final String attrType = "type";
 		/** KNX subnet communication medium: { "tp1", "pl110", "knxip", "rf" }. */
 		public static final String attrMedium = "medium";
-		/** KNX subnet domain address for power-line and RF, as hexadecimal value string. */
-		public static final String attrDoA = "domainAddress";
-		/** */
-		public static final String attrRef = "ref";
-		/** */
-		public static final String attrExpirationTimeout = "expirationTimeout";
-
 
 		private static final Function<String, String> expandHome = v -> v.replaceFirst("^~",
 				System.getProperty("user.home"));
@@ -206,8 +172,8 @@ public class Launcher implements Runnable, AutoCloseable
 			if (r.nextTag() != XmlReader.START_ELEMENT || !r.getLocalName().equals(XmlConfiguration.knxServer))
 				throw new KNXMLException("no valid KNX server configuration (no " + XmlConfiguration.knxServer + " element)");
 
-			final var serverName = attr(r, XmlConfiguration.attrName).orElseThrow();
-			final String friendly = attr(r, XmlConfiguration.attrFriendly).orElseThrow();
+			final var serverName = attr(r, "name").orElseThrow();
+			final String friendly = attr(r, "friendlyName").orElseThrow();
 			appData = attr(r, "appData").map(expandHome).map(Path::of).orElse(Path.of("")).toAbsolutePath();
 
 			boolean discovery = true;
@@ -217,10 +183,10 @@ public class Launcher implements Runnable, AutoCloseable
 			while (r.next() != XmlReader.END_DOCUMENT) {
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					switch (r.getLocalName()) {
-						case XmlConfiguration.discovery -> {
+						case "discovery" -> {
 							discovery = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
 							listen = attr(r, XmlConfiguration.attrListenNetIf).orElse("");
-							outgoing = attr(r, XmlConfiguration.attrOutgoingNetIf).orElse("");
+							outgoing = attr(r, "outgoingNetIf").orElse("");
 						}
 						case XmlConfiguration.svcCont -> readServiceContainer(r);
 					}
@@ -241,11 +207,11 @@ public class Launcher implements Runnable, AutoCloseable
 				throw new KNXMLException("no service container element");
 
 			final boolean activate = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
-			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrRouting));
-			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrReuseEP));
+			final boolean routing = Boolean.parseBoolean(r.getAttributeValue(null, "routing"));
+			final boolean reuse = Boolean.parseBoolean(r.getAttributeValue(null, "reuseCtrlEP"));
 			if (routing && reuse)
 				throw new KNXIllegalArgumentException("with routing activated, reusing control endpoint is not allowed");
-			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, XmlConfiguration.attrNetworkMonitoring));
+			final boolean monitor = Boolean.parseBoolean(r.getAttributeValue(null, "networkMonitoring"));
 			final int port = attr(r, XmlConfiguration.attrUdpPort).map(Integer::parseUnsignedInt).orElse(3671);
 			final NetworkInterface netif = getNetIf(r);
 
@@ -258,17 +224,17 @@ public class Launcher implements Runnable, AutoCloseable
 			final var secureServices = decodeSecuredServicecs(attr(r, "securedServices").orElse("0"));
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
-			String addr = "";
+			String subnetArgs = "";
 			String interfaceType = "";
 			String msgFormat = "";
 			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
 			byte[] subnetDoA = null;
-			String overrideSrcAddr = "";
+			IndividualAddress overrideSrcAddress = null;
 
 			IndividualAddress subnet = null;
 			NetworkInterface subnetKnxipNetif = null;
 			InetAddress routingMcast = KNXNetworkLinkIP.DefaultMulticast;
-			int latencyTolerance = 1000; // ms
+			Duration latencyTolerance = Duration.ofMillis(1000);
 			boolean useNat = false;
 			String subnetLinkClass = null;
 			// in virtual KNX subnets, the subnetwork can be described by a datapoint model
@@ -286,14 +252,14 @@ public class Launcher implements Runnable, AutoCloseable
 				final String name = r.getLocalName();
 				if (r.getEventType() == XmlReader.START_ELEMENT) {
 					switch (name) {
-						case XmlConfiguration.datapoints -> {
+						case "datapoints" -> {
 							final DatapointMap<Datapoint> dps = new DatapointMap<>();
-							final XmlReader dpReader = attr(r, XmlConfiguration.attrRef)
+							final XmlReader dpReader = attr(r, "ref")
 									.map(XmlInputFactory.newInstance()::createXMLReader).orElse(r);
 							dps.load(dpReader);
 							datapoints = dps;
 						}
-						case XmlConfiguration.subnet -> {
+						case "knxSubnet" -> {
 							interfaceType = r.getAttributeValue(null, XmlConfiguration.attrType);
 							msgFormat = attr(r, "format").orElse("");
 							String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
@@ -302,7 +268,8 @@ public class Launcher implements Runnable, AutoCloseable
 							else if (medium == null)
 								medium = "tp1";
 							subnetMedium = KNXMediumSettings.getMedium(medium);
-							final String doa = r.getAttributeValue(null, XmlConfiguration.attrDoA);
+							// KNX subnet domain address for power-line and RF, as hexadecimal value string
+							final String doa = r.getAttributeValue(null, "domainAddress");
 							if (doa != null) {
 								long l = Long.parseLong(doa, 16);
 								final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
@@ -310,7 +277,7 @@ public class Launcher implements Runnable, AutoCloseable
 								for (int i = subnetDoA.length; i-- > 0; l >>>= 8)
 									subnetDoA[i] = (byte) l;
 							}
-							overrideSrcAddr = attr(r, "knxAddress").orElse("");
+							overrideSrcAddress = indAddress(r, "knxAddress");
 							switch (interfaceType) {
 								case "ip" -> {
 									subnetKnxipNetif = getNetIf(r);
@@ -318,16 +285,16 @@ public class Launcher implements Runnable, AutoCloseable
 								}
 								case "knxip" -> subnetKnxipNetif = getNetIf(r);
 								case "user-supplied" ->
-										subnetLinkClass = r.getAttributeValue(null, XmlConfiguration.attrClass);
+										subnetLinkClass = r.getAttributeValue(null, "class");
 							}
-							addr = r.getElementText();
+							subnetArgs = r.getElementText();
 						}
 						case XmlConfiguration.grpAddrFilter -> filter = readGroupAddressFilter(r);
 						case XmlConfiguration.addAddresses -> indAddressPool = readAdditionalAddresses(r);
 						case "tunnelingUsers" -> tunnelingUserToAddresses.putAll(readTunnelingUsers(r));
 						case "routing" -> {
 							try {
-								latencyTolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(2000);
+								latencyTolerance = latencyTolerance(r);
 								final String mcast = r.getElementText();
 								if (!mcast.isEmpty())
 									routingMcast = InetAddress.getByName(mcast);
@@ -337,15 +304,15 @@ public class Launcher implements Runnable, AutoCloseable
 								throw new KNXMLException("invalid latency tolerance", r);
 							}
 						}
-						case XmlConfiguration.routingMcast -> {
+						case "routingMcast" -> {
 							try {
 								routingMcast = InetAddress.getByName(r.getElementText());
 							} catch (final UnknownHostException uhe) {
 								throw new KNXMLException(uhe.getMessage(), r);
 							}
 						}
-						case XmlConfiguration.disruptionBuffer -> {
-							expirationTimeout = r.getAttributeValue(null, attrExpirationTimeout);
+						case "disruptionBuffer" -> {
+							expirationTimeout = r.getAttributeValue(null, "expirationTimeout");
 							final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
 							disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
 							disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
@@ -380,11 +347,11 @@ public class Launcher implements Runnable, AutoCloseable
 									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
 						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
-						final String svcContName = addr.isEmpty() ? interfaceType + "-" + subnet : addr;
+						final String svcContName = subnetArgs.isEmpty() ? interfaceType + "-" + subnet : subnetArgs;
 						final boolean baosSupport = "baos".equals(msgFormat);
 						if (routing)
 							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, udpOnly,
-									routingMcast, Duration.ofMillis(latencyTolerance), baosSupport);
+									routingMcast, latencyTolerance, baosSupport);
 						else
 							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, udpOnly,
 									baosSupport);
@@ -392,8 +359,8 @@ public class Launcher implements Runnable, AutoCloseable
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
-						final var connector = subnetConnector(sc, interfaceType, addr, msgFormat,
-								overrideSrcAddr, subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
+						final var connector = subnetConnector(sc, interfaceType, subnetArgs, msgFormat,
+								overrideSrcAddress, subnetKnxipNetif, useNat, subnetLinkClass, datapoints);
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
 						if (keyring != null) {
@@ -413,6 +380,23 @@ public class Launcher implements Runnable, AutoCloseable
 					}
 				}
 			}
+		}
+
+		private static IndividualAddress indAddress(final XmlReader r, final String name) {
+			final var attr = r.getAttributeValue(null, name);
+			if (attr == null)
+				return null;
+			try {
+				return new IndividualAddress(attr);
+			}
+			catch (final KNXFormatException e) {
+				throw new IllegalArgumentException(e.getMessage());
+			}
+		}
+
+		private static Duration latencyTolerance(final XmlReader r) {
+			final int tolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(1000);
+			return Duration.ofMillis(tolerance);
 		}
 
 		private static EnumSet<ServiceFamily> decodeSecuredServicecs(final String svcs) {
@@ -446,7 +430,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		private static SubnetConnector subnetConnector(final ServiceContainer sc, final String interfaceType,
-				final String subnetArgs, final String msgFormat, final String overrideSrcAddress,
+				final String subnetArgs, final String msgFormat, final IndividualAddress overrideSrcAddress,
 				final NetworkInterface netif, final boolean useNat, final String subnetLinkClass,
 				final DatapointModel<Datapoint> datapoints) {
 
@@ -454,7 +438,7 @@ public class Launcher implements Runnable, AutoCloseable
 				case "knxip" -> SubnetConnector.newWithRoutingLink(sc, netif, subnetArgs);
 				case "ip" -> SubnetConnector.newWithTunnelingLink(sc, netif, useNat, msgFormat, overrideSrcAddress, subnetArgs);
 				case "tpuart" -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
-				case "user-supplied" -> SubnetConnector.newWithUserLink(sc, overrideSrcAddress, subnetLinkClass, subnetArgs);
+				case "user-supplied" -> SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
 				case "emulate" -> datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
 						: SubnetConnector.newCustom(sc, "emulate");
 				default -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat, overrideSrcAddress, subnetArgs);
