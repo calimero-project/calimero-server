@@ -112,7 +112,8 @@ Optional attributes for secure routing:
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to the KNX subnet, one of:
-      - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
+      - `ip`: the KNX subnet is connected via a UDP KNXnet/IP tunneling connection
+      - `tcp`: the KNX subnet is connected via a TCP KNXnet/IP tunneling connection
       - `knxip`: the KNX subnet is connected via KNX IP or KNXnet/IP routing
       - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
       - `ft12`: use a FT1.2 protocol connection with EMI2 format (specify the `format` attribute for cEMI exchange format)
@@ -128,7 +129,7 @@ Optional attributes for secure routing:
     - `format` (optional): useful for knx interfaces which support different exchange formats; recognized values are "" (default), "baos", or "cemi"
     - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
     - `netif` (tunneling only, optional): server network interface for tunneling to KNX subnet
-    - `useNat` (tunneling only, optional): use network address translation (NAT)
+    - `useNat` (UDP tunneling only, optional): use network address translation (NAT)
     - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
     - `domainAddress` (open media only): domain address for power-line or RF transmission medium
     - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
@@ -139,6 +140,10 @@ Optional attributes for secure routing:
 * `<groupAddressFilter>`: Contains a (possibly empty) list of KNX group addresses, which represents the server group address filter applied to messages for that service container. An empty filter list does not filter any messages. Only messages with their group address in the filter list will be forwarded. 
 
 * `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1.
+
+* `<tunnelingUsers>` (optional, only required for KNX IP secure tunneling if no keyring is used): contains a mapping of KNX IP Secure user IDs to permitted tunneling addresses.
+	* `<user id="id">`: a user ID in the integer range [1..127], with `<knxAddress>` elements listing the permitted individual addresses assigned to client-side tunneling connections of that user.
+		* `<knxAddress type="individual">x.y.z</knxAddress>`: additional address entry
 
 * `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements. Time server values are sent secured if the datapoint destination is in the keyring.
 
