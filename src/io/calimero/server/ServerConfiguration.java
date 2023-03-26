@@ -149,24 +149,6 @@ public class ServerConfiguration {
 			this.timeServer = List.copyOf(timeServerDatapoints);
 		}
 
-		@Deprecated
-		Container(final List<IndividualAddress> additionalAddresses,
-				final EnumSet<ServiceFamily> securedServices, final Map<Integer, List<IndividualAddress>> tunnelingUsers,
-				final Keyring keyring, final Map<String, byte[]> keyfile, final SubnetConnector connector,
-				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
-
-			this.additionalAddresses = List.copyOf(additionalAddresses);
-			this.tunnelingUsers = Map.copyOf(tunnelingUsers);
-			this.securedServices = EnumSet.copyOf(securedServices);
-			this.keyring = keyring;
-			this.keyfile = Map.copyOf(keyfile);
-
-			this.connector = connector;
-			this.groupAddressFilter = List.copyOf(groupAddressFilter);
-			this.timeServer = List.copyOf(timeServerDatapoints);
-		}
-
-
 		public List<IndividualAddress> additionalAddresses() { return additionalAddresses; }
 
 		public EnumSet<ServiceFamily> securedServices() { return securedServices.clone(); }
@@ -209,15 +191,11 @@ public class ServerConfiguration {
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null ? secureSymbol + " "
 					: "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
-			// @formatter:off
-			return String.format(
-     				"""
+			return String.format("""
 					%s%s:
 						listen on %s (%sport %s), KNX IP %srouting %s
-						%s connection: %s%s""",
-					sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast, secureRouting, mcast, type,
-					sc.getMediumSettings(), filter);
-			// @formatter:on
+						%s connection: %s%s""", sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast,
+					secureRouting, mcast, type, sc.getMediumSettings(), filter);
 		}
 	}
 
@@ -280,13 +258,6 @@ public class ServerConfiguration {
 		this.containers = List.copyOf(containers);
 		this.iosResource = iosResource;
 		this.iosResourcePwd = iosResourcePwd.clone();
-	}
-
-	@Deprecated
-	public ServerConfiguration(final String name, final String friendlyName, final boolean discovery,
-			final List<String> discoveryNetifs, final List<String> outgoingNetifs, final URI iosResource,
-			final List<Container> containers) {
-		this(name, friendlyName, discovery, discoveryNetifs, outgoingNetifs, containers, iosResource, new char[0]);
 	}
 
 	public String name() { return name; }
