@@ -48,7 +48,6 @@ import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILData;
 import io.calimero.internal.EventListeners;
 import io.calimero.link.AbstractLink;
-import io.calimero.link.KNXLinkClosedException;
 import io.calimero.link.KNXNetworkLink;
 import io.calimero.link.NetworkLinkListener;
 import io.calimero.link.medium.KNXMediumSettings;
@@ -98,9 +97,7 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 	}
 
 	@Override
-	protected void onSend(final KNXAddress dst, final byte[] msg, final boolean waitForCon)
-		throws KNXLinkClosedException
-	{}
+	protected void onSend(final KNXAddress dst, final byte[] msg, final boolean waitForCon) {}
 
 	@Override
 	protected void onSend(final CEMILData msg, final boolean waitForCon)
@@ -109,10 +106,6 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 		for (final VirtualLink l : deviceLinks)
 			send(msg, notifier.getListeners(), l);
 	}
-
-	@Override
-	protected void onClose()
-	{}
 
 	private void send(final CEMILData msg, final EventListeners<NetworkLinkListener> confirmation,
 		final VirtualLink uplink)

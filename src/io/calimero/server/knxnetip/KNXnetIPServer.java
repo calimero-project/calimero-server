@@ -365,8 +365,8 @@ public class KNXnetIPServer
 			final var svcContainer = containerConfig.subnetConnector().getServiceContainer();
 			addServiceContainer(svcContainer);
 		}
-		setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, config.discoveryNetifs().toString().replaceAll("\\[|\\]", ""));
-		setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, config.outgoingNetifs().toString().replaceAll("\\[|\\]", ""));
+		setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, config.discoveryNetifs().toString().replaceAll("\\[|]", ""));
+		setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, config.outgoingNetifs().toString().replaceAll("\\[|]", ""));
 		setOption(KNXnetIPServer.OPTION_DISCOVERY_DESCRIPTION, config.runDiscovery() ? "true" : "false");
 	}
 
