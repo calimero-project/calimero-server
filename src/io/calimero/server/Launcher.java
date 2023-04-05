@@ -464,7 +464,7 @@ public class Launcher implements Runnable, AutoCloseable
 		private static Map<String, byte[]> readKeyfile(final Path keyfile) {
 			try (var lines = Files.lines(keyfile)) {
 				// ignore comments, limit keys to words with dot separator, require '='
-				final var matcher = Pattern.compile("^[^/#][\\w[\\[\\d+\\]]\\.]+\\s*=.+$").asMatchPredicate();
+				final var matcher = Pattern.compile("^[^/#](\\w+(\\[\\d+])?\\.)+\\w+\\s*=.+$").asMatchPredicate();
 				final Map<String, byte[]> keys = lines.filter(matcher)
 						.map(line -> line.split("=", 2))
 						.map(XmlConfiguration::hashDeviceOrUserPassword)
