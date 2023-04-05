@@ -1067,8 +1067,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 
 		if (assigned == null) {
-			final List<IndividualAddress> list = additionalAddresses;
-			if (new HashSet<>(list).size() != list.size())
+			if (new HashSet<>(additionalAddresses).size() != additionalAddresses.size())
 				return NoMoreUniqueConnections;
 			return ErrorCodes.NO_MORE_CONNECTIONS;
 		}

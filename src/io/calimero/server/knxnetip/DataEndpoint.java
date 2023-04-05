@@ -618,12 +618,12 @@ public final class DataEndpoint extends ConnectionBase
 			resetRequest.accept(this);
 		}
 		else {
-			switch (mc) {
-				case CEMILData.MC_LDATA_CON -> logger.log(WARNING, "received L-Data confirmation - ignored");
-				case CEMILData.MC_LDATA_IND -> logger.log(WARNING, "received L-Data indication - ignored");
-				case CEMIBusMon.MC_BUSMON_IND -> logger.log(WARNING, "received L-Busmon indication - ignored");
-				default -> logger.log(WARNING, "unsupported cEMI message code " + mc + " - ignored");
-			}
+			logger.log(WARNING, switch (mc) {
+				case CEMILData.MC_LDATA_CON -> "received L-Data confirmation - ignored";
+				case CEMILData.MC_LDATA_IND -> "received L-Data indication - ignored";
+				case CEMIBusMon.MC_BUSMON_IND -> "received L-Busmon indication - ignored";
+				default -> "unsupported cEMI message code " + mc + " - ignored";
+			});
 		}
 	}
 
