@@ -8,7 +8,7 @@ Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project
 * Use a scheduler with a single worker (carrier) thread. With the default scheduler (by creating the thread with no-argument `Thread.builder().virtual()` method), use `-Djdk.defaultScheduler.parallelism=1`
 
 
-A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [Java SE 11](https://www.oracle.com/technetwork/java/javase/downloads/index.html) (_java.base_).
+A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [JDK 17](https://www.oracle.com/java/technologies/downloads/) (_java.base_).
 
 * No KNXnet/IP server hardware required
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
@@ -20,11 +20,11 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 
 ### Dependencies
 
-The Calimero KNXnet/IP server requires `calimero-core`, `calimero-device`, and `slf4j-api`.
-_Optional_ dependencies, required for communication over serial ports:
+The Calimero KNXnet/IP server requires `calimero-core` and `calimero-device`.
+_Optional_ dependencies, required for serial communication:
 
-* Any of the native libraries in the `serial-native` repository, or `calimero-rxtx` for using RXTX or any RXTX descendant/compatible library on your platform. 
-* For KNX USB or KNX RF USB communication links, `calimero-core` depends on `org.usb4java:usb4java-javax` (and its transitive closure).
+* TP-UART / FT1.2: `serial-native` (with its JNI libraries), or `calimero-rxtx` for using any RXTX descendant/compatible library on your platform. 
+* KNX USB or KNX RF USB: `calimero-usb` (and its transitive closure).
 
 ### Docker image
 
@@ -77,10 +77,10 @@ Make sure all required `jar` packages are available, and any referenced files in
 
 ~~~ sh
 # Either, assuming all jar dependencies are located in the current working directory
-java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
+java -cp "./*" io.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.6-SNAPSHOT.jar:calimero-core-2.6-SNAPSHOT.jar:calimero-device-2.6-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-3.0-SNAPSHOT.jar:calimero-core-3.0-SNAPSHOT.jar:calimero-device-3.0-SNAPSHOT.jar" io.calimero.server.Launcher server-config.xml
 ~~~
 
 
@@ -119,7 +119,8 @@ Optional attributes for secure routing:
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to the KNX subnet, one of:
-      - `ip`: the KNX subnet is connected via a KNXnet/IP tunneling connection
+      - `ip`: the KNX subnet is connected via a UDP KNXnet/IP tunneling connection
+      - `tcp`: the KNX subnet is connected via a TCP KNXnet/IP tunneling connection
       - `knxip`: the KNX subnet is connected via KNX IP or KNXnet/IP routing
       - `usb`: connect to subnet via a USB device, if the device name/ID is left empty, the first USB device found will be used
       - `ft12`: use a FT1.2 protocol connection with EMI2 format (specify the `format` attribute for cEMI exchange format)
@@ -135,7 +136,7 @@ Optional attributes for secure routing:
     - `format` (optional): useful for knx interfaces which support different exchange formats; recognized values are "" (default), "baos", or "cemi"
     - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
     - `netif` (tunneling only, optional): server network interface for tunneling to KNX subnet
-    - `useNat` (tunneling only, optional): use network address translation (NAT)
+    - `useNat` (UDP tunneling only, optional): use network address translation (NAT)
     - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
     - `domainAddress` (open media only): domain address for power-line or RF transmission medium
     - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
@@ -146,6 +147,10 @@ Optional attributes for secure routing:
 * `<groupAddressFilter>`: Contains a (possibly empty) list of KNX group addresses, which represents the server group address filter applied to messages for that service container. An empty filter list does not filter any messages. Only messages with their group address in the filter list will be forwarded. 
 
 * `<additionalAddresses>`: Contains a (possibly empty) list of KNX individual addresses, which are assigned to KNXnet/IP tunneling connections. An individual address has to match the KNX subnet (area, line), otherwise it will not be used! If no additional addresses are provided, the service container individual address is used, and the maximum of open tunneling connections at a time is limited to 1.
+
+* `<tunnelingUsers>` (optional, only required for KNX IP secure tunneling if no keyring is used): contains a mapping of KNX IP Secure user IDs to permitted tunneling addresses.
+	* `<user id="id">`: a user ID in the integer range [1..127], with `<knxAddress>` elements listing the permitted individual addresses assigned to client-side tunneling connections of that user.
+		* `<knxAddress type="individual">x.y.z</knxAddress>`: additional address entry
 
 * `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements. Time server values are sent secured if the datapoint destination is in the keyring.
 
@@ -203,4 +208,4 @@ To run the KNXnet/IP server and gateway directly in Java code, see the implement
 Logging
 -------
 
-Calimero KNXnet/IP server uses the [Simple Logging Facade for Java (slf4j)](http://www.slf4j.org/). Bind any desired logging frameworks of your choice. The default gradle/maven dependency is the [Simple Logger](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html). It logs everything to standard output. The simple logger can be configured via the file `simplelogger.properties`, JVM system properties, or `java` command line options, e.g., `-Dorg.slf4j.simpleLogger.defaultLogLevel=warn`.
+Calimero KNXnet/IP server uses the [System.Logger](https://docs.oracle.com/en/java/javase/19/docs/api/java.base/java/lang/System.Logger.html). Bind any desired logging frameworks of your choice.

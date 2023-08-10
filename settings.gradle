@@ -1,10 +1,16 @@
 rootProject.name = 'calimero-server-loom'
 
 def safeIncludeBuild(String dir) {
-	boolean inComposite = gradle.parent != null
-	if (!inComposite && file(dir).exists()) includeBuild dir
+	if (file(dir).exists()) includeBuild dir
 }
 
 safeIncludeBuild '../calimero-core'
 safeIncludeBuild '../calimero-device'
 safeIncludeBuild '../calimero-rxtx'
+safeIncludeBuild '../serial-native'
+
+if (file('../calimero-usb').exists()) includeBuild('../calimero-usb') {
+    dependencySubstitution { // gradle does not automatically substitute with included 'lib' sub-project
+        substitute module('io.calimero:calimero-usb') using project(':lib')
+    }
+}

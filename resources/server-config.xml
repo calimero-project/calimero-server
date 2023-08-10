@@ -18,7 +18,7 @@
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
 		
 		<!-- Specify one KNX subnet type, connecting the KNX network. The subnet connection type is one of 
-			{ "ip", "knxip", "ft12", "ft12-cemi", "usb", "tpuart", "user-supplied", "virtual", "emulate" }. 
+			{ "ip", "tcp", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" }. 
 			The KNX communication medium is one of { "tp1" (default), "pl110", "knxip", "rf" }. 
 			In the follwing are some examples: -->
 
@@ -30,8 +30,11 @@
 
 		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
 
+		<!-- <knxSubnet type="tcp">192.168.10.80:3671</knxSubnet> -->
+		<!-- <knxSubnet type="tcp" host="1.2.0" user="4">192.168.10.80:3671</knxSubnet> -->
+
 		<!-- <knxSubnet type="ft12" medium="pl110" domainAddress="6f">/dev/ttyS0</knxSubnet> -->
-		<!-- <knxSubnet type="ft12-cemi" medium="tp1">/dev/ttyS0</knxSubnet> -->
+		<!-- <knxSubnet type="ft12" medium="tp1" format="cemi">/dev/ttyS0</knxSubnet> -->
 
 		<!-- KNX USB: specify the vendorId:productId or vendor name, e.g., siemens -->
 		<!-- <knxSubnet  type="usb" medium="tp1">siemens</knxSubnet> -->

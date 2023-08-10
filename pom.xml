@@ -2,9 +2,9 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>com.github.calimero</groupId>
+		<groupId>io.calimero</groupId>
 		<artifactId>calimero-parent-loom</artifactId>
-		<version>2.6-SNAPSHOT</version>
+		<version>3.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>calimero-server-loom</artifactId>
 	<name>Calimero KNXnet/IP Server (Loom)</name>
@@ -20,7 +20,7 @@
 		</developer>
 	</developers>
 	<properties>
-		<exec.mainClass>tuwien.auto.calimero.server.Launcher</exec.mainClass>
+		<exec.mainClass>io.calimero.server.Launcher</exec.mainClass>
 	</properties>
 	<build>
 		<plugins>
@@ -48,41 +48,28 @@
 	</build>
 	<dependencies>
 		<dependency>
-			<groupId>com.github.calimero</groupId>
+			<groupId>io.calimero</groupId>
 			<artifactId>calimero-core-loom</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.github.calimero</groupId>
+			<groupId>io.calimero</groupId>
 			<artifactId>calimero-device-loom</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.github.calimero</groupId>
+			<groupId>io.calimero</groupId>
 			<artifactId>calimero-rxtx</artifactId>
 			<version>${project.version}</version>
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-simple</artifactId>
-			<version>${slf4j.version}</version>
+			<groupId>io.calimero</groupId>
+			<artifactId>calimero-usb</artifactId>
+			<version>${project.version}</version>
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
 	</dependencies>
-	<repositories>
-		<repository>
-			<id>snapshots</id>
-			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-				<updatePolicy>daily</updatePolicy>
-			</snapshots>
-		</repository>
-	</repositories>
 </project>
