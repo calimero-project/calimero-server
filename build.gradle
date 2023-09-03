@@ -18,10 +18,10 @@ ext.junitJupiterVersion = '5.9.2'
 group = 'io.calimero'
 version = '3.0-SNAPSHOT'
 
-sourceCompatibility = 19
-targetCompatibility = 19
-
 java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
     withSourcesJar()
     withJavadocJar()
 
@@ -67,7 +67,6 @@ compileJava.options*.compilerArgs = [
 compileTestJava.options*.compilerArgs = [
 	'-Xlint:all',
 	'-Xlint:-try',
-	'--enable-preview',
 ]
 
 tasks.named('compileJava') {
@@ -88,8 +87,7 @@ sourceSets {
 
 tasks.withType(Javadoc).configureEach {
     options.addStringOption("Xdoclint:-missing", '-quiet')
-    options.addBooleanOption('-enable-preview', true)
-	options.addStringOption("-release", "${targetCompatibility}")
+	options.addStringOption("-release", "${java.targetCompatibility}")
 }
 
 test {

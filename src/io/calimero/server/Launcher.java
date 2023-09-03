@@ -595,9 +595,8 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 	}
 
-	@SuppressWarnings("preview")
 	private static Thread shutdownHook(final Launcher launcher) {
-		return Thread.ofVirtual().inheritInheritableThreadLocals(false).allowSetThreadLocals(false)
+		return Thread.ofVirtual().inheritInheritableThreadLocals(false)
 				.name(launcher.server.getName() + " shutdown").unstarted(launcher::quit);
 	}
 
