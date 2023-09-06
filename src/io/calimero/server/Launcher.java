@@ -83,6 +83,7 @@ import io.calimero.KNXAddress;
 import io.calimero.KNXFormatException;
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KnxRuntimeException;
+import io.calimero.Settings;
 import io.calimero.datapoint.Datapoint;
 import io.calimero.datapoint.DatapointMap;
 import io.calimero.datapoint.DatapointModel;
@@ -573,6 +574,11 @@ public class Launcher implements Runnable, AutoCloseable
 	{
 		if (args.length == 0) {
 			System.out.println("supply file name/URI for the KNX server configuration");
+			return;
+		}
+
+		if ("--version".equals(args[0]) || args.length == 1 && "-v".equals(args[0])) {
+			System.out.println("Calimero server " + Settings.getLibraryVersion());
 			return;
 		}
 
