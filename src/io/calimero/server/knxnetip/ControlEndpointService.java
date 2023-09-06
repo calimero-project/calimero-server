@@ -36,6 +36,11 @@
 
 package io.calimero.server.knxnetip;
 
+import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static io.calimero.knxnetip.KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION;
+import static io.calimero.knxnetip.KNXnetIPTunnel.TUNNEL_CONNECTION;
+import static io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily.DeviceManagement;
+import static io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily.Tunneling;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -43,11 +48,6 @@ import static java.lang.System.Logger.Level.TRACE;
 import static java.lang.System.Logger.Level.WARNING;
 import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.toList;
-import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
-import static io.calimero.knxnetip.KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION;
-import static io.calimero.knxnetip.KNXnetIPTunnel.TUNNEL_CONNECTION;
-import static io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily.DeviceManagement;
-import static io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily.Tunneling;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -976,7 +976,7 @@ final class ControlEndpointService extends ServiceLooper
 		final var additionalAddresses = knxipObject.additionalAddresses();
 		boolean tunnelingAddress = false;
 
-		for (byte index : indices) {
+		for (final byte index : indices) {
 			final var idx = index & 0xff;
 			if (idx == 0) {
 				if (addr.equals(serverAddress())) {
