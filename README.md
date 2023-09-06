@@ -21,7 +21,7 @@ _Optional_ dependencies, required for communication over serial ports:
 
 ### Docker image
 
-Pre-built Docker images for running the server are available on [Docker Hub](https://hub.docker.com/r/calimeroproject/knxserver).
+Pre-built Docker images for running the server are available on [Docker Hub](https://hub.docker.com/r/calimeroproject/knxserver). These snapshots might be [ahead of the latest release](https://github.com/calimero-project/calimero-server/issues/14) but in general not less stable than releases.
 
 Supported Features
 ------------------
