@@ -350,7 +350,7 @@ public class KNXnetIPServer
 		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();
 
-		logger.log(INFO, "{0} v{1}", friendlyName, Settings.getLibraryVersion());
+		logger.log(INFO, "{0} v{1}", "Calimero KNX IP server", Settings.getLibraryVersion());
 
 		ios.addServerListener(this::onPropertyValueChanged);
 

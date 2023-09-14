@@ -88,10 +88,10 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 
 		final KNXMediumSettings ms = getKNXMedium();
 		final KNXMediumSettings devSettings = KNXMediumSettings.create(ms.getMedium(), device);
-		if (ms instanceof PLSettings)
-			((PLSettings) devSettings).setDomainAddress(((PLSettings) ms).getDomainAddress());
-		if (ms instanceof RFSettings)
-			((RFSettings) devSettings).setDomainAddress(((RFSettings) ms).getDomainAddress());
+		if (ms instanceof final PLSettings pl)
+			((PLSettings) devSettings).setDomainAddress(pl.getDomainAddress());
+		if (ms instanceof final RFSettings rf)
+			((RFSettings) devSettings).setDomainAddress(rf.getDomainAddress());
 
 		final VirtualLink devLink = new VirtualLink(device.toString(), devSettings, true);
 		devLink.deviceLinks.add(this);

@@ -458,7 +458,7 @@ public final class SubnetConnector
 	}
 
 	public boolean knxipSecure() {
-		return args.length > 0 && args[0] instanceof Duration d && !d.isZero();
+		return args.length > 0 && args[0] instanceof final Duration d && !d.isZero();
 	}
 
 	@Override
