@@ -78,6 +78,7 @@ import io.calimero.link.KNXNetworkMonitorIP;
 import io.calimero.link.KNXNetworkMonitorTpuart;
 import io.calimero.link.KNXNetworkMonitorUsb;
 import io.calimero.link.medium.KNXMediumSettings;
+import io.calimero.link.medium.RFSettings;
 import io.calimero.link.medium.TPSettings;
 import io.calimero.server.VirtualLink;
 import io.calimero.server.gateway.KnxServerGateway.SubnetListener;
@@ -324,12 +325,13 @@ public final class SubnetConnector
 				}
 			}
 			case "usb" -> {
-				// ignore configured device address with USB on TP1 and always use 0.0.0
-				final var adjustForTP1 = settings instanceof ReplaceInterfaceAddressProxy ? settings
-						: settings instanceof TPSettings ? new UsbSettingsProxy(settings) : settings;
+				// ignore configured device address with USB on TP1/RF and always use 0.0.0
+				final var adjustedSettings = settings instanceof ReplaceInterfaceAddressProxy ? settings
+						: settings instanceof final TPSettings tp ? new UsbTpSettingsProxy(tp) :
+						  settings instanceof final RFSettings rf ? new UsbRfSettingsProxy(rf) : settings;
 				if (requestBaos)
-					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustForTP1));
-				yield () -> new KNXNetworkLinkUsb(linkArgs, adjustForTP1);
+					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustedSettings));
+				yield () -> new KNXNetworkLinkUsb(linkArgs, adjustedSettings);
 			}
 			case "ft12" -> {
 				if ("cemi".equals(msgFormat))
@@ -511,11 +513,11 @@ public final class SubnetConnector
 			setSubnetListener(listener);
 	}
 
-	// always use device address 0.0.0 with USB interface on TP1
-	private static final class UsbSettingsProxy extends TPSettings {
-		private final KNXMediumSettings delegate;
+	// always use device address 0.0.0 with USB TP1 interface
+	private static final class UsbTpSettingsProxy extends TPSettings {
+		private final TPSettings delegate;
 
-		UsbSettingsProxy(final KNXMediumSettings settings) {
+		UsbTpSettingsProxy(final TPSettings settings) {
 			this.delegate = settings;
 		}
 
@@ -524,6 +526,25 @@ public final class SubnetConnector
 			super.setMaxApduLength(maxApduLength);
 			delegate.setMaxApduLength(maxApduLength);
 		}
+	}
+
+	// always use device address 0.0.0 with USB RF interface
+	private static final class UsbRfSettingsProxy extends RFSettings {
+		private final RFSettings delegate;
+
+		UsbRfSettingsProxy(final RFSettings settings) {
+			super(BackboneRouter, settings.getDomainAddress(), settings.serialNumber(), settings.isUnidirectional());
+			this.delegate = settings;
+		}
+
+		@Override
+		public void setMaxApduLength(final int maxApduLength) {
+			super.setMaxApduLength(maxApduLength);
+			delegate.setMaxApduLength(maxApduLength);
+		}
+
+		// TODO override setDomainAddress
+		// TODO override setDeviceAddress?
 	}
 
 	private KNXMediumSettings mediumSettings() {
