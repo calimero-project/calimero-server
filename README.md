@@ -165,7 +165,7 @@ Optional attributes for secure routing:
 
 	`<knxSubnet type="usb" medium="rf" domainAddress="000000004b01">0409:005a</knxSubnet>`
 
-### KNX IP Secure 
+### <a id="knx-ip-secure"></a>KNX IP Secure 
 Running the server with KNX IP Secure requires a keyring (*.knxkeys) exported from ETS, or a keyfile. A keyfile contains 
 
 * a _group key_ if the server should use KNX IP Secure multicast communication
