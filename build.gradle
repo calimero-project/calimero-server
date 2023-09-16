@@ -55,8 +55,6 @@ application {
 }
 
 run {
-	// allows to pass -Djava.util.logging.config.file=resources/logging.properties
-	systemProperties System.properties
     standardInput = System.in
 }
 
@@ -109,11 +107,12 @@ dependencies {
     api "io.calimero:calimero-core:${version}"
     api "io.calimero:calimero-device:${version}"
 
-//	runtimeOnly 'org.slf4j:slf4j-jdk-platform-logging:2.0.4'
-
 	serialRuntimeOnly "io.calimero:calimero-rxtx:${version}"
 	serialRuntimeOnly "io.calimero:serial-native:${version}"
 	usbRuntimeOnly "io.calimero:calimero-usb:${version}"
+
+	runtimeOnly 'org.slf4j:slf4j-jdk-platform-logging:2.0.9'
+	runtimeOnly 'org.slf4j:slf4j-simple:2.0.9'
 
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
 }
