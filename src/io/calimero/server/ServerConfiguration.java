@@ -279,10 +279,10 @@ public class ServerConfiguration {
 	@Override
 	public String toString() {
 		// @formatter:off
-		return String.format("%s '%s' - %s service container%s, discovery%s",
-				name, friendly,
+		return String.format("'%s' with %s service container%s, discovery%s",
+				friendly,
 				containers.size(), containers.size() > 1 ? "s" : "",
-				discovery ? ": listen on " + discoveryNetifs() + " send on " + outgoingNetifs() : " disabled");
+				discovery ? ": listen on " + discoveryNetifs() + " send on " + outgoingNetifs() + " interfaces": " disabled");
 		// @formatter:on
 	}
 }

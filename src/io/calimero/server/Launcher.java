@@ -609,9 +609,9 @@ public class Launcher implements Runnable, AutoCloseable
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
-		logger.info("{}", config);
+		logger.info("use configuration {}", config);
 		for (final var contConfig : config.containers()) {
-			logger.info("{}", contConfig);
+			logger.info("service container {}", contConfig);
 		}
 	}
 
