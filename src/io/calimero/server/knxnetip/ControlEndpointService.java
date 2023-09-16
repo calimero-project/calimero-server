@@ -817,7 +817,7 @@ final class ControlEndpointService extends ServiceLooper
 				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.LinkLayer);
 				if (active.size() > 0) {
 					logger.log(WARNING, "{0}: tunneling on busmonitor-layer currently not allowed (active connections "
-							+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), active);
+							+ "for tunneling on link-layer)\n\tcurrently connected: {1}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 
@@ -837,7 +837,7 @@ final class ControlEndpointService extends ServiceLooper
 				final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
 				if (active.size() > 0) {
 					logger.log(WARNING, "{0}: connect request denied for tunneling on link-layer (active tunneling on "
-							+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
+							+ "busmonitor-layer connections)\n\tcurrently connected: {1}", svcCont.getName(), active);
 					return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 				}
 			}
@@ -845,7 +845,7 @@ final class ControlEndpointService extends ServiceLooper
 			final List<DataEndpoint> baos = activeConnectionsOfType(ConnectionType.Baos);
 			if (baos.size() > 0) {
 				logger.log(WARNING, "{0}: connect request denied for tunneling (active baos "
-						+ "connections)\n\tcurrently connected: {}", svcCont.getName(), baos);
+						+ "connections)\n\tcurrently connected: {1}", svcCont.getName(), baos);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 
@@ -889,13 +889,13 @@ final class ControlEndpointService extends ServiceLooper
 			final List<DataEndpoint> active = activeConnectionsOfType(ConnectionType.Monitor);
 			if (active.size() > 0) {
 				logger.log(WARNING, "{0}: connect request denied for baos connection (active tunneling on "
-						+ "busmonitor-layer connections)\n\tcurrently connected: {}", svcCont.getName(), active);
+						+ "busmonitor-layer connections)\n\tcurrently connected: {1}", svcCont.getName(), active);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 			final List<DataEndpoint> linkLayer = activeConnectionsOfType(ConnectionType.LinkLayer);
 			if (linkLayer.size() > 0) {
 				logger.log(WARNING, "{0}: baos connection currently not allowed (active connections "
-						+ "for tunneling on link-layer)\n\tcurrently connected: {}", svcCont.getName(), linkLayer);
+						+ "for tunneling on link-layer)\n\tcurrently connected: {1}", svcCont.getName(), linkLayer);
 				return errorResponse(ErrorCodes.NO_MORE_CONNECTIONS, endpoint);
 			}
 
