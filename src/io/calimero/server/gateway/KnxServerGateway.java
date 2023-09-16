@@ -568,7 +568,9 @@ public class KnxServerGateway implements Runnable
 	};
 
 	private final List<NetworkLinkListener> deviceListeners = new ArrayList<>();
-	private final KNXNetworkLink deviceLinkProxy = new KNXNetworkLink() {
+
+
+	private final class LinkAdapter implements KNXNetworkLink {
 		@Override
 		public void addLinkListener(final NetworkLinkListener l) { deviceListeners.add(l); }
 
@@ -582,8 +584,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
-				throws KNXTimeoutException, KNXLinkClosedException {
+		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu) {
 
 			final boolean ldm = dst != null && dst.equals(new IndividualAddress(0));
 			if (ldm) {
@@ -619,15 +620,13 @@ public class KnxServerGateway implements Runnable
 		}
 
 		@Override
-		public String getName() { return name + " device"; }
+		public String getName() { return name; }
 
 		@Override
 		public void setKNXMedium(final KNXMediumSettings settings) {}
 
 		@Override
-		public KNXMediumSettings getKNXMedium() {
-			return new KnxIPSettings(server.device().getAddress());
-		}
+		public KNXMediumSettings getKNXMedium() { return new KnxIPSettings(server.device().getAddress()); }
 
 		@Override
 		public void setHopCount(final int count) {}
@@ -640,7 +639,8 @@ public class KnxServerGateway implements Runnable
 
 		@Override
 		public void close() {}
-	};
+	}
+
 
 	/**
 	 * Creates a new server gateway for the supplied KNXnet/IP server.
@@ -657,7 +657,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		try {
-			server.device().setDeviceLink(deviceLinkProxy);
+			server.device().setDeviceLink(new LinkAdapter());
 
 			// setting the device link also sets the medium of our link proxy (KNX IP), so restore the correct
 			// value of the first service container
