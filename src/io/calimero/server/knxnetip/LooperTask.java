@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2022 B. Malinowsky
+    Copyright (c) 2016, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -118,7 +118,9 @@ class LooperTask implements Runnable {
 	void quit() {
 		// only call cleanup if there is no looper, otherwise cleanup is called in run()
 		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(LogLevel.INFO, null));
-		scheduledFuture.cancel(true);
+		final var future = scheduledFuture;
+		if (future != null)
+			future.cancel(true);
 	}
 
 	void cleanup(final LogLevel level, final Throwable t) {
