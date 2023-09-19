@@ -613,10 +613,8 @@ public class Launcher implements Runnable, AutoCloseable
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
-		logger.log(INFO, "use configuration {0}", config);
-		for (final var contConfig : config.containers()) {
-			logger.log(INFO, "service container {0}", contConfig);
-		}
+		String s = config.containers().stream().map(c -> "service container " + c).collect(Collectors.joining("\n"));
+		logger.log(INFO, "use configuration {0}\n{1}", config, s);
 	}
 
 	@Override
