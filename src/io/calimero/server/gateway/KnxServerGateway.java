@@ -653,7 +653,7 @@ public class KnxServerGateway implements Runnable
 		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).collect(Collectors.toList()));
 		for (final var c : config.containers()) {
 			final var sc = c.subnetConnector().getServiceContainer();
-			setupTimeServer(sc, c.timeServer());
+			setupTimeServer(sc, c.timeServerDatapoints());
 		}
 
 		try {
