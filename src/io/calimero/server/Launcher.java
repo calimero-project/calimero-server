@@ -402,12 +402,10 @@ public class Launcher implements Runnable, AutoCloseable
 								tunnelingUserToAddresses.computeIfAbsent(iface.user(), ArrayList::new).add(iface.address());
 								indAddressPool.add(iface.address());
 							}
-							config = new Container(indAddressPool, tunnelingUserToAddresses, connector, filter,
-									timeServerDatapoints, secureServices, keyfile, keyring);
 						}
-						else
-							config = new Container(indAddressPool, tunnelingUserToAddresses, connector, filter,
-									timeServerDatapoints, secureServices, keyfile);
+
+						config = new Container(indAddressPool, tunnelingUserToAddresses, connector, filter,
+								timeServerDatapoints, secureServices, keyfile, Optional.ofNullable(keyring));
 						containers.add(config);
 						return;
 					}

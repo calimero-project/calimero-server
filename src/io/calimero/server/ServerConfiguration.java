@@ -65,26 +65,35 @@ public class ServerConfiguration {
 	/**
 	 * Contains the configuration for a service container managed by the KNXnet/IP server.
 	 */
-	public static final class Container {
+	public record Container(List<IndividualAddress> additionalAddresses,
+			Map<Integer, List<IndividualAddress>> tunnelingUsers, SubnetConnector subnetConnector,
+			List<GroupAddress> groupAddressFilter, List<StateDP> timeServerDatapoints,
+			EnumSet<ServiceFamily> securedServices, Map<String, byte[]> keyfile, Optional<Keyring> keyring) {
+
 		private static final String secureSymbol = new String(Character.toChars(0x1F512));
 
-		// server side
 
-		private final List<IndividualAddress> additionalAddresses;
-		private final EnumSet<ServiceFamily> securedServices;
-		private final Map<Integer, List<IndividualAddress>> tunnelingUsers;
-		private final Keyring keyring;
-		private final Map<String, byte[]> keyfile;
+		/**
+		 * Creates a new service container configuration with security and a keyring resource.
+		 *
+		 * @param additionalAddresses additional addresses assigned to tunneling connections.
+		 * @param subnetConnector subnet connector for that container
+		 * @param groupAddressFilter group address filter
+		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
+		 *        functionality
+		 * @param securedServices set of service families that should use KNX IP Secure
+		 * @param keyfile map with KNX IP Secure keys/passwords, e.g., loaded from a keyfile
+		 * @param keyring keyring to use for this container, <code>keyfile</code> can contain the keyring password
+		 */
+		public Container {
+			additionalAddresses = List.copyOf(additionalAddresses);
+			tunnelingUsers = Map.copyOf(tunnelingUsers);
+			securedServices = EnumSet.copyOf(securedServices);
+			keyfile = Map.copyOf(keyfile);
 
-		// subnet side
-
-		private final SubnetConnector connector;
-		private final List<GroupAddress> groupAddressFilter;
-
-		// both sides
-
-		private final List<StateDP> timeServer;
-
+			groupAddressFilter = List.copyOf(groupAddressFilter);
+			timeServerDatapoints = List.copyOf(timeServerDatapoints);
+		}
 
 		/**
 		 * Creates a new service container configuration without any security.
@@ -102,7 +111,7 @@ public class ServerConfiguration {
 		}
 
 		/**
-		 * Creates a new service container configuration with security.
+		 * Creates a new service container configuration with security using a keyfile.
 		 *
 		 * @param additionalAddresses additional addresses assigned to tunneling connections.
 		 * @param connector subnet connector for that container
@@ -118,52 +127,10 @@ public class ServerConfiguration {
 				final EnumSet<ServiceFamily> securedServices, final Map<String, byte[]> keyfile) {
 
 			this(additionalAddresses, tunnelingUsers, connector, groupAddressFilter, timeServerDatapoints,
-					securedServices, keyfile, null);
+					securedServices, keyfile, Optional.empty());
 		}
-
-		/**
-		 * Creates a new service container configuration with security and a keyring resource.
-		 *
-		 * @param additionalAddresses additional addresses assigned to tunneling connections.
-		 * @param connector subnet connector for that container
-		 * @param groupAddressFilter group address filter
-		 * @param timeServerDatapoints datapoints used for running a time server, empty map for no time server
-		 *        functionality
-		 * @param securedServices set of service families that should use KNX IP Secure
-		 * @param keyfile map with KNX IP Secure keys/passwords, e.g., loaded from a keyfile
-		 * @param keyring keyring to use for this container, <code>keyfile</code> can contain the keyring password
-		 */
-		public Container(final List<IndividualAddress> additionalAddresses,
-			final Map<Integer, List<IndividualAddress>> tunnelingUsers, final SubnetConnector connector,
-			final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints,
-			final EnumSet<ServiceFamily> securedServices, final Map<String, byte[]> keyfile, final Keyring keyring) {
-
-			this.additionalAddresses = List.copyOf(additionalAddresses);
-			this.tunnelingUsers = Map.copyOf(tunnelingUsers);
-			this.securedServices = EnumSet.copyOf(securedServices);
-			this.keyring = keyring;
-			this.keyfile = Map.copyOf(keyfile);
-
-			this.connector = connector;
-			this.groupAddressFilter = List.copyOf(groupAddressFilter);
-			this.timeServer = List.copyOf(timeServerDatapoints);
-		}
-
-		public List<IndividualAddress> additionalAddresses() { return additionalAddresses; }
 
 		public EnumSet<ServiceFamily> securedServices() { return securedServices.clone(); }
-
-		public Map<Integer, List<IndividualAddress>> tunnelingUsers() { return tunnelingUsers; }
-
-		public Optional<Keyring> keyring() { return Optional.ofNullable(keyring); }
-
-		public Map<String, byte[]> keyfile() { return keyfile; }
-
-		public SubnetConnector subnetConnector() { return connector; }
-
-		public List<GroupAddress> groupAddressFilter() { return groupAddressFilter; }
-
-		public List<StateDP> timeServer() { return timeServer; }
 
 		@Override
 		public String toString() {
