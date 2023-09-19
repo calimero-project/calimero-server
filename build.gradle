@@ -101,6 +101,18 @@ tasks.withType(JavaExec).configureEach {
 
 startScripts {
     defaultJvmOpts = addReads
+    
+	doLast {
+		// put commons-lang jar also on the classpath, used by libusb4java (which is in UNNAMED module)
+		def commonsLang3 = configurations.runtimeClasspath.filter { it.name.startsWith("commons-lang3") }
+		def libName = commonsLang3.getSingleFile().name
+
+        def unixScriptFile = file getUnixScript()
+        def windowsScriptFile = file getWindowsScript()
+
+        unixScriptFile.text = unixScriptFile.text.replace('\n\nMODULE_PATH=', ':$APP_HOME/lib/' + "${libName}\n\nMODULE_PATH=")
+        windowsScriptFile.text = windowsScriptFile.text.replace('\r\nset MODULE_PATH=', ';%APP_HOME%\\lib\\' + "${libName}\r\nset MODULE_PATH=")
+	}
 }
 
 dependencies {
