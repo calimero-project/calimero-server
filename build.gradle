@@ -18,10 +18,10 @@ ext.junitJupiterVersion = '5.10.0'
 group = 'io.calimero'
 version = '2.6-SNAPSHOT'
 
-sourceCompatibility = 17
-targetCompatibility = 17
-
 java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
     withSourcesJar()
     withJavadocJar()
 
