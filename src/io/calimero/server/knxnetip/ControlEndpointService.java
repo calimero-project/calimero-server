@@ -324,7 +324,7 @@ final class ControlEndpointService extends ServiceLooper
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			byte[] macFilter = {};
 			byte[] requestedServices = {};
-			byte[] requestedDibs = { DIB.DEVICE_INFO, DIB.AdditionalDeviceInfo, DIB.SUPP_SVC_FAMILIES };
+			byte[] requestedDibs = {};
 			for (final Srp srp : sr.searchParameters()) {
 				final Type type = srp.type();
 				if (type == Srp.Type.SelectByProgrammingMode) {
@@ -572,7 +572,8 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 
-		final Set<Integer> set = new TreeSet<>();
+		// always include device info and service families in response
+		final Set<Integer> set = new TreeSet<>(List.of(DIB.DEVICE_INFO, DIB.AdditionalDeviceInfo, DIB.SUPP_SVC_FAMILIES));
 		for (final byte dibType : requestedDibs)
 			set.add(dibType & 0xff);
 		if (((DefaultServiceContainer) svcCont).baosSupport())
