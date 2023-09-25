@@ -549,7 +549,7 @@ final class ControlEndpointService extends ServiceLooper
 		final InetSocketAddress local = (InetSocketAddress) getSocket().getLocalSocketAddress();
 		if (local == null) {
 			logger.log(WARNING, "KNXnet/IP discovery unable to announce container ''{0}'', problem with local endpoint: "
-					+ "socket bound={}, closed={}", svcCont.getName(), getSocket().isBound(), getSocket().isClosed());
+					+ "socket bound={1}, closed={2}", svcCont.getName(), getSocket().isBound(), getSocket().isClosed());
 			return Optional.empty();
 		}
 
