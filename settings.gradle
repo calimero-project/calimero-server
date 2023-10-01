@@ -7,9 +7,4 @@ safeIncludeBuild '../calimero-core'
 safeIncludeBuild '../calimero-device'
 safeIncludeBuild '../calimero-rxtx'
 safeIncludeBuild '../serial-native'
-
-if (file('../calimero-usb').exists()) includeBuild('../calimero-usb') {
-    dependencySubstitution { // gradle does not automatically substitute with included 'lib' sub-project
-        substitute module('io.calimero:calimero-usb') using project(':lib')
-    }
-}
+safeIncludeBuild '../calimero-usb'
