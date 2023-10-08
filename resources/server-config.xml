@@ -5,25 +5,25 @@
 	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
 
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
-	<serviceContainer activate="true" routing="true" networkMonitoring="true" 
+	<serviceContainer activate="true" routing="true" networkMonitoring="true"
 		udpPort="3671" listenNetIf="any">
 		<knxAddress type="individual">7.1.0</knxAddress>
 		<routing/>
-		<!-- latencyTolerance specifies the time window for accepting secure multicasts, 
+		<!-- latencyTolerance specifies the time window for accepting secure multicasts,
 			depends on max. end-to-end network latency (usually [500 .. 8000] ms) -->
 		<!-- <routing latencyTolerance="1000">224.0.23.12</routing> -->
 
-		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link 
+		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link
 			using the specific client UDP port range (if caused by a disrupted connection). -->
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
-		
-		<!-- Specify one KNX subnet type, connecting the KNX network. The subnet connection type is one of 
-			{ "ip", "tcp", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" }. 
-			The KNX communication medium is one of { "tp1" (default), "pl110", "knxip", "rf" }. 
+
+		<!-- Specify one KNX subnet type, connecting the KNX network. The subnet connection type is one of
+			{ "ip", "tcp", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" }.
+			The KNX communication medium is one of { "tp1" (default), "pl110", "knxip", "rf" }.
 			In the follwing are some examples: -->
 
 		<!-- <knxSubnet type="ip">192.168.10.10:3671</knxSubnet> -->
-		<!-- two optional attributes are supported for tunneling: 
+		<!-- two optional attributes are supported for tunneling:
 			* netif: specifies the server network interface to the knx subnet
 			* useNat="true"|"false": use network address translation (NAT) -->
 		<!-- <knxSubnet type="ip" netif="eth0" useNat="true">192.168.10.10:3671</knxSubnet> -->
@@ -64,7 +64,7 @@
 			<knxAddress type="individual">7.1.13</knxAddress>
 		</additionalAddresses>
 
-		<!-- Cyclically transmit date (11.001), time (10.001), or date+time (19.001) information on the subnetwork 
+		<!-- Cyclically transmit date (11.001), time (10.001), or date+time (19.001) information on the subnetwork
 			 and server side, using the default time zone and the specified datapoint(s).
 			 Expiration timeout specifies tx cycle in seconds, e.g., 1 min = 60, 1 hour = 3600, 12 hours = 43200 -->
 		<!--
