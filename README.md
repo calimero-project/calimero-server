@@ -79,13 +79,15 @@ java -cp "calimero-server-3.0-SNAPSHOT.jar:calimero-core-3.0-SNAPSHOT.jar:calime
 
 ### Server Configuration
 
-Elements and attributes of `server-config.xml`:
+A working example of an XML server configuration can be found [here](https://github.com/calimero-project/calimero-server/blob/master/resources/server-config.xml).
 
-* `<knxServer name="knx-server" friendlyName="My KNXnet/IP Server">` (required): the server ID (for logging etc.) and the KNXnet/IP friendly name (for discovery & self-description)
+Description of the supported XML elements and attributes:
+
+* `<knxServer name="knx-server" friendlyName="My KNXnet/IP Server">` (required): specifies the server ID (for logging etc.) and the KNXnet/IP friendly name (for discovery & self-description)
 
 	- `name="knx-server"`: Attribute to specify the internal name of the server (mainly for logging, naming, debugging purposes)
-	- `friendlyName="My KNXnet/IP Server"`: Attribute to specify a custom name (max. 30 characters). Will be displayed in e.g. ETS-tool.
-	- `appData="/path/to/app/dir"` (optional): base directory to load/save server application data, by default this is the empty path. The path might start with _~_, expanded to the Java system property _"user.home"_. The server's interface object server data is stored in this directory. The `<serviceContainer>` attributes `keyfile` and `keyring` are resolved against this directory if they contain a relative path.
+	- `friendlyName="My KNXnet/IP Server"`: Attribute to specify a custom name (max. 30 characters). Will be displayed in e.g. ETS.
+	- `appData="/path/to/app/dir"` (optional): base directory to load/save server application data, by default this is the empty path. The path might start with _~_, expanded to the Java system property _"user.home"_. The server's interface object server (IOS) data is stored in this directory between restarts. The `<serviceContainer>` attributes `keyfile` and `keyring` are resolved against this directory if they contain a relative path.
 
 * `<discovery listenNetIf="all" outgoingNetIf="all" activate="true"/>` (optional attributes): the network interfaces to listen for KNXnet/IP discovery requests, as well as the network interfaces to answer requests, e.g., `"all"`, `"any"`, or `"lo,eth0,eth1"`. The attribute `activate` allows to disable KNXnet/IP discovery & self-description. If disabled, any received discovery or descriptions request will be ignored.
 
