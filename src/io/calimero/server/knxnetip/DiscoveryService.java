@@ -254,7 +254,7 @@ final class DiscoveryService extends ServiceLooper
 					sentOn.add(nameOf(nif));
 				}
 				catch (final IOException e) {
-					logger.log(INFO, "failure sending on interface {0}", nameOf(nif));
+					logger.log(INFO, "failure sending on interface {0}: {1}", nameOf(nif), e.getMessage());
 				}
 			}
 		}
