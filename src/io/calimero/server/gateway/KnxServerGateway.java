@@ -578,8 +578,7 @@ public class KnxServerGateway implements Runnable
 		public void removeLinkListener(final NetworkLinkListener l) { deviceListeners.remove(l); }
 
 		@Override
-		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu)
-				throws KNXTimeoutException, KNXLinkClosedException {
+		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu) {
 			sendRequestWait(dst, p, nsdu);
 		}
 
