@@ -97,6 +97,8 @@ def addReads = [ "--add-reads", "io.calimero.core=io.calimero.server", // @LinkE
 
 tasks.withType(JavaExec).configureEach {
     jvmArgs += addReads
+    // add as root module because it is required by non-modularized usb4java
+    jvmArgs += [ "--add-modules", "org.apache.commons.lang3" ]
 }
 
 startScripts {
