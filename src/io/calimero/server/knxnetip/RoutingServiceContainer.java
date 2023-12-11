@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2022 B. Malinowsky
+    Copyright (c) 2010, 2023 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -69,8 +69,8 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
-	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
-	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DefaultMulticast}
+	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing;
+	 *        use {@link KNXnetIPRouting#DefaultMulticast} for the default KNX multicast group
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
 	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
@@ -93,15 +93,15 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
-	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing; if
-	 *        you are unsure about a supported multicast address, use {@link KNXnetIPRouting#DefaultMulticast}
+	 * @param routingMulticast the routing multicast address this service container should use for KNXnet/IP routing;
+	 *        use {@link KNXnetIPRouting#DefaultMulticast} for the default KNX multicast group
 	 * @param latencyTolerance time window for accepting secure multicasts, depending on max. end-to-end network latency
-	 *        (typically 500 ms to 5000 ms), <code>latencyTolerance.toMillis() &gt; 0</code>
+	 *        (typically 500 ms to 5000 ms), <code>0 &lt; latencyTolerance.toMillis() &le; 8000</code>
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
-	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint, final KNXMediumSettings subnet,
-		final boolean allowNetworkMonitoring, final boolean udpOnly, final InetAddress routingMulticast,
-		final Duration latencyTolerance, final boolean baosSupport) {
+	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+			final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
+			final InetAddress routingMulticast, final Duration latencyTolerance, final boolean baosSupport) {
 		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring, udpOnly, baosSupport);
 		final IndividualAddress addr = subnet.getDeviceAddress();
 		if (addr.getDevice() != 0)
