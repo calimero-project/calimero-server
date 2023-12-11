@@ -423,7 +423,7 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		private static Duration latencyTolerance(final XmlReader r) {
-			final int tolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(0);
+			final int tolerance = attr(r, "latencyTolerance").map(Integer::parseUnsignedInt).orElse(1000);
 			return Duration.ofMillis(tolerance);
 		}
 
