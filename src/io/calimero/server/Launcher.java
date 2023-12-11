@@ -224,7 +224,7 @@ public class Launcher implements Runnable, AutoCloseable
 			// look for a keyring configuration
 			final var keyring = attr(r, "keyring").map(file -> appData.resolve(file).toString()).map(Keyring::load).orElse(null);
 
-			final var secureServices = decodeSecuredServicecs(attr(r, "securedServices").orElse("0"));
+			final var secureServices = decodeSecuredServices(attr(r, "securedServices").orElse("0"));
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String subnetArgs = "";
@@ -427,7 +427,7 @@ public class Launcher implements Runnable, AutoCloseable
 			return Duration.ofMillis(tolerance);
 		}
 
-		private static EnumSet<ServiceFamily> decodeSecuredServicecs(final String svcs) {
+		private static EnumSet<ServiceFamily> decodeSecuredServices(final String svcs) {
 			try {
 				return toEnumSet(Integer.decode(svcs));
 			}
