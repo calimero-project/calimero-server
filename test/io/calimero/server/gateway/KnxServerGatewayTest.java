@@ -100,7 +100,7 @@ class KnxServerGatewayTest
 	private static final int MAIN_LCGRPCONFIG = 54;
 	private static final int SUB_LCGRPCONFIG = 55;
 
-	private KNXnetIPServer setupServer(final String name)
+	private static KNXnetIPServer setupServer(final String name)
 	{
 		final var config = new ServerConfiguration(name, "friendly server name", true, List.of(), List.of(), List.of());
 		final KNXnetIPServer s = new KNXnetIPServer(config);
