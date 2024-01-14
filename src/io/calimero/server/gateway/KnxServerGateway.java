@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -265,6 +265,10 @@ public class KnxServerGateway implements Runnable
 					else if (type != ConnectionType.Monitor && !(rawLink instanceof KNXNetworkLink)) {
 						closeLink(subnetLink);
 						connector.openNetworkLink();
+						// we immediately set a virtual network to connected, so that there is no
+						// initial state "knx bus not connected" in a server discovery
+						if (connector.interfaceType().equals("virtual"))
+							setNetworkState(1, true, false);
 					}
 					else if (type == ConnectionType.Monitor && !(rawLink instanceof KNXNetworkMonitor)) {
 						closeLink(subnetLink);
@@ -727,6 +731,10 @@ public class KnxServerGateway implements Runnable
 			if (connector.getServiceContainer().isActivated())
 				try {
 					connector.openNetworkLink();
+					// we immediately set a virtual network to connected, so that there is no
+					// initial state "knx bus not connected" in a server discovery
+					if (connector.interfaceType().equals("virtual"))
+						setNetworkState(1, true, false);
 				}
 				catch (KNXException | RuntimeException e) {
 					logger.log(ERROR, "error opening network link for " + connector.getName(), e);
