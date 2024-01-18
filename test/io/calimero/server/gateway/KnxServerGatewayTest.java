@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,6 +70,7 @@ import io.calimero.link.medium.TPSettings;
 import io.calimero.mgmt.PropertyAccess;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.server.ServerConfiguration;
+import io.calimero.server.gateway.SubnetConnector.InterfaceType;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.ServiceContainer;
@@ -124,7 +125,7 @@ class KnxServerGatewayTest
 		final var sc = new DefaultServiceContainer("test container 2", "any", new HPAI(lo, 0), new TPSettings(),
 				false, false, false, false);
 		s.addServiceContainer(sc);
-		final var connector = SubnetConnector.newCustom(sc, "emulate");
+		final var connector = SubnetConnector.newCustom(sc, InterfaceType.Emulate);
 
 		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
 		final var config = new ServerConfiguration("test GW 2", "friendly test GW 2", true, List.of(), List.of(),

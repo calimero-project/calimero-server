@@ -276,11 +276,11 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				catch (KNXException | InterruptedException e) {
-					final String subnetType = connector.getInterfaceType();
+					final var interfaceType = connector.interfaceType();
 					final String subnetArgs = connector.linkArguments();
 					final ServiceContainer serviceContainer = connector.getServiceContainer();
 					final KNXMediumSettings settings = serviceContainer.getMediumSettings();
-					logger.log(ERROR, "open network link using {0} interface {1} for {2}", subnetType, subnetArgs, settings, e);
+					logger.log(ERROR, "open subnet link using {0} interface {1} for {2}", interfaceType, subnetArgs, settings, e);
 					if (e instanceof InterruptedException)
 						Thread.currentThread().interrupt();
 					return false;
@@ -733,7 +733,7 @@ public class KnxServerGateway implements Runnable
 					connector.openNetworkLink();
 					// we immediately set a virtual network to connected, so that there is no
 					// initial state "knx bus not connected" in a server discovery
-					if (connector.interfaceType().equals("virtual"))
+					if (connector.interfaceType() == SubnetConnector.InterfaceType.Virtual)
 						setNetworkState(1, true, false);
 				}
 				catch (KNXException | RuntimeException e) {
@@ -1208,7 +1208,7 @@ public class KnxServerGateway implements Runnable
 					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
 					if (ldata.getDestination().equals(containerAddr)) {
 						// with an usb interface, device is always our own address, so we always exclude it for now
-						if (connector.getInterfaceType().equals("usb"))
+						if (connector.interfaceType() == SubnetConnector.InterfaceType.Usb)
 							logger.log(DEBUG, "received from subnet using usb interface {0}, don't intercept frame",
 									connector.getName());
 						else if (connector.interfaceAddress().isPresent())
@@ -1475,7 +1475,7 @@ public class KnxServerGateway implements Runnable
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
 				// addresses to client connections,
 				// even though we always have the same destination (e.g., the address of the usb interface)
-				else if (subnet.getInterfaceType().equals("usb")
+				else if (subnet.interfaceType() == SubnetConnector.InterfaceType.Usb
 						&& f.getDestination().equals(localInterface) || subnet.interfaceAddress().isPresent()) {
 					for (final var entry : connections.entrySet()) {
 						final var connection = entry.getValue();
@@ -2018,7 +2018,7 @@ public class KnxServerGateway implements Runnable
 	private boolean localDeviceManagement(final SubnetConnector connector, final CEMILData ldata)
 	{
 		final IndividualAddress localInterface = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
-		if (connector.getInterfaceType().equals("usb") && ldata.getDestination().equals(localInterface)) {
+		if (connector.interfaceType() == SubnetConnector.InterfaceType.Usb && ldata.getDestination().equals(localInterface)) {
 			final byte[] data = ldata.getPayload();
 			logger.log(DEBUG, "request for {0}, use USB Local-DM", localInterface);
 			if (data.length < 2)
@@ -2118,7 +2118,7 @@ public class KnxServerGateway implements Runnable
 	{
 		final SubnetConnector connector = getSubnetConnector(svcCont.getName());
 		// TODO check for cEMI server
-		if (!connector.getInterfaceType().equals("usb"))
+		if (connector.interfaceType() != SubnetConnector.InterfaceType.Usb)
 			return;
 		final IndividualAddress configured = svcCont.getMediumSettings().getDeviceAddress();
 		final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
