@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2020, 2023 B. Malinowsky
+    Copyright (c) 2020, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -155,8 +155,8 @@ public class ServerConfiguration {
 				filter = "\n\tGroup address filter " + groupAddressFilter();
 
 			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
-			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null ? secureSymbol + " "
-					: "";
+			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
+					? secureSymbol + " " : "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
 			return String.format("""
 					%s%s:

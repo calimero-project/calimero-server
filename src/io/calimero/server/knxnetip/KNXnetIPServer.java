@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -860,16 +860,16 @@ public class KNXnetIPServer
 		//
 		// set properties used in manufacturer data DIB for discovery self-description
 		//
-		final byte[] zero = new byte[1];
+
 		// we don't indicate any capabilities here, since executing the respective tasks
 		// is either done in the gateway (and, therefore, the property is set by the
 		// gateway) or by the user, who has to care about it on its own
-		setProperty(knxObject, objectInstance, PID.KNXNETIP_ROUTING_CAPABILITIES, zero);
-		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_STATE, zero);
+		setProperty(knxObject, objectInstance, PID.KNXNETIP_ROUTING_CAPABILITIES, (byte) 0);
+		setProperty(knxObject, objectInstance, PID.KNXNETIP_DEVICE_STATE, (byte) 0);
 
-		setProperty(knxObject, objectInstance, PID.IP_CAPABILITIES, zero);
-		setPropertyIfAbsent(knxObject, objectInstance, PID.IP_ASSIGNMENT_METHOD, new byte[] { 1 });
-		setPropertyIfAbsent(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, new byte[] { 1 });
+		setProperty(knxObject, objectInstance, PID.IP_CAPABILITIES, (byte) 0);
+		setPropertyIfAbsent(knxObject, objectInstance, PID.IP_ASSIGNMENT_METHOD, (byte) 1);
+		setPropertyIfAbsent(knxObject, objectInstance, PID.CURRENT_IP_ASSIGNMENT_METHOD, (byte) 1);
 	}
 
 	private void setRoutingConfiguration(final RoutingServiceContainer endpoint, final int objectInstance)

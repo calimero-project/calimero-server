@@ -423,7 +423,8 @@ public final class DataEndpoint extends ConnectionBase
 				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				logger.log(TRACE, "data endpoint received connection state request from " + dataEndpt + " for channel " + csr.getChannelID());
+				logger.log(TRACE, "data endpoint received connection state request from "
+						+ ServiceLooper.hostPort(dataEndpt) + " for channel " + csr.getChannelID());
 				updateLastMsgTimestamp();
 				status = subnetStatus();
 			}
@@ -447,12 +448,12 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
-		final int svc = h.getServiceType();
 		// NYI detect data type conflict (wrong sized value) and respond with ReturnCode.DataTypeConflict
 		final var req = ServiceRequest.from(h, buffer.array(), buffer.position());
 		final TunnelingFeature feat = req.service();
 		logger.log(DEBUG, "received {0}", feat);
 
+		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.TunnelingFeatureGet) {
 			return switch (feat.featureId()) {
 				case SupportedEmiTypes -> responseForFeature(feat, (byte) 0, (byte) 0x04); // only cEMI (see EmiType.CEmi)

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -362,7 +362,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
-			logger.log(INFO, "send KNXnet/IP description to {0}: {1}", responseAddress, description);
+			logger.log(INFO, "send KNXnet/IP description to {0}: {1}", hostPort(responseAddress), description);
 			send(sessionId, 0, buf, responseAddress);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
