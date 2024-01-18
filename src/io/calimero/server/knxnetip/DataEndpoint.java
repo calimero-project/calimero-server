@@ -131,6 +131,10 @@ public final class DataEndpoint extends ConnectionBase
 	private boolean featureInfoServiceEnabled;
 	private boolean tunnelingAddressChanged;
 
+	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
+	// even if indicated otherwise in the HPAI or required by the spec
+	private volatile InetSocketAddress useDifferingEtsSrcPortForResponse;
+
 	public enum ConnectionType {
 		LinkLayer(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
 		Monitor(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
@@ -218,13 +222,15 @@ public final class DataEndpoint extends ConnectionBase
 
 		if (TcpLooper.send(buf, dst))
 			return;
-		final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
-		if (dst.equals(dataEndpt))
+
+		var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
+		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
+		if (actualDst.equals(dataEndpt))
 			socket.send(p);
-		else if (dst.equals(ctrlEndpt))
+		else if (actualDst.equals(ctrlEndpt))
 			ctrlSocket.send(p);
 		else {
-			logger.log(TRACE, "sending to non-standard destination {0}", ServiceLooper.hostPort(dst));
+			logger.log(TRACE, "sending to non-standard destination {0}", ServiceLooper.hostPort(actualDst));
 			socket.send(p);
 		}
 	}
@@ -354,7 +360,7 @@ public final class DataEndpoint extends ConnectionBase
 				; // no-op
 			else if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
-				send(buf, dataEndpt);
+				send(buf, etsDstHack(dataEndpt, src));
 			}
 			else {
 				logger.log(WARNING, type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
@@ -437,7 +443,8 @@ public final class DataEndpoint extends ConnectionBase
 				logger.log(WARNING, "received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			send(buf, ctrlEndpt);
+			var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
+			send(buf, dst);
 		}
 		else
 			return false;
@@ -449,7 +456,9 @@ public final class DataEndpoint extends ConnectionBase
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		logger.log(DEBUG, "respond with {0}", res);
-		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dataEndpt);
+
+		var dst = etsDstHack(dataEndpt, src);
+		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dst);
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
@@ -684,5 +693,18 @@ public final class DataEndpoint extends ConnectionBase
 
 		if (ctype == ConnectionType.DevMgmt && !(frame instanceof CEMIDevMgmt))
 			throw new KNXIllegalArgumentException("expect cEMI device management frame type");
+	}
+
+	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
+	// even if indicated otherwise in the HPAI or required by the spec
+	private InetSocketAddress etsDstHack(InetSocketAddress correct, InetSocketAddress actual) {
+		// we ignore any attempt to respond to a different IP address
+		if (!actual.getAddress().equals(correct.getAddress()))
+			return correct;
+		if (actual.getPort() == correct.getPort())
+			return correct;
+		logger.log(DEBUG, "[ETS] respond to different port {0} (data endpoint was setup for {1})", actual.getPort(), correct.getPort());
+		useDifferingEtsSrcPortForResponse = actual;
+		return actual;
 	}
 }
