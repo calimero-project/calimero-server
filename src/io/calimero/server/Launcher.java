@@ -157,7 +157,7 @@ public class Launcher implements Runnable, AutoCloseable
 				System.getProperty("user.home"));
 
 		private final URI uri;
-		private final List<ServerConfiguration.Container> containers = new ArrayList<>();
+		private final List<Container> containers = new ArrayList<>();
 		private Path appData;
 
 
@@ -623,7 +623,7 @@ public class Launcher implements Runnable, AutoCloseable
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
-		String s = config.containers().stream().map(c -> "service container " + c).collect(Collectors.joining("\n"));
+		final String s = config.containers().stream().map(c -> "service container " + c).collect(Collectors.joining("\n"));
 		logger.info("use configuration {}\n{}", config, s);
 	}
 
@@ -791,7 +791,7 @@ public class Launcher implements Runnable, AutoCloseable
 			decrypted.put("user[1].key", mgmtKey);
 		}
 
-		if (sc instanceof final RoutingServiceContainer rsc) {
+		if (sc instanceof RoutingServiceContainer rsc) {
 			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().equals(rsc.routingMulticastAddress()));
 			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
 				final var enc = backbone.get().groupKey().get();

@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2023 B. Malinowsky
+    Copyright (c) 2018, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -105,8 +105,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	private static void runTcpServerEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint,
 			final boolean baos, final AbstractQueue<Closeable> serverSocket) {
 
-		final String namePrefix = ces.server.getName() + " " + ces.getServiceContainer().getName() + (baos ? " baos" : "")
-				+ " tcp ";
+		final String namePrefix = ces.getServiceContainer().getName() + (baos ? " baos" : "") + " tcp ";
 		final String name = namePrefix + "service";
 		Thread.currentThread().setName(name);
 

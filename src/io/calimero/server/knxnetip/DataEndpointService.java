@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ final class DataEndpointService extends ServiceLooper
 	{
 		super(server, newSocket(localCtrlEndpt.getLocalAddress(), 0), 512, MAX_RECEIVE_INTERVAL * 1000);
 		this.svcContName = svcContName;
-		logger.debug("created socket on " + s.getLocalSocketAddress());
+		logger.debug("created socket on " + hostPort((InetSocketAddress) s.getLocalSocketAddress()));
 	}
 
 	void resetRequest(final DataEndpoint endpoint)

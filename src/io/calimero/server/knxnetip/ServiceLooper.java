@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2021 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -154,7 +154,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		// regardless whether subsequent HPAIs contain useful information
 		if (useNat) {
 			if (logEndpointType != 0)
-				logger.debug("responses use route back {} endpoint {}", type, sender);
+				logger.debug("responses use route-back {} endpoint {}", type, hostPort(sender));
 			return sender;
 		}
 
@@ -163,12 +163,12 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		if (endpoint.getAddress().isAnyLocalAddress() || endpoint.getPort() == 0) {
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.debug("responses to client use route back {} endpoint {}", type, sender);
+				logger.debug("responses to client use route-back {} endpoint {}", type, hostPort(sender));
 			return sender;
 		}
 
 		if (logEndpointType == 2)
-			logger.trace("using client-assigned {} endpoint {} for responses", type, endpoint.endpoint());
+			logger.trace("using client-assigned {} endpoint {} for responses", type, hostPort(endpoint.endpoint()));
 		return endpoint.endpoint();
 	}
 

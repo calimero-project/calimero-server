@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ class LooperTask implements Runnable {
 			looper = supplier.get();
 			// reset for the next reconnection attempt
 			attempt = 0;
-			logger.info(looper.server.getName() + " " + looper + " is up and running");
+			logger.info(looper + " is up and running");
 			looper.run();
 			cleanup(LogLevel.INFO, null);
 		}

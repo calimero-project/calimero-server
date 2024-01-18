@@ -906,7 +906,7 @@ public class KnxServerGateway implements Runnable
 			((DPTXlatorDate) xlator).setValue(millis);
 		else if (xlator instanceof DPTXlatorTime)
 			((DPTXlatorTime) xlator).setValue(millis);
-		else if (xlator instanceof final DPTXlatorDateTime dateTime) {
+		else if (xlator instanceof DPTXlatorDateTime dateTime) {
 			dateTime.setValue(millis);
 			dateTime.setClockSync(true);
 		}
@@ -941,7 +941,7 @@ public class KnxServerGateway implements Runnable
 			info.append(format("service container '%s'%n", c.getName()));
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			try {
-				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
+				if (c.getServiceContainer() instanceof RoutingServiceContainer rsc) {
 					info.append(format("\trouting multicast %s netif %s%n",
 							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
 				}
@@ -1039,7 +1039,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		final int mc = frame.getMessageCode();
-		if (frame instanceof final CEMILData ldata) {
+		if (frame instanceof CEMILData ldata) {
 
 			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
@@ -1376,34 +1376,33 @@ public class KnxServerGateway implements Runnable
 		dispatchToOtherSubnets(f, null, systemBroadcast);
 	}
 
-	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData f, final int rawAddress,
+	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData ldata, final int rawAddress,
 		final boolean systemBroadcast)
 	{
 		final int objinst = objectInstance(subnet);
-		if (f.getDestination() instanceof final GroupAddress d && rawAddress > 0 && rawAddress <= 0x6fff) {
+		if (ldata.getDestination() instanceof final GroupAddress d && rawAddress > 0 && rawAddress <= 0x6fff) {
 			// get forwarding settings for group destination address
 			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.MAIN_LCGROUPCONFIG, 3);
 			final int subGroupAddressConfig = value & 0x03;
 			if (subGroupAddressConfig == 2) {
-				logger.debug("no frames shall be routed to subnet {} - discard {}", subnet.getName(), f);
+				logger.debug("no frames shall be routed to subnet {} - discard {}", subnet.getName(), ldata);
 				return;
 			}
 			if (subGroupAddressConfig == 3 && !inGroupAddressTable(d, objinst)) {
-				logger.info("destination {} not in {} group address table - discard {}", d, subnet.getName(), f);
+				logger.info("destination {} not in {} group address table - discard {}", d, subnet.getName(), ldata);
 				return;
 			}
 		}
 
 		if (!isNetworkLink(subnet))
 			return;
-		final CEMILData ldata = f;
 		if (systemBroadcast) {
-			if (!isIpSystemBroadcast(objinst, f)) {
-				logger.warn("cEMI in IP system broadcast not qualified for subnet broadcast: {}", f);
+			if (!isIpSystemBroadcast(objinst, ldata)) {
+				logger.warn("cEMI in IP system broadcast not qualified for subnet broadcast: {}", ldata);
 				return;
 			}
 			// std frames have the SB flag already removed when adjusting the hop count
-			if (f instanceof final CEMILDataEx cemilDataEx) {
+			if (ldata instanceof CEMILDataEx cemilDataEx) {
 				cemilDataEx.setBroadcast(true);
 			}
 		}
