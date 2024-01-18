@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2023 B. Malinowsky
+    Copyright (c) 2018, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -228,7 +228,7 @@ final class SecureSessions {
 						return ces.acceptControlService(sessionId, svcHeader, knxipPacket, start, remote);
 					}
 
-					return ((DataEndpoint) svcHandler).acceptDataService(svcHeader, knxipPacket, start);
+					return ((DataEndpoint) svcHandler).acceptDataService(remote, svcHeader, knxipPacket, start);
 				}
 				return true;
 			}

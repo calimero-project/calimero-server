@@ -97,7 +97,7 @@ final class DataEndpointService extends ServiceLooper
 	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
 			throws KNXFormatException, IOException {
 		try {
-			return svcHandler.handleDataServiceType(h, data, offset);
+			return svcHandler.handleDataServiceType(src, h, data, offset);
 		}
 		finally {
 			setTimeout();
