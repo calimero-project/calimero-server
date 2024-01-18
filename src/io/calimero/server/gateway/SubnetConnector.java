@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -92,8 +92,10 @@ import io.calimero.server.knxnetip.ServiceContainer;
  */
 public final class SubnetConnector
 {
+	public enum InterfaceType { Udp, Tcp, Knxip, Tpuart, Usb, Ft12, Emulate, Virtual, User, Unknown }
+
 	private final ServiceContainer sc;
-	private final String interfaceType;
+	private final InterfaceType interfaceType;
 	private final String msgFormat;
 	private final IndividualAddress overrideInterfaceAddress;
 	private final String linkArgs;
@@ -127,13 +129,13 @@ public final class SubnetConnector
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs)
 	{
-		return new SubnetConnector(container, "knxip", "", null, routingNetif, null, subnetArgs);
+		return new SubnetConnector(container, InterfaceType.Knxip, "", null, routingNetif, null, subnetArgs);
 	}
 
 	public static SubnetConnector newWithRoutingLink(final ServiceContainer container,
 		final NetworkInterface routingNetif, final String subnetArgs, final Duration latencyTolerance)
 	{
-		return new SubnetConnector(container, "knxip", "", null, routingNetif, null, subnetArgs, latencyTolerance);
+		return new SubnetConnector(container, InterfaceType.Knxip, "", null, routingNetif, null, subnetArgs, latencyTolerance);
 	}
 
 	/**
@@ -150,12 +152,12 @@ public final class SubnetConnector
 	public static SubnetConnector newWithTunnelingLink(final ServiceContainer container, final NetworkInterface netif,
 			final boolean useNat, final String msgFormat, final IndividualAddress overrideSrcAddress,
 			final String subnetArgs) {
-		return new SubnetConnector(container, "ip", msgFormat, overrideSrcAddress, netif, null, subnetArgs, useNat);
+		return new SubnetConnector(container, InterfaceType.Udp, msgFormat, overrideSrcAddress, netif, null, subnetArgs, useNat);
 	}
 
 	public static SubnetConnector newWithTpuartLink(final ServiceContainer container,
 			final IndividualAddress overrideSrcAddress, final String subnetArgs) {
-		return new SubnetConnector(container, "tpuart", "", overrideSrcAddress, null, null, subnetArgs);
+		return new SubnetConnector(container, InterfaceType.Tpuart, "", overrideSrcAddress, null, null, subnetArgs);
 	}
 
 	/**
@@ -169,12 +171,12 @@ public final class SubnetConnector
 	 */
 	public static SubnetConnector newWithUserLink(final ServiceContainer container, final String className,
 			final IndividualAddress overrideSrcAddress, final String subnetArgs) {
-		return new SubnetConnector(container, "user-supplied", "", overrideSrcAddress, null, className, subnetArgs);
+		return new SubnetConnector(container, InterfaceType.User, "", overrideSrcAddress, null, className, subnetArgs);
 	}
 
 	public static SubnetConnector withTcp(final ServiceContainer container, final String subnetArgs,
 			final IndividualAddress tunnelingAddress, final int user, final IndividualAddress host) {
-		return new SubnetConnector(container, "tcp", "", new IndividualAddress(0), null, null, subnetArgs,
+		return new SubnetConnector(container, InterfaceType.Tcp, "", new IndividualAddress(0), null, null, subnetArgs,
 				tunnelingAddress, user, host);
 	}
 
@@ -182,11 +184,11 @@ public final class SubnetConnector
 	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
 	 *
 	 * @param container service container
-	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
+	 * @param interfaceType the interface type
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
-	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
+	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final InterfaceType interfaceType,
 		final String subnetArgs)
 	{
 		return newWithInterfaceType(container, interfaceType, "", null, subnetArgs);
@@ -196,13 +198,13 @@ public final class SubnetConnector
 	 * Creates a new subnet connector using an interface type identifier for the KNX subnet interface.
 	 *
 	 * @param container service container
-	 * @param interfaceType the interface type, use on of "ip", "usb", "tpuart", or "ft12".
+	 * @param interfaceType the interface type
 	 * @param msgFormat one of "" (default), "cemi", "baos"
 	 * @param overrideSrcAddress force specific address (or absence) of knx source address
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
-	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final String interfaceType,
+	public static SubnetConnector newWithInterfaceType(final ServiceContainer container, final InterfaceType interfaceType,
 			final String msgFormat, final IndividualAddress overrideSrcAddress, final String subnetArgs)
 	{
 		return new SubnetConnector(container, interfaceType, msgFormat, overrideSrcAddress, null, null, subnetArgs);
@@ -216,13 +218,13 @@ public final class SubnetConnector
 	 * @param subnetArgs the arguments to create the subnet link
 	 * @return the created subnet connector
 	 */
-	public static SubnetConnector newCustom(final ServiceContainer container, final String interfaceType,
-		final Object... subnetArgs)
+	public static SubnetConnector newCustom(final ServiceContainer container, final InterfaceType interfaceType,
+			final Object... subnetArgs)
 	{
-		return new SubnetConnector(container, interfaceType, "", null, null, null, interfaceType, subnetArgs);
+		return new SubnetConnector(container, interfaceType, "", null, null, null, "", subnetArgs);
 	}
 
-	private SubnetConnector(final ServiceContainer container, final String interfaceType, final String msgFormat,
+	private SubnetConnector(final ServiceContainer container, final InterfaceType interfaceType, final String msgFormat,
 		final IndividualAddress overrideSrcAddress,
 		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
 	{
@@ -275,14 +277,14 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = mediumSettings();
 
 		// special-case virtual: if we use connector below, we cannot cast link to VirtualLink for creating device links
-		if ("virtual".equals(interfaceType)) {
+		if (interfaceType == InterfaceType.Virtual) {
 			final KNXNetworkLink link = new VirtualLink(linkArgs, settings);
 			setSubnetLink(link);
 			return link;
 		}
 
 		final TSupplier<KNXNetworkLink> ts = switch (interfaceType) {
-			case "ip" -> {
+			case Udp -> {
 				// find IPv4 address for local socket address
 				final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
 						.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
@@ -293,7 +295,7 @@ public final class SubnetConnector
 					yield () -> BaosLinkIp.newUdpLink(local, server);
 				yield () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
 			}
-			case "tcp" -> {
+			case Tcp -> {
 				if (requestBaos)
 					yield () -> BaosLinkIp.newTcpLink(newTcpConnection());
 
@@ -311,7 +313,7 @@ public final class SubnetConnector
 				}
 				yield () -> KNXNetworkLinkIP.newTunnelingLink(newTcpConnection(), tunnelingSettings);
 			}
-			case "knxip" -> {
+			case Knxip -> {
 				try {
 					final InetAddress mcGroup = InetAddress.getByName(linkArgs);
 					if (args.length > 0 && args[0] instanceof final Duration latencyTolerance && groupKey != null)
@@ -324,7 +326,7 @@ public final class SubnetConnector
 							e);
 				}
 			}
-			case "usb" -> {
+			case Usb -> {
 				// ignore configured device address with USB on TP1/RF and always use 0.0.0
 				final var adjustedSettings = settings instanceof ReplaceInterfaceAddressProxy ? settings
 						: settings instanceof final TPSettings tp ? new UsbTpSettingsProxy(tp) :
@@ -333,16 +335,16 @@ public final class SubnetConnector
 					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkUsb(linkArgs, adjustedSettings));
 				yield () -> new KNXNetworkLinkUsb(linkArgs, adjustedSettings);
 			}
-			case "ft12" -> {
+			case Ft12 -> {
 				if ("cemi".equals(msgFormat))
 					yield () -> KNXNetworkLinkFT12.newCemiLink(linkArgs, settings);
 				if (requestBaos)
 					yield () -> BaosLinkAdapter.asBaosLink(new KNXNetworkLinkFT12(linkArgs, settings));
 				yield () -> new KNXNetworkLinkFT12(linkArgs, settings);
 			}
-			case "tpuart" -> () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
-			case "user-supplied" -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
-			case "emulate" -> {
+			case Tpuart -> () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
+			case User -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			case Emulate -> {
 				final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
 				final VirtualLink vl = new VirtualLink(sc.getName(), settings);
 				final Configuration config = nb.addConfiguration(vl);
@@ -390,14 +392,14 @@ public final class SubnetConnector
 			return null;
 
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
-			case "ip" ->
+			case Udp ->
 				() -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
-			case "tcp" -> () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), settings);
-			case "usb" -> () -> new KNXNetworkMonitorUsb(linkArgs, settings);
-			case "ft12" -> () -> "cemi".equals(msgFormat) ? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
+			case Tcp -> () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), settings);
+			case Usb -> () -> new KNXNetworkMonitorUsb(linkArgs, settings);
+			case Ft12 -> () -> "cemi".equals(msgFormat) ? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
 					: new KNXNetworkMonitorFT12(linkArgs, settings);
-			case "tpuart" -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
-			case "user-supplied" -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			case Tpuart -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
+			case User -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
 			default -> throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
 		};
 
@@ -423,16 +425,11 @@ public final class SubnetConnector
 		return new InetSocketAddress(ip, port);
 	}
 
-	public String interfaceType() { return interfaceType; }
+	public InterfaceType interfaceType() { return interfaceType; }
 
 	public String format() { return msgFormat; }
 
 	Optional<IndividualAddress> interfaceAddress() { return Optional.ofNullable(overrideInterfaceAddress); }
-
-	String getInterfaceType()
-	{
-		return interfaceType;
-	}
 
 	public String linkArguments() { return linkArgs; }
 

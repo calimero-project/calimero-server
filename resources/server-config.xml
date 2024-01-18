@@ -18,15 +18,15 @@
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
 
 		<!-- Specify one KNX subnet type, connecting the KNX network. The subnet connection type is one of
-			{ "ip", "tcp", "knxip", "ft12", "usb", "tpuart", "user-supplied", "virtual", "emulate" }.
+			{ "udp", "tcp", "knxip", "ft12", "usb", "tpuart", "user", "virtual", "emulate" }.
 			The KNX communication medium is one of { "tp1" (default), "pl110", "knxip", "rf" }.
-			In the follwing are some examples: -->
+			In the following are some examples: -->
 
-		<!-- <knxSubnet type="ip">192.168.10.10:3671</knxSubnet> -->
+		<!-- <knxSubnet type="udp">192.168.10.10:3671</knxSubnet> -->
 		<!-- two optional attributes are supported for tunneling:
 			* netif: specifies the server network interface to the knx subnet
 			* useNat="true"|"false": use network address translation (NAT) -->
-		<!-- <knxSubnet type="ip" netif="eth0" useNat="true">192.168.10.10:3671</knxSubnet> -->
+		<!-- <knxSubnet type="udp" netif="eth0" useNat="true">192.168.10.10:3671</knxSubnet> -->
 
 		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
 
@@ -42,9 +42,9 @@
 		<knxSubnet type="usb" medium="tp1"></knxSubnet>
 
 		<!-- <knxSubnet type="tpuart" medium="tp1">/dev/ttyACM0</knxSubnet> -->
-		<!-- <knxSubnet type="user-supplied" class="my.knx.NetworkLink">o1,i2|i4</knxSubnet> -->
 		<!-- <knxSubnet type="virtual">virtual-subnet</knxSubnet> -->
 		<!-- <knxSubnet type="emulate">emulate-subnet</knxSubnet> -->
+		<!-- <knxSubnet type="user" class="my.knx.NetworkLink">o1,i2|i4</knxSubnet> -->
 
 		<!-- Datapoints are only useful if an emulated KNX subnet is used -->
 		<!-- <datapoints ref="datapointMap.xml" /> -->

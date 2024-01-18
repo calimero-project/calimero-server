@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -110,6 +110,7 @@ import io.calimero.secure.Security;
 import io.calimero.server.ServerConfiguration.Container;
 import io.calimero.server.gateway.KnxServerGateway;
 import io.calimero.server.gateway.SubnetConnector;
+import io.calimero.server.gateway.SubnetConnector.InterfaceType;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
@@ -228,7 +229,7 @@ public class Launcher implements Runnable, AutoCloseable
 			final boolean udpOnly = Boolean.parseBoolean(r.getAttributeValue(null, "udpOnly"));
 
 			String subnetArgs = "";
-			String interfaceType = "";
+			InterfaceType interfaceType = InterfaceType.Unknown;
 			String msgFormat = "";
 			int subnetMedium = KNXMediumSettings.MEDIUM_TP1;
 			byte[] subnetDoA = null;
@@ -267,10 +268,10 @@ public class Launcher implements Runnable, AutoCloseable
 							datapoints = dps;
 						}
 						case "knxSubnet" -> {
-							interfaceType = r.getAttributeValue(null, XmlConfiguration.attrType);
+							interfaceType = interfaceType(r);
 							msgFormat = attr(r, "format").orElse("");
 							String medium = r.getAttributeValue(null, XmlConfiguration.attrMedium);
-							if (interfaceType.equals("knxip"))
+							if (interfaceType == InterfaceType.Knxip)
 								medium = "knxip";
 							else if (medium == null)
 								medium = "tp1";
@@ -286,11 +287,11 @@ public class Launcher implements Runnable, AutoCloseable
 							}
 							overrideSrcAddress = indAddress(r, "knxAddress");
 							switch (interfaceType) {
-								case "ip" -> {
+								case Udp -> {
 									subnetKnxipNetif = getNetIf(r);
 									useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
 								}
-								case "tcp" -> {
+								case Tcp -> {
 									tunnelingAddress = indAddress(r, "tunnelingAddress");
 									host = indAddress(r, "host");
 									user = attr(r, "user", 0);
@@ -298,12 +299,11 @@ public class Launcher implements Runnable, AutoCloseable
 										throw new KNXIllegalArgumentException(
 												"KNX IP Secure user ID " + user + " out of range [1..127]");
 								}
-								case "knxip" -> {
+								case Knxip -> {
 									subnetKnxipNetif = getNetIf(r);
 									subnetLatencyTolerance = latencyTolerance(r);
 								}
-								case "user-supplied" ->
-										subnetLinkClass = r.getAttributeValue(null, "class");
+								case User -> subnetLinkClass = r.getAttributeValue(null, "class");
 							}
 							subnetArgs = r.getElementText();
 						}
@@ -378,18 +378,18 @@ public class Launcher implements Runnable, AutoCloseable
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
 						final var connector = switch (interfaceType) {
-							case "knxip"   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
+							case Knxip   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
 									subnetLatencyTolerance);
-							case "ip"      -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
+							case Udp      -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
 									msgFormat, overrideSrcAddress, subnetArgs);
-							case "tcp"     -> SubnetConnector.withTcp(sc, subnetArgs, tunnelingAddress, user, host);
-							case "tpuart"  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
-							case "emulate" -> datapoints != null ? SubnetConnector.newCustom(sc, "emulate", datapoints)
-									: SubnetConnector.newCustom(sc, "emulate");
-							case "user-supplied" ->
-									SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
-							default        -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat,
+							case Tcp     -> SubnetConnector.withTcp(sc, subnetArgs, tunnelingAddress, user, host);
+							case Tpuart  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
+							case Emulate -> datapoints != null ? SubnetConnector.newCustom(sc, InterfaceType.Emulate, datapoints)
+									: SubnetConnector.newCustom(sc, InterfaceType.Emulate);
+							case User -> SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
+							case Usb, Ft12, Virtual -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat,
 									overrideSrcAddress, subnetArgs);
+							case Unknown -> throw new KNXMLException("no subnet interface type specified");
 						};
 						var config = new Container(indAddressPool, connector, filter, timeServerDatapoints);
 
@@ -408,6 +408,22 @@ public class Launcher implements Runnable, AutoCloseable
 					}
 				}
 			}
+		}
+
+		private static InterfaceType interfaceType(final XmlReader r) {
+			final String type = r.getAttributeValue(null, XmlConfiguration.attrType);
+			return switch (type) {
+				case "udp", "ip" -> InterfaceType.Udp;
+				case "tcp" -> InterfaceType.Tcp;
+				case "knxip" -> InterfaceType.Knxip;
+				case "tpuart" -> InterfaceType.Tpuart;
+				case "usb" -> InterfaceType.Usb;
+				case "ft12" -> InterfaceType.Ft12;
+				case "emulate" -> InterfaceType.Emulate;
+				case "virtual" -> InterfaceType.Virtual;
+				case "user", "user-supplied" -> InterfaceType.User;
+				default -> throw new KNXMLException("invalid subnet interface type \"" + type + "\"");
+			};
 		}
 
 		private static IndividualAddress indAddress(final XmlReader r, final String name) {
@@ -680,14 +696,14 @@ public class Launcher implements Runnable, AutoCloseable
 
 			// configure security for subnet if required
 			switch (connector.interfaceType()) {
-				case "tcp" -> {
+				case Tcp -> {
 					if (connector.user().isPresent()) {
 						final var userKey = keyfile.get("subnet.tunneling.key");
 						final var deviceAuthCode = keyfile.get("subnet.device.key");
 						connector.setIpSecure(userKey, deviceAuthCode);
 					}
 				}
-				case "knxip" -> {
+				case Knxip -> {
 					if (connector.knxipSecure()) {
 						final var groupKey = keyfile.get("subnet.group.key");
 						if (groupKey == null)
@@ -705,15 +721,15 @@ public class Launcher implements Runnable, AutoCloseable
 
 			setGroupAddressFilter(ios, objectInstance, container.groupAddressFilter());
 
-			final String subnetType = connector.interfaceType();
+			final var interfaceType = connector.interfaceType();
 			final String subnetArgs = connector.linkArguments();
 			final String activated = sc.isActivated() ? "" : " [not activated]";
 
 			final String subnetName = subnetArgs.isEmpty()
-					? subnetType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
-			logger.debug("setup {} subnet '{}'{}", subnetType, subnetName, activated);
+					? interfaceType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
+			logger.debug("setup {} subnet ''{}''{}", interfaceType, subnetName, activated);
 
-			if ("tpuart".equals(subnetType)) {
+			if (interfaceType == InterfaceType.Tpuart) {
 				final int oi = objectInstance;
 				connector.setAckOnTp(() -> acknowledgeOnTp(sc, oi));
 			}
