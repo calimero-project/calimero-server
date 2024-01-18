@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -221,8 +221,12 @@ public final class DataEndpoint extends ConnectionBase
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, dst);
 		if (dst.equals(dataEndpt))
 			socket.send(p);
-		else
+		else if (dst.equals(ctrlEndpt))
 			ctrlSocket.send(p);
+		else {
+			logger.log(TRACE, "sending to non-standard destination {0}", ServiceLooper.hostPort(dst));
+			socket.send(p);
+		}
 	}
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
@@ -286,13 +290,13 @@ public final class DataEndpoint extends ConnectionBase
 		this.socket = socket;
 	}
 
-	boolean handleDataServiceType(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException
+	boolean handleDataServiceType(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException
 	{
 		if (sessionId == 0)
-			return acceptDataService(h, data, offset);
+			return acceptDataService(src, h, data, offset);
 
 		if (TcpLooper.connections.containsKey(dataEndpt))
-			return acceptDataService(h, data, offset);
+			return acceptDataService(src, h, data, offset);
 
 		if (!h.isSecure()) {
 			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, HexFormat.ofDelimiter(" ").formatHex(data));
@@ -310,7 +314,8 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	};
 
-	boolean acceptDataService(final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException {
+	boolean acceptDataService(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 
 		final boolean tunnel = ctype == ConnectionType.LinkLayer || ctype == ConnectionType.Monitor;
@@ -328,7 +333,7 @@ public final class DataEndpoint extends ConnectionBase
 			final Optional<DataEndpointService> dataEndpointService = ControlEndpointService.findDataEndpoint(recvChannelId);
 			if (dataEndpointService.isPresent()) {
 				dataEndpointService.get().rebindSocket(localPort);
-				dataEndpointService.get().svcHandler.acceptDataService(h, data, offset);
+				dataEndpointService.get().svcHandler.acceptDataService(src, h, data, offset);
 			}
 			return true;
 		}
@@ -366,7 +371,7 @@ public final class DataEndpoint extends ConnectionBase
 				updateLastMsgTimestamp();
 
 				if (svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-					respondToFeature(h, data, offset);
+					respondToFeature(src, h, data, offset);
 					if (tunnelingAddressChanged) {
 						tunnelingAddressChanged = false;
 						sendFeatureInfo(InterfaceFeature.IndividualAddress, device.toByteArray());
@@ -439,7 +444,7 @@ public final class DataEndpoint extends ConnectionBase
 		return true;
 	}
 
-	private void respondToFeature(final KNXnetIPHeader h, final byte[] data, final int offset)
+	private void respondToFeature(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
