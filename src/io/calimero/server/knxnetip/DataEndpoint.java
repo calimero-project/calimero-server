@@ -36,6 +36,7 @@
 
 package io.calimero.server.knxnetip;
 
+import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -216,7 +217,7 @@ public final class DataEndpoint extends ConnectionBase
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, ServiceLooper.hostPort(dst),
+			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, hostPort(dst),
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
@@ -416,7 +417,7 @@ public final class DataEndpoint extends ConnectionBase
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
 				logger.log(TRACE, "received service ack {0} from {1} (channel {2})", res.getSequenceNumber(),
-						ServiceLooper.hostPort(ctrlEndpt), channelId);
+						hostPort(ctrlEndpt), channelId);
 				if (internalState == ACK_ERROR)
 					logger.log(WARNING, "received service acknowledgment status " + res.getStatusString());
 			}
@@ -435,7 +436,7 @@ public final class DataEndpoint extends ConnectionBase
 
 			if (status == ErrorCodes.NO_ERROR) {
 				logger.log(TRACE, "data endpoint received connection state request from "
-						+ ServiceLooper.hostPort(dataEndpt) + " for channel " + csr.getChannelID());
+						+ hostPort(dataEndpt) + " for channel " + csr.getChannelID());
 				updateLastMsgTimestamp();
 				status = subnetStatus();
 			}
