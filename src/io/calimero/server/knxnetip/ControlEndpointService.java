@@ -952,7 +952,7 @@ final class ControlEndpointService extends ServiceLooper
 		// for udp, always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
 		final boolean tcp = req.getControlEndpoint().getHostProtocol() == HPAI.IPV4_TCP;
-		final HPAI hpai = tcp ? new HPAI(HPAI.IPV4_TCP, null)
+		final HPAI hpai = tcp ? HPAI.Tcp : useNat ? new HPAI(HPAI.IPV4_UDP, null)
 				: new HPAI(HPAI.IPV4_UDP, (InetSocketAddress) svcLoop.getSocket().getLocalSocketAddress());
 		return new ConnectResponse(channelId, ErrorCodes.NO_ERROR, hpai, crd);
 	}

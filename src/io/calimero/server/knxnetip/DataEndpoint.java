@@ -226,14 +226,14 @@ public final class DataEndpoint extends ConnectionBase
 
 		var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-		if (actualDst.equals(dataEndpt))
-			socket.send(p);
-		else if (actualDst.equals(ctrlEndpt))
+		var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+		logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
+				hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
+
+		if (useNat || actualDst.equals(ctrlEndpt))
 			ctrlSocket.send(p);
-		else {
-			logger.log(TRACE, "sending to non-standard destination {0}", ServiceLooper.hostPort(actualDst));
+		else
 			socket.send(p);
-		}
 	}
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
