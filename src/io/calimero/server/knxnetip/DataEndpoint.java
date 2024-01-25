@@ -36,6 +36,8 @@
 
 package io.calimero.server.knxnetip;
 
+import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -43,6 +45,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -219,14 +222,14 @@ public final class DataEndpoint extends ConnectionBase
 
 		final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-		if (actualDst.equals(dataEndpt))
-			socket.send(p);
-		else if (actualDst.equals(ctrlEndpt))
+		final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+		logger.trace("send {}->{} {}", hostPort((InetSocketAddress) src),
+				hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
+
+		if (useNat || actualDst.equals(ctrlEndpt))
 			ctrlSocket.send(p);
-		else {
-			logger.trace("sending to non-standard destination {}", ServiceLooper.hostPort(actualDst));
+		else
 			socket.send(p);
-		}
 	}
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
