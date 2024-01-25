@@ -258,8 +258,9 @@ public final class DataEndpoint extends ConnectionBase
 	@Override
 	public String toString()
 	{
+		final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
 		final var deviceAddress = device != null ? ", " + device : "";
-		return getName() + " (channel " + getChannelId() + deviceAddress + ")";
+		return "%s (%s, channel %d%s)".formatted(getName(), type, getChannelId(), deviceAddress);
 	}
 
 	public IndividualAddress deviceAddress() { return device; }
@@ -432,13 +433,14 @@ public final class DataEndpoint extends ConnectionBase
 				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
-				logger.trace("data endpoint received connection state request from "
-						+ ServiceLooper.hostPort(dataEndpt) + " for channel " + csr.getChannelID());
+				logger.trace("data endpoint received connection-state request (channel {}) from {}",
+						csr.getChannelID(), hostPort(dataEndpt));
 				updateLastMsgTimestamp();
 				status = subnetStatus();
 			}
 			else
-				logger.warn("received invalid connection state request: " + ErrorCodes.getErrorMessage(status));
+				logger.warn("received invalid connection-state request (channel {}) from {}: {}",
+						csr.getChannelID(), hostPort(dataEndpt), ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
 			final var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
