@@ -67,6 +67,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -288,6 +289,8 @@ final class ControlEndpointService extends ServiceLooper
 	@Override
 	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
 			throws KNXFormatException, IOException {
+		logger.log(TRACE, "{0} received {1} {2}", svcCont.getName(), hostPort(src),
+				HexFormat.ofDelimiter(" ").formatHex(data,offset - h.getStructLength(), offset - h.getStructLength() + h.getTotalLength()));
 		if (h.isSecure()) {
 			try {
 				secureSvcInProgress = true;
@@ -309,7 +312,6 @@ final class ControlEndpointService extends ServiceLooper
 
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			final var connType = req.getCRI().getConnectionType();
-
 			final boolean tunneling = connType == TUNNEL_CONNECTION;
 			final boolean devmgmt = connType == DEVICE_MGMT_CONNECTION;
 			final var typeString = tunneling ? "tunneling" : devmgmt ? "device management" : "0x" + connType;
@@ -407,8 +409,9 @@ final class ControlEndpointService extends ServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
-					logger.log(INFO, "{0}: setup data endpoint (channel {1}) for connection request from {2} ({3})",
-							svcCont.getName(), channelId, hostPort(ctrlEndpt), tcp ? "tcp" : "udp");
+					final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
+					logger.log(INFO, "{0}: setup data endpoint ({1}, channel {2}) for connection request from {3}",
+							svcCont.getName(), type, channelId, hostPort(ctrlEndpt));
 					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(expectedVersion, res);
@@ -478,8 +481,8 @@ final class ControlEndpointService extends ServiceLooper
 				protocolVersion = endpoint.protocolVersion();
 				status = checkVersion(h, protocolVersion);
 				if (status == ErrorCodes.NO_ERROR) {
-					logger.log(TRACE, "received connection state request from {0} channel {1}",
-							hostPort(endpoint.getRemoteAddress()), csr.getChannelID());
+					logger.log(TRACE, "received connection-state request (channel {0}) from {1}",
+							csr.getChannelID(), hostPort(endpoint.getRemoteAddress()));
 					endpoint.updateLastMsgTimestamp();
 				}
 			}
@@ -490,8 +493,8 @@ final class ControlEndpointService extends ServiceLooper
 				final var ctrlEp = csr.getControlEndpoint().endpoint();
 				final var addr = endpoint != null ? endpoint.getRemoteAddress()
 						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
-				logger.log(WARNING, "received invalid connection state request from {0} channel {1}: {2}",
-						hostPort(addr), csr.getChannelID(),
+				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
+						csr.getChannelID(), hostPort(addr),
 						ErrorCodes.getErrorMessage(status));
 			}
 
@@ -500,7 +503,7 @@ final class ControlEndpointService extends ServiceLooper
 			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
-			logger.log(WARNING, "received connection state response - ignored");
+			logger.log(WARNING, "received connection-state response - ignored");
 		else {
 			DataEndpoint endpoint = null;
 			try {
