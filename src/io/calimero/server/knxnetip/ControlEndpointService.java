@@ -151,6 +151,8 @@ final class ControlEndpointService extends ServiceLooper
 	private final Closeable tcpLooper;
 	private final Closeable baosLooper;
 
+	private volatile boolean inShutdown;
+
 
 	ControlEndpointService(final KNXnetIPServer server, final ServiceContainer sc)
 	{
@@ -226,6 +228,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	@Override
 	public void quit() {
+		inShutdown = true;
 		closeDataConnections();
 		try {
 			tcpLooper.close();
@@ -291,6 +294,15 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 		else if (h.getServiceType() == KNXnetIPHeader.CONNECT_REQ) {
+			// Some clients immediately send a new connect.req when the old connection got closed.
+			// If we're shutting down, we're not here anymore. This avoids our connections list being repopulated
+			// with newly established connections which won't last and just get closed again.
+			if (inShutdown) {
+				logger.log(TRACE, "{0} is being shut down, ignore connect request from {1}",
+						svcCont.getName(), hostPort(src));
+				return true;
+			}
+
 			final ConnectRequest req = new ConnectRequest(data, offset);
 			final var connType = req.getCRI().getConnectionType();
 
