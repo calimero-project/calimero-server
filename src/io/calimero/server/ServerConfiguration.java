@@ -51,6 +51,7 @@ import io.calimero.datapoint.StateDP;
 import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import io.calimero.secure.Keyring;
 import io.calimero.server.gateway.SubnetConnector;
+import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
 import io.calimero.server.knxnetip.ServiceContainer;
@@ -158,11 +159,13 @@ public class ServerConfiguration {
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
 					? secureSymbol + " " : "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
+			String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
+			String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
 			return String.format("""
 					%s%s:
-						listen on %s (%sport %s), KNX IP %srouting %s
+						listen on %s (%sport %s%s%s), KNX IP %srouting %s
 						%s connection: %s%s""", sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast,
-					secureRouting, mcast, type, sc.getMediumSettings(), filter);
+					udpOnly, reuseCtrlEndpoint, secureRouting, mcast, type, sc.getMediumSettings(), filter);
 		}
 	}
 
