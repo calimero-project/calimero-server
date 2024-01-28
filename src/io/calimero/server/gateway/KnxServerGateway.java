@@ -452,6 +452,10 @@ public class KnxServerGateway implements Runnable
 		@LinkEvent
 		void connectionStatus(final ConnectionStatus status) {
 			logger.info("KNX connection {}", status);
+			switch (status) {
+				case Offline -> subnetConnected(false);
+				case Online -> subnetConnected(true);
+			}
 		}
 	}
 
