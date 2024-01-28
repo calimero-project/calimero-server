@@ -141,6 +141,7 @@ public class ServerConfiguration {
 			String mcast = "disabled";
 			String secureRouting = "";
 			final var securedServices = securedServices();
+			final var optSec = securedServices.contains(ServiceFamily.Security) ? ", KNX secure: optional" : "";
 			final var keyfile = keyfile();
 
 			if ((sc instanceof RoutingServiceContainer)) {
@@ -153,19 +154,19 @@ public class ServerConfiguration {
 			final String type = subnetConnector().toString();
 			String filter = "";
 			if (!groupAddressFilter().isEmpty())
-				filter = "\n\tGroup address filter " + groupAddressFilter();
+				filter = "\n\tactive group address filter (size " + groupAddressFilter().size() + ")";
 
 			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
 					? secureSymbol + " " : "";
 			final String unicast = "" + sc.getControlEndpoint().getPort();
-			String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
-			String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
+			final String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
+			final String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
 			return String.format("""
 					%s%s:
-						listen on %s (%sport %s%s%s), KNX IP %srouting %s
+						server: listen on %s (%sport %s%s%s), KNX IP %srouting %s%s
 						%s connection: %s%s""", sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast,
-					udpOnly, reuseCtrlEndpoint, secureRouting, mcast, type, sc.getMediumSettings(), filter);
+					udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, type, sc.getMediumSettings(), filter);
 		}
 	}
 
