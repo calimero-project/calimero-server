@@ -686,7 +686,7 @@ public class KnxServerGateway implements Runnable
 
 		final var ios = server.getInterfaceObjectServer();
 		for (final var entry : ios.propertyDefinitions().entrySet()) {
-			if (entry.getValue().getPDT() == PropertyTypes.PDT_FUNCTION)
+			if (entry.getValue().pdt() == PropertyTypes.PDT_FUNCTION)
 				functionProperties.add(entry.getKey());
 		}
 
@@ -1818,8 +1818,8 @@ public class KnxServerGateway implements Runnable
 		final var ios = server.getInterfaceObjectServer();
 		final var key = pid <= 50 ? new PropertyKey(pid) : new PropertyKey(objectType, pid);
 		final var property = ios.propertyDefinitions().get(key);
-		if (property != null && !property.getName().isEmpty())
-			return " - " + property.getName();
+		if (property != null && !property.propertyName().isEmpty())
+			return " - " + property.propertyName();
 		return "";
 	}
 
@@ -2068,7 +2068,7 @@ public class KnxServerGateway implements Runnable
 							final var definitions = server.getInterfaceObjectServer().propertyDefinitions();
 							final var property = definitions.get(key);
 							if (property != null)
-								response[3] |= property.getPDT();
+								response[3] |= property.pdt();
 							response[response.length - 2] = 1;
 						}
 						catch (final KNXRemoteException pidNotFound) {
