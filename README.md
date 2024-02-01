@@ -148,7 +148,9 @@ Optional attributes for secure routing:
 	* `<user id="id">`: a user ID in the integer range [1..127], with `<knxAddress>` elements listing the permitted individual addresses assigned to client-side tunneling connections of that user.
 		* `<knxAddress type="individual">x.y.z</knxAddress>`: additional address entry
 
-* `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on the subnetwork. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` elements. Time server values are sent secured if the datapoint destination is in the keyring.
+* `<timeServer>`: Cyclically transmit date (DPT 11.001), time (DPT 10.001), or date+time (DPT 19.001) information on 
+  the KNX subnet and server-side. The date/time datapoints are configured using `<datapoint stateBased="true" ...>` 
+  elements. Time-server values are sent secured if the datapoint destination is in the keyring.
 
 ### Configuration Examples for KNX subnets
 
