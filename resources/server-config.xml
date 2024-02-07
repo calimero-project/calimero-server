@@ -49,7 +49,8 @@
 		<!-- Datapoints are only useful if an emulated KNX subnet is used -->
 		<!-- <datapoints ref="datapointMap.xml" /> -->
 
-		<!-- KNX group address filter applied by the server for this service container (optional) -->
+		<!-- KNX group address filter applied by the server for this service container (optional).
+		     This filter is used both for server->subnet and vice versa. -->
 		<groupAddressFilter>
 			<!-- <knxAddress type="group">2/1/1</knxAddress> -->
 			<!-- <knxAddress type="group">2/1/0</knxAddress> -->

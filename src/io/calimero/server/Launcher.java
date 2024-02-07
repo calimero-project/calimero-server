@@ -38,6 +38,7 @@ package io.calimero.server;
 
 import static io.calimero.device.ios.InterfaceObject.ADDRESSTABLE_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
+import static io.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
 import static io.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
 
 import java.io.BufferedReader;
@@ -58,13 +59,17 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -90,6 +95,8 @@ import io.calimero.device.ios.InterfaceObject;
 import io.calimero.device.ios.InterfaceObjectServer;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
+import io.calimero.device.ios.RouterObject;
+import io.calimero.device.ios.RouterObject.RoutingConfig;
 import io.calimero.dptxlator.DPTXlatorDate;
 import io.calimero.dptxlator.DPTXlatorDateTime;
 import io.calimero.dptxlator.DPTXlatorTime;
@@ -677,15 +684,10 @@ public class Launcher implements Runnable, AutoCloseable
 
 		for (final var container : containers) {
 			final var connector = container.subnetConnector();
-
 			++objectInstance;
+
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-			ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.LOAD_STATE_CONTROL, 1, 1, (byte) 1);
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MEDIUM_STATUS, 1, 1, (byte) 1);
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCCONFIG, 1, 1, (byte) 1);
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCCONFIG, 1, 1, (byte) 1);
-			ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, 56, 1, 1, (byte) 0);
+			initRouterObject(ios, objectInstance, new HashSet<>(container.groupAddressFilter()));
 
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 
@@ -719,8 +721,6 @@ public class Launcher implements Runnable, AutoCloseable
 			if (!additionalAddresses.isEmpty())
 				setAdditionalIndividualAddresses(ios, objectInstance, additionalAddresses);
 
-			setGroupAddressFilter(ios, objectInstance, container.groupAddressFilter());
-
 			final var interfaceType = connector.interfaceType();
 			final String subnetArgs = connector.linkArguments();
 			final String activated = sc.isActivated() ? "" : " [not activated]";
@@ -752,6 +752,20 @@ public class Launcher implements Runnable, AutoCloseable
 				setTunnelingAddresses(ios, objectInstance, addrIndices);
 			}
 		}
+	}
+
+	private void initRouterObject(InterfaceObjectServer ios, int objectInstance, final Set<GroupAddress> filter) {
+		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
+		var routerObj = RouterObject.lookup(ios, objectInstance);
+
+		routerObj.set(PID.LOAD_STATE_CONTROL, (byte) 1);
+		routerObj.set(PID.MEDIUM_STATUS, (byte) 1);
+		routerObj.set(PID.MAIN_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
+		routerObj.set(PID.SUB_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
+		int pidRouteTableControl = 56; // Function property
+		routerObj.set(pidRouteTableControl, (byte) 0);
+
+		setGroupAddressFilter(routerObj, filter);
 	}
 
 	private Map<String, byte[]> decodeKeyring(final ServiceContainer sc, final Container config) {
@@ -870,28 +884,29 @@ public class Launcher implements Runnable, AutoCloseable
 		catch (final IOException e) {}
 	}
 
-	private enum RoutingConfig { Reserved, All, None, Table }
+	private void setGroupAddressFilter(final RouterObject routerObj, final Set<GroupAddress> filter) {
+		var table = new BitSet((1 << 16) / 8);
 
-	private static void setGroupAddressFilter(final InterfaceObjectServer ios, final int objectInstance,
-			final List<GroupAddress> filter) throws KnxPropertyException {
-		if (!filter.isEmpty()) {
-			final var buf = ByteBuffer.allocate(2 * filter.size());
-			filter.forEach(ga -> buf.putShort((short) ga.getRawAddress()));
-
-			ensureInterfaceObjectInstance(ios, ADDRESSTABLE_OBJECT, objectInstance);
-			ios.setProperty(ADDRESSTABLE_OBJECT, objectInstance, PID.TABLE, 1, filter.size(), buf.array());
+		RoutingConfig route7000 = RoutingConfig.All; // default config for group addresses ≥ 0x7000
+		if (filter.isEmpty())
+			table.set(1, 1 << 16); // broadcast address stays 0
+		else {
+			for (var ga : filter) {
+				int raw = ga.getRawAddress();
+				if (raw >= 0x7000)
+					route7000 = RoutingConfig.Route; // switch to table lookup
+				table.set(raw);
+			}
 		}
 
-		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
+		// use location of Filter Table Realisation Type 2, which shall start at memory address 0x0200
+		int filterTableLocation = 0x200;
+		routerObj.set(PID.TABLE_REFERENCE, ByteBuffer.allocate(4).putInt(filterTableLocation).array());
+		server.device().deviceMemory().set(filterTableLocation, table.toByteArray());
 
-		// set the handling of group addressed frames, based on whether we have set a
-		// group address filter table or not
-		final RoutingConfig route = filter.isEmpty() ? RoutingConfig.All : RoutingConfig.Table;
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.MAIN_LCGROUPCONFIG, 1, 1,
-				(byte) (1 << 4 | RoutingConfig.All.ordinal() << 2 | route.ordinal()));
-		// by default, we don't check the group address filter table for group frames from subnetworks
-		ios.setProperty(InterfaceObject.ROUTER_OBJECT, objectInstance, PID.SUB_LCGROUPCONFIG, 1, 1,
-				(byte) (RoutingConfig.All.ordinal() << 2 | RoutingConfig.All.ordinal()));
+		int config = (1 << 4 | route7000.ordinal() << 2 | RoutingConfig.Route.ordinal());
+		routerObj.set(PID.MAIN_LCGROUPCONFIG, (byte) config);
+		routerObj.set(PID.SUB_LCGROUPCONFIG, (byte) config);
 	}
 
 	private static void ensureInterfaceObjectInstance(final InterfaceObjectServer ios,
