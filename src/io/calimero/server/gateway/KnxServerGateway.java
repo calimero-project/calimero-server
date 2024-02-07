@@ -616,7 +616,11 @@ public class KnxServerGateway implements Runnable
 			// TODO support > 1 service containers
 			final SubnetConnector connector = connectors.get(0);
 			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
-			dispatchToServer(connector, msg, eventId);
+			try {
+				dispatchToServer(connector, msg, eventId);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
 		}
 
 		@Override
@@ -1190,7 +1194,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void onSubnetFrameReceived(final FrameEvent fe) {
+	private void onSubnetFrameReceived(final FrameEvent fe) throws InterruptedException {
 		final String s = "subnet";
 		final SubnetConnector subnet = (SubnetConnector) fe.getSource();
 		final CEMI frame = fe.getFrame();
@@ -1454,7 +1458,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void dispatchToServer(final SubnetConnector subnet, final CEMILData f, final long eventId)
-	{
+			throws InterruptedException {
 		final ServiceContainer sc = subnet.getServiceContainer();
 		try {
 			if (f.getDestination() instanceof IndividualAddress) {
@@ -1548,7 +1552,7 @@ public class KnxServerGateway implements Runnable
 				dispatchLdataToClients(subnet, f, eventId);
 			}
 		}
-		catch (KnxPropertyException | InterruptedException e) {
+		catch (final KnxPropertyException e) {
 			logger.error("send to server-side failed for " + f, e);
 		}
 	}
