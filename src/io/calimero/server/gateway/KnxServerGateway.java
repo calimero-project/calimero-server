@@ -111,6 +111,7 @@ import io.calimero.device.ios.InterfaceObjectServer;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.device.ios.PropertyEvent;
+import io.calimero.device.ios.RouterObject;
 import io.calimero.dptxlator.DPTXlator;
 import io.calimero.dptxlator.DPTXlatorDate;
 import io.calimero.dptxlator.DPTXlatorDateTime;
@@ -170,9 +171,9 @@ import io.calimero.server.knxnetip.ShutdownEvent;
  * KNXnet/IP server and links to KNX subnets.<br>
  * Besides, the gateway handles KNXnet/IP local device management by processing and answering
  * received client messages.<br>
- * The gateway implements group address filtering using the KNX property
- * {@link io.calimero.mgmt.PropertyAccess.PID#TABLE} in the interface object
- * {@link InterfaceObject#ADDRESSTABLE_OBJECT} in the Interface Object Server.
+ * The gateway implements a group address filter using a memory-mapped table with its location stored in the KNX property
+ * {@link io.calimero.mgmt.PropertyAccess.PID#TABLE_REFERENCE} in the interface object
+ * {@link InterfaceObject#ROUTER_OBJECT}.
  * <p>
  * Starting a gateway by invoking {@link #run()} is a blocking operation. Therefore, this class
  * implements {@link Runnable} to allow execution in its own thread.
@@ -1390,7 +1391,7 @@ public class KnxServerGateway implements Runnable
 				logger.log(DEBUG, "no frames shall be routed to subnet {0} - discard {1}", subnet.getName(), ldata);
 				return;
 			}
-			if (subGroupAddressConfig == 3 && !inGroupAddressTable(d, objinst)) {
+			if (subGroupAddressConfig == 3 && !inGroupFilterTable(d, objinst)) {
 				logger.log(INFO, "destination {0} not in {1} group address table - discard {2}", d, subnet.getName(), ldata);
 				return;
 			}
@@ -1523,7 +1524,7 @@ public class KnxServerGateway implements Runnable
 					}
 					// check if forwarding requests us to use the filter table
 					if (mainGroupAddressConfig == 3 && raw != 0
-							&& !inGroupAddressTable((GroupAddress) f.getDestination(), objinst)) {
+							&& !inGroupFilterTable((GroupAddress) f.getDestination(), objinst)) {
 						logger.log(WARNING, f + ", destination not in group address table - throw away");
 						return;
 					}
@@ -1766,27 +1767,19 @@ public class KnxServerGateway implements Runnable
 		server.getInterfaceObjectServer().setProperty(objectType, objectInstance, propertyId, 1, 1, data);
 	}
 
-	// implements KNX group address filtering using IOS addresstable object
-	private boolean inGroupAddressTable(final GroupAddress addr, final int objectInstance)
-	{
+	// queries KNX group address filter, a message shall be routed if corresponding address bit is set
+	private boolean inGroupFilterTable(final GroupAddress addr, final int objectInstance) {
 		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 		try {
-			final byte[] data = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT,
-					objectInstance, PropertyAccess.PID.TABLE, 0, 1);
-			final int elems = (data[0] & 0xff) << 8 | (data[1] & 0xff);
+			// Filter table realisation type 3: memory location of table is stored in Router object PID_TABLE_REFERENCE
+			final byte[] data = ios.getProperty(ROUTER_OBJECT, objectInstance, PID.TABLE_REFERENCE, 1, 1);
+			final int tableLoc = (int) toUnsignedInt (data);
 
-			// not sure if this is some common behavior: if property exists with zero length, allow every address
-			if (elems == 0)
-				return true;
-
-			final byte[] addrTable = ios.getProperty(InterfaceObject.ADDRESSTABLE_OBJECT,
-					objectInstance, PropertyAccess.PID.TABLE, 1, elems);
-			final byte hi = (byte) (addr.getRawAddress() >> 8);
-			final byte lo = (byte) addr.getRawAddress();
-			for (int i = 0; i < addrTable.length; i += 2)
-				if (hi == addrTable[i] && lo == addrTable[i + 1])
-					return true;
-			return false;
+			// table size is 8192 bytes to fit all 1<<16 group addresses
+			int addrOffset = addr.getRawAddress() / 8;
+			int bitPos = addr.getRawAddress() % 8;
+			int bits = server.device().deviceMemory().get(tableLoc + addrOffset);
+			return (bits & (1 << bitPos)) != 0;
 		}
 		catch (final KnxPropertyException e) {
 			// when in doubt, pass the message on...
