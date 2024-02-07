@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2018 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -56,7 +56,13 @@ class ReplayBuffer<T extends FrameEvent>
 {
 	private static final Logger logger = LoggerFactory.getLogger("calimero.server.gateway.ReplayBuffer");
 
-	private final Map<KNXnetIPConnection, Object[]> connectionToKey = Collections.synchronizedMap(new HashMap<>());
+	private record Key(String hostAddress, int port, long timestamp) {
+		Key(InetSocketAddress remote) {
+			this(remote.getAddress().getHostAddress(), remote.getPort(), System.currentTimeMillis());
+		}
+	}
+
+	private final Map<KNXnetIPConnection, Key> connectionToKey = Collections.synchronizedMap(new HashMap<>());
 	private final Map<KNXnetIPConnection, Long> completedEvent = Collections.synchronizedMap(new HashMap<>());
 
 	private static final long maxBufferSize = 350;
@@ -76,7 +82,7 @@ class ReplayBuffer<T extends FrameEvent>
 
 	private List<KNXnetIPConnection> disruptedCandidates(final KNXnetIPConnection c)
 	{
-		final Object[] key = keyFor(c);
+		final Key key = new Key(c.getRemoteAddress());
 		synchronized (connectionToKey) {
 			final List<KNXnetIPConnection> exactMatch = find(c, key, 2);
 			if (!exactMatch.isEmpty()) {
@@ -114,12 +120,12 @@ class ReplayBuffer<T extends FrameEvent>
 	}
 
 	// only call iff synchronized on connectionToKey
-	private List<KNXnetIPConnection> find(final KNXnetIPConnection c, final Object[] key, final int compare)
+	private List<KNXnetIPConnection> find(final KNXnetIPConnection c, final Key key, final int compare)
 	{
 		final List<KNXnetIPConnection> remove = new ArrayList<>();
 		final List<KNXnetIPConnection> found = new ArrayList<>();
-		for (final Entry<KNXnetIPConnection, Object[]> e : connectionToKey.entrySet()) {
-			final long timestamp = (Long) e.getValue()[2];
+		for (final Entry<KNXnetIPConnection, Key> e : connectionToKey.entrySet()) {
+			final long timestamp = e.getValue().timestamp();
 			final KNXnetIPConnection conn = e.getKey();
 			if ((timestamp + keepDisruptedConnection) < System.currentTimeMillis()) {
 				logger.info("remove expired disrupted connection {}", conn);
@@ -137,7 +143,7 @@ class ReplayBuffer<T extends FrameEvent>
 	public void add(final KNXnetIPConnection c)
 	{
 		logger.debug("activate replay buffer for {}", c);
-		connectionToKey.put(c, keyFor(c));
+		connectionToKey.put(c, new Key(c.getRemoteAddress()));
 	}
 
 	public void recordEvent(final T e)
@@ -195,10 +201,10 @@ class ReplayBuffer<T extends FrameEvent>
 	public void completeEvent(final KNXnetIPConnection c, final T e)
 	{
 		synchronized (connectionToKey) {
-			final Object[] key = connectionToKey.get(c);
+			final Key key = connectionToKey.get(c);
 			if (key == null)
 				return;
-			key[2] = System.currentTimeMillis();
+			connectionToKey.put(c, new Key(key.hostAddress(), key.port(), System.currentTimeMillis()));
 		}
 		completedEvent.put(c, e.id());
 		logger.debug("{} successfully completed event '{}/{}'", c, e.id(), latestEventCount());
@@ -214,23 +220,16 @@ class ReplayBuffer<T extends FrameEvent>
 	public void remove(final KNXnetIPConnection c)
 	{
 		completedEvent.remove(c);
-		final Object[] key = connectionToKey.remove(c);
-		logger.trace("remove {} (ID {})", c, key);
-	}
-
-	private static Object[] keyFor(final KNXnetIPConnection c)
-	{
-		final InetSocketAddress remote = c.getRemoteAddress();
-		final Object[] key = new Object[] { remote.getAddress().getHostAddress(), remote.getPort(),
-			System.currentTimeMillis() };
-		return key;
+		final Key key = connectionToKey.remove(c);
+		if (key != null)
+			logger.trace("remove {} ({})", c, key);
 	}
 
 	// returns 0: no match, 1: key[0] matches to[0], 2: match 1 and key[1] matches to[1]
-	private static int compare(final Object[] key, final Object[] to)
+	private static int compare(final Key key, final Key to)
 	{
-		if (key[0].equals(to[0])) {
-			if (key[1].equals(to[1]))
+		if (key.hostAddress().equals(to.hostAddress())) {
+			if (key.port() == to.port())
 				return 2;
 			return 1;
 		}
