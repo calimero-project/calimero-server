@@ -658,8 +658,7 @@ public class KnxServerGateway implements Runnable
 	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) {
 		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).toList());
 		for (final var c : config.containers()) {
-			final var sc = c.subnetConnector().getServiceContainer();
-			setupTimeServer(sc, c.timeServerDatapoints());
+			setupTimeServer(c.subnetConnector(), c.timeServerDatapoints());
 		}
 
 		try {
@@ -822,8 +821,7 @@ public class KnxServerGateway implements Runnable
 		return List.copyOf(connectors);
 	}
 
-	private void setupTimeServer(final ServiceContainer sc, final List<StateDP> datapoints) {
-		final var connector = getSubnetConnector(sc.getName());
+	private void setupTimeServer(final SubnetConnector connector, final List<StateDP> datapoints) {
 		for (final var datapoint : datapoints) {
 			final var security = Security.defaultInstallation().groupKeys().containsKey(datapoint.getMainAddress())
 					? DataSecurity.AuthConf : DataSecurity.None;
