@@ -77,7 +77,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import io.calimero.CloseEvent;
 import io.calimero.DataUnitBuilder;
@@ -153,6 +152,7 @@ import io.calimero.serial.ConnectionStatus;
 import io.calimero.serial.usb.UsbConnection;
 import io.calimero.server.ServerConfiguration;
 import io.calimero.server.VirtualLink;
+import io.calimero.server.gateway.SubnetConnector.InterfaceType;
 import io.calimero.server.knxnetip.DataEndpoint;
 import io.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
@@ -656,7 +656,7 @@ public class KnxServerGateway implements Runnable
 	 * @param config server configuration
 	 */
 	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) {
-		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).collect(Collectors.toList()));
+		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).toList());
 		for (final var c : config.containers()) {
 			final var sc = c.subnetConnector().getServiceContainer();
 			setupTimeServer(sc, c.timeServerDatapoints());
@@ -738,7 +738,7 @@ public class KnxServerGateway implements Runnable
 					connector.openNetworkLink();
 					// we immediately set a virtual network to connected, so that there is no
 					// initial state "knx bus not connected" in a server discovery
-					if (connector.interfaceType() == SubnetConnector.InterfaceType.Virtual)
+					if (connector.interfaceType() == InterfaceType.Virtual)
 						setNetworkState(1, true, false);
 				}
 				catch (KNXException | RuntimeException e) {
@@ -1432,10 +1432,7 @@ public class KnxServerGateway implements Runnable
 			return true;
 		if (subnetMask.getArea() == addr.getArea()) {
 			// if we represent an area coupler, line is 0
-			if (subnetMask.getLine() == 0 || subnetMask.getLine() == addr.getLine()) {
-				// address does match the mask
-				return true;
-			}
+			return subnetMask.getLine() == 0 || subnetMask.getLine() == addr.getLine();
 		}
 		return false;
 	}
@@ -1479,7 +1476,7 @@ public class KnxServerGateway implements Runnable
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
 				// addresses to client connections,
 				// even though we always have the same destination (e.g., the address of the usb interface)
-				else if (subnet.interfaceType() == SubnetConnector.InterfaceType.Usb
+				else if (subnet.interfaceType() == InterfaceType.Usb
 						&& f.getDestination().equals(localInterface) || subnet.interfaceAddress().isPresent()) {
 					for (final var entry : connections.entrySet()) {
 						final var connection = entry.getValue();
@@ -2014,7 +2011,7 @@ public class KnxServerGateway implements Runnable
 	private boolean localDeviceManagement(final SubnetConnector connector, final CEMILData ldata)
 	{
 		final IndividualAddress localInterface = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
-		if (connector.interfaceType() == SubnetConnector.InterfaceType.Usb && ldata.getDestination().equals(localInterface)) {
+		if (connector.interfaceType() == InterfaceType.Usb && ldata.getDestination().equals(localInterface)) {
 			final byte[] data = ldata.getPayload();
 			logger.log(DEBUG, "request for {0}, use USB Local-DM", localInterface);
 			if (data.length < 2)
@@ -2061,7 +2058,7 @@ public class KnxServerGateway implements Runnable
 							final var definitions = server.getInterfaceObjectServer().propertyDefinitions();
 							final var property = definitions.get(key);
 							if (property != null)
-								response[3] |= property.pdt();
+								response[3] |= (byte) property.pdt();
 							response[response.length - 2] = 1;
 						}
 						catch (final KNXRemoteException pidNotFound) {
@@ -2091,7 +2088,7 @@ public class KnxServerGateway implements Runnable
 					final int svcResponse = svc == PropertyDescRead ? PropertyDescResponse : PropertyResponse;
 					final byte[] tpdu = DataUnitBuilder.createAPDU(svcResponse, response);
 					if (connected)
-						tpdu[0] |= dataConnectedTsdu | (rcvSeq << 2);
+						tpdu[0] |= (byte) (dataConnectedTsdu | (rcvSeq << 2));
 					final CEMILData f = new CEMILDataEx(CEMILData.MC_LDATA_IND,
 							(IndividualAddress) ldata.getDestination(), ldata.getSource(), tpdu, Priority.LOW);
 					dispatchToServer(connector, f, 0);
@@ -2114,7 +2111,7 @@ public class KnxServerGateway implements Runnable
 	{
 		final SubnetConnector connector = getSubnetConnector(svcCont.getName());
 		// TODO check for cEMI server
-		if (connector.interfaceType() != SubnetConnector.InterfaceType.Usb)
+		if (connector.interfaceType() != InterfaceType.Usb)
 			return;
 		final IndividualAddress configured = svcCont.getMediumSettings().getDeviceAddress();
 		final LocalDeviceManagementUsb ldm = localDevMgmtAdapter(connector);
