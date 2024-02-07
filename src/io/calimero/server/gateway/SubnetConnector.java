@@ -387,7 +387,7 @@ public final class SubnetConnector
 	{
 		final KNXMediumSettings settings = sc.getMediumSettings();
 
-		if ("virtual".equals(interfaceType) || "emulate".equals(interfaceType))
+		if (interfaceType == InterfaceType.Virtual || interfaceType == InterfaceType.Emulate)
 			return null;
 
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
