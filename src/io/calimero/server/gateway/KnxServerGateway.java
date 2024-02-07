@@ -199,7 +199,7 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void frameReceived(final FrameEvent e)
 		{
-			if (!ipEvents.offer(e))
+			if (!ipEvents.offer(new IpEvent(sc, e)))
 				incMsgQueueOverflow(true);
 		}
 
@@ -387,12 +387,9 @@ public class KnxServerGateway implements Runnable
 
 	final class SubnetListener implements NetworkLinkListener
 	{
-		private final String scid;
+		private final SubnetConnector subnet;
 
-		SubnetListener(final String svcContainerId)
-		{
-			scid = svcContainerId;
-		}
+		SubnetListener(final SubnetConnector subnet) { this.subnet = subnet; }
 
 		@Override
 		public void confirmation(final FrameEvent e) {
@@ -403,19 +400,13 @@ public class KnxServerGateway implements Runnable
 		public void indication(final FrameEvent e)
 		{
 			subnetConnected(true);
-			// In the dispatching to server side, we rely on having the
-			// subnet link in the frame event source stored so to know where the
-			// frame came from.
-			// But this will not work if the sending link differs from the one
-			// stored in this frame event, e.g., when using a buffered link.
-			// Therefore, I store the svcContainer in here for re-association.
-			if (!subnetEvents.offer(new FrameEvent(scid, e.getFrame())))
+			if (!subnetEvents.offer(new FrameEvent(subnet, e.getFrame())))
 				incMsgQueueOverflow(false);
 		}
 
 		@LinkEvent
 		void baosService(final BaosService svc) {
-			if (!subnetEvents.offer(new FrameEvent(scid, svc.toByteArray())))
+			if (!subnetEvents.offer(new FrameEvent(subnet, svc.toByteArray())))
 				incMsgQueueOverflow(false);
 		}
 
@@ -428,11 +419,11 @@ public class KnxServerGateway implements Runnable
 
 		// connection status notification of the link (closed/open)
 		void connectionStatus(final boolean connected) {
-			final var sc = getSubnetConnector(scid).getServiceContainer();
+			final var sc = subnet.getServiceContainer();
 			final byte[] data = bytesFromWord(sc.getMediumSettings().maxApduLength());
 			final int pidMaxRoutingApduLength = 58;
-			setProperty(ROUTER_OBJECT, objectInstance(scid), pidMaxRoutingApduLength, data);
-			if (scid.equals(connectors.get(0).getServiceContainer().getName())) {
+			setProperty(ROUTER_OBJECT, objectInstance(subnet), pidMaxRoutingApduLength, data);
+			if (subnet == connectors.get(0)) {
 				setProperty(DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, data);
 				final int pidMaxInterfaceApduLength = 68;
 				setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, pidMaxInterfaceApduLength, data);
@@ -444,7 +435,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		private void subnetConnected(final boolean connected) {
-			setNetworkState(objectInstance(scid), true, !connected);
+			setNetworkState(objectInstance(subnet), true, !connected);
 		}
 
 		// connection status for serial connections (knx network offline/online)
@@ -466,8 +457,9 @@ public class KnxServerGateway implements Runnable
 	private final List<SubnetConnector> connectors = new ArrayList<>();
 	private final List<KNXnetIPConnection> serverConnections = new CopyOnWriteArrayList<>();
 
+	record IpEvent(ServiceContainer sc, FrameEvent event) {}
 	private final int maxEventQueueSize = 250;
-	private final BlockingQueue<FrameEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
+	private final BlockingQueue<IpEvent> ipEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
 	private final BlockingQueue<FrameEvent> subnetEvents = new ArrayBlockingQueue<>(maxEventQueueSize);
 
 	private static final FrameEvent ResetEvent = new FrameEvent(KnxServerGateway.class, new byte[0]);
@@ -512,11 +504,11 @@ public class KnxServerGateway implements Runnable
 		{
 			try {
 				while (trucking) {
-					final FrameEvent event = ipEvents.take();
+					final var ipEvent = ipEvents.take();
 					try {
-						if (!event.systemBroadcast())
+						if (!ipEvent.event().systemBroadcast())
 							checkRoutingBusy();
-						onClientFrameReceived(event);
+						onServerFrameReceived(ipEvent);
 					}
 					catch (final RuntimeException e) {
 						logger.log(ERROR, "on server-side frame event", e);
@@ -694,7 +686,7 @@ public class KnxServerGateway implements Runnable
 		for (final SubnetConnector connector : connectors) {
 			objinst++;
 
-			connector.setSubnetListener(new SubnetListener(connector.getName()));
+			connector.setSubnetListener(new SubnetListener(connector));
 
 			final ServiceContainer sc = connector.getServiceContainer();
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
@@ -1030,8 +1022,9 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void onClientFrameReceived(final FrameEvent fe) throws InterruptedException {
+	private void onServerFrameReceived(final IpEvent ipEvent) throws InterruptedException {
 		final String s = "server-side";
+		var fe = ipEvent.event();
 		final CEMI frame = fe.getFrame();
 
 		if (frame == null) {
@@ -1197,14 +1190,15 @@ public class KnxServerGateway implements Runnable
 
 	private void onSubnetFrameReceived(final FrameEvent fe) {
 		final String s = "subnet";
+		final SubnetConnector subnet = (SubnetConnector) fe.getSource();
 		final CEMI frame = fe.getFrame();
 
 		if (frame instanceof final CEMILData ldata) {
-			logger.log(TRACE, "{0} {1}: {2}: {3}", s, fe.getSource(), frame,
+			logger.log(TRACE, "{0} {1}: {2}: {3}", s, subnet.getName(), frame,
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
 
 			if (frame.getMessageCode() == CEMILData.MC_LDATA_IND) {
-				final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
+				final SubnetConnector connector = subnet;
 
 				// check if frame is addressed to us
 				if (connector != null) {
@@ -1237,9 +1231,9 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		else if (frame instanceof CEMIBusMon) {
-			logger.log(TRACE, "{0} {1}: {2}", s, fe.getSource(), frame);
+			logger.log(TRACE, "{0} {1}: {2}", s, subnet.getName(), frame);
 
-			final SubnetConnector connector = getSubnetConnector((String) fe.getSource());
+			final SubnetConnector connector = subnet;
 			if (connector == null)
 				return;
 			recordEvent(connector, fe);
@@ -1257,7 +1251,7 @@ public class KnxServerGateway implements Runnable
 		}
 
 		if (frame == null) {
-			final var connector = getSubnetConnector((String) fe.getSource());
+			final var connector = subnet;
 			if ("baos".equals(connector.format())) {
 				try {
 					final var svc = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
