@@ -267,7 +267,7 @@ public class KnxServerGateway implements Runnable
 						connector.openNetworkLink();
 						// we immediately set a virtual network to connected, so that there is no
 						// initial state "knx bus not connected" in a server discovery
-						if (connector.interfaceType().equals("virtual"))
+						if (connector.interfaceType() == SubnetConnector.InterfaceType.Virtual)
 							setNetworkState(1, true, false);
 					}
 					else if (type == ConnectionType.Monitor && !(rawLink instanceof KNXNetworkMonitor)) {
