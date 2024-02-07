@@ -343,7 +343,7 @@ public final class SubnetConnector
 				yield () -> new KNXNetworkLinkFT12(linkArgs, settings);
 			}
 			case Tpuart -> () -> new KNXNetworkLinkTpuart(linkArgs, settings, acknowledge.get());
-			case User -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			case User -> () -> newLinkUsing(className, linkArgs.split("[,|]"));
 			case Emulate -> {
 				final NetworkBuffer nb = NetworkBuffer.createBuffer(sc.getName());
 				final VirtualLink vl = new VirtualLink(sc.getName(), settings);
@@ -385,11 +385,10 @@ public final class SubnetConnector
 
 	public KNXNetworkMonitor openMonitorLink() throws KNXException, InterruptedException
 	{
-		final KNXMediumSettings settings = sc.getMediumSettings();
-
 		if (interfaceType == InterfaceType.Virtual || interfaceType == InterfaceType.Emulate)
 			return null;
 
+		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
 			case Udp ->
 				() -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
@@ -398,7 +397,7 @@ public final class SubnetConnector
 			case Ft12 -> () -> "cemi".equals(msgFormat) ? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
 					: new KNXNetworkMonitorFT12(linkArgs, settings);
 			case Tpuart -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
-			case User -> () -> newLinkUsing(className, linkArgs.split(",|\\|"));
+			case User -> () -> newLinkUsing(className, linkArgs.split("[,|]"));
 			default -> throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
 		};
 
