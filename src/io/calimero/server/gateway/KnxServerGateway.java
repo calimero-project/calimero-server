@@ -135,7 +135,6 @@ import io.calimero.link.medium.KNXMediumSettings;
 import io.calimero.link.medium.KnxIPSettings;
 import io.calimero.log.LogService;
 import io.calimero.mgmt.LocalDeviceManagementUsb;
-import io.calimero.mgmt.PropertyAccess;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.mgmt.PropertyClient;
 import io.calimero.mgmt.PropertyClient.PropertyKey;
@@ -855,7 +854,7 @@ public class KnxServerGateway implements Runnable
 			try {
 				final var apdu = prepareTimestamp(xlator, src, dst);
 				final var ldata = new CEMILDataEx(CEMILData.MC_LDATA_REQ, src, dst, apdu, p);
-				dispatchToSubnet(connector, ldata, dst.getRawAddress(), false);
+				dispatchToSubnet(connector, ldata, false);
 			}
 			catch (final RuntimeException e) {
 				logger.warn("time server error {} {}", dst, xlator, e);
@@ -1038,6 +1037,10 @@ public class KnxServerGateway implements Runnable
 			return;
 		}
 
+		ServiceContainer svcCont = ipEvent.sc();
+		int objinst = objectInstance(svcCont);
+		RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
+
 		final int mc = frame.getMessageCode();
 		if (frame instanceof CEMILData ldata) {
 
@@ -1065,82 +1068,15 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 
+				final var client = (KNXnetIPConnection) fe.getSource();
+
 				if (ldata.getDestination() instanceof final IndividualAddress dst) {
 					final Optional<SubnetConnector> connector = connectorFor(dst);
-					if (connector.isPresent() && localDeviceManagement(connector.get(), ldata))
-						return;
 					if (connector.isPresent()) {
-						final var svcContainer = connector.get().getServiceContainer();
+						if (localDeviceManagement(connector.get(), ldata))
+							return;
 
-						// check if destination is a client of ours
-						final var dataConnections = server.dataConnections(svcContainer);
-						for (final var dataEndpoint : dataConnections.values()) {
-							if (ldata.getDestination().equals(dataEndpoint.deviceAddress())) {
-								try {
-									final var ind = CEMIFactory.create(null, null,
-											(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-									send(svcContainer, dataEndpoint, ind);
-								}
-								catch (KNXFormatException | RuntimeException e) {
-									e.printStackTrace();
-								}
-								return;
-							}
-						}
-
-						// defend our own additional individual addresses when receiving a TL connect.req
-						if (DataUnitBuilder.getTPDUService(ldata.getPayload()) == 0x80) {
-							final int objectInstance = 1;
-							final var addresses = additionalAddresses(objectInstance);
-							if (addresses.contains(ldata.getDestination())) {
-								// send disconnect
-								try {
-									final var ind = CEMIFactory.create(dst, ldata.getSource(), (CEMILData) CEMIFactory
-											.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
-									dispatchToServer(connector.get(), ind, fe.id());
-								}
-								catch (final KNXFormatException e) {
-									e.printStackTrace();
-								}
-								return;
-							}
-						}
-					}
-				}
-
-				final var dst = ldata.getDestination();
-				if (dst instanceof GroupAddress) {
-					// broadcasts are of interest to us
-					if (dst.getRawAddress() == 0)
-						deviceListeners.forEach(l -> l.indication(fe));
-
-					// send to all clients except sender
-					logger.trace("forward {} to all tunneling clients (except {})", ldata, ldata.getSource());
-					final var svcCont = connectorFor(ldata.getSource()).map(SubnetConnector::getServiceContainer);
-					if (svcCont.isPresent()) {
-						for (final var conn : serverConnections) {
-							final String type = conn.getName().toLowerCase();
-							if (type.contains("devmgmt") || type.contains("monitor"))
-								continue;
-							final var client = (KNXnetIPConnection) fe.getSource();
-							if (client == conn)
-								continue;
-
-							try {
-								final var ind = CEMIFactory.create(null, null,
-										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-								send(svcCont.get(), conn, ind);
-							}
-							catch (KNXFormatException | RuntimeException e) {
-								e.printStackTrace();
-							}
-						}
-					}
-				}
-				else if (dst instanceof final IndividualAddress ia) {
-					// see if the frame is addressed to us
-					final Optional<SubnetConnector> connector = connectorFor(ia);
-					if (connector.isPresent()) {
+						// see if the frame is addressed to us
 						final IndividualAddress localInterface = connector.get().getServiceContainer()
 								.getMediumSettings().getDeviceAddress();
 						if (ldata.getDestination().equals(localInterface)) {
@@ -1148,12 +1084,127 @@ public class KnxServerGateway implements Runnable
 							return;
 						}
 					}
+
+					var routingConfig = routerObj.routingLcConfig(true);
+					switch (routingConfig) {
+						case All -> {
+							final CEMILData send = adjustHopCount(ldata);
+							if (send == null)
+								return;
+							dispatchToSubnets(send, fe.systemBroadcast());
+						}
+						case Block -> {
+							logger.log(DEBUG, "no p2p frames shall be routed from {0} - discard {1}", svcCont.getName(), ldata);
+							return;
+						}
+						case Route -> {
+							// check if destination is a client of ours
+							final var dataConnections = server.dataConnections(svcCont);
+							for (final var dataEndpoint : dataConnections.values()) {
+								if (ldata.getDestination().equals(dataEndpoint.deviceAddress())) {
+									try {
+										final var ind = CEMIFactory.create(null, null,
+												(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+										send(svcCont, dataEndpoint, ind);
+									}
+									catch (KNXFormatException | RuntimeException e) {
+										e.printStackTrace();
+									}
+									return;
+								}
+							}
+
+							// defend our own unused additional individual addresses when receiving a TL connect.req
+							if (DataUnitBuilder.getTPDUService(ldata.getPayload()) == 0x80) {
+								final var addresses = additionalAddresses(objinst);
+								if (addresses.contains(ldata.getDestination())) {
+									// send disconnect
+									try {
+										final var disconnect = CEMIFactory.create(dst, ldata.getSource(), (CEMILData) CEMIFactory
+												.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
+										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
+												ldata.getDestination(), disconnect.getSource(), disconnect.getDestination(), client);
+										send(svcCont, client, disconnect);
+									}
+									catch (final KNXFormatException e) {
+										e.printStackTrace();
+									}
+									return;
+								}
+							}
+
+							final CEMILData send = adjustHopCount(ldata);
+							if (send == null)
+								return;
+
+							// if destination is the default individual address 0xffff (e.g., after a device reset)
+							// we can't route, dispatch to all subnets
+							if (ldata.getDestination().getRawAddress() == 0xffff) {
+								logger.log(TRACE, "destination is default individual address 15.15.255, dispatch to all subnets");
+								for (final var subnet : connectors) {
+									if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet))
+										send(subnet, send);
+								}
+								return;
+							}
+
+							connector.ifPresent(subnet -> dispatchToSubnet(subnet, send, fe.systemBroadcast()));
+						}
+					}
 				}
+				else { // GroupAddress
+					GroupAddress dst = (GroupAddress) ldata.getDestination();
 
-				final CEMILData send = adjustHopCount(ldata);
-				if (send != null)
-					dispatchToSubnets(send, fe.systemBroadcast());
+					// broadcasts are of interest to us
+					if (dst.getRawAddress() == 0)
+						deviceListeners.forEach(l -> l.indication(fe));
 
+					// send to all clients except sender
+					logger.trace("forward {} to all tunneling clients (except {})", ldata, ldata.getSource());
+					for (final var conn : serverConnections) {
+						final String type = conn.getName().toLowerCase();
+						if (client == conn || type.contains("devmgmt") || type.contains("monitor"))
+							continue;
+
+						try {
+							final var ind = CEMIFactory.create(null, null,
+									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+							send(svcCont, conn, ind);
+						}
+						catch (KNXFormatException | RuntimeException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (dst.equals(GroupAddress.Broadcast)) {
+						if (!routerObj.broadcastLcConfig(true)) {
+							logger.log(DEBUG, "no broadcast frames shall be routed from main line {0} - discard {1}",
+									svcCont.getName(), ldata);
+							return;
+						}
+					} else {
+						final var config = routerObj.routingLcGroupConfig(true, dst);
+						switch (config) {
+							case All -> {}  // nothing extra to do
+							case Block -> {
+								logger.log(DEBUG, "no multicast frames shall be routed from main line {0} - discard {1}",
+										svcCont.getName(), ldata);
+								return;
+							}
+							case Route -> {
+								if (!inGroupFilterTable(routerObj, dst)) {
+									logger.log(DEBUG, "destination {0} not set in {1} group filter - discard {2}", dst,
+											svcCont.getName(), ldata);
+									return;
+								}
+							}
+						}
+					}
+
+					final CEMILData send = adjustHopCount(ldata);
+					if (send != null)
+						dispatchToSubnets(send, fe.systemBroadcast());
+				}
 				return;
 			}
 		}
@@ -1204,51 +1255,131 @@ public class KnxServerGateway implements Runnable
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
 
 			if (frame.getMessageCode() == CEMILData.MC_LDATA_IND) {
-				final SubnetConnector connector = subnet;
+				var sc = subnet.getServiceContainer();
 
-				// check if frame is addressed to us
-				if (connector != null) {
-					final var containerAddr = connector.getServiceContainer().getMediumSettings().getDeviceAddress();
+				int objinst = objectInstance(subnet);
+				RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
+
+				if (ldata.getDestination() instanceof final IndividualAddress dst) {
+					// check if frame is addressed to us
+					final var containerAddr = sc.getMediumSettings().getDeviceAddress();
 					if (ldata.getDestination().equals(containerAddr)) {
 						// with an usb interface, device is always our own address, so we always exclude it for now
-						if (connector.interfaceType() == SubnetConnector.InterfaceType.Usb)
-							logger.debug("received from subnet using usb interface {}, don't intercept frame",
-									connector.getName());
-						else if (connector.interfaceAddress().isPresent())
+						if (subnet.interfaceType() == InterfaceType.Usb)
+							logger.trace("received from subnet using usb interface {}, don't intercept frame",
+									subnet.getName());
+						else if (subnet.interfaceAddress().isPresent())
 							logger.trace("received from subnet interface {}, don't intercept frame",
-									connector.getName());
+									subnet.getName());
 						else {
 							deviceListeners.forEach(l -> l.indication(fe));
 							return;
 						}
 					}
-				}
 
-				final CEMILData send = adjustHopCount(ldata);
-				if (send == null)
-					return;
-				if (connector != null) {
-					recordEvent(connector, fe);
-					dispatchToServer(connector, send, fe.id());
-				}
+					final CEMILData send = adjustHopCount(ldata);
+					if (send == null)
+						return;
 
-				dispatchToOtherSubnets(send, connector, false);
+					var config = routerObj.routingLcConfig(false);
+					switch (config) {
+						case All -> {
+							for (final var conn : serverConnections)
+								send(sc, conn, send);
+							dispatchToOtherSubnets(send, subnet, false);
+						}
+						case Block -> {
+							logger.log(DEBUG, "no p2p frames shall be routed from subnet {0} - discard {1}",
+									subnet.getName(), ldata);
+							return;
+						}
+						case Route -> {
+							dispatchToServer(subnet, send, 0);
+							// route to other subnet if indicated by destination
+							var otherSubnet = connectorFor(dst);
+							if (otherSubnet.isPresent())
+								dispatchToSubnet(otherSubnet.get(), send, fe.systemBroadcast());
+							else
+								logger.log(TRACE, "no subnet for {0}->{1} (received {2})",
+										send.getSource(), send.getDestination(),
+										DataUnitBuilder.decode(send.getPayload(), send.getDestination()));
+						}
+					}
+				}
+				else { // GroupAddress
+					var dst = (GroupAddress) ldata.getDestination();
+
+					if (dst.equals(GroupAddress.Broadcast)) {
+						if (!routerObj.broadcastLcConfig(false)) {
+							logger.log(DEBUG, "no broadcast frames shall be routed from subnet {0} - discard {1}",
+									subnet.getName(), ldata);
+							return;
+						}
+					}
+					else {
+						var config = routerObj.routingLcGroupConfig(false, dst);
+						switch (config) {
+							case All -> {} // nothing extra to do
+							case Block -> {
+								logger.log(DEBUG, "no group addressed frames shall be routed from subnet {0} - discard {1}",
+										subnet.getName(), ldata);
+								return;
+							}
+							case Route -> {
+								if (!inGroupFilterTable(routerObj, dst)) {
+									logger.log(INFO, "destination {0} not set in {1} group filter - discard {2}",
+											dst, subnet.getName(), ldata);
+									return;
+								}
+							}
+						}
+					}
+
+					final CEMILData send = adjustHopCount(ldata);
+					if (send == null)
+						return;
+
+					final var routing = findRoutingConnection();
+					if (routing.isPresent() && isSubnetBroadcast(objinst, ldata)) {
+						logger.log(INFO, "forward as IP system broadcast {0}", ldata);
+						final CEMILData bcast;
+						if (ldata instanceof CEMILDataEx ex) {
+							ex.setBroadcast(false);
+							bcast = ex;
+						}
+						else {
+							bcast = new CEMILDataEx(send.getMessageCode(), send.getSource(), send.getDestination(),
+									send.getPayload(), send.getPriority(), send.isRepetition(), false, send.isAckRequested(),
+									send.getHopCount());
+						}
+
+						final var sentOnNetif = new HashSet<NetworkInterface>();
+						for (final var conn : serverConnections) {
+							if (conn instanceof final KNXnetIPRouting rc) {
+								if (sentOnNetif.add(rc.networkInterface()))
+									send(sc, rc, bcast);
+							}
+						}
+						return;
+					}
+
+					recordEvent(subnet, fe);
+					dispatchLdataToClients(subnet, send, fe.id());
+
+					dispatchToOtherSubnets(send, subnet, false);
+				}
 				return;
 			}
 		}
 		else if (frame instanceof CEMIBusMon) {
 			logger.trace("{} {}: {}", s, subnet.getName(), frame);
-
-			final SubnetConnector connector = subnet;
-			if (connector == null)
-				return;
-			recordEvent(connector, fe);
+			recordEvent(subnet, fe);
 
 			for (final var conn : serverConnections) {
 				// routing does not support busmonitor mode
 				if (!(conn instanceof KNXnetIPRouting)) {
 					try {
-						send(connector.getServiceContainer(), conn, frame);
+						send(subnet.getServiceContainer(), conn, frame);
 					}
 					catch (final InterruptedException e) {}
 				}
@@ -1257,11 +1388,10 @@ public class KnxServerGateway implements Runnable
 		}
 
 		if (frame == null) {
-			final var connector = subnet;
-			if ("baos".equals(connector.format())) {
+			if ("baos".equals(subnet.format())) {
 				try {
 					final var svc = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
-					final var serviceContainer = connector.getServiceContainer();
+					final var serviceContainer = subnet.getServiceContainer();
 
 					final var connections = server.dataConnections(serviceContainer);
 					for (final var c : connections.values()) {
@@ -1337,37 +1467,13 @@ public class KnxServerGateway implements Runnable
 		return null;
 	}
 
-	private void dispatchToOtherSubnets(final CEMILData f, final SubnetConnector exclude, final boolean systemBroadcast)
-	{
-		if (f.getDestination() instanceof IndividualAddress) {
-			// deal with medium independent default individual address
-			if (f.getDestination().getRawAddress() == 0xffff) {
-				logger.trace("default individual address, dispatch to all active KNX subnets");
-				for (final SubnetConnector subnet : connectors) {
-					if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet))
-						send(subnet, f);
-				}
-				return;
-			}
-			final KNXNetworkLink lnk = findSubnetLink((IndividualAddress) f.getDestination());
-			if (lnk == null) {
-				logger.warn("no subnet configured for destination " + f.getDestination() + " (received "
-						+ DataUnitBuilder.decode(f.getPayload(), f.getDestination())
-						+ " from " + f.getSource() + ")");
-				return;
-			}
-			if (exclude != null && lnk.equals(exclude.getSubnetLink()))
-				logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
-			else
-				connectorFor((IndividualAddress) f.getDestination()).ifPresent(subnet -> send(subnet, f));
-		}
-		else {
-			final int raw = f.getDestination().getRawAddress();
-			for (final SubnetConnector subnet : connectors) {
-				if (subnet.getServiceContainer().isActivated() && !subnet.equals(exclude))
-					dispatchToSubnet(subnet, f, raw, systemBroadcast);
-				else if (subnet.equals(exclude))
+	private void dispatchToOtherSubnets(final CEMILData ldata, final SubnetConnector exclude, final boolean systemBroadcast) {
+		for (final SubnetConnector subnet : connectors) {
+			if (subnet.getServiceContainer().isActivated()) {
+				if (subnet.equals(exclude))
 					logger.trace("dispatching to KNX subnets: exclude subnet " + exclude.getName());
+				else
+					dispatchToSubnet(subnet, ldata, systemBroadcast);
 			}
 		}
 	}
@@ -1377,27 +1483,11 @@ public class KnxServerGateway implements Runnable
 		dispatchToOtherSubnets(f, null, systemBroadcast);
 	}
 
-	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData ldata, final int rawAddress,
-		final boolean systemBroadcast)
-	{
-		final int objinst = objectInstance(subnet);
-		if (ldata.getDestination() instanceof final GroupAddress d && rawAddress > 0 && rawAddress <= 0x6fff) {
-			// get forwarding settings for group destination address
-			final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.MAIN_LCGROUPCONFIG, 3);
-			final int subGroupAddressConfig = value & 0x03;
-			if (subGroupAddressConfig == 2) {
-				logger.debug("no frames shall be routed to subnet {} - discard {}", subnet.getName(), ldata);
-				return;
-			}
-			if (subGroupAddressConfig == 3 && !inGroupFilterTable(d, objinst)) {
-				logger.info("destination {} not in {} group address table - discard {}", d, subnet.getName(), ldata);
-				return;
-			}
-		}
-
+	private void dispatchToSubnet(final SubnetConnector subnet, final CEMILData ldata, final boolean systemBroadcast) {
 		if (!isNetworkLink(subnet))
 			return;
 		if (systemBroadcast) {
+			final int objinst = objectInstance(subnet);
 			if (!isIpSystemBroadcast(objinst, ldata)) {
 				logger.warn("cEMI in IP system broadcast not qualified for subnet broadcast: {}", ldata);
 				return;
@@ -1435,40 +1525,19 @@ public class KnxServerGateway implements Runnable
 		return false;
 	}
 
-	private KNXNetworkLink findSubnetLink(final IndividualAddress dst)
-	{
-        for (final SubnetConnector b : connectors) {
-            final ServiceContainer c = b.getServiceContainer();
-            if (c.isActivated()) {
-                final IndividualAddress subnet = c.getMediumSettings().getDeviceAddress();
-                if (matchesSubnet(dst, subnet)) {
-                    if (!isNetworkLink(b))
-                        break;
-                    final KNXNetworkLink link = (KNXNetworkLink) b.getSubnetLink();
-                    logger.trace("dispatch to KNX subnet {} ({} in service container '{}')",
-                            subnet, link.getName(), b.getName());
-                    // assuming a proper address assignment of area/line coupler
-                    // addresses, this has to be the correct knx subnet link
-                    return link;
-                }
-                logger.trace("subnet=" + subnet + " dst=" + dst);
-            }
-        }
-		return null;
-	}
-
 	private void dispatchToServer(final SubnetConnector subnet, final CEMILData f, final long eventId)
 			throws InterruptedException {
 		final ServiceContainer sc = subnet.getServiceContainer();
 		try {
-			if (f.getDestination() instanceof IndividualAddress) {
+			final int objinst = objectInstance(subnet);
+			if (f.getDestination() instanceof IndividualAddress dst) {
 				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
 
 				final var connections = server.dataConnections(sc);
 				// 1. look for client tunneling connection with matching assigned address
-				KNXnetIPConnection c = findConnection((IndividualAddress) f.getDestination());
+				KNXnetIPConnection c = findConnection(dst);
 				if (c != null) {
-					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+					logger.debug("dispatch {}->{} using {}", f.getSource(), dst, c);
 					send(sc, c, f);
 				}
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
@@ -1476,77 +1545,59 @@ public class KnxServerGateway implements Runnable
 				// even though we always have the same destination (e.g., the address of the usb interface)
 				else if (subnet.interfaceType() == InterfaceType.Usb
 						&& f.getDestination().equals(localInterface) || subnet.interfaceAddress().isPresent()) {
-					for (final var entry : connections.entrySet()) {
-						final var connection = entry.getValue();
+					for (final var connection : connections.values()) {
 						final IndividualAddress assignedAddress = connection.deviceAddress();
 						// skip devmgmt connections
 						if (assignedAddress != null) {
 							logger.debug("dispatch {}->{} ({}) using {}", f.getSource(), assignedAddress,
-									f.getDestination(), connection);
+									dst, connection);
 							send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
 						}
 					}
 					// also dispatch via routing as-is
 					c = findRoutingConnection().orElse(null);
 					if (c != null) {
-						logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+						logger.debug("dispatch {}->{} using {}", f.getSource(), dst, c);
 						send(sc, c, f);
 					}
 				}
 				// 3. look for activated client-side routing
 				else if ((c = findRoutingConnection().orElse(null)) != null) {
-					logger.debug("dispatch {}->{} using {}", f.getSource(), f.getDestination(), c);
+					logger.debug("dispatch {}->{} using {}", f.getSource(), dst, c);
 					send(sc, c, f);
 				}
 				else {
-					logger.warn("no active KNXnet/IP connection for destination {}, dispatch {}->{} to all server-side"
-							+ " connections", f.getDestination(), f.getSource(), f.getDestination());
+					logger.info("no active KNXnet/IP connection for destination {}, " +
+							"dispatch {}->{} to all server-side connections", dst, f.getSource(), dst);
 					for (final var conn : serverConnections)
 						send(sc, conn, f);
 				}
 			}
 			else {
 				// group destination address
-				final int raw = f.getDestination().getRawAddress();
-				if (raw <= 0x6fff) {
-					final int objinst = objectInstance(subnet);
-					// check if forwarding requests us to block all frames
-					final int value = getPropertyOrDefault(ROUTER_OBJECT, objinst, PID.SUB_LCGROUPCONFIG, 3);
-					final int mainGroupAddressConfig = value & 0x03;
-					if (mainGroupAddressConfig == 2) {
-						logger.debug("no frames shall be routed from subnet {} - discard {}", subnet.getName(), f);
-						return;
+				final KNXnetIPConnection routing = findRoutingConnection().orElse(null);
+
+				if (routing != null && isSubnetBroadcast(objinst, f)) {
+					logger.info("forward as IP system broadcast {}", f);
+					final CEMILData bcast;
+					if (f instanceof CEMILDataEx) {
+						((CEMILDataEx) f).setBroadcast(false);
+						bcast = f;
 					}
-					// check if forwarding requests us to use the filter table
-					if (mainGroupAddressConfig == 3 && raw != 0
-							&& !inGroupFilterTable((GroupAddress) f.getDestination(), objinst)) {
-						logger.warn(f + ", destination not in group address table - throw away");
-						return;
+					else {
+						bcast = new CEMILDataEx(f.getMessageCode(), f.getSource(), f.getDestination(),
+								f.getPayload(), f.getPriority(), f.isRepetition(), false, f.isAckRequested(),
+								f.getHopCount());
 					}
 
-					final KNXnetIPConnection routing = findRoutingConnection().orElse(null);
-					if (routing != null && isSubnetBroadcast(objinst, f)) {
-						logger.info("forward as IP system broadcast {}", f);
-						final CEMILData bcast;
-						if (f instanceof CEMILDataEx) {
-							((CEMILDataEx) f).setBroadcast(false);
-							bcast = f;
+					final var sentOnNetif = new HashSet<>();
+					for (final var conn : serverConnections) {
+						if (conn instanceof final KNXnetIPRouting rc) {
+							if (sentOnNetif.add(rc.networkInterface()))
+								send(sc, rc, bcast);
 						}
-						else {
-							bcast = new CEMILDataEx(f.getMessageCode(), f.getSource(), f.getDestination(),
-									f.getPayload(), f.getPriority(), f.isRepetition(), false, f.isAckRequested(),
-									f.getHopCount());
-						}
-
-						final var sentOnNetif = new HashSet<NetworkInterface>();
-						for (final var conn : serverConnections) {
-							if (conn instanceof final KNXnetIPRouting rc) {
-								if (sentOnNetif.add(rc.networkInterface()))
-									send(sc, rc, bcast);
-							}
-						}
-						return;
 					}
+					return;
 				}
 
 				dispatchLdataToClients(subnet, f, eventId);
@@ -1763,12 +1814,10 @@ public class KnxServerGateway implements Runnable
 	}
 
 	// queries KNX group address filter, a message shall be routed if corresponding address bit is set
-	private boolean inGroupFilterTable(final GroupAddress addr, final int objectInstance) {
-		final InterfaceObjectServer ios = server.getInterfaceObjectServer();
+	private boolean inGroupFilterTable(final RouterObject routerObj, final GroupAddress addr) {
 		try {
 			// Filter table realisation type 3: memory location of table is stored in Router object PID_TABLE_REFERENCE
-			final byte[] data = ios.getProperty(ROUTER_OBJECT, objectInstance, PID.TABLE_REFERENCE, 1, 1);
-			final int tableLoc = (int) toUnsignedInt (data);
+			final int tableLoc = (int) toUnsignedInt (routerObj.get(PID.TABLE_REFERENCE));
 
 			// table size is 8192 bytes to fit all 1<<16 group addresses
 			int addrOffset = addr.getRawAddress() / 8;
@@ -1945,6 +1994,10 @@ public class KnxServerGateway implements Runnable
 				return Optional.of(connector);
 		}
 		return Optional.empty();
+	}
+
+	private int objectInstance(ServiceContainer svcCont) {
+		return objectInstance(svcCont.getName());
 	}
 
 	private int objectInstance(final SubnetConnector connector) {
