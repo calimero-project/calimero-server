@@ -245,7 +245,7 @@ public class KNXnetIPServer
 		}
 
 		@Override
-		protected void ipRoutingConfigChanged(final RoutingConfig config) {
+		protected void ipRoutingConfigChanged(final IpRoutingConfig config) {
 			for (final var ep : endpoints) {
 				final var rep = ep.routingEndpoint();
 				if (rep.isPresent()) {
