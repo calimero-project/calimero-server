@@ -13,7 +13,7 @@ repositories {
     maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots' }
 }
 
-ext.junitJupiterVersion = '5.10.1'
+ext.junitJupiterVersion = '5.10.2'
 
 group = 'io.calimero'
 version = '2.6-SNAPSHOT'
