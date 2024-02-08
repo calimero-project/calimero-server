@@ -1170,34 +1170,11 @@ public class KnxServerGateway implements Runnable
 						}
 					}
 
-					if (dst.equals(GroupAddress.Broadcast)) {
-						if (!routerObj.broadcastLcConfig(true)) {
-							logger.debug("no broadcast frames shall be routed from main line {} - discard {}",
-									svcCont.getName(), ldata);
-							return;
-						}
-					} else {
-						final var config = routerObj.routingLcGroupConfig(true, dst);
-						switch (config) {
-							case All -> {}  // nothing extra to do
-							case Block -> {
-								logger.debug("no multicast frames shall be routed from main line {} - discard {}",
-										svcCont.getName(), ldata);
-								return;
-							}
-							case Route -> {
-								if (!inGroupFilterTable(routerObj, dst)) {
-									logger.debug("destination {} not set in {} group filter - discard {}", dst,
-											svcCont.getName(), ldata);
-									return;
-								}
-							}
-						}
+					if (routeBasedOnGroupConfig(ldata, routerObj, true, svcCont.getName())) {
+						final CEMILData send = adjustHopCount(ldata);
+						if (send != null)
+							dispatchToSubnets(send, fe.systemBroadcast());
 					}
-
-					final CEMILData send = adjustHopCount(ldata);
-					if (send != null)
-						dispatchToSubnets(send, fe.systemBroadcast());
 				}
 				return;
 			}
@@ -1301,33 +1278,8 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				else { // GroupAddress
-					final var dst = (GroupAddress) ldata.getDestination();
-
-					if (dst.equals(GroupAddress.Broadcast)) {
-						if (!routerObj.broadcastLcConfig(false)) {
-							logger.debug("no broadcast frames shall be routed from subnet {} - discard {}",
-									subnet.getName(), ldata);
-							return;
-						}
-					}
-					else {
-						final var config = routerObj.routingLcGroupConfig(false, dst);
-						switch (config) {
-							case All -> {} // nothing extra to do
-							case Block -> {
-								logger.debug("no group addressed frames shall be routed from subnet {} - discard {}",
-										subnet.getName(), ldata);
-								return;
-							}
-							case Route -> {
-								if (!inGroupFilterTable(routerObj, dst)) {
-									logger.info("destination {} not set in {} group filter - discard {}",
-											dst, subnet.getName(), ldata);
-									return;
-								}
-							}
-						}
-					}
+					if (!routeBasedOnGroupConfig(ldata, routerObj, false, subnet.getName()))
+						return;
 
 					final CEMILData send = adjustHopCount(ldata);
 					if (send == null)
@@ -1407,6 +1359,36 @@ public class KnxServerGateway implements Runnable
 		}
 
 		logger.warn("received {} {} - ignored", s, frame);
+	}
+
+	private boolean routeBasedOnGroupConfig(final CEMILData ldata, final RouterObject routerObj, final boolean fromMain,
+			final String name) {
+		final GroupAddress dst = (GroupAddress) ldata.getDestination();
+		final String net = fromMain ? "main line" : "subnet";
+		if (dst.equals(GroupAddress.Broadcast)) {
+			if (!routerObj.broadcastLcConfig(fromMain)) {
+				logger.debug("no broadcast frames shall be routed from {} {} - discard {}", net, name, ldata);
+				return false;
+			}
+		}
+		else {
+			final var config = routerObj.routingLcGroupConfig(fromMain, dst);
+			switch (config) {
+				case All -> {} // nothing extra to do
+				case Block -> {
+					logger.debug("no group addressed frames shall be routed from {} {} - discard {}",
+							net, name, ldata);
+					return false;
+				}
+				case Route -> {
+					if (!inGroupFilterTable(routerObj, dst)) {
+						logger.debug("destination {} not set in {} group filter - discard {}", dst, name, ldata);
+						return false;
+					}
+				}
+			}
+		}
+		return true;
 	}
 
 	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
