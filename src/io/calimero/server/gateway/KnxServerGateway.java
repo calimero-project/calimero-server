@@ -232,8 +232,6 @@ public class KnxServerGateway implements Runnable
 		public boolean acceptDataConnection(final ServiceContainer svcContainer, final KNXnetIPConnection conn,
 				final IndividualAddress assignedDeviceAddress, final ConnectionType type) {
 			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
-			if (connector == null)
-				return false;
 
 			if (!(conn instanceof KNXnetIPDevMgmt)) {
 				final AutoCloseable subnetLink = connector.getSubnetLink();
@@ -1453,16 +1451,10 @@ public class KnxServerGateway implements Runnable
 		return con;
 	}
 
-	// Using the sending link for identification does not always work,
-	// see listener indication for the reason of using the container name
-	private SubnetConnector getSubnetConnector(final String containerName)
-	{
-		for (final SubnetConnector b : connectors) {
-			if (b.getServiceContainer().getName().equals(containerName))
-				return b;
-		}
-		logger.log(ERROR, "dispatch to server: no subnet connector found!");
-		return null;
+	private SubnetConnector getSubnetConnector(final String containerName) {
+		return connectors.stream().filter(c -> c.getServiceContainer().getName().equals(containerName))
+				.findFirst()
+				.orElseThrow(() -> new KnxRuntimeException("no subnet connector found for '" + containerName + "'"));
 	}
 
 	private void dispatchToOtherSubnets(final CEMILData ldata, final SubnetConnector exclude, final boolean systemBroadcast) {
