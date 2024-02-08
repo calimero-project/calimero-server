@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
@@ -68,7 +69,7 @@ public class ServerConfiguration {
 	 */
 	public record Container(List<IndividualAddress> additionalAddresses,
 			Map<Integer, List<IndividualAddress>> tunnelingUsers, SubnetConnector subnetConnector,
-			List<GroupAddress> groupAddressFilter, List<StateDP> timeServerDatapoints,
+			Set<GroupAddress> groupAddressFilter, List<StateDP> timeServerDatapoints,
 			EnumSet<ServiceFamily> securedServices, Map<String, byte[]> keyfile, Optional<Keyring> keyring) {
 
 		private static final String secureSymbol = new String(Character.toChars(0x1F512));
@@ -92,7 +93,7 @@ public class ServerConfiguration {
 			securedServices = EnumSet.copyOf(securedServices);
 			keyfile = Map.copyOf(keyfile);
 
-			groupAddressFilter = List.copyOf(groupAddressFilter);
+			groupAddressFilter = Set.copyOf(groupAddressFilter);
 			timeServerDatapoints = List.copyOf(timeServerDatapoints);
 		}
 
@@ -106,7 +107,7 @@ public class ServerConfiguration {
 		 *        functionality
 		 */
 		public Container(final List<IndividualAddress> additionalAddresses, final SubnetConnector connector,
-				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
+				final Set<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints) {
 			this(additionalAddresses, Map.of(), connector, groupAddressFilter, timeServerDatapoints,
 					EnumSet.noneOf(ServiceFamily.class), Map.of());
 		}
@@ -124,7 +125,7 @@ public class ServerConfiguration {
 		 */
 		public Container(final List<IndividualAddress> additionalAddresses,
 				final Map<Integer, List<IndividualAddress>> tunnelingUsers, final SubnetConnector connector,
-				final List<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints,
+				final Set<GroupAddress> groupAddressFilter, final List<StateDP> timeServerDatapoints,
 				final EnumSet<ServiceFamily> securedServices, final Map<String, byte[]> keyfile) {
 
 			this(additionalAddresses, tunnelingUsers, connector, groupAddressFilter, timeServerDatapoints,
