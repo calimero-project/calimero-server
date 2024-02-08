@@ -894,10 +894,10 @@ public class KnxServerGateway implements Runnable
 									final GroupAddress dst) throws InterruptedException {
 		final long millis = System.currentTimeMillis();
 
-		if (xlator instanceof DPTXlatorDate)
-			((DPTXlatorDate) xlator).setValue(millis);
-		else if (xlator instanceof DPTXlatorTime)
-			((DPTXlatorTime) xlator).setValue(millis);
+		if (xlator instanceof final DPTXlatorDate date)
+			date.setValue(millis);
+		else if (xlator instanceof final DPTXlatorTime time)
+			time.setValue(millis);
 		else if (xlator instanceof final DPTXlatorDateTime dateTime) {
 			dateTime.setValue(millis);
 			dateTime.setClockSync(true);
@@ -1147,10 +1147,8 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				else { // GroupAddress
-					final GroupAddress dst = (GroupAddress) ldata.getDestination();
-
 					// broadcasts are of interest to us
-					if (dst.getRawAddress() == 0)
+					if (ldata.getDestination().equals(GroupAddress.Broadcast))
 						deviceListeners.forEach(l -> l.indication(fe));
 
 					// send to all clients except sender
@@ -1311,7 +1309,6 @@ public class KnxServerGateway implements Runnable
 
 					recordEvent(subnet, fe);
 					dispatchLdataToClients(subnet, send, fe.id());
-
 					dispatchToOtherSubnets(send, subnet, false);
 				}
 				return;

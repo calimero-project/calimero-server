@@ -1152,7 +1152,7 @@ final class ControlEndpointService extends ServiceLooper
 				return false;
 			}
 			if (usedKnxAddresses.contains(device)) {
-				logger.debug("address {} already assigned", device);
+				logger.trace("address {} already assigned", device);
 				return false;
 			}
 			usedKnxAddresses.add(device);
