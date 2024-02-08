@@ -227,8 +227,6 @@ public class KnxServerGateway implements Runnable
 		public boolean acceptDataConnection(final ServiceContainer svcContainer, final KNXnetIPConnection conn,
 				final IndividualAddress assignedDeviceAddress, final ConnectionType type) {
 			final SubnetConnector connector = getSubnetConnector(svcContainer.getName());
-			if (connector == null)
-				return false;
 
 			if (!(conn instanceof KNXnetIPDevMgmt)) {
 				final AutoCloseable subnetLink = connector.getSubnetLink();
@@ -617,7 +615,7 @@ public class KnxServerGateway implements Runnable
 			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
 			try {
 				dispatchToServer(connector, msg, eventId);
-			} catch (InterruptedException e) {
+			} catch (final InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 		}
@@ -904,7 +902,7 @@ public class KnxServerGateway implements Runnable
 			((DPTXlatorDate) xlator).setValue(millis);
 		else if (xlator instanceof DPTXlatorTime)
 			((DPTXlatorTime) xlator).setValue(millis);
-		else if (xlator instanceof DPTXlatorDateTime dateTime) {
+		else if (xlator instanceof final DPTXlatorDateTime dateTime) {
 			dateTime.setValue(millis);
 			dateTime.setClockSync(true);
 		}
@@ -939,7 +937,7 @@ public class KnxServerGateway implements Runnable
 			info.append(format("service container '%s'%n", c.getName()));
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			try {
-				if (c.getServiceContainer() instanceof RoutingServiceContainer rsc) {
+				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
 					info.append(format("\trouting multicast %s netif %s%n",
 							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
 				}
@@ -1029,7 +1027,7 @@ public class KnxServerGateway implements Runnable
 
 	private void onServerFrameReceived(final IpEvent ipEvent) throws InterruptedException {
 		final String s = "server-side";
-		var fe = ipEvent.event();
+		final var fe = ipEvent.event();
 		final CEMI frame = fe.getFrame();
 
 		if (frame == null) {
@@ -1037,12 +1035,12 @@ public class KnxServerGateway implements Runnable
 			return;
 		}
 
-		ServiceContainer svcCont = ipEvent.sc();
-		int objinst = objectInstance(svcCont);
-		RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
+		final ServiceContainer svcCont = ipEvent.sc();
+		final int objinst = objectInstance(svcCont);
+		final RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
 
 		final int mc = frame.getMessageCode();
-		if (frame instanceof CEMILData ldata) {
+		if (frame instanceof final CEMILData ldata) {
 
 			logger.trace("{} {}: {}: {}", s, fe.getSource(), frame,
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
@@ -1085,7 +1083,7 @@ public class KnxServerGateway implements Runnable
 						}
 					}
 
-					var routingConfig = routerObj.routingLcConfig(true);
+					final var routingConfig = routerObj.routingLcConfig(true);
 					switch (routingConfig) {
 						case All -> {
 							final CEMILData send = adjustHopCount(ldata);
@@ -1094,7 +1092,7 @@ public class KnxServerGateway implements Runnable
 							dispatchToSubnets(send, fe.systemBroadcast());
 						}
 						case Block -> {
-							logger.log(DEBUG, "no p2p frames shall be routed from {0} - discard {1}", svcCont.getName(), ldata);
+							logger.debug("no p2p frames shall be routed from {} - discard {}", svcCont.getName(), ldata);
 							return;
 						}
 						case Route -> {
@@ -1122,7 +1120,7 @@ public class KnxServerGateway implements Runnable
 									try {
 										final var disconnect = CEMIFactory.create(dst, ldata.getSource(), (CEMILData) CEMIFactory
 												.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
-										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
+										logger.debug("defend own additional individual address {}, dispatch {}->{} using {}",
 												ldata.getDestination(), disconnect.getSource(), disconnect.getDestination(), client);
 										send(svcCont, client, disconnect);
 									}
@@ -1140,7 +1138,7 @@ public class KnxServerGateway implements Runnable
 							// if destination is the default individual address 0xffff (e.g., after a device reset)
 							// we can't route, dispatch to all subnets
 							if (ldata.getDestination().getRawAddress() == 0xffff) {
-								logger.log(TRACE, "destination is default individual address 15.15.255, dispatch to all subnets");
+								logger.trace("destination is default individual address 15.15.255, dispatch to all subnets");
 								for (final var subnet : connectors) {
 									if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet))
 										send(subnet, send);
@@ -1153,7 +1151,7 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				else { // GroupAddress
-					GroupAddress dst = (GroupAddress) ldata.getDestination();
+					final GroupAddress dst = (GroupAddress) ldata.getDestination();
 
 					// broadcasts are of interest to us
 					if (dst.getRawAddress() == 0)
@@ -1178,7 +1176,7 @@ public class KnxServerGateway implements Runnable
 
 					if (dst.equals(GroupAddress.Broadcast)) {
 						if (!routerObj.broadcastLcConfig(true)) {
-							logger.log(DEBUG, "no broadcast frames shall be routed from main line {0} - discard {1}",
+							logger.debug("no broadcast frames shall be routed from main line {} - discard {}",
 									svcCont.getName(), ldata);
 							return;
 						}
@@ -1187,13 +1185,13 @@ public class KnxServerGateway implements Runnable
 						switch (config) {
 							case All -> {}  // nothing extra to do
 							case Block -> {
-								logger.log(DEBUG, "no multicast frames shall be routed from main line {0} - discard {1}",
+								logger.debug("no multicast frames shall be routed from main line {} - discard {}",
 										svcCont.getName(), ldata);
 								return;
 							}
 							case Route -> {
 								if (!inGroupFilterTable(routerObj, dst)) {
-									logger.log(DEBUG, "destination {0} not set in {1} group filter - discard {2}", dst,
+									logger.debug("destination {} not set in {} group filter - discard {}", dst,
 											svcCont.getName(), ldata);
 									return;
 								}
@@ -1255,10 +1253,10 @@ public class KnxServerGateway implements Runnable
 					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
 
 			if (frame.getMessageCode() == CEMILData.MC_LDATA_IND) {
-				var sc = subnet.getServiceContainer();
+				final var sc = subnet.getServiceContainer();
 
-				int objinst = objectInstance(subnet);
-				RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
+				final int objinst = objectInstance(subnet);
+				final RouterObject routerObj = RouterObject.lookup(server.getInterfaceObjectServer(), objinst);
 
 				if (ldata.getDestination() instanceof final IndividualAddress dst) {
 					// check if frame is addressed to us
@@ -1281,7 +1279,7 @@ public class KnxServerGateway implements Runnable
 					if (send == null)
 						return;
 
-					var config = routerObj.routingLcConfig(false);
+					final var config = routerObj.routingLcConfig(false);
 					switch (config) {
 						case All -> {
 							for (final var conn : serverConnections)
@@ -1289,45 +1287,45 @@ public class KnxServerGateway implements Runnable
 							dispatchToOtherSubnets(send, subnet, false);
 						}
 						case Block -> {
-							logger.log(DEBUG, "no p2p frames shall be routed from subnet {0} - discard {1}",
+							logger.debug("no p2p frames shall be routed from subnet {} - discard {}",
 									subnet.getName(), ldata);
 							return;
 						}
 						case Route -> {
 							dispatchToServer(subnet, send, 0);
 							// route to other subnet if indicated by destination
-							var otherSubnet = connectorFor(dst);
+							final var otherSubnet = connectorFor(dst);
 							if (otherSubnet.isPresent())
 								dispatchToSubnet(otherSubnet.get(), send, fe.systemBroadcast());
 							else
-								logger.log(TRACE, "no subnet for {0}->{1} (received {2})",
+								logger.trace("no subnet for {}->{} (received {})",
 										send.getSource(), send.getDestination(),
 										DataUnitBuilder.decode(send.getPayload(), send.getDestination()));
 						}
 					}
 				}
 				else { // GroupAddress
-					var dst = (GroupAddress) ldata.getDestination();
+					final var dst = (GroupAddress) ldata.getDestination();
 
 					if (dst.equals(GroupAddress.Broadcast)) {
 						if (!routerObj.broadcastLcConfig(false)) {
-							logger.log(DEBUG, "no broadcast frames shall be routed from subnet {0} - discard {1}",
+							logger.debug("no broadcast frames shall be routed from subnet {} - discard {}",
 									subnet.getName(), ldata);
 							return;
 						}
 					}
 					else {
-						var config = routerObj.routingLcGroupConfig(false, dst);
+						final var config = routerObj.routingLcGroupConfig(false, dst);
 						switch (config) {
 							case All -> {} // nothing extra to do
 							case Block -> {
-								logger.log(DEBUG, "no group addressed frames shall be routed from subnet {0} - discard {1}",
+								logger.debug("no group addressed frames shall be routed from subnet {} - discard {}",
 										subnet.getName(), ldata);
 								return;
 							}
 							case Route -> {
 								if (!inGroupFilterTable(routerObj, dst)) {
-									logger.log(INFO, "destination {0} not set in {1} group filter - discard {2}",
+									logger.info("destination {} not set in {} group filter - discard {}",
 											dst, subnet.getName(), ldata);
 									return;
 								}
@@ -1341,9 +1339,9 @@ public class KnxServerGateway implements Runnable
 
 					final var routing = findRoutingConnection();
 					if (routing.isPresent() && isSubnetBroadcast(objinst, ldata)) {
-						logger.log(INFO, "forward as IP system broadcast {0}", ldata);
+						logger.info("forward as IP system broadcast {}", ldata);
 						final CEMILData bcast;
-						if (ldata instanceof CEMILDataEx ex) {
+						if (ldata instanceof final CEMILDataEx ex) {
 							ex.setBroadcast(false);
 							bcast = ex;
 						}
@@ -1455,16 +1453,10 @@ public class KnxServerGateway implements Runnable
 		return con;
 	}
 
-	// Using the sending link for identification does not always work,
-	// see listener indication for the reason of using the container name
-	private SubnetConnector getSubnetConnector(final String containerName)
-	{
-        for (final SubnetConnector b : connectors) {
-            if (b.getServiceContainer().getName().equals(containerName))
-                return b;
-        }
-		logger.error("dispatch to server: no subnet connector found!");
-		return null;
+	private SubnetConnector getSubnetConnector(final String containerName) {
+		return connectors.stream().filter(c -> c.getServiceContainer().getName().equals(containerName))
+				.findFirst()
+				.orElseThrow(() -> new KnxRuntimeException("no subnet connector found for '" + containerName + "'"));
 	}
 
 	private void dispatchToOtherSubnets(final CEMILData ldata, final SubnetConnector exclude, final boolean systemBroadcast) {
@@ -1493,7 +1485,7 @@ public class KnxServerGateway implements Runnable
 				return;
 			}
 			// std frames have the SB flag already removed when adjusting the hop count
-			if (ldata instanceof CEMILDataEx cemilDataEx) {
+			if (ldata instanceof final CEMILDataEx cemilDataEx) {
 				cemilDataEx.setBroadcast(true);
 			}
 		}
@@ -1530,7 +1522,7 @@ public class KnxServerGateway implements Runnable
 		final ServiceContainer sc = subnet.getServiceContainer();
 		try {
 			final int objinst = objectInstance(subnet);
-			if (f.getDestination() instanceof IndividualAddress dst) {
+			if (f.getDestination() instanceof final IndividualAddress dst) {
 				final IndividualAddress localInterface = sc.getMediumSettings().getDeviceAddress();
 
 				final var connections = server.dataConnections(sc);
@@ -1820,9 +1812,9 @@ public class KnxServerGateway implements Runnable
 			final int tableLoc = (int) toUnsignedInt (routerObj.get(PID.TABLE_REFERENCE));
 
 			// table size is 8192 bytes to fit all 1<<16 group addresses
-			int addrOffset = addr.getRawAddress() / 8;
-			int bitPos = addr.getRawAddress() % 8;
-			int bits = server.device().deviceMemory().get(tableLoc + addrOffset);
+			final int addrOffset = addr.getRawAddress() / 8;
+			final int bitPos = addr.getRawAddress() % 8;
+			final int bits = server.device().deviceMemory().get(tableLoc + addrOffset);
 			return (bits & (1 << bitPos)) != 0;
 		}
 		catch (final KnxPropertyException e) {
@@ -1996,7 +1988,7 @@ public class KnxServerGateway implements Runnable
 		return Optional.empty();
 	}
 
-	private int objectInstance(ServiceContainer svcCont) {
+	private int objectInstance(final ServiceContainer svcCont) {
 		return objectInstance(svcCont.getName());
 	}
 
