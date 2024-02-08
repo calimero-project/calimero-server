@@ -1080,6 +1080,8 @@ public class KnxServerGateway implements Runnable
 					final var routingConfig = routerObj.routingLcConfig(true);
 					switch (routingConfig) {
 						case All -> {
+							dispatchLdataToClients(getSubnetConnector(svcCont.getName()), ldata, fe.id());
+
 							final CEMILData send = adjustHopCount(ldata);
 							if (send == null)
 								return;
