@@ -260,7 +260,7 @@ public class KnxServerGateway implements Runnable
 						connector.openNetworkLink();
 						// we immediately set a virtual network to connected, so that there is no
 						// initial state "knx bus not connected" in a server discovery
-						if (connector.interfaceType() == SubnetConnector.InterfaceType.Virtual)
+						if (connector.interfaceType() == InterfaceType.Virtual)
 							setNetworkState(1, true, false);
 					}
 					else if (type == ConnectionType.Monitor && !(rawLink instanceof KNXNetworkMonitor)) {
@@ -1470,8 +1470,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void dispatchToSubnets(final CEMILData f, final boolean systemBroadcast)
-	{
+	private void dispatchToSubnets(final CEMILData f, final boolean systemBroadcast) {
 		dispatchToOtherSubnets(f, null, systemBroadcast);
 	}
 
@@ -1536,7 +1535,7 @@ public class KnxServerGateway implements Runnable
 				// addresses to client connections,
 				// even though we always have the same destination (e.g., the address of the usb interface)
 				else if (subnet.interfaceType() == InterfaceType.Usb
-						&& f.getDestination().equals(localInterface) || subnet.interfaceAddress().isPresent()) {
+						&& dst.equals(localInterface) || subnet.interfaceAddress().isPresent()) {
 					for (final var connection : connections.values()) {
 						final IndividualAddress assignedAddress = connection.deviceAddress();
 						// skip devmgmt connections
