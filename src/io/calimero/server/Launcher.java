@@ -38,7 +38,6 @@ package io.calimero.server;
 
 import static io.calimero.device.ios.InterfaceObject.ADDRESSTABLE_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
-import static io.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
 import static io.calimero.mgmt.PropertyAccess.PID.ADDITIONAL_INDIVIDUAL_ADDRESSES;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
@@ -256,7 +255,7 @@ public class Launcher implements Runnable, AutoCloseable
 			String subnetLinkClass = null;
 			// in virtual KNX subnets, the subnetwork can be described by a datapoint model
 			DatapointModel<Datapoint> datapoints = null;
-			List<GroupAddress> filter = Collections.emptyList();
+			Set<GroupAddress> filter = Collections.emptySet();
 			List<IndividualAddress> indAddressPool = new ArrayList<>();
 			String expirationTimeout = "0";
 			int disruptionBufferLowerPort = 0;
@@ -510,18 +509,18 @@ public class Launcher implements Runnable, AutoCloseable
 			return Map.entry(key, HexFormat.of().parseHex(value));
 		}
 
-		private static List<GroupAddress> readGroupAddressFilter(final XmlReader r) throws KNXMLException
+		private static Set<GroupAddress> readGroupAddressFilter(final XmlReader r) throws KNXMLException
 		{
 			assert r.getLocalName().equals(XmlConfiguration.grpAddrFilter);
 			assert r.getEventType() == XmlReader.START_ELEMENT;
 			r.nextTag();
-			final List<GroupAddress> list = new ArrayList<>();
+			final var filter = new HashSet<GroupAddress>();
 			while (!(r.getLocalName().equals(XmlConfiguration.grpAddrFilter)
 					&& r.getEventType() == XmlReader.END_ELEMENT)) {
-				list.add(new GroupAddress(r));
+				filter.add(new GroupAddress(r));
 				r.nextTag();
 			}
-			return list;
+			return filter;
 		}
 
 		private static List<IndividualAddress> readAdditionalAddresses(final XmlReader r) throws KNXMLException
@@ -691,7 +690,7 @@ public class Launcher implements Runnable, AutoCloseable
 			++objectInstance;
 
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
-			initRouterObject(ios, objectInstance, new HashSet<>(container.groupAddressFilter()));
+			initRouterObject(ios, objectInstance, container.groupAddressFilter());
 
 			ios.setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 1, 1, (byte) 1);
 

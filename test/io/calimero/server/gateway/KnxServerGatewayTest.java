@@ -91,7 +91,7 @@ class KnxServerGatewayTest
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), null, "");
 		connector.openNetworkLink();
 
-		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
+		final var container = new ServerConfiguration.Container(List.of(), connector, Set.of(), List.of());
 		final var config = new ServerConfiguration("gateway", "friendly server name", true, List.of(), List.of(),
 				List.of(container));
 
@@ -127,7 +127,7 @@ class KnxServerGatewayTest
 		s.addServiceContainer(sc);
 		final var connector = SubnetConnector.newCustom(sc, InterfaceType.Emulate);
 
-		final var container = new ServerConfiguration.Container(List.of(), connector, List.of(), List.of());
+		final var container = new ServerConfiguration.Container(List.of(), connector, Set.of(), List.of());
 		final var config = new ServerConfiguration("test GW 2", "friendly test GW 2", true, List.of(), List.of(),
 				List.of(container));
 
