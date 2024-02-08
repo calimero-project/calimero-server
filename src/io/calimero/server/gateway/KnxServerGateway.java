@@ -87,7 +87,6 @@ import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
 import io.calimero.KNXException;
 import io.calimero.KNXFormatException;
-import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KNXRemoteException;
 import io.calimero.KNXTimeoutException;
 import io.calimero.KnxRuntimeException;
@@ -861,9 +860,14 @@ public class KnxServerGateway implements Runnable
 				logger.log(DEBUG, "dispatch {0}->{1} to all server-side connections", src, dst);
 				final long eventId = new FrameEvent(this, (CEMI) null).id();
 				for (final var conn : serverConnections) {
-					final String type = conn.getName().toLowerCase();
-					if (type.contains("devmgmt"))
-						continue;
+					boolean monitor = false;
+					if (conn instanceof final DataEndpoint de) {
+						if (de.type() == ConnectionType.DevMgmt)
+							continue;
+						// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
+						// we serve that connection by converting cEMI L-Data -> cEMI BusMon
+						monitor = de.type() == ConnectionType.Monitor;
+					}
 
 					// always create new timestamp, so we don't send an outdated timestamp if a previous client
 					// connection was not responsive
@@ -871,16 +875,8 @@ public class KnxServerGateway implements Runnable
 					final var f = new CEMILDataEx(CEMILData.MC_LDATA_IND, src, dst, apdu, p);
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
-					final boolean monitoring = type.contains("monitor");
-					final CEMI send = monitoring ? convertToBusmon(f, eventId, connector) : f;
-					try {
-						send(sc, conn, send);
-					}
-					catch (final KNXIllegalArgumentException e) {
-						// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
-						// frames. Catch here, so we can continue serving other open connections.
-						logger.log(WARNING, "frame not accepted by {0} ({1}): {2}", conn.getName(), e.getMessage(), send, e);
-					}
+					final CEMI send = monitor ? convertToBusmon(f, eventId, connector) : f;
+					send(sc, conn, send);
 				}
 			}
 			catch (final RuntimeException e) {
@@ -1158,9 +1154,9 @@ public class KnxServerGateway implements Runnable
 					// send to all clients except sender
 					logger.log(TRACE, "forward {0} to all tunneling clients (except {1})", ldata, ldata.getSource());
 					for (final var conn : serverConnections) {
-						final String type = conn.getName().toLowerCase();
-						if (client == conn || type.contains("devmgmt") || type.contains("monitor"))
-							continue;
+						if (client == conn || conn instanceof final DataEndpoint de
+								&& (de.type() == ConnectionType.DevMgmt || de.type() == ConnectionType.Monitor))
+								continue;
 
 						try {
 							final var ind = CEMIFactory.create(null, null,
@@ -1602,21 +1598,16 @@ public class KnxServerGateway implements Runnable
 		logger.log(DEBUG, "dispatch {0}->{1} to all server-side connections", f.getSource(), f.getDestination());
 		final ServiceContainer sc = subnet.getServiceContainer();
 		for (final var conn : serverConnections) {
-			final String type = conn.getName().toLowerCase();
-			if (type.contains("devmgmt"))
-				continue;
-			// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
-			// we serve that connection by converting cEMI L-Data -> cEMI BusMon
-			final boolean monitoring = type.contains("monitor");
-			final CEMI send = monitoring ? convertToBusmon(f, eventId, subnet) : f;
-			try {
-				send(sc, conn, send);
+			CEMI send = f;
+			if (conn instanceof final DataEndpoint de) {
+				if (de.type() == ConnectionType.DevMgmt)
+					continue;
+				// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
+				// we serve that connection by converting cEMI L-Data -> cEMI BusMon
+				if (de.type() == ConnectionType.Monitor)
+					send = convertToBusmon(f, eventId, subnet);
 			}
-			catch (final KNXIllegalArgumentException e) {
-				// Occurs, for example, if we serve a management connection which expects only cEMI device mgmt
-				// frames. Catch here, so we can continue serving other open connections.
-				logger.log(WARNING, "frame not accepted by {0} ({1}): {2}", conn.getName(), e.getMessage(), send, e);
-			}
+			send(sc, conn, send);
 		}
 	}
 
