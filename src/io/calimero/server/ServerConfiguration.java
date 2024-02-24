@@ -160,7 +160,7 @@ public class ServerConfiguration {
 			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
 					? secureSymbol + " " : "";
-			final String unicast = "" + sc.getControlEndpoint().getPort();
+			final String unicast = "" + sc.getControlEndpoint().endpoint().getPort();
 			final String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
 			final String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
 			return String.format("""

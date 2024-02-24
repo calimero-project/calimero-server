@@ -843,7 +843,7 @@ public class KNXnetIPServer
 		setPropertyIfAbsent(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, bytesFromWord(100));
 
 		// ip and setup multicast
-		final byte[] ip = endpoint.getControlEndpoint().getAddress().getAddress();
+		final byte[] ip = endpoint.getControlEndpoint().endpoint().getAddress().getAddress();
 		setProperty(knxObject, objectInstance, PID.CURRENT_IP_ADDRESS, ip);
 		setProperty(knxObject, objectInstance, PID.SYSTEM_SETUP_MULTICAST_ADDRESS, DefaultMulticast.getAddress());
 
