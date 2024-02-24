@@ -429,8 +429,7 @@ public final class DataEndpoint extends ConnectionBase
 			// gets delayed by the connection-state.res timeout.
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().getHostProtocol() != HPAI.IPV4_UDP)
-				status = ErrorCodes.HOST_PROTOCOL_TYPE;
+			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().hostProtocol() != HPAI.IPV4_UDP) status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
 				logger.trace("data endpoint received connection-state request (channel {}) from {}",

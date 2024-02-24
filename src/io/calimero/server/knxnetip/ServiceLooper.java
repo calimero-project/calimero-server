@@ -160,7 +160,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 
 		// in NAT aware mode, if the data EP is incomplete or left
 		// empty, we fall back to the IP address and port of the sender
-		if (endpoint.getAddress().isAnyLocalAddress() || endpoint.getPort() == 0) {
+		if (endpoint.nat()) {
 			useNat = true;
 			if (logEndpointType != 0)
 				logger.debug("responses to client use route-back {} endpoint {}", type, hostPort(sender));

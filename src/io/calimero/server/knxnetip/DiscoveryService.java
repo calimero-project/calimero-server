@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -161,7 +161,7 @@ final class DiscoveryService extends ServiceLooper
 			if (!checkVersion(h))
 				return true;
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
-			if (sr.getEndpoint().getHostProtocol() != HPAI.IPV4_UDP) {
+			if (sr.getEndpoint().hostProtocol() != HPAI.IPV4_UDP) {
 				logger.warn("search requests to a discovery endpoint are only supported for UDP/IP");
 				return true;
 			}

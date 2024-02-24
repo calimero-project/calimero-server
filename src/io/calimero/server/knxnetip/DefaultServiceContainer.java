@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ public class DefaultServiceContainer implements ServiceContainer
 			// create with local host address and ephemeral port
 			ctrlEndpt = new HPAI((InetAddress) null, 0);
 		else {
-			if (controlEndpoint.getHostProtocol() != HPAI.IPV4_UDP)
+			if (controlEndpoint.hostProtocol() != HPAI.IPV4_UDP)
 				throw new KNXIllegalArgumentException("only support for UDP communication");
 			ctrlEndpt = controlEndpoint;
 		}
