@@ -377,6 +377,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
 			useNat = false;
+			// req throws if HPAI contains invalid address part
 			final ConnectRequest req = new ConnectRequest(data, offset);
 
 			final int connType = req.getCRI().getConnectionType();
@@ -385,17 +386,6 @@ final class ControlEndpointService extends ServiceLooper
 			int status = checkVersion(h, expectedVersion);
 
 			final HPAI controlEndpoint = req.getControlEndpoint();
-			final boolean tcp = controlEndpoint.getHostProtocol() == HPAI.IPV4_TCP;
-			if (tcp) {
-				final var ctrlRouteBack = controlEndpoint.isRouteBack();
-				final HPAI dataEndpoint = req.getDataEndpoint();
-				final var dataRouteBack = dataEndpoint.isRouteBack();
-				if (!ctrlRouteBack || !dataRouteBack) {
-					logger.info("connect request from {} does not contain route-back {} endpoint, ignore", hostPort(src),
-							ctrlRouteBack ? "data" : "control");
-					return true;
-				}
-			}
 			final InetSocketAddress ctrlEndpt = createResponseAddress(controlEndpoint, src, 1);
 			byte[] buf = null;
 			boolean established = false;
@@ -405,6 +395,7 @@ final class ControlEndpointService extends ServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
+					final boolean tcp = controlEndpoint.hostProtocol() == HPAI.IPV4_TCP;
 					final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
 					logger.info("{}: setup data endpoint ({}, channel {}) for connection request from {}",
 							svcCont.getName(), type, channelId, hostPort(ctrlEndpt));
