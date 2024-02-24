@@ -101,7 +101,7 @@ public class DefaultServiceContainer implements ServiceContainer
 			ctrlEndpt = controlEndpoint;
 		}
 		// IP is mandatory, port might be 0 indicating the use of an ephemeral port
-		if (ctrlEndpt.getAddress().isAnyLocalAddress())
+		if (ctrlEndpt.endpoint().getAddress().isAnyLocalAddress())
 			throw new KNXIllegalArgumentException("no local host address specified");
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;

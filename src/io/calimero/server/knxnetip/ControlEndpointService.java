@@ -682,10 +682,11 @@ final class ControlEndpointService extends ServiceLooper
 		try {
 			final DatagramSocket s = new DatagramSocket(null);
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
-			if (ep.getPort() == KNXnetIPConnection.DEFAULT_PORT)
+			final int port = ep.endpoint().getPort();
+			if (port == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
 			ip = usableIpAddresses().findFirst().orElse(null);
-			s.bind(new InetSocketAddress(ip, ep.getPort()));
+			s.bind(new InetSocketAddress(ip, port));
 			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
 			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), hostPort(boundTo));
 			return s;
