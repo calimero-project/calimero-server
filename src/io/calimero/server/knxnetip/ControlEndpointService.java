@@ -592,7 +592,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 
 		// always include device info and service families in response
-		final Set<Integer> set = new TreeSet<>(List.of(DIB.DEVICE_INFO, DIB.AdditionalDeviceInfo, DIB.SUPP_SVC_FAMILIES));
+		final Set<Integer> set = new TreeSet<>(List.of(DIB.DEVICE_INFO, DIB.SUPP_SVC_FAMILIES));
 		for (final byte dibType : requestedDibs)
 			set.add(dibType & 0xff);
 		if (((DefaultServiceContainer) svcCont).baosSupport())
