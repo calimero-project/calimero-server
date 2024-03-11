@@ -15,7 +15,7 @@ repositories {
 
 ext.junitJupiterVersion = '5.10.2'
 
-group = 'io.calimero'
+group = 'com.github.calimero'
 version = '2.6-SNAPSHOT'
 
 java {
@@ -49,7 +49,7 @@ compileJava.options.encoding = 'UTF-8'
 compileTestJava.options.encoding = 'UTF-8'
 javadoc.options.encoding = 'UTF-8'
 
-mainClassName = 'io.calimero.server.Launcher'
+mainClassName = 'tuwien.auto.calimero.server.Launcher'
 
 run {
     standardInput = System.in
@@ -85,8 +85,8 @@ test {
 }
 
 dependencies {
-    api "io.calimero:calimero-core:${version}"
-    api "io.calimero:calimero-device:${version}"
+    api "com.github.calimero:calimero-core:${version}"
+    api "com.github.calimero:calimero-device:${version}"
 
     implementation 'org.slf4j:slf4j-api:1.7.36'
     runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'

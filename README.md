@@ -70,10 +70,10 @@ Make sure all required `jar` packages are available, and any referenced files in
 
 ~~~ sh
 # Either, assuming all jar dependencies are located in the current working directory
-java -cp "./*" io.calimero.server.Launcher server-config.xml
+java -cp "./*" tuwien.auto.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-2.6-SNAPSHOT.jar:calimero-core-2.6-SNAPSHOT.jar:calimero-device-2.6-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" io.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-2.6-SNAPSHOT.jar:calimero-core-2.6-SNAPSHOT.jar:calimero-device-2.6-SNAPSHOT.jar:slf4j-api-1.8.0-beta1.jar:slf4j-simple-1.8.0-beta1.jar" tuwien.auto.calimero.server.Launcher server-config.xml
 ~~~
 
 
