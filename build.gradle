@@ -88,8 +88,8 @@ dependencies {
     api "com.github.calimero:calimero-core:${version}"
     api "com.github.calimero:calimero-device:${version}"
 
-    implementation 'org.slf4j:slf4j-api:1.7.36'
-    runtimeOnly 'org.slf4j:slf4j-simple:1.7.36'
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.12'
 
 	serialRuntimeOnly "com.github.calimero:calimero-rxtx:${version}"
 	serialRuntimeOnly "io.calimero:serial-native:${version}"
