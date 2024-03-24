@@ -16,7 +16,7 @@ repositories {
 ext.junitJupiterVersion = '5.10.2'
 
 group = 'com.github.calimero'
-version = '2.6-SNAPSHOT'
+version = '2.6-rc1'
 
 java {
     toolchain {
