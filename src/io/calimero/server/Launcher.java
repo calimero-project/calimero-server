@@ -730,7 +730,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 			final String subnetName = subnetArgs.isEmpty()
 					? interfaceType + "-" + sc.getMediumSettings().getDeviceAddress() : subnetArgs;
-			logger.log(DEBUG, "setup {0} subnet ''{1}''{2}", interfaceType, subnetName, activated);
+			logger.log(DEBUG, "setup {0} subnet '{1}'{2}", interfaceType, subnetName, activated);
 
 			if (interfaceType == InterfaceType.Tpuart) {
 				final int oi = objectInstance;
