@@ -757,15 +757,15 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 	}
 
-	private void initRouterObject(InterfaceObjectServer ios, int objectInstance, final Set<GroupAddress> filter) {
+	private void initRouterObject(final InterfaceObjectServer ios, final int objectInstance, final Set<GroupAddress> filter) {
 		ensureInterfaceObjectInstance(ios, InterfaceObject.ROUTER_OBJECT, objectInstance);
-		var routerObj = RouterObject.lookup(ios, objectInstance);
+		final var routerObj = RouterObject.lookup(ios, objectInstance);
 
 		routerObj.set(PID.LOAD_STATE_CONTROL, (byte) 1);
 		routerObj.set(PID.MEDIUM_STATUS, (byte) 1);
 		routerObj.set(PID.MAIN_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
 		routerObj.set(PID.SUB_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
-		int pidRouteTableControl = 56; // Function property
+		final int pidRouteTableControl = 56; // Function property
 		routerObj.set(pidRouteTableControl, (byte) 0);
 
 		setGroupAddressFilter(routerObj, filter);
@@ -808,7 +808,7 @@ public class Launcher implements Runnable, AutoCloseable
 			decrypted.put("user[1].key", mgmtKey);
 		}
 
-		if (sc instanceof RoutingServiceContainer rsc) {
+		if (sc instanceof final RoutingServiceContainer rsc) {
 			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().equals(rsc.routingMulticastAddress()));
 			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
 				final var enc = backbone.get().groupKey().get();
@@ -888,14 +888,14 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private void setGroupAddressFilter(final RouterObject routerObj, final Set<GroupAddress> filter) {
-		var table = new BitSet((1 << 16) / 8);
+		final var table = new BitSet((1 << 16) / 8);
 
 		RoutingConfig route7000 = RoutingConfig.All; // default config for group addresses ≥ 0x7000
 		if (filter.isEmpty())
 			table.set(1, 1 << 16); // broadcast address stays 0
 		else {
-			for (var ga : filter) {
-				int raw = ga.getRawAddress();
+			for (final var ga : filter) {
+				final int raw = ga.getRawAddress();
 				if (raw >= 0x7000)
 					route7000 = RoutingConfig.Route; // switch to table lookup
 				table.set(raw);
@@ -903,11 +903,11 @@ public class Launcher implements Runnable, AutoCloseable
 		}
 
 		// use location of Filter Table Realisation Type 2, which shall start at memory address 0x0200
-		int filterTableLocation = 0x200;
+		final int filterTableLocation = 0x200;
 		routerObj.set(PID.TABLE_REFERENCE, ByteBuffer.allocate(4).putInt(filterTableLocation).array());
 		server.device().deviceMemory().set(filterTableLocation, table.toByteArray());
 
-		int config = (1 << 4 | route7000.ordinal() << 2 | RoutingConfig.Route.ordinal());
+		final int config = (1 << 4 | route7000.ordinal() << 2 | RoutingConfig.Route.ordinal());
 		routerObj.set(PID.MAIN_LCGROUPCONFIG, (byte) config);
 		routerObj.set(PID.SUB_LCGROUPCONFIG, (byte) config);
 	}
