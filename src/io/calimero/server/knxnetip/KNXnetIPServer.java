@@ -36,12 +36,12 @@
 
 package io.calimero.server.knxnetip;
 
-import static java.lang.System.Logger.Level.ERROR;
-import static java.lang.System.Logger.Level.INFO;
-import static java.lang.System.Logger.Level.WARNING;
 import static io.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static io.calimero.knxnetip.KNXnetIPRouting.DefaultMulticast;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.WARNING;
 
 import java.io.ByteArrayOutputStream;
 import java.lang.System.Logger;
@@ -51,6 +51,7 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -750,7 +751,9 @@ public class KNXnetIPServer
 
 		stopDiscoveryService();
 
-		endpoints.forEach(Endpoint::stop);
+		try (var scope = new TaskScope("service container shutdown", Duration.ofSeconds(12))) {
+			endpoints.forEach(ep -> scope.execute(ep::stop));
+		}
 
 		device.close();
 		inShutdown = false;

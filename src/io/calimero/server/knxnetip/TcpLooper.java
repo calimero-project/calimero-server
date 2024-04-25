@@ -46,6 +46,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
@@ -58,6 +59,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import io.calimero.CloseEvent;
 import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.Executor;
@@ -73,6 +75,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	private final Socket socket;
 	private final boolean baos;
 	private final Logger logger;
+	private boolean closing;
 
 	// impl note: we cannot simply return the future of ExecutorService::submit, because Future::cancel is
 	// interrupt-based, and the server socket does not honor interrupts; we have to close the socket directly
@@ -253,8 +256,25 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	}
 
 	private void close(final String reason) {
+		synchronized (this) {
+			if (closing)
+				return;
+			closing = true;
+		}
 		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
-		logger.log(INFO, "close tcp connection to {0}{1}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), suffix);
+		final String hostPort = hostPort((InetSocketAddress) socket.getRemoteSocketAddress());
+		logger.log(INFO, "close tcp connection to {0}{1}", hostPort, suffix);
+
+		// Make sure we cleanup any left-overs from active datapoints within this connection if the client
+		// didn't close them properly (even if the socket got already closed!).
+		// Close data endpoints in parallel to avoid scaling effect of timeouts.
+		try (var scope = new TaskScope("data connection closer for " + hostPort, Duration.ofSeconds(12))) {
+			for (final var ep : ctrlEndpoint.connections().values()) {
+				if (ep.getRemoteAddress().equals(socket.getRemoteSocketAddress()))
+					scope.execute(() -> ep.close(CloseEvent.SERVER_REQUEST,
+							reason.isEmpty() ? "tcp connection closing" : reason, Level.DEBUG, null));
+			}
+		}
 		try {
 			socket.close();
 		}

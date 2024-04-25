@@ -61,6 +61,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -531,8 +532,11 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	private void closeDataConnections() {
-		for (final DataEndpoint endpoint : connections.values())
-			endpoint.close(CloseEvent.SERVER_REQUEST, "quit service container " + svcCont.getName(), INFO, null);
+		try (final var scope = new TaskScope("data connection closer", Duration.ofSeconds(12))) {
+			for (final DataEndpoint endpoint : connections.values())
+				scope.execute(() -> endpoint.close(CloseEvent.SERVER_REQUEST,
+						"quit service container " + svcCont.getName(), INFO, null));
+		}
 	}
 
 	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
