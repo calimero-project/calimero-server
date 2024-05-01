@@ -418,7 +418,7 @@ final class ControlEndpointService extends ServiceLooper
 				connectionEstablished(svcCont, connections.get(channelId));
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_RES)
-			logger.log(WARNING, "received connect response - ignored");
+			logger.log(DEBUG, "received connect response - ignored");
 		else if (svc == KNXnetIPHeader.DISCONNECT_REQ) {
 			final DisconnectRequest dr = new DisconnectRequest(data, offset);
 			// find connection based on channel id
@@ -427,7 +427,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			// requests with wrong channel ID are ignored (conforming to spec)
 			if (conn == null) {
-				logger.log(WARNING, "received disconnect request with unknown channel id " + dr.getChannelID() + " - ignored");
+				logger.log(DEBUG, "received disconnect request with unknown channel id " + dr.getChannelID() + " - ignored");
 				return true;
 			}
 
@@ -437,8 +437,8 @@ final class ControlEndpointService extends ServiceLooper
 			// issue a warning
 			final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
 			if (!ctrlEndpt.equals(src)) {
-				logger.log(WARNING, "disconnect request: sender control endpoint changed from " + hostPort(ctrlEndpt) + " to "
-						+ src + ", not recommended");
+				logger.log(WARNING, "disconnect request: sender control endpoint changed from {0} to {1}, not recommended",
+						hostPort(ctrlEndpt), src);
 			}
 
 			conn.updateLastMsgTimestamp();
@@ -495,7 +495,7 @@ final class ControlEndpointService extends ServiceLooper
 			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
-			logger.log(WARNING, "received connection-state response - ignored");
+			logger.log(DEBUG, "received connection-state response - ignored");
 		else {
 			DataEndpoint endpoint = null;
 			try {
