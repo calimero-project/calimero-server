@@ -77,6 +77,7 @@ import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
 import tuwien.auto.calimero.knxnetip.KNXnetIPConnection;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectionstateRequest;
 import tuwien.auto.calimero.knxnetip.servicetype.ConnectionstateResponse;
+import tuwien.auto.calimero.knxnetip.servicetype.DisconnectResponse;
 import tuwien.auto.calimero.knxnetip.servicetype.ErrorCodes;
 import tuwien.auto.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import tuwien.auto.calimero.knxnetip.servicetype.PacketHelper;
@@ -448,6 +449,13 @@ public final class DataEndpoint extends ConnectionBase
 		else
 			return false;
 		return true;
+	}
+
+	void disconnectResponse(final DisconnectResponse res) {
+		if (res.getStatus() != ErrorCodes.NO_ERROR)
+			logger.warn("received disconnect response status 0x{} ({})",
+					Integer.toHexString(res.getStatus()), ErrorCodes.getErrorMessage(res.getStatus()));
+		finishClosingNotify();
 	}
 
 	private void respondToFeature(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)

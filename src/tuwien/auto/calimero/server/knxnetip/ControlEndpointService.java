@@ -451,11 +451,10 @@ final class ControlEndpointService extends ServiceLooper
 			}
 		}
 		else if (svc == KNXnetIPHeader.DISCONNECT_RES) {
-			final DisconnectResponse res = new DisconnectResponse(data, offset);
-			if (res.getStatus() != ErrorCodes.NO_ERROR)
-				logger.warn("received disconnect response status 0x" + Integer.toHexString(res.getStatus()) + " ("
-						+ ErrorCodes.getErrorMessage(res.getStatus()) + ")");
-			// finalize closing
+			final var res = new DisconnectResponse(data, offset);
+			final var endpoint = connections.get(res.getChannelID());
+			if (endpoint != null)
+				endpoint.disconnectResponse(res);
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_REQ) {
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
