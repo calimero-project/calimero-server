@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@ package io.calimero.server;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -135,7 +136,7 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 			uplink.notifier.getListeners().fire(l -> l.indication(e));
 		}
 		catch (final KNXFormatException e) {
-			logger.log(ERROR, "create cEMI for KNX link {0} using: {1}", uplink.getName(), msg, e);
+			logger.log(ERROR, MessageFormat.format("create cEMI for link {0} using: {1}", uplink.getName(), msg), e);
 		}
 	}
 

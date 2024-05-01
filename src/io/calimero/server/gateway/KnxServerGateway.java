@@ -54,6 +54,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -277,7 +278,8 @@ public class KnxServerGateway implements Runnable
 					final String subnetArgs = connector.linkArguments();
 					final ServiceContainer serviceContainer = connector.getServiceContainer();
 					final KNXMediumSettings settings = serviceContainer.getMediumSettings();
-					logger.log(ERROR, "open subnet link using {0} interface {1} for {2}", interfaceType, subnetArgs, settings, e);
+					logger.log(ERROR, MessageFormat.format("open subnet link using {0} interface {1} for {2}", interfaceType,
+							subnetArgs, settings), e);
 					if (e instanceof InterruptedException)
 						Thread.currentThread().interrupt();
 					return false;
@@ -557,7 +559,7 @@ public class KnxServerGateway implements Runnable
 				connection.send(msg);
 			}
 			catch (final KNXConnectionClosedException e) {
-				logger.log(WARNING, "trying to send routing busy message on closed {0}", connection, e);
+				logger.log(WARNING, "trying to send routing busy message on closed " + connection, e);
 			}
 		}
 	};
@@ -852,7 +854,7 @@ public class KnxServerGateway implements Runnable
 				dispatchToSubnet(connector, ldata, false);
 			}
 			catch (final RuntimeException e) {
-				logger.log(WARNING, "time server error {0} {1}", dst, xlator, e);
+				logger.log(WARNING, MessageFormat.format("time server error {0} {1}", dst, xlator), e);
 			}
 
 			// dispatch to server-side clients
@@ -880,7 +882,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 			catch (final RuntimeException e) {
-				logger.log(WARNING, "time server error {0} {1}", dst, xlator, e);
+				logger.log(WARNING, MessageFormat.format("time server error {0} {1}", dst, xlator), e);
 			}
 		}
 		catch (final InterruptedException e) {
@@ -1744,7 +1746,7 @@ public class KnxServerGateway implements Runnable
 		catch (final KNXFormatException | KNXLinkClosedException e) {
 			logger.log(ERROR, "error sending to {0} on subnet {1}: {2}", f.getDestination(), link.getName(), e.getMessage());
 			if (e.getCause() != null)
-				logger.log(INFO, "{0}, caused by:", e, e.getCause());
+				logger.log(DEBUG, e + ", caused by:", e.getCause());
 		}
 	}
 

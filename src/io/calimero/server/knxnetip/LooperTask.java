@@ -39,9 +39,11 @@ package io.calimero.server.knxnetip;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
+import static java.text.MessageFormat.format;
 
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
+import java.text.MessageFormat;
 import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -100,9 +102,9 @@ class LooperTask implements Runnable {
 		catch (final RuntimeException e) {
 			final String s = attempt > 0 ? " (attempt " + attempt + "/" + (maxRetries + 1) + ")" : "";
 			if (maxRetries == -1 || attempt <= maxRetries)
-				logger.log(WARNING, "initialization of {0} failed{1}, retry in {2} seconds", serviceName, s, retryDelay, e);
+				logger.log(WARNING, format("initialization of {0} failed{1}, retry in {2} seconds", serviceName, s, retryDelay), e);
 			else {
-				logger.log(ERROR, "error initializing {0}{1}", serviceName, s, e);
+				logger.log(ERROR, format("error initializing {0}{1}", serviceName, s), e);
 				quit();
 			}
 		}

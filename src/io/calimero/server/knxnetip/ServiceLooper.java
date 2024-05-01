@@ -92,7 +92,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		}
 		catch (final RuntimeException e) {
 			final Object id = s != null && !s.isClosed() ? s.getLocalSocketAddress() : Thread.currentThread().getName();
-			logger.log(ERROR, "runtime exception in service loop of {0}", id, e);
+			logger.log(ERROR, "runtime exception in service loop of " + id, e);
 			cleanup(INFO, null);
 		}
 	}

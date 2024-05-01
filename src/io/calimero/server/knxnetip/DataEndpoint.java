@@ -580,7 +580,7 @@ public final class DataEndpoint extends ConnectionBase
 				send(PacketHelper.toPacket(new ServiceRequest<>(info.type(), channelId, getSeqSend(), info)), dataEndpt);
 			}
 			catch (final IOException e) {
-				logger.log(ERROR, "sending {0}", info, e);
+				logger.log(ERROR, "sending " + info, e);
 			}
 		}
 	}

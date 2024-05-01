@@ -133,14 +133,12 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			}
 		}
 		catch (final InterruptedIOException e) {
-			ces.logger.log(INFO, "tcp service {0}:{1} interrupted", endpoint.getAddress().getHostAddress(),
-					endpoint.getPort());
+			ces.logger.log(INFO, "tcp service {0} interrupted", hostPort(endpoint));
 			Thread.currentThread().interrupt();
 		}
 		catch (final IOException e) {
 			if (localRef == null || !localRef.isClosed())
-				ces.logger.log(ERROR, "socket error in tcp service {0}:{1}", endpoint.getAddress().getHostAddress(),
-						endpoint.getPort(), e);
+				ces.logger.log(ERROR, "socket error in tcp service " + hostPort(endpoint), e);
 		}
 	}
 
@@ -227,11 +225,11 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			Thread.currentThread().interrupt();
 		}
 		catch (final KnxRuntimeException e) {
-			logger.log(WARNING, "{0} error", name, e);
+			logger.log(WARNING, name + " error", e);
 		}
 		catch (IOException | RuntimeException e) {
 			if (!socket.isClosed())
-				logger.log(ERROR, "tcp connection error to {0}", hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), e);
+				logger.log(ERROR, "tcp connection error to " + hostPort((InetSocketAddress) socket.getRemoteSocketAddress()), e);
 		}
 		finally {
 			close();
