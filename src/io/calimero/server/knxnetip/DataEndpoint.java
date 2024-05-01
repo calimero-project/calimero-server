@@ -82,6 +82,7 @@ import io.calimero.knxnetip.KNXConnectionClosedException;
 import io.calimero.knxnetip.KNXnetIPConnection;
 import io.calimero.knxnetip.servicetype.ConnectionstateRequest;
 import io.calimero.knxnetip.servicetype.ConnectionstateResponse;
+import io.calimero.knxnetip.servicetype.DisconnectResponse;
 import io.calimero.knxnetip.servicetype.ErrorCodes;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.servicetype.PacketHelper;
@@ -451,6 +452,13 @@ public final class DataEndpoint extends ConnectionBase
 		else
 			return false;
 		return true;
+	}
+
+	void disconnectResponse(DisconnectResponse res) {
+		if (res.getStatus() != ErrorCodes.NO_ERROR)
+			logger.log(WARNING, "received disconnect response status 0x{0} ({1})",
+					Integer.toHexString(res.getStatus()), ErrorCodes.getErrorMessage(res.getStatus()));
+		finishClosingNotify();
 	}
 
 	private void respondToFeature(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
