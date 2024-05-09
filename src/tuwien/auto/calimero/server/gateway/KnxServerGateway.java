@@ -1268,8 +1268,12 @@ public class KnxServerGateway implements Runnable
 							dispatchToServer(subnet, send, 0);
 							// route to other subnet if indicated by destination
 							final var otherSubnet = connectorFor(dst);
-							if (otherSubnet.isPresent())
-								dispatchToSubnet(otherSubnet.get(), send, fe.systemBroadcast());
+							if (otherSubnet.isPresent()) {
+								var os = otherSubnet.get();
+								// only forward if dst is actually in a different subnet (never feed back into originating subnet)
+								if (!os.equals(subnet))
+									dispatchToSubnet(os, send, fe.systemBroadcast());
+							}
 							else
 								logger.trace("no subnet for {}->{} (received {})",
 										send.getSource(), send.getDestination(),
