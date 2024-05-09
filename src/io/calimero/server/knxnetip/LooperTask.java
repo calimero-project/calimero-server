@@ -43,7 +43,6 @@ import static java.text.MessageFormat.format;
 
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
-import java.text.MessageFormat;
 import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
