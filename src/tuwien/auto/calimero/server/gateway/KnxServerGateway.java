@@ -54,7 +54,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -463,7 +462,8 @@ public class KnxServerGateway implements Runnable
 	private static final FrameEvent ResetEvent = new FrameEvent(KnxServerGateway.class, new byte[0]);
 
 	// support replaying subnet events for disrupted tunneling connections
-	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new HashMap<>();
+	// TODO move to subnet connector?
+	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new ConcurrentHashMap<>();
 	private final Map<KNXnetIPConnection, ServiceContainer> waitingForReplay = new ConcurrentHashMap<>();
 
 	private final Instant startTime;
@@ -861,6 +861,8 @@ public class KnxServerGateway implements Runnable
 			try {
 				logger.debug("dispatch {}->{} to all server-side connections", src, dst);
 				final long eventId = new FrameEvent(this, (CEMI) null).id();
+				final var apdu = prepareTimestamp(xlator, src, dst);
+
 				for (final var conn : serverConnections) {
 					boolean monitor = false;
 					if (conn instanceof final DataEndpoint de) {
@@ -871,14 +873,11 @@ public class KnxServerGateway implements Runnable
 						monitor = de.type() == ConnectionType.Monitor;
 					}
 
-					// always create new timestamp, so we don't send an outdated timestamp if a previous client
-					// connection was not responsive
-					final var apdu = prepareTimestamp(xlator, src, dst);
 					final var f = new CEMILDataEx(CEMILData.MC_LDATA_IND, src, dst, apdu, p);
 					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
 					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
 					final CEMI send = monitor ? convertToBusmon(f, eventId, connector) : f;
-					send(sc, conn, send);
+					asyncSend(sc, conn, send);
 				}
 			}
 			catch (final RuntimeException e) {
@@ -974,17 +973,19 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer svcContainer = entry.getValue();
 			final ReplayBuffer<FrameEvent> replayBuffer = subnetEventBuffers.get(svcContainer);
 			final Collection<FrameEvent> events = replayBuffer.replay(c);
-			logger.warn("previous connection of {} got disrupted => replay {} pending messages", c, events.size());
-			events.forEach(fe -> {
+
+			Executor.execute(() -> {
+				logger.warn("previous connection of {} got disrupted => replay {} pending messages", c, events.size());
 				try {
-					send(svcContainer, c, fe.getFrame());
+					for (final var fe : events)
+						send(svcContainer, c, fe.getFrame());
 				}
 				catch (final InterruptedException e) {
-					logger.warn("failed to replay frame event", e);
+					logger.warn("interrupted replay for " + c, e);
 				}
-			});
-			waitingForReplay.remove(c);
-			logger.debug("replay completed for connection {}", c);
+				waitingForReplay.remove(c);
+				logger.debug("replay completed for connection {}", c);
+			}, c + " replay");
 		}
 	}
 
@@ -1010,15 +1011,11 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private FrameEvent recordFrameEvent;
-
 	private void recordEvent(final SubnetConnector connector, final FrameEvent fe)
 	{
 		final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(connector.getServiceContainer());
-		if (buffer != null) {
+		if (buffer != null)
 			buffer.recordEvent(fe);
-			recordFrameEvent = fe;
-		}
 	}
 
 	private void onServerFrameReceived(final IpEvent ipEvent) throws InterruptedException {
@@ -1082,7 +1079,7 @@ public class KnxServerGateway implements Runnable
 					final var routingConfig = routerObj.routingLcConfig(true);
 					switch (routingConfig) {
 						case All -> {
-							dispatchLdataToClients(getSubnetConnector(svcCont.getName()), ldata, fe.id());
+							dispatchLdataToClients(getSubnetConnector(svcCont.getName()), ldata, fe.id(), null);
 
 							final CEMILData send = adjustHopCount(ldata);
 							if (send == null)
@@ -1101,7 +1098,7 @@ public class KnxServerGateway implements Runnable
 									try {
 										final var ind = CEMIFactory.create(null, null,
 												(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-										send(svcCont, dataEndpoint, ind);
+										asyncSend(svcCont, dataEndpoint, ind);
 									}
 									catch (KNXFormatException | RuntimeException e) {
 										e.printStackTrace();
@@ -1163,7 +1160,7 @@ public class KnxServerGateway implements Runnable
 						try {
 							final var ind = CEMIFactory.create(null, null,
 									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-							send(svcCont, conn, ind);
+							asyncSend(svcCont, conn, ind);
 						}
 						catch (KNXFormatException | RuntimeException e) {
 							e.printStackTrace();
@@ -1256,7 +1253,7 @@ public class KnxServerGateway implements Runnable
 					switch (config) {
 						case All -> {
 							for (final var conn : serverConnections)
-								send(sc, conn, send);
+								asyncSend(sc, conn, send);
 							dispatchToOtherSubnets(send, subnet, false);
 						}
 						case Block -> {
@@ -1269,7 +1266,7 @@ public class KnxServerGateway implements Runnable
 							// route to other subnet if indicated by destination
 							final var otherSubnet = connectorFor(dst);
 							if (otherSubnet.isPresent()) {
-								var os = otherSubnet.get();
+								final var os = otherSubnet.get();
 								// only forward if dst is actually in a different subnet (never feed back into originating subnet)
 								if (!os.equals(subnet))
 									dispatchToSubnet(os, send, fe.systemBroadcast());
@@ -1314,7 +1311,7 @@ public class KnxServerGateway implements Runnable
 					}
 
 					recordEvent(subnet, fe);
-					dispatchLdataToClients(subnet, send, fe.id());
+					dispatchLdataToClients(subnet, send, fe.id(), fe);
 					dispatchToOtherSubnets(send, subnet, false);
 				}
 				return;
@@ -1326,12 +1323,8 @@ public class KnxServerGateway implements Runnable
 
 			for (final var conn : serverConnections) {
 				// routing does not support busmonitor mode
-				if (!(conn instanceof KNXnetIPRouting)) {
-					try {
-						send(subnet.getServiceContainer(), conn, frame);
-					}
-					catch (final InterruptedException e) {}
-				}
+				if (!(conn instanceof KNXnetIPRouting))
+					asyncSend(subnet.getServiceContainer(), conn, frame, fe);
 			}
 			return;
 		}
@@ -1523,7 +1516,7 @@ public class KnxServerGateway implements Runnable
 						if (assignedAddress != null) {
 							logger.debug("dispatch {}->{} ({}) using {}", f.getSource(), assignedAddress,
 									dst, connection);
-							send(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
+							asyncSend(sc, connection, CEMIFactory.create(null, assignedAddress, f, false));
 						}
 					}
 					// also dispatch via routing as-is
@@ -1542,7 +1535,7 @@ public class KnxServerGateway implements Runnable
 					logger.info("no active KNXnet/IP connection for destination {}, " +
 							"dispatch {}->{} to all server-side connections", dst, f.getSource(), dst);
 					for (final var conn : serverConnections)
-						send(sc, conn, f);
+						asyncSend(sc, conn, f);
 				}
 			}
 			else {
@@ -1572,7 +1565,7 @@ public class KnxServerGateway implements Runnable
 					return;
 				}
 
-				dispatchLdataToClients(subnet, f, eventId);
+				dispatchLdataToClients(subnet, f, eventId, null);
 			}
 		}
 		catch (final KnxPropertyException e) {
@@ -1580,8 +1573,8 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void dispatchLdataToClients(final SubnetConnector subnet, final CEMILData f, final long eventId)
-			throws InterruptedException {
+	private void dispatchLdataToClients(final SubnetConnector subnet, final CEMILData f, final long eventId,
+			final FrameEvent recordFrameEvent) throws InterruptedException {
 		logger.debug("dispatch {}->{} to all server-side connections", f.getSource(), f.getDestination());
 		final ServiceContainer sc = subnet.getServiceContainer();
 		for (final var conn : serverConnections) {
@@ -1594,7 +1587,7 @@ public class KnxServerGateway implements Runnable
 				if (de.type() == ConnectionType.Monitor)
 					send = convertToBusmon(f, eventId, subnet);
 			}
-			send(sc, conn, send);
+			asyncSend(sc, conn, send, recordFrameEvent);
 		}
 	}
 
@@ -1651,6 +1644,27 @@ public class KnxServerGateway implements Runnable
 		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
 	}
 
+	private void asyncSend(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f) {
+		asyncSend(svcContainer, c, f, null);
+	}
+
+	private void asyncSend(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
+			final FrameEvent recordFrameEvent) {
+		Executor.execute(() -> {
+			try {
+				send(svcContainer, c, f);
+				if (recordFrameEvent != null) {
+					final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
+					if (buffer != null)
+						buffer.completeEvent(c, recordFrameEvent);
+				}
+			}
+			catch (final InterruptedException e) {
+				e.printStackTrace();
+			}
+		}, c + " sender");
+	}
+
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f)
 			throws InterruptedException {
 		final int oi = objectInstance(svcContainer.getName());
@@ -1658,10 +1672,6 @@ public class KnxServerGateway implements Runnable
 			c.send(f, WaitForAck);
 			setNetworkState(oi, false, false);
 			incMsgTransmitted(oi, false);
-
-			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
-			if (buffer != null)
-				buffer.completeEvent(c, recordFrameEvent);
 		}
 		catch (final KNXTimeoutException e) {
 			logger.warn("sending on {} failed: {} ({})", c, e.getMessage(), f.toString());
@@ -2145,7 +2155,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private void incMsgTransmitted(final int objinst, final boolean toKnxNetwork)
+	private synchronized void incMsgTransmitted(final int objinst, final boolean toKnxNetwork)
 	{
 		final int pid = toKnxNetwork ? PID.MSG_TRANSMIT_TO_KNX : PID.MSG_TRANSMIT_TO_IP;
 		// must be 4 byte unsigned
@@ -2208,7 +2218,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	// if we can not transmit for 5 seconds, we assume some network fault
-	private void setNetworkState(final int objectInstance, final boolean knxNetwork, final boolean faulty)
+	private synchronized void setNetworkState(final int objectInstance, final boolean knxNetwork, final boolean faulty)
 	{
 		// 1 byte bit field
 		int state = getPropertyOrDefault(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.KNXNETIP_DEVICE_STATE, 0);
