@@ -224,6 +224,11 @@ public class KNXnetIPServer
 			if (routing != null)
 				routing.quit();
 		}
+
+		@Override
+		public String toString() {
+			return serviceContainer.getName();
+		}
 	}
 
 	final List<Endpoint> endpoints = new CopyOnWriteArrayList<>();
