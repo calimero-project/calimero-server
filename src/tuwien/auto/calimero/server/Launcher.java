@@ -883,7 +883,8 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private void setGroupAddressFilter(final RouterObject routerObj, final Set<GroupAddress> filter) {
-		final var table = new BitSet((1 << 16) / 8);
+		final int filterSize = (1 << 16) / 8;
+		final var table = new BitSet(filterSize);
 
 		RoutingConfig route7000 = RoutingConfig.All; // default config for group addresses ≥ 0x7000
 		if (filter.isEmpty())
@@ -900,7 +901,11 @@ public class Launcher implements Runnable, AutoCloseable
 		// use location of Filter Table Realisation Type 2, which shall start at memory address 0x0200
 		final int filterTableLocation = 0x200;
 		routerObj.set(PID.TABLE_REFERENCE, ByteBuffer.allocate(4).putInt(filterTableLocation).array());
-		server.device().deviceMemory().set(filterTableLocation, table.toByteArray());
+        final var memory = server.device().deviceMemory();
+		// table.toByteArray is only so big to contain the index of the highest set bit in the bitset
+		// we need to clear all bits first, so we don't retain any filter loaded from disk during init of device
+		memory.set(filterTableLocation, new byte[filterSize]);
+		memory.set(filterTableLocation, table.toByteArray());
 
 		final int config = (1 << 4 | route7000.ordinal() << 2 | RoutingConfig.Route.ordinal());
 		routerObj.set(PID.MAIN_LCGROUPCONFIG, (byte) config);
