@@ -895,11 +895,10 @@ public class KNXnetIPServer
 
 	int objectInstance(final ServiceContainer sc)
 	{
-		final int i = 0;
-		for (final var endpoint : endpoints) {
-			if (endpoint.serviceContainer == sc)
-				return i + 1;
-		}
+        for (int i = 0; i < endpoints.size(); i++) {
+            if (endpoints.get(i).serviceContainer == sc)
+                return i + 1;
+        }
 		throw new IllegalStateException("service container \"" + sc.getName() + "\" not found");
 	}
 
