@@ -977,8 +977,11 @@ public class KnxServerGateway implements Runnable
 			Executor.execute(() -> {
 				logger.warn("previous connection of {} got disrupted => replay {} pending messages", c, events.size());
 				try {
-					for (final var fe : events)
-						send(svcContainer, c, fe.getFrame());
+					final String hostPort = hostPort(c.getRemoteAddress());
+					for (final var fe : events) {
+						logger.trace("replay {}: {}", hostPort, fe.getFrame());
+                        send(svcContainer, c, fe.getFrame());
+                    }
 				}
 				catch (final InterruptedException e) {
 					logger.warn("interrupted replay for " + c, e);
@@ -987,6 +990,10 @@ public class KnxServerGateway implements Runnable
 				logger.debug("replay completed for connection {}", c);
 			}, c + " replay");
 		}
+	}
+
+	static String hostPort(final InetSocketAddress addr) {
+		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
 	}
 
 	private void launchServer()
