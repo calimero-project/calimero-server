@@ -105,7 +105,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			final KNXnetIPHeader h = KNXnetIPHeader.from(data, offset);
 			if (!sanitize(h, length))
 				return;
-			if (!handleServiceType(h, data, offset + h.getStructLength(), new EndpointAddress(source))) {
+			if (!handleServiceType(h, data, offset + h.getStructLength(), new UdpEndpointAddress(source))) {
 				final int svc = h.getServiceType();
 				if (!ignoreServices.contains(svc))
 					logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", source,
@@ -134,13 +134,6 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			logger.log(WARNING, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
 		return ok;
-	}
-
-	record EndpointAddress(InetSocketAddress inet) {
-		@Override
-		public final String toString() {
-			return hostPort(inet);
-		}
 	}
 
 	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, EndpointAddress src)
@@ -180,7 +173,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 
 		if (logEndpointType == 2)
 			logger.log(TRACE, "using client-assigned {0} endpoint {1} for responses", type, hostPort(endpoint.endpoint()));
-		return new EndpointAddress(endpoint.endpoint());
+		return new UdpEndpointAddress(endpoint.endpoint());
 	}
 
 	void fireResetRequest(final String endpointName, final InetSocketAddress ctrlEndpoint)

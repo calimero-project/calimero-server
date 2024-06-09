@@ -90,7 +90,6 @@ import io.calimero.knxnetip.SecureConnection;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.log.LogService;
 import io.calimero.secure.KnxSecureException;
-import io.calimero.server.knxnetip.ServiceLooper.EndpointAddress;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
 final class SecureSessions {
@@ -105,6 +104,7 @@ final class SecureSessions {
 	private static final int macSize = 16; // [bytes]
 	private static final int keyLength = 32; // [bytes]
 
+	private final ControlEndpointService ctrlEndpoint;
 	private final DatagramSocket socket;
 	private final Logger logger;
 
@@ -141,6 +141,7 @@ final class SecureSessions {
 
 	SecureSessions(final ControlEndpointService ctrlEndpoint) {
 		socket = ctrlEndpoint.getSocket();
+		this.ctrlEndpoint = ctrlEndpoint;
 		final String lock = new String(Character.toChars(0x1F512));
 		final String name = ctrlEndpoint.getServiceContainer().getName();
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name + ".KNX IP " + lock + " Session");
@@ -283,8 +284,12 @@ final class SecureSessions {
 	}
 
 	private void send(final byte[] data, final EndpointAddress address) throws IOException {
-		if (!TcpLooper.send(data, address))
-			socket.send(new DatagramPacket(data, data.length, address.inet()));
+		if (address instanceof TcpEndpointAddress)
+			ctrlEndpoint.tcpEndpoint.send(data, address);
+		else if (address instanceof UnixEndpointAddress)
+			ctrlEndpoint.udsEndpoint.send(data, address);
+		else if (address instanceof final UdpEndpointAddress udp)
+			socket.send(new DatagramPacket(data, data.length, udp.inet()));
 	}
 
 	private ByteBuffer establishSession(final EndpointAddress remote, final KNXnetIPHeader h, final byte[] data,
@@ -440,7 +445,8 @@ final class SecureSessions {
 		sendStatusInfo(sessionId, (int) seq, Timeout, session.client);
 		// TODO remove all secure client connections of this session
 		sessions.remove(sessionId);
-		TcpLooper.lastSessionTimedOut(session.client);
+		ctrlEndpoint.tcpEndpoint.lastSessionTimedOut(session.client);
+		ctrlEndpoint.udsEndpoint.lastSessionTimedOut(session.client);
 	}
 
 	private void closeSession(final int sessionId, final Session session) {

@@ -195,9 +195,12 @@ final class DiscoveryService extends ServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
+			if (!(addr instanceof final UdpEndpointAddress udp))
+				return false;
+
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
-				sendSearchResponse(addr, ces, ext, macFilter, requestedServices, requestedDibs);
+				sendSearchResponse(udp.inet(), ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		else if (ignoreServices.contains(svc))
@@ -218,14 +221,14 @@ final class DiscoveryService extends ServiceLooper
 			KNXnetIPHeader.DISCONNECT_REQ,
 			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
-	private void sendSearchResponse(final EndpointAddress dst, final ControlEndpointService ces, final boolean ext,
+	private void sendSearchResponse(final InetSocketAddress dst, final ControlEndpointService ces, final boolean ext,
 			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
 			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs, 0);
 			if (res.isPresent()) {
 				final var buf = res.get();
-				final var sentOn = send(new DatagramPacket(buf, buf.length, dst.inet()));
+				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));
 				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
 				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
 						sc.getName(), dst, sentOn);
