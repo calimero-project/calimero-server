@@ -156,7 +156,7 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
@@ -218,17 +218,17 @@ final class DiscoveryService extends ServiceLooper
 			KNXnetIPHeader.DISCONNECT_REQ,
 			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
-	private void sendSearchResponse(final InetSocketAddress dst, final ControlEndpointService ces, final boolean ext,
+	private void sendSearchResponse(final EndpointAddress dst, final ControlEndpointService ces, final boolean ext,
 			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
 			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs, 0);
 			if (res.isPresent()) {
 				final var buf = res.get();
-				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));
+				final var sentOn = send(new DatagramPacket(buf, buf.length, dst.inet()));
 				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
 				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
-						sc.getName(), hostPort(dst), sentOn);
+						sc.getName(), dst, sentOn);
 			}
 		}
 	}

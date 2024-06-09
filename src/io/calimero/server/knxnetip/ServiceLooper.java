@@ -105,7 +105,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			final KNXnetIPHeader h = KNXnetIPHeader.from(data, offset);
 			if (!sanitize(h, length))
 				return;
-			if (!handleServiceType(h, data, offset + h.getStructLength(), source)) {
+			if (!handleServiceType(h, data, offset + h.getStructLength(), new EndpointAddress(source))) {
 				final int svc = h.getServiceType();
 				if (!ignoreServices.contains(svc))
 					logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", source,
@@ -136,7 +136,14 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		return ok;
 	}
 
-	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, InetSocketAddress src)
+	record EndpointAddress(InetSocketAddress inet) {
+		@Override
+		public final String toString() {
+			return hostPort(inet);
+		}
+	}
+
+	abstract boolean handleServiceType(KNXnetIPHeader h, byte[] data, int offset, EndpointAddress src)
 		throws KNXFormatException, IOException;
 
 	void cleanup(final Level level, final Throwable t)
@@ -150,7 +157,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	}
 
 	// logEndpointType: 0 = don't log, 1 = ctrl endpt, 2 = data endpt
-	InetSocketAddress createResponseAddress(final HPAI endpoint, final InetSocketAddress sender,
+	EndpointAddress createResponseAddress(final HPAI endpoint, final EndpointAddress sender,
 			final int logEndpointType) {
 		final String type = logEndpointType == 1 ? "control" : logEndpointType == 2 ? "data" : "";
 
@@ -158,7 +165,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		// regardless whether subsequent HPAIs contain useful information
 		if (useNat) {
 			if (logEndpointType != 0)
-				logger.log(DEBUG, "responses use route-back {0} endpoint {1}", type, hostPort(sender));
+				logger.log(DEBUG, "responses use route-back {0} endpoint {1}", type, sender);
 			return sender;
 		}
 
@@ -167,13 +174,13 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		if (endpoint.nat()) {
 			useNat = true;
 			if (logEndpointType != 0)
-				logger.log(DEBUG, "responses to client use route-back {0} endpoint {1}", type, hostPort(sender));
+				logger.log(DEBUG, "responses to client use route-back {0} endpoint {1}", type, sender);
 			return sender;
 		}
 
 		if (logEndpointType == 2)
 			logger.log(TRACE, "using client-assigned {0} endpoint {1} for responses", type, hostPort(endpoint.endpoint()));
-		return endpoint.endpoint();
+		return new EndpointAddress(endpoint.endpoint());
 	}
 
 	void fireResetRequest(final String endpointName, final InetSocketAddress ctrlEndpoint)

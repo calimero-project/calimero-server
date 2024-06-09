@@ -221,8 +221,8 @@ final class ControlEndpointService extends ServiceLooper
 
 		final long now = System.currentTimeMillis();
 		final boolean timeout = (now - endpoint.getLastMsgTimestamp()) >= 120_000;
-		if (timeout && !anyMatchDataConnection(endpoint.getRemoteAddress())) {
-			TcpLooper.lastConnectionTimedOut(endpoint.getRemoteAddress());
+		if (timeout && !anyMatchDataConnection(new EndpointAddress(endpoint.getRemoteAddress()))) {
+			TcpLooper.lastConnectionTimedOut(new EndpointAddress(endpoint.getRemoteAddress()));
 		}
 	}
 
@@ -288,9 +288,9 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException {
-		logger.log(TRACE, "{0} received {1} {2}", svcCont.getName(), hostPort(src),
+		logger.log(TRACE, "{0} received {1} {2}", svcCont.getName(), src,
 				HexFormat.ofDelimiter(" ").formatHex(data,offset - h.getStructLength(), offset - h.getStructLength() + h.getTotalLength()));
 		if (h.isSecure()) {
 			try {
@@ -307,7 +307,7 @@ final class ControlEndpointService extends ServiceLooper
 			// with newly established connections which won't last and just get closed again.
 			if (inShutdown) {
 				logger.log(TRACE, "{0} is being shut down, ignore connect request from {1}",
-						svcCont.getName(), hostPort(src));
+						svcCont.getName(), src);
 				return true;
 			}
 
@@ -319,7 +319,7 @@ final class ControlEndpointService extends ServiceLooper
 
 			if (tunneling && isSecuredService(Tunneling) || devmgmt && isSecuredService(DeviceManagement)) {
 				logger.log(WARNING, "reject {0}, secure services required for {1}", h, typeString);
-				final InetSocketAddress ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, 1);
+				final var ctrlEndpt = createResponseAddress(req.getControlEndpoint(), src, 1);
 				final byte[] buf = PacketHelper
 						.toPacket(errorResponse(ErrorCodes.CONNECTION_TYPE, ctrlEndpt.toString()));
 				send(0, 0, buf, ctrlEndpt);
@@ -333,7 +333,7 @@ final class ControlEndpointService extends ServiceLooper
 	}
 
 	boolean acceptControlService(final int sessionId, final KNXnetIPHeader h, final byte[] data, final int offset,
-			final InetSocketAddress src) throws KNXFormatException, IOException {
+			final EndpointAddress src) throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SearchRequest) {
 			// extended unicast search request to this control endpoint
@@ -360,7 +360,7 @@ final class ControlEndpointService extends ServiceLooper
 					return true;
 			}
 
-			final InetSocketAddress addr = createResponseAddress(sr.getEndpoint(), src, 1);
+			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
 			sendSearchResponse(sessionId, addr, macFilter, requestedServices, requestedDibs);
 		}
 		else if (svc == KNXnetIPHeader.DESCRIPTION_REQ) {
@@ -375,9 +375,9 @@ final class ControlEndpointService extends ServiceLooper
 					? new DescriptionResponse(device, svcFamilies, mfr)
 					: new DescriptionResponse(device, svcFamilies, new KnxAddressesDIB(addresses), mfr);
 
-			final InetSocketAddress responseAddress = createResponseAddress(dr.getEndpoint(), src, 1);
+			final var responseAddress = createResponseAddress(dr.getEndpoint(), src, 1);
 			final byte[] buf = PacketHelper.toPacket(description);
-			logger.log(INFO, "send KNXnet/IP description to {0}: {1}", hostPort(responseAddress), description);
+			logger.log(INFO, "send KNXnet/IP description to {0}: {1}", responseAddress, description);
 			send(sessionId, 0, buf, responseAddress);
 		}
 		else if (svc == KNXnetIPHeader.CONNECT_REQ) {
@@ -391,7 +391,7 @@ final class ControlEndpointService extends ServiceLooper
 			int status = checkVersion(h, expectedVersion);
 
 			final HPAI controlEndpoint = req.getControlEndpoint();
-			final InetSocketAddress ctrlEndpt = createResponseAddress(controlEndpoint, src, 1);
+			final var ctrlEndpt = createResponseAddress(controlEndpoint, src, 1);
 			byte[] buf = null;
 			boolean established = false;
 
@@ -403,8 +403,8 @@ final class ControlEndpointService extends ServiceLooper
 					final boolean tcp = controlEndpoint.hostProtocol() == HPAI.IPV4_TCP;
 					final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
 					logger.log(INFO, "{0}: setup data endpoint ({1}, channel {2}) for connection request from {3}",
-							svcCont.getName(), type, channelId, hostPort(ctrlEndpt));
-					final InetSocketAddress dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
+							svcCont.getName(), type, channelId, ctrlEndpt);
+					final var dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(expectedVersion, res);
 					established = res.getStatus() == ErrorCodes.NO_ERROR;
@@ -435,10 +435,10 @@ final class ControlEndpointService extends ServiceLooper
 			// during an established connection, but it's not recommended; if the
 			// sender control endpoint differs from our connection control endpoint,
 			// issue a warning
-			final InetSocketAddress ctrlEndpt = conn.getRemoteAddress();
+			final var ctrlEndpt = new EndpointAddress(conn.getRemoteAddress());
 			if (!ctrlEndpt.equals(src)) {
 				logger.log(WARNING, "disconnect request: sender control endpoint changed from {0} to {1}, not recommended",
-						hostPort(ctrlEndpt), src);
+						ctrlEndpt, src);
 			}
 
 			conn.updateLastMsgTimestamp();
@@ -485,8 +485,7 @@ final class ControlEndpointService extends ServiceLooper
 				final var addr = endpoint != null ? endpoint.getRemoteAddress()
 						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
 				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
-						csr.getChannelID(), hostPort(addr),
-						ErrorCodes.getErrorMessage(status));
+						csr.getChannelID(), addr, ErrorCodes.getErrorMessage(status));
 			}
 
 			final byte[] buf = PacketHelper.toPacket(protocolVersion,
@@ -538,7 +537,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
-	private void sendSearchResponse(final int sessionId, final InetSocketAddress dst, final byte[] macFilter,
+	private void sendSearchResponse(final int sessionId, final EndpointAddress dst, final byte[] macFilter,
 			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
 		final var res = createSearchResponse(true, macFilter, requestedServices, requestedDibs, sessionId);
 		if (res.isPresent()) {
@@ -660,7 +659,7 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.of(new TunnelingDib(maxApduLength, slots));
 	}
 
-	private void send(final int sessionId, final int channelId, final byte[] packet, final InetSocketAddress dst) throws IOException {
+	private void send(final int sessionId, final int channelId, final byte[] packet, final EndpointAddress dst) throws IOException {
 		byte[] buf = packet;
 		if (sessionId > 0) {
 			final Session session = sessions.sessions.get(sessionId);
@@ -671,11 +670,11 @@ final class ControlEndpointService extends ServiceLooper
 			final long seq = session.sendSeq.getAndIncrement();
 			final int msgTag = 0;
 			buf = sessions.newSecurePacket(sessionId, seq, msgTag, packet);
-			logger.log(DEBUG, "send session {0} seq {1} tag {2} to {3}", sessionId, seq, msgTag, hostPort(dst));
+			logger.log(DEBUG, "send session {0} seq {1} tag {2} to {3}", sessionId, seq, msgTag, dst);
 		}
 
 		if (!TcpLooper.send(buf, dst))
-			s.send(new DatagramPacket(buf, buf.length, dst));
+			s.send(new DatagramPacket(buf, buf.length, dst.inet()));
 	}
 
 	private DatagramSocket createSocket()
@@ -784,8 +783,8 @@ final class ControlEndpointService extends ServiceLooper
 
 	private IndividualAddress device;
 
-	private ConnectResponse initNewConnection(final ConnectRequest req, final InetSocketAddress ctrlEndpt,
-		final InetSocketAddress dataEndpt, final int channelId)
+	private ConnectResponse initNewConnection(final ConnectRequest req, final EndpointAddress ctrlEndpt,
+		final EndpointAddress dataEndpt, final int channelId)
 	{
 		// information about remote endpoint in case of error response
 		final String endpoint = ctrlEndpt.toString();
@@ -1200,7 +1199,7 @@ final class ControlEndpointService extends ServiceLooper
 		return Optional.empty();
 	}
 
-	boolean anyMatchDataConnection(final InetSocketAddress remoteEndpoint) {
+	boolean anyMatchDataConnection(final EndpointAddress remoteEndpoint) {
 		return connections.values().stream().anyMatch(c -> c.getRemoteAddress().equals(remoteEndpoint));
 	}
 
@@ -1234,7 +1233,7 @@ final class ControlEndpointService extends ServiceLooper
 		return status;
 	}
 
-	boolean setupBaosTcpEndpoint(final InetSocketAddress remote) {
+	boolean setupBaosTcpEndpoint(final EndpointAddress remote) {
 		try {
 			final var svcLoop = new DataEndpointService(server, s, svcCont.getName());
 
@@ -1261,7 +1260,7 @@ final class ControlEndpointService extends ServiceLooper
 			return true;
 		}
 		catch (final RuntimeException e) {
-			logger.log(WARNING, "error setting up baos tcp endpoint for {0}", hostPort(remote), e);
+			logger.log(WARNING, "error setting up baos tcp endpoint for {0}", remote, e);
 			return false;
 		}
 	}

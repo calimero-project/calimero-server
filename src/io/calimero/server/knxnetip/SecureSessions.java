@@ -36,7 +36,6 @@
 
 package io.calimero.server.knxnetip;
 
-import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -49,7 +48,6 @@ import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -92,6 +90,7 @@ import io.calimero.knxnetip.SecureConnection;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.log.LogService;
 import io.calimero.secure.KnxSecureException;
+import io.calimero.server.knxnetip.ServiceLooper.EndpointAddress;
 
 /** Secure sessions container for KNX IP secure unicast connections. */
 final class SecureSessions {
@@ -122,7 +121,7 @@ final class SecureSessions {
 	private static final AtomicLong sessionCounter = new AtomicLong();
 
 	static final class Session {
-		private final InetSocketAddress client;
+		private final EndpointAddress client;
 		private final Key secretKey;
 
 		private byte[] xorClientServer;
@@ -132,7 +131,7 @@ final class SecureSessions {
 		final AtomicLong sendSeq = new AtomicLong();
 		private volatile long lastUpdate = System.nanoTime() / 1_000_000;
 
-		private Session(final InetSocketAddress client, final Key secretKey) {
+		private Session(final EndpointAddress client, final Key secretKey) {
 			this.client = client;
 			this.secretKey = secretKey;
 		}
@@ -151,7 +150,7 @@ final class SecureSessions {
 		deviceAuthKey = deviceAuthKey();
 	}
 
-	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress remote,
+	boolean acceptService(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress remote,
 		final Object svcHandler) throws KNXFormatException, IOException {
 
 		int sessionId = 0;
@@ -190,7 +189,7 @@ final class SecureSessions {
 						try {
 							sessionAuth(session, knxipPacket, 6);
 							status = AuthSuccess;
-							logger.log(DEBUG, "client {0} authorized for session {1} with user ID {2}", hostPort(session.client),
+							logger.log(DEBUG, "client {0} authorized for session {1} with user ID {2}", session.client,
 									sessionId, session.userId);
 						}
 						catch (final KnxSecureException e) {
@@ -247,9 +246,9 @@ final class SecureSessions {
 	}
 
 	// temporary
-	private final Map<InetSocketAddress, Integer> connections = new ConcurrentHashMap<>();
+	private final Map<EndpointAddress, Integer> connections = new ConcurrentHashMap<>();
 
-	int registerConnection(final int connType, final InetSocketAddress ctrlEndpt, final int channelId) {
+	int registerConnection(final int connType, final EndpointAddress ctrlEndpt, final int channelId) {
 		final int sid = connections.getOrDefault(ctrlEndpt, 0);
 		// only session with user id 1 has proper access level for management access
 		if (connType == KNXnetIPDevMgmt.DEVICE_MGMT_CONNECTION && sid > 0 && sessions.get(sid).userId > 1) {
@@ -259,7 +258,7 @@ final class SecureSessions {
 		return sid;
 	}
 
-	void addConnection(final int sessionId, final InetSocketAddress remoteCtrlEp) {
+	void addConnection(final int sessionId, final EndpointAddress remoteCtrlEp) {
 		final Session session = sessions.get(sessionId);
 		if (session != null) {
 			connections.remove(remoteCtrlEp);
@@ -275,7 +274,7 @@ final class SecureSessions {
 		}
 	}
 
-	boolean anyMatch(final InetSocketAddress remoteEndpoint) {
+	boolean anyMatch(final EndpointAddress remoteEndpoint) {
 		for (final Entry<Integer, Session> entry : sessions.entrySet()) {
 			if (entry.getValue().client.equals(remoteEndpoint))
 				return true;
@@ -283,12 +282,12 @@ final class SecureSessions {
 		return false;
 	}
 
-	private void send(final byte[] data, final InetSocketAddress address) throws IOException {
+	private void send(final byte[] data, final EndpointAddress address) throws IOException {
 		if (!TcpLooper.send(data, address))
-			socket.send(new DatagramPacket(data, data.length, address));
+			socket.send(new DatagramPacket(data, data.length, address.inet()));
 	}
 
-	private ByteBuffer establishSession(final InetSocketAddress remote, final KNXnetIPHeader h, final byte[] data,
+	private ByteBuffer establishSession(final EndpointAddress remote, final KNXnetIPHeader h, final byte[] data,
 			final int offset) {
 
 		final byte[] clientKey = Arrays.copyOfRange(data, offset + 8, h.getTotalLength());
@@ -308,7 +307,7 @@ final class SecureSessions {
 			sharedSecret = keyAgreement(keyPair.getPrivate(), clientKey);
 		}
 		catch (final Throwable e) {
-			throw new KnxSecureException("error creating secure session keys for " + hostPort(remote), e);
+			throw new KnxSecureException("error creating secure session keys for " + remote, e);
 		}
 
 		final Key secretKey = createSecretKey(sessionKey(sharedSecret));
@@ -317,7 +316,7 @@ final class SecureSessions {
 		final Session session = new Session(remote, secretKey);
 		session.xorClientServer = xor(clientKey, 0, publicKey, 0, keyLength);
 		sessions.put(sessionId, session);
-		logger.log(DEBUG, "establish secure session {0} for {1}", sessionId, hostPort(remote));
+		logger.log(DEBUG, "establish secure session {0} for {1}", sessionId, remote);
 
 		return sessionResponse(sessionId, publicKey, clientKey);
 	}
@@ -376,13 +375,13 @@ final class SecureSessions {
 		session.userId = userId;
 	}
 
-	private void sendStatusInfo(final int sessionId, final long seq, final int status, final InetSocketAddress address) {
+	private void sendStatusInfo(final int sessionId, final long seq, final int status, final EndpointAddress address) {
 		try {
 			final byte[] packet = statusInfo(sessionId, seq, status);
 			send(packet, address);
 		}
 		catch (IOException | RuntimeException e) {
-			logger.log(ERROR, "sending session {0} status {1} to {2}", sessionId, statusMsg(status), hostPort(address), e);
+			logger.log(ERROR, "sending session {0} status {1} to {2}", sessionId, statusMsg(status), address, e);
 		}
 	}
 

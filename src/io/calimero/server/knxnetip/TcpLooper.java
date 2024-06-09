@@ -64,12 +64,13 @@ import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.Executor;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
+import io.calimero.server.knxnetip.ServiceLooper.EndpointAddress;
 
 final class TcpLooper implements Runnable, AutoCloseable {
 
 	private static final Duration inactiveConnectionTimeout = Duration.ofSeconds(10);
 
-	static final ConcurrentHashMap<InetSocketAddress, TcpLooper> connections = new ConcurrentHashMap<>();
+	static final ConcurrentHashMap<EndpointAddress, TcpLooper> connections = new ConcurrentHashMap<>();
 
 	private final ControlEndpointService ctrlEndpoint;
 	private final Socket socket;
@@ -99,7 +100,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		logger = ctrlEndpoint.logger;
 	}
 
-	static boolean send(final byte[] buf, final InetSocketAddress address) throws IOException {
+	static boolean send(final byte[] buf, final EndpointAddress address) throws IOException {
 		final TcpLooper looper = connections.get(address);
 		if (looper == null)
 			return false;
@@ -126,7 +127,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 				final Socket conn = s.accept();
 				conn.setTcpNoDelay(true);
 				final TcpLooper looper = new TcpLooper(ces, conn, baos);
-				connections.put((InetSocketAddress) conn.getRemoteSocketAddress(), looper);
+				connections.put(new EndpointAddress((InetSocketAddress) conn.getRemoteSocketAddress()), looper);
 
 				Executor.execute(looper, namePrefix + "connection "
 						+ hostPort((InetSocketAddress) conn.getRemoteSocketAddress()));
@@ -146,20 +147,20 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		return ServiceLooper.hostPort(addr);
 	}
 
-	static void lastSessionTimedOut(final InetSocketAddress remote) {
+	static void lastSessionTimedOut(final EndpointAddress remote) {
 		final TcpLooper looper = connections.get(remote);
 		if (looper != null && !looper.ctrlEndpoint.anyMatchDataConnection(remote))
 			looper.close("last active secure session timed out");
 	}
 
-	static void lastConnectionTimedOut(final InetSocketAddress remote) {
+	static void lastConnectionTimedOut(final EndpointAddress remote) {
 		final TcpLooper looper = connections.get(remote);
 		if (looper != null && !looper.ctrlEndpoint.sessions.anyMatch(remote))
 			looper.close("last active client connection timed out");
 	}
 
 	private boolean inactive() {
-		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
+		final var remote = new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
 		return !ctrlEndpoint.sessions.anyMatch(remote) && !ctrlEndpoint.anyMatchDataConnection(remote);
 	}
 
@@ -169,7 +170,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 		try (InputStream in = socket.getInputStream()) {
 			if (baos) {
-				if (!ctrlEndpoint.setupBaosTcpEndpoint((InetSocketAddress) socket.getRemoteSocketAddress()))
+				if (!ctrlEndpoint.setupBaosTcpEndpoint(new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress())))
 					return;
 			}
 
@@ -260,15 +261,16 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			closing = true;
 		}
 		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
-		final String hostPort = hostPort((InetSocketAddress) socket.getRemoteSocketAddress());
-		logger.log(INFO, "close tcp connection to {0}{1}", hostPort, suffix);
+		final InetSocketAddress remoteSocketAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
+		final var endpointAddress = new EndpointAddress(remoteSocketAddress);
+		logger.log(INFO, "close tcp connection to {0}{1}", endpointAddress, suffix);
 
 		// Make sure we cleanup any left-overs from active datapoints within this connection if the client
 		// didn't close them properly (even if the socket got already closed!).
 		// Close data endpoints in parallel to avoid scaling effect of timeouts.
-		try (var scope = new TaskScope("data connection closer for " + hostPort, Duration.ofSeconds(12))) {
+		try (var scope = new TaskScope("data connection closer for " + endpointAddress, Duration.ofSeconds(12))) {
 			for (final var ep : ctrlEndpoint.connections().values()) {
-				if (ep.getRemoteAddress().equals(socket.getRemoteSocketAddress()))
+				if (ep.getRemoteAddress().equals(remoteSocketAddress))
 					scope.execute(() -> ep.close(CloseEvent.SERVER_REQUEST,
 							reason.isEmpty() ? "tcp connection closing" : reason, Level.DEBUG, null));
 			}
@@ -277,12 +279,12 @@ final class TcpLooper implements Runnable, AutoCloseable {
 			socket.close();
 		}
 		catch (final IOException ignore) {}
-		connections.remove(socket.getRemoteSocketAddress());
+		connections.remove(endpointAddress);
 	}
 
 	private void onReceive(final KNXnetIPHeader h, final byte[] data, final int offset)
 		throws IOException, KNXFormatException {
-		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();
+		final var remote = new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
 		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote)) {
 			final int svc = h.getServiceType();
 			logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", remote,

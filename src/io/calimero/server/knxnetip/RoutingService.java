@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -214,12 +214,12 @@ final class RoutingService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException
 	{
 		if (secure)
 			return true;
-		return r.handleServiceType(h, data, offset, src.getAddress(), src.getPort());
+		return r.handleServiceType(h, data, offset, src.inet().getAddress(), src.inet().getPort());
 	}
 
 	void sendRoutingLostMessage(final int lost, final int state) throws KNXConnectionClosedException

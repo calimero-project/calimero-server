@@ -96,6 +96,7 @@ import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.SecurityControl;
 import io.calimero.secure.SecurityControl.DataSecurity;
 import io.calimero.server.knxnetip.SecureSessions.Session;
+import io.calimero.server.knxnetip.ServiceLooper.EndpointAddress;
 
 /**
  * Server-side implementation of KNX IP (secure) tunneling and device management protocol.
@@ -157,7 +158,7 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
-		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
+		final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
 		final SecureSessions sessions, final int sessionId,
 		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
@@ -171,8 +172,8 @@ public final class DataEndpoint extends ConnectionBase
 		ctrlSocket = localCtrlEndpt;
 		socket = localDataEndpt;
 
-		ctrlEndpt = remoteCtrlEndpt;
-		dataEndpt = remoteDataEndpt;
+		ctrlEndpt = remoteCtrlEndpt.inet(); // TODO assign only if inet
+		dataEndpt = remoteDataEndpt.inet(); // TODO assign only if inet
 
 		useNat = useNAT;
 		this.sessions = sessions;
@@ -198,7 +199,7 @@ public final class DataEndpoint extends ConnectionBase
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
 		checkFrameType(frame);
-		if (TcpLooper.connections.containsKey(dataEndpt)) {
+		if (TcpLooper.connections.containsKey(new EndpointAddress(dataEndpt))) {
 			super.send(frame, BlockingMode.NonBlocking);
 			setStateNotify(OK);
 		}
@@ -222,14 +223,14 @@ public final class DataEndpoint extends ConnectionBase
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
-		if (TcpLooper.send(buf, dst))
+		if (TcpLooper.send(buf, new EndpointAddress(dst)))
 			return;
 
-		var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
+		final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-		var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+		final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
 		logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
-				hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
+				actualDst, HexFormat.ofDelimiter(" ").formatHex(buf));
 
 		if (useNat || actualDst.equals(ctrlEndpt))
 			ctrlSocket.send(p);
@@ -299,19 +300,20 @@ public final class DataEndpoint extends ConnectionBase
 		this.socket = socket;
 	}
 
-	boolean handleDataServiceType(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException
+	boolean handleDataServiceType(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+			throws KNXFormatException, IOException
 	{
 		if (sessionId == 0)
 			return acceptDataService(src, h, data, offset);
 
-		if (TcpLooper.connections.containsKey(dataEndpt))
+		if (TcpLooper.connections.containsKey(new EndpointAddress(dataEndpt)))
 			return acceptDataService(src, h, data, offset);
 
 		if (!h.isSecure()) {
 			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, HexFormat.ofDelimiter(" ").formatHex(data));
 			return true;
 		}
-		return sessions.acceptService(h, data, offset, dataEndpt, this);
+		return sessions.acceptService(h, data, offset, new EndpointAddress(dataEndpt), this);
 	}
 
 	private static final Function<ByteBuffer, BaosService> baosServiceParser = buf -> {
@@ -323,7 +325,7 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	};
 
-	boolean acceptDataService(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+	boolean acceptDataService(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 
@@ -446,7 +448,7 @@ public final class DataEndpoint extends ConnectionBase
 						csr.getChannelID(), hostPort(dataEndpt), ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
+			final var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
 			send(buf, dst);
 		}
 		else
@@ -454,20 +456,20 @@ public final class DataEndpoint extends ConnectionBase
 		return true;
 	}
 
-	void disconnectResponse(DisconnectResponse res) {
+	void disconnectResponse(final DisconnectResponse res) {
 		if (res.getStatus() != ErrorCodes.NO_ERROR)
 			logger.log(WARNING, "received disconnect response status 0x{0} ({1})",
 					Integer.toHexString(res.getStatus()), ErrorCodes.getErrorMessage(res.getStatus()));
 		finishClosingNotify();
 	}
 
-	private void respondToFeature(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+	private void respondToFeature(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		logger.log(DEBUG, "respond with {0}", res);
 
-		var dst = etsDstHack(dataEndpt, src);
+		final var dst = etsDstHack(dataEndpt, src);
 		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dst);
 	}
 
@@ -705,9 +707,15 @@ public final class DataEndpoint extends ConnectionBase
 			throw new KNXIllegalArgumentException("expect cEMI device management frame type");
 	}
 
+	// forwarder for inet socket overload
+	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final EndpointAddress actual) {
+		// TODO only forward if inet socket
+		return etsDstHack(correct, actual.inet());
+	}
+
 	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
 	// even if indicated otherwise in the HPAI or required by the spec
-	private InetSocketAddress etsDstHack(InetSocketAddress correct, InetSocketAddress actual) {
+	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final InetSocketAddress actual) {
 		// we ignore any attempt to respond to a different IP address
 		if (!actual.getAddress().equals(correct.getAddress()))
 			return correct;
