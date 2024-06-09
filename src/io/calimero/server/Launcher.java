@@ -262,6 +262,8 @@ public class Launcher implements Runnable, AutoCloseable
 			int disruptionBufferUpperPort = 0;
 			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
 
+			Path unixSocketPath = null;
+
 			final var timeServerDatapoints = new ArrayList<StateDP>();
 
 			while (r.nextTag() != XmlReader.END_DOCUMENT) {
@@ -337,6 +339,7 @@ public class Launcher implements Runnable, AutoCloseable
 								throw new KNXMLException(uhe.getMessage(), r);
 							}
 						}
+						case "unixSocket" -> unixSocketPath = Path.of(r.getElementText());
 						case "disruptionBuffer" -> {
 							expirationTimeout = r.getAttributeValue(null, "expirationTimeout");
 							final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
@@ -384,6 +387,8 @@ public class Launcher implements Runnable, AutoCloseable
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
+						if (unixSocketPath != null)
+							sc.unixSocketPath(unixSocketPath);
 
 						final var connector = switch (interfaceType) {
 							case Knxip   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,

@@ -37,8 +37,10 @@
 package io.calimero.server.knxnetip;
 
 import java.net.InetAddress;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.knxnetip.util.HPAI;
@@ -63,6 +65,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private volatile int disruptionBufferLowerPort;
 	private volatile int disruptionBufferUpperPort;
 	private final boolean baosSupport;
+	private volatile Path unixSocketPath;
 
 	/**
 	 * Creates a new service container with the supplied parameters. The control endpoint of this
@@ -180,6 +183,10 @@ public class DefaultServiceContainer implements ServiceContainer
 	{
 		return new int[] { disruptionBufferLowerPort, disruptionBufferUpperPort };
 	}
+
+	public final void unixSocketPath(final Path path) { unixSocketPath = path; }
+
+	public final Optional<Path> unixSocketPath() { return Optional.ofNullable(unixSocketPath); }
 
 	/**
 	 * {@return <code>true</code> iff service container should serve BAOS connections, <code>false</code> otherwise}

@@ -64,7 +64,6 @@ import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.Executor;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
-import io.calimero.server.knxnetip.ServiceLooper.EndpointAddress;
 
 final class TcpLooper implements Runnable, AutoCloseable {
 
@@ -127,7 +126,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 				final Socket conn = s.accept();
 				conn.setTcpNoDelay(true);
 				final TcpLooper looper = new TcpLooper(ces, conn, baos);
-				connections.put(new EndpointAddress((InetSocketAddress) conn.getRemoteSocketAddress()), looper);
+				connections.put(new TcpEndpointAddress((InetSocketAddress) conn.getRemoteSocketAddress()), looper);
 
 				Executor.execute(looper, namePrefix + "connection "
 						+ hostPort((InetSocketAddress) conn.getRemoteSocketAddress()));
@@ -160,7 +159,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 	}
 
 	private boolean inactive() {
-		final var remote = new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
+		final var remote = new TcpEndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
 		return !ctrlEndpoint.sessions.anyMatch(remote) && !ctrlEndpoint.anyMatchDataConnection(remote);
 	}
 
@@ -170,7 +169,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 		try (InputStream in = socket.getInputStream()) {
 			if (baos) {
-				if (!ctrlEndpoint.setupBaosTcpEndpoint(new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress())))
+				if (!ctrlEndpoint.setupBaosStreamEndpoint(new TcpEndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress())))
 					return;
 			}
 
@@ -262,7 +261,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		}
 		final String suffix = reason.isEmpty() ? "" : " (" + reason + ")";
 		final InetSocketAddress remoteSocketAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
-		final var endpointAddress = new EndpointAddress(remoteSocketAddress);
+		final var endpointAddress = new TcpEndpointAddress(remoteSocketAddress);
 		logger.log(INFO, "close tcp connection to {0}{1}", endpointAddress, suffix);
 
 		// Make sure we cleanup any left-overs from active datapoints within this connection if the client
@@ -284,7 +283,7 @@ final class TcpLooper implements Runnable, AutoCloseable {
 
 	private void onReceive(final KNXnetIPHeader h, final byte[] data, final int offset)
 		throws IOException, KNXFormatException {
-		final var remote = new EndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
+		final var remote = new TcpEndpointAddress((InetSocketAddress) socket.getRemoteSocketAddress());
 		if (!ctrlEndpoint.handleServiceType(h, data, offset, remote)) {
 			final int svc = h.getServiceType();
 			logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", remote,

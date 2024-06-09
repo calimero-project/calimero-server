@@ -61,6 +61,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -157,6 +158,10 @@ final class ControlEndpointService extends ServiceLooper
 	private final Closeable tcpLooper;
 	private final Closeable baosLooper;
 
+	final UnixDomainSocketEndpoint udsEndpoint;
+	private final UnixDomainSocketEndpoint udsBaosEndpoint;
+
+
 	private volatile boolean inShutdown;
 
 
@@ -189,9 +194,15 @@ final class ControlEndpointService extends ServiceLooper
 		final String tunneling = secureTunneling ? "required" : "optional";
 		logger.log(INFO, "{0} secure mgmt/tunneling connections: {1}/{2}", sc.getName(), mgmt, tunneling);
 
+		final Optional<Path> unixSocketPath = ((DefaultServiceContainer) sc).unixSocketPath();
+		final Path p = unixSocketPath.orElse(Path.of(""));
+		udsEndpoint = new UnixDomainSocketEndpoint(this, p, false);
+		udsBaosEndpoint = new UnixDomainSocketEndpoint(this, Path.of(p.toString() + ".baos"), true);
+
+		Closeable tcpl = null;
 		try {
 			final var ctrlEndpoint = (InetSocketAddress) s.getLocalSocketAddress();
-			tcpLooper = TcpLooper.start(this, ctrlEndpoint, false);
+			tcpl = TcpLooper.start(this, ctrlEndpoint, false);
 			final boolean baosConnections = ((DefaultServiceContainer) sc).baosSupport();
 			if (baosConnections) {
 				final var baosEndpoint = new InetSocketAddress(ctrlEndpoint.getAddress(), 12004);
@@ -199,13 +210,29 @@ final class ControlEndpointService extends ServiceLooper
 			}
 			else
 				baosLooper = () -> {};
+
+			if (unixSocketPath.isPresent()) {
+				udsEndpoint.start();
+				if (baosConnections)
+					udsBaosEndpoint.start();
+			}
 		}
 		catch (final Exception e) {
 			if (e instanceof InterruptedException)
 				Thread.currentThread().interrupt();
+			if (tcpl != null)
+				try {
+					tcpl.close();
+				}
+				catch (final IOException ioe) {
+					logger.log(INFO, "closing tcp looper", ioe);
+				}
+			udsEndpoint.close();
+			udsBaosEndpoint.close();
 			s.close();
 			throw wrappedException(e);
 		}
+		tcpLooper = tcpl;
 	}
 
 	void connectionClosed(final DataEndpoint endpoint, final IndividualAddress device)
@@ -221,8 +248,10 @@ final class ControlEndpointService extends ServiceLooper
 
 		final long now = System.currentTimeMillis();
 		final boolean timeout = (now - endpoint.getLastMsgTimestamp()) >= 120_000;
-		if (timeout && !anyMatchDataConnection(new EndpointAddress(endpoint.getRemoteAddress()))) {
-			TcpLooper.lastConnectionTimedOut(new EndpointAddress(endpoint.getRemoteAddress()));
+		final var remote = endpoint.remoteAddress();
+		if (timeout && !anyMatchDataConnection(remote)) {
+			TcpLooper.lastConnectionTimedOut(remote);
+			udsEndpoint.lastConnectionTimedOut(remote);
 		}
 	}
 
@@ -239,6 +268,8 @@ final class ControlEndpointService extends ServiceLooper
 		try {
 			tcpLooper.close();
 			baosLooper.close();
+			udsEndpoint.close();
+			udsBaosEndpoint.close();
 		}
 		catch (final IOException ignore) {}
 		super.quit();
@@ -400,10 +431,8 @@ final class ControlEndpointService extends ServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
-					final boolean tcp = controlEndpoint.hostProtocol() == HPAI.IPV4_TCP;
-					final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
-					logger.log(INFO, "{0}: setup data endpoint ({1}, channel {2}) for connection request from {3}",
-							svcCont.getName(), type, channelId, ctrlEndpt);
+					logger.log(INFO, "{0}: setup data endpoint (channel {1}) for connection request from {2}",
+							svcCont.getName(), channelId, ctrlEndpt);
 					final var dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
 					buf = PacketHelper.toPacket(expectedVersion, res);
@@ -435,7 +464,7 @@ final class ControlEndpointService extends ServiceLooper
 			// during an established connection, but it's not recommended; if the
 			// sender control endpoint differs from our connection control endpoint,
 			// issue a warning
-			final var ctrlEndpt = new EndpointAddress(conn.getRemoteAddress());
+			final var ctrlEndpt = conn.remoteAddress();
 			if (!ctrlEndpt.equals(src)) {
 				logger.log(WARNING, "disconnect request: sender control endpoint changed from {0} to {1}, not recommended",
 						ctrlEndpt, src);
@@ -473,7 +502,7 @@ final class ControlEndpointService extends ServiceLooper
 				status = checkVersion(h, protocolVersion);
 				if (status == ErrorCodes.NO_ERROR) {
 					logger.log(TRACE, "received connection-state request (channel {0}) from {1}",
-							csr.getChannelID(), hostPort(endpoint.getRemoteAddress()));
+							csr.getChannelID(), endpoint.remoteAddress());
 					endpoint.updateLastMsgTimestamp();
 				}
 			}
@@ -673,8 +702,12 @@ final class ControlEndpointService extends ServiceLooper
 			logger.log(DEBUG, "send session {0} seq {1} tag {2} to {3}", sessionId, seq, msgTag, dst);
 		}
 
-		if (!TcpLooper.send(buf, dst))
-			s.send(new DatagramPacket(buf, buf.length, dst.inet()));
+		if (dst instanceof TcpEndpointAddress)
+			TcpLooper.send(buf, dst);
+		else if (dst instanceof UnixEndpointAddress)
+			udsEndpoint.send(buf, dst);
+		else if (dst instanceof final UdpEndpointAddress udp)
+			s.send(new DatagramPacket(buf, buf.length, udp.inet()));
 	}
 
 	private DatagramSocket createSocket()
@@ -784,8 +817,7 @@ final class ControlEndpointService extends ServiceLooper
 	private IndividualAddress device;
 
 	private ConnectResponse initNewConnection(final ConnectRequest req, final EndpointAddress ctrlEndpt,
-		final EndpointAddress dataEndpt, final int channelId)
-	{
+			final EndpointAddress dataEndpt, final int channelId) {
 		// information about remote endpoint in case of error response
 		final String endpoint = ctrlEndpt.toString();
 
@@ -922,7 +954,7 @@ final class ControlEndpointService extends ServiceLooper
 
 		if (svcCont.reuseControlEndpoint()) {
 			svcLoop = this;
-			newDataEndpoint = new DataEndpoint(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
+			newDataEndpoint = new DataEndpoint(this, s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
 					useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
@@ -930,13 +962,13 @@ final class ControlEndpointService extends ServiceLooper
 				svcLoop = new DataEndpointService(server, s, svcCont.getName());
 
 				final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-				newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
+				newDataEndpoint = new DataEndpoint(this, s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
 						cType, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
 						((DataEndpointService) svcLoop)::resetRequest);
 				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
 				looperTask = new LooperTask(server,
-						svcCont.getName() + " data endpoint " + hostPort(newDataEndpoint.getRemoteAddress()), 0,
+						svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0,
 						() -> svcLoop);
 			}
 			catch (final RuntimeException e) {
@@ -1233,18 +1265,17 @@ final class ControlEndpointService extends ServiceLooper
 		return status;
 	}
 
-	boolean setupBaosTcpEndpoint(final EndpointAddress remote) {
+	boolean setupBaosStreamEndpoint(final EndpointAddress remote) {
 		try {
 			final var svcLoop = new DataEndpointService(server, s, svcCont.getName());
 
 			final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-			final var newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), remote, remote, 0, device,
+			final var newDataEndpoint = new DataEndpoint(this, s, svcLoop.getSocket(), remote, remote, 0, device,
 					ConnectionType.Baos, false, sessions, 0, bc.andThen(this::connectionClosed), __ -> {});
 			svcLoop.svcHandler = newDataEndpoint;
 
 			final var looperTask = new LooperTask(server,
-					svcCont.getName() + " data endpoint " + hostPort(newDataEndpoint.getRemoteAddress()), 0,
-					() -> svcLoop);
+					svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0, () -> svcLoop);
 
 			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos)) {
 				// don't use sh.close() here, we would initiate tunneling disconnect sequence
@@ -1260,7 +1291,7 @@ final class ControlEndpointService extends ServiceLooper
 			return true;
 		}
 		catch (final RuntimeException e) {
-			logger.log(WARNING, "error setting up baos tcp endpoint for {0}", remote, e);
+			logger.log(WARNING, "error setting up baos endpoint for {0}", remote, e);
 			return false;
 		}
 	}

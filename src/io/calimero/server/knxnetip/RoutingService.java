@@ -219,7 +219,8 @@ final class RoutingService extends ServiceLooper
 	{
 		if (secure)
 			return true;
-		return r.handleServiceType(h, data, offset, src.inet().getAddress(), src.inet().getPort());
+		final var udp = ((UdpEndpointAddress) src).inet();
+		return r.handleServiceType(h, data, offset, udp.getAddress(), udp.getPort());
 	}
 
 	void sendRoutingLostMessage(final int lost, final int state) throws KNXConnectionClosedException
