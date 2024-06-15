@@ -57,7 +57,7 @@ class ReplayBuffer<T extends FrameEvent>
 	private static final Logger logger = LoggerFactory.getLogger("calimero.server.gateway.ReplayBuffer");
 
 	private record Key(String hostAddress, int port, long timestamp) {
-		Key(InetSocketAddress remote) {
+		Key(final InetSocketAddress remote) {
 			this(remote.getAddress().getHostAddress(), remote.getPort(), System.currentTimeMillis());
 		}
 	}
@@ -128,7 +128,7 @@ class ReplayBuffer<T extends FrameEvent>
 			final long timestamp = e.getValue().timestamp();
 			final KNXnetIPConnection conn = e.getKey();
 			if ((timestamp + keepDisruptedConnection) < System.currentTimeMillis()) {
-				logger.info("remove expired disrupted connection {}", conn);
+				logger.debug("remove expired disrupted connection {}", conn);
 				remove.add(conn);
 			}
 			else if (conn != c) { // we ignore c itself in the entry set, otherwise it would always show up in found
@@ -225,7 +225,7 @@ class ReplayBuffer<T extends FrameEvent>
 			logger.trace("remove {} ({})", c, key);
 	}
 
-	// returns 0: no match, 1: key[0] matches to[0], 2: match 1 and key[1] matches to[1]
+	// returns 0: no match, 1: key.hostAddress matches to.hostAddress, 2: match 1 and key.port matches to.port
 	private static int compare(final Key key, final Key to)
 	{
 		if (key.hostAddress().equals(to.hostAddress())) {
