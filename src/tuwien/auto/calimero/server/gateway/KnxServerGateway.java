@@ -50,6 +50,9 @@ import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -917,47 +920,53 @@ public class KnxServerGateway implements Runnable
 		final var uptime = Duration.between(startTime, Instant.now()).truncatedTo(ChronoUnit.SECONDS);
 		final var days = uptime.toDays();
 		final var dayPart = days > 1 ? days + " days " : days == 1 ? "1 day " : "";
-		info.append(format("start time %s (uptime %s%d:%d)%n", startTime, dayPart, uptime.toHoursPart(),
-				uptime.toMinutesPart()));
+		final var dtFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.LONG).withZone(ZoneId.systemDefault());
+
+		info.append(format("start time %s (uptime %s%02d:%02d)%n", dtFormatter.format(startTime), dayPart,
+				uptime.toHoursPart(), uptime.toMinutesPart()));
 
 		int objInst = 0;
 
-		info.append(format("used msg buffer IP => KNX: %d/%d (%d %%)%n", ipEvents.size(), maxEventQueueSize,
+		info.append(format("used msg buffer:%n", ipEvents.size(), maxEventQueueSize,
 				ipEvents.size() * 100 / maxEventQueueSize));
-		info.append(format("used msg buffer KNX => IP: %d/%d (%d %%)%n", subnetEvents.size(), maxEventQueueSize,
+		info.append(format("    IP => KNX: %d/%d (%d %%)%n", ipEvents.size(), maxEventQueueSize,
+				ipEvents.size() * 100 / maxEventQueueSize));
+		info.append(format("    KNX => IP: %d/%d (%d %%)%n", subnetEvents.size(), maxEventQueueSize,
 				subnetEvents.size() * 100 / maxEventQueueSize));
 
 		for (final SubnetConnector c : getSubnetConnectors()) {
 			objInst++;
-			info.append(format("service container '%s'%n", c.getName()));
+			info.append(format("service container '%s':%n", c.getName()));
 			final InterfaceObjectServer ios = server.getInterfaceObjectServer();
 			try {
-				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
-					info.append(format("\trouting multicast %s netif %s%n",
-							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
-				}
-
 				final var knxipObject = KnxipParameterObject.lookup(ios, objInst);
 
 				final InetAddress ip = knxipObject.inetAddress(PID.CURRENT_IP_ADDRESS);
 				final InetAddress mask = knxipObject.inetAddress(PID.CURRENT_SUBNET_MASK);
-				info.append(format("\tserver IP %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
-						NetworkInterface.getByInetAddress(ip)));
+				info.append(format("    server IP: %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
+						NetworkInterface.getByInetAddress(ip).getName()));
 
-				info.append(format("\tsubnet %s%n", c.getSubnetLink()));
+				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
+					info.append(format("     IP mcast: %s netif %s%n",
+							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
+				}
+
+				info.append(format("       subnet: %s%n", c.getSubnetLink()));
 
 				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
 				final long overflowKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_KNX).orElse(0L);
 				final int rateToKnx = telegramsToKnx.get(objInst - 1).average();
-				info.append(format("\tIP => KNX: sent %d, overflow %d [msgs], %d [msgs/min]%n", toKnx, overflowKnx, rateToKnx));
+				info.append(format("    IP => KNX: sent %d, overflow %d [msgs], %d [msgs/min]%n", toKnx, overflowKnx, rateToKnx));
 				final long toIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_IP).orElse(0L);
 				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
 				final int rateToIP = telegramsFromKnx.get(objInst - 1).average();
-				info.append(format("\tKNX => IP: sent %d, overflow %d [msgs], %d [msgs/min]%n", toIP, overflowIP, rateToIP));
+				info.append(format("    KNX => IP: sent %d, overflow %d [msgs], %d [msgs/min]%n", toIP, overflowIP, rateToIP));
 
 				final var connections = server.dataConnections(c.getServiceContainer());
-				connections.forEach((addr, client) -> info.append(format("\t%s, connected since %s%n",
-						client, client.connectedSince())));
+				if (!connections.isEmpty())
+					info.append("  active client connections:\n");
+				connections.forEach((addr, client) -> info.append(format("    %s, connected since %s%n",
+						client, dtFormatter.format(client.connectedSince()))));
 			}
 			catch (final Exception e) {
 				logger.error("gathering stat for service container {}", c.getName(), e);
