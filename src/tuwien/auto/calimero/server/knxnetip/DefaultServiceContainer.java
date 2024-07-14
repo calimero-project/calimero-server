@@ -36,7 +36,6 @@
 
 package tuwien.auto.calimero.server.knxnetip;
 
-import java.net.InetAddress;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 
@@ -94,7 +93,7 @@ public class DefaultServiceContainer implements ServiceContainer
 		this.netif = netif;
 		if (controlEndpoint == null)
 			// create with local host address and ephemeral port
-			ctrlEndpt = new HPAI((InetAddress) null, 0);
+			ctrlEndpt = new HPAI(null, 0);
 		else {
 			if (controlEndpoint.hostProtocol() != HPAI.IPV4_UDP)
 				throw new KNXIllegalArgumentException("only support for UDP communication");
