@@ -69,7 +69,7 @@ final class DataEndpointService extends ServiceLooper
 	void resetRequest(final DataEndpoint endpoint)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
-		fireResetRequest(endpoint.getName(), ctrlEndpoint);
+		fireResetRequest(endpoint.name(), ctrlEndpoint);
 	}
 
 	@Override
@@ -117,7 +117,7 @@ final class DataEndpointService extends ServiceLooper
 		svcHandler.setSocket(s);
 		reboundSocket = true;
 		old.close();
-		logger.log(WARNING, "{0} (channel {1}): rebound socket {2} to use UDP port {3}", svcHandler.getName(),
+		logger.log(WARNING, "{0} (channel {1}): rebound socket {2} to use UDP port {3}", svcHandler.name(),
 				svcHandler.getChannelId(), oldAddress, port);
 	}
 

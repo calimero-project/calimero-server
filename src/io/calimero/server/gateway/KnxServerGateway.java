@@ -288,7 +288,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 
-			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.getName()));
+			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.name()));
 			return true;
 		}
 
@@ -337,7 +337,7 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer sc = sce.getContainer();
 			if (event == ServiceContainerEvent.ROUTING_SVC_STARTED) {
 				final KNXnetIPConnection conn = sce.getConnection();
-				conn.addConnectionListener(new ConnectionListener(sc, conn.getName()));
+				conn.addConnectionListener(new ConnectionListener(sc, conn.name()));
 				serverConnections.add(conn);
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
@@ -1972,7 +1972,7 @@ public class KnxServerGateway implements Runnable
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
 			// handle reset.req here since we have the connection name for logging
-			logger.log(INFO, "received reset request " + c.getName() + " - restarting " + server.getName());
+			logger.log(INFO, "received reset request " + c.name() + " - restarting " + server.getName());
 			inReset = true;
 			server.shutdown();
 			// corresponding launch is done in run()
