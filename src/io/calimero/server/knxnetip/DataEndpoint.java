@@ -225,9 +225,9 @@ public final class DataEndpoint extends ConnectionBase
 		if (TcpLooper.send(buf, dst))
 			return;
 
-		var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
+		final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
 		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-		var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+		final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
 		logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
 				hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
 
@@ -446,7 +446,7 @@ public final class DataEndpoint extends ConnectionBase
 						csr.getChannelID(), hostPort(dataEndpt), ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
+			final var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
 			send(buf, dst);
 		}
 		else
@@ -454,7 +454,7 @@ public final class DataEndpoint extends ConnectionBase
 		return true;
 	}
 
-	void disconnectResponse(DisconnectResponse res) {
+	void disconnectResponse(final DisconnectResponse res) {
 		if (res.getStatus() != ErrorCodes.NO_ERROR)
 			logger.log(WARNING, "received disconnect response status 0x{0} ({1})",
 					Integer.toHexString(res.getStatus()), ErrorCodes.getErrorMessage(res.getStatus()));
@@ -467,7 +467,7 @@ public final class DataEndpoint extends ConnectionBase
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		logger.log(DEBUG, "respond with {0}", res);
 
-		var dst = etsDstHack(dataEndpt, src);
+		final var dst = etsDstHack(dataEndpt, src);
 		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dst);
 	}
 
@@ -707,7 +707,7 @@ public final class DataEndpoint extends ConnectionBase
 
 	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
 	// even if indicated otherwise in the HPAI or required by the spec
-	private InetSocketAddress etsDstHack(InetSocketAddress correct, InetSocketAddress actual) {
+	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final InetSocketAddress actual) {
 		// we ignore any attempt to respond to a different IP address
 		if (!actual.getAddress().equals(correct.getAddress()))
 			return correct;
