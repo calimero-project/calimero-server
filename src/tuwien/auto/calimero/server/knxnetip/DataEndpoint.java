@@ -176,7 +176,7 @@ public final class DataEndpoint extends ConnectionBase
 		this.connectionClosed = connectionClosed;
 		this.resetRequest = resetRequest;
 
-		logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+		logger = LogService.getLogger("calimero.server.knxnetip." + name());
 
 		tcp = TcpLooper.connections.containsKey(remoteDataEndpt);
 
@@ -249,11 +249,11 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	@Override
-	public String getName()
+	public String name()
 	{
 		final String lock = new String(Character.toChars(0x1F512));
 		final String prefix = "KNX IP " + (sessionId > 0 ? lock + " " : "");
-		return prefix + ctype + " " + super.getName();
+		return prefix + ctype + " " + super.name();
 	}
 
 	@Override
@@ -261,7 +261,7 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
 		final var deviceAddress = device != null ? ", " + device : "";
-		return "%s (%s, channel %d%s)".formatted(getName(), type, getChannelId(), deviceAddress);
+		return "%s (%s, channel %d%s)".formatted(name(), type, getChannelId(), deviceAddress);
 	}
 
 	public IndividualAddress deviceAddress() { return device; }

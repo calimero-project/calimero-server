@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2023 B. Malinowsky
+    Copyright (c) 2016, 2024 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -75,7 +75,7 @@ final class RoutingService extends ServiceLooper
 			final boolean enableLoopback) throws KNXException {
 			super(mcGroup);
 			init(netif, enableLoopback, false);
-			logger = LogService.getLogger("calimero.server.knxnetip." + getName());
+			logger = LogService.getLogger("calimero.server.knxnetip." + name());
 		}
 
 		// forwarder for RoutingService dispatch, called from handleServiceType
@@ -87,7 +87,7 @@ final class RoutingService extends ServiceLooper
 		}
 
 		@Override
-		public String getName()
+		public String name()
 		{
 			return "KNX IP routing service (" + networkInterface().getName() + " " + ctrlEndpt.getAddress().getHostAddress() + ")";
 		}
@@ -113,7 +113,7 @@ final class RoutingService extends ServiceLooper
 		@Override
 		public String toString()
 		{
-			return getName();
+			return name();
 		}
 
 		@Override
@@ -157,7 +157,7 @@ final class RoutingService extends ServiceLooper
 					}
 
 					@Override
-					public String getName() { return inst.getName(); }
+					public String name() { return inst.name(); }
 
 					@Override
 					protected void close(final int initiator, final String reason, final LogLevel level,
@@ -236,7 +236,7 @@ final class RoutingService extends ServiceLooper
 
 	@Override
 	public String toString() {
-		return svcCont.getName() + " " + r.getName();
+		return svcCont.getName() + " " + r.name();
 	}
 
 	private void fireRoutingServiceStarted(final ServiceContainer sc, final KNXnetIPRouting r)

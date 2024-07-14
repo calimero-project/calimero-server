@@ -225,7 +225,7 @@ final class ControlEndpointService extends ServiceLooper
 	void resetRequest(final DataEndpoint endpoint)
 	{
 		final InetSocketAddress ctrlEndpoint = null;
-		fireResetRequest(endpoint.getName(), ctrlEndpoint);
+		fireResetRequest(endpoint.name(), ctrlEndpoint);
 	}
 
 	@Override
