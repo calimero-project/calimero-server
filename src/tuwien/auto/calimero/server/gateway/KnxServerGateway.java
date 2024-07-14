@@ -927,8 +927,7 @@ public class KnxServerGateway implements Runnable
 
 		int objInst = 0;
 
-		info.append(format("used msg buffer:%n", ipEvents.size(), maxEventQueueSize,
-				ipEvents.size() * 100 / maxEventQueueSize));
+		info.append(format("used msg buffer:%n"));
 		info.append(format("    IP => KNX: %d/%d (%d %%)%n", ipEvents.size(), maxEventQueueSize,
 				ipEvents.size() * 100 / maxEventQueueSize));
 		info.append(format("    KNX => IP: %d/%d (%d %%)%n", subnetEvents.size(), maxEventQueueSize,
