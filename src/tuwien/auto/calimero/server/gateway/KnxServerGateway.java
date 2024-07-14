@@ -1212,15 +1212,16 @@ public class KnxServerGateway implements Runnable
 		for (final var connector : connectors) {
 			// we assume there is only one service container with baos support
 			if ("baos".equals(connector.format())) {
-				final var link = ((Link<?>) connector.getSubnetLink()).target();
-				if (link instanceof BaosLink) {
-					try {
-						final var baosService = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
-						logger.trace("send baos {}", baosService);
-						((BaosLink) link).send(baosService);
-					}
-					catch (final KNXException e) {
-						logger.warn("forwarding client baos service", e);
+				if (connector.getSubnetLink() instanceof final Link<?> subnetLink) {
+					if (subnetLink.target() instanceof final BaosLink baosLink) {
+						try {
+							final var baosService = BaosService.from(ByteBuffer.wrap(fe.getFrameBytes()));
+							logger.trace("send baos {}", baosService);
+							baosLink.send(baosService);
+						}
+						catch (final KNXException e) {
+							logger.warn("forwarding client baos service", e);
+						}
 					}
 				}
 				return;
