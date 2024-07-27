@@ -86,7 +86,6 @@ import io.calimero.KNXAddress;
 import io.calimero.KNXFormatException;
 import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KnxRuntimeException;
-import io.calimero.Settings;
 import io.calimero.datapoint.Datapoint;
 import io.calimero.datapoint.DatapointMap;
 import io.calimero.datapoint.DatapointModel;
@@ -102,6 +101,7 @@ import io.calimero.dptxlator.DPTXlatorDateTime;
 import io.calimero.dptxlator.DPTXlatorTime;
 import io.calimero.dptxlator.PropertyTypes;
 import io.calimero.internal.Executor;
+import io.calimero.internal.Manifest;
 import io.calimero.knxnetip.SecureConnection;
 import io.calimero.knxnetip.util.HPAI;
 import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
@@ -592,12 +592,13 @@ public class Launcher implements Runnable, AutoCloseable
 	public static void main(final String[] args)
 	{
 		if (args.length == 0) {
-			System.out.println("supply file name/URI for the KNX server configuration");
+			System.out.println("Calimero server " + Manifest.buildInfo(Launcher.class));
+			System.out.println("Supply file name/URI for the KNX server configuration");
 			return;
 		}
 
 		if ("--version".equals(args[0]) || args.length == 1 && "-v".equals(args[0])) {
-			System.out.println("Calimero server " + Settings.getLibraryVersion());
+			System.out.println(Manifest.buildInfo(Launcher.class));
 			return;
 		}
 
