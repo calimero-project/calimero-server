@@ -131,7 +131,8 @@ dependencies {
 	testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
 }
 
-def gitHash = 'git rev-parse --verify --short HEAD'.execute().text.trim()
+
+def gitHash = "git -C $projectDir rev-parse --verify --short HEAD".execute().text.trim()
 def buildDate = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
                         .withZone(ZoneId.of("UTC"))
                         .format(Instant.now())
