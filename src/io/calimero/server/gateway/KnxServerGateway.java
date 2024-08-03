@@ -315,6 +315,9 @@ public class KnxServerGateway implements Runnable
 				return;
 			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
 			final InetSocketAddress remote = connection.getRemoteAddress();
+			// unix domain sockets are not applicable for our replay buffer
+			if (remote == null)
+				return;
 			final int port = remote.getPort();
 			if (port >= portRange[0] && port <= portRange[1]) {
 				buffer.add(connection);

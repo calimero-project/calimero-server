@@ -114,8 +114,12 @@ public final class DataEndpoint extends ConnectionBase
 	private final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed;
 	private final Consumer<DataEndpoint> resetRequest;
 
+	private final ControlEndpointService ces;
 	private final IndividualAddress device;
 	private final ConnectionType ctype;
+
+	private final EndpointAddress remoteCtrlEndpt;
+	private final EndpointAddress remoteDataEndpt;
 
 	private volatile boolean shutdown;
 
@@ -156,23 +160,38 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	}
 
-	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
-		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
+	DataEndpoint(final ControlEndpointService ces, final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
+		final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
 		final SecureSessions sessions, final int sessionId,
 		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
 		final Consumer<DataEndpoint> resetRequest)
 	{
 		super(type.req, type.ack, type.maxSendAttempts, type.timeout);
-		device = assigned;
+		this.ces = ces;
+		this.device = assigned;
 		this.ctype = type;
+		this.remoteCtrlEndpt = remoteCtrlEndpt;
+		this.remoteDataEndpt = remoteDataEndpt;
+
 		this.channelId = channelId;
 
 		ctrlSocket = localCtrlEndpt;
 		socket = localDataEndpt;
 
-		ctrlEndpt = remoteCtrlEndpt;
-		dataEndpt = remoteDataEndpt;
+		if (remoteCtrlEndpt instanceof final UdpEndpointAddress udp)
+			ctrlEndpt = udp.inet();
+		else if  (remoteCtrlEndpt instanceof final TcpEndpointAddress tcp)
+			ctrlEndpt = tcp.address();
+		else
+			ctrlEndpt = null;
+
+		if (remoteDataEndpt instanceof final UdpEndpointAddress udp)
+			dataEndpt = udp.inet();
+		else if  (remoteDataEndpt instanceof final TcpEndpointAddress tcp)
+			dataEndpt = tcp.address();
+		else
+			dataEndpt = null;
 
 		useNat = useNAT;
 		this.sessions = sessions;
@@ -182,7 +201,8 @@ public final class DataEndpoint extends ConnectionBase
 
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
 
-		tcp = TcpLooper.connections.containsKey(remoteDataEndpt);
+		tcp = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
+				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
 
 		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
@@ -198,9 +218,13 @@ public final class DataEndpoint extends ConnectionBase
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
 		checkFrameType(frame);
-		if (TcpLooper.connections.containsKey(dataEndpt)) {
-			super.send(frame, BlockingMode.NonBlocking);
-			setStateNotify(OK);
+		final var remote = remoteAddress();
+		// always send non-blocking over tcp and unix sockets
+		if (remote instanceof TcpEndpointAddress || remote instanceof UnixEndpointAddress) {
+			synchronized (this) {
+				super.send(frame, BlockingMode.NonBlocking);
+				setStateNotify(OK);
+			}
 		}
 		else
 			super.send(frame, mode);
@@ -222,19 +246,22 @@ public final class DataEndpoint extends ConnectionBase
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
-		if (TcpLooper.send(buf, dst))
-			return;
+		if (remoteDataEndpt instanceof TcpEndpointAddress)
+			ces.tcpEndpoint.send(buf, remoteDataEndpt);
+		else if (remoteDataEndpt instanceof UnixEndpointAddress)
+			ces.udsEndpoint.send(buf, remoteDataEndpt);
+		else {
+			final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
+			final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
+			final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+			logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
+					hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
 
-		final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
-		final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-		final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
-		logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
-				hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
-
-		if (useNat || actualDst.equals(ctrlEndpt))
-			ctrlSocket.send(p);
-		else
-			socket.send(p);
+			if (useNat || actualDst.equals(ctrlEndpt))
+				ctrlSocket.send(p);
+			else
+				socket.send(p);
+		}
 	}
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
@@ -257,18 +284,20 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		final String lock = new String(Character.toChars(0x1F512));
 		final String prefix = "KNX IP " + (sessionId > 0 ? lock + " " : "");
-		return prefix + ctype + " " + super.name();
+		return prefix + ctype + " " + remoteCtrlEndpt;
 	}
 
 	@Override
 	public String toString()
 	{
-		final String type = tcp ? "TCP" : useNat ? "UDP NAT" : "UDP";
+		final String nat = (useNat && !tcp) ? "NAT, " : "";
 		final var deviceAddress = device != null ? ", " + device : "";
-		return "%s (%s, channel %d%s)".formatted(name(), type, getChannelId(), deviceAddress);
+		return "%s (%schannel %d%s)".formatted(name(), nat, getChannelId(), deviceAddress);
 	}
 
 	public IndividualAddress deviceAddress() { return device; }
+
+	EndpointAddress remoteAddress() { return remoteDataEndpt; }
 
 	public Instant connectedSince() { return connectedSince; }
 
@@ -299,19 +328,21 @@ public final class DataEndpoint extends ConnectionBase
 		this.socket = socket;
 	}
 
-	boolean handleDataServiceType(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset) throws KNXFormatException, IOException
-	{
+	boolean handleDataServiceType(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+			throws KNXFormatException, IOException {
 		if (sessionId == 0)
 			return acceptDataService(src, h, data, offset);
 
-		if (TcpLooper.connections.containsKey(dataEndpt))
+		if (ces.tcpEndpoint.connections.containsKey(remoteAddress()))
+			return acceptDataService(src, h, data, offset);
+		if (ces.udsEndpoint.connections.containsKey(remoteAddress()))
 			return acceptDataService(src, h, data, offset);
 
 		if (!h.isSecure()) {
 			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, HexFormat.ofDelimiter(" ").formatHex(data));
 			return true;
 		}
-		return sessions.acceptService(h, data, offset, dataEndpt, this);
+		return sessions.acceptService(h, data, offset, remoteAddress(), this);
 	}
 
 	private static final Function<ByteBuffer, BaosService> baosServiceParser = buf -> {
@@ -323,7 +354,7 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	};
 
-	boolean acceptDataService(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+	boolean acceptDataService(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 
@@ -461,7 +492,7 @@ public final class DataEndpoint extends ConnectionBase
 		finishClosingNotify();
 	}
 
-	private void respondToFeature(final InetSocketAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
+	private void respondToFeature(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
@@ -703,6 +734,13 @@ public final class DataEndpoint extends ConnectionBase
 
 		if (ctype == ConnectionType.DevMgmt && !(frame instanceof CEMIDevMgmt))
 			throw new KNXIllegalArgumentException("expect cEMI device management frame type");
+	}
+
+	// forwarder for udp inet socket overload
+	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final EndpointAddress actual) {
+		if (actual instanceof final UdpEndpointAddress udp)
+			return etsDstHack(correct, udp.inet());
+		return correct;
 	}
 
 	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,

@@ -214,12 +214,13 @@ final class RoutingService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException
 	{
 		if (secure)
 			return true;
-		return r.handleServiceType(h, data, offset, src.getAddress(), src.getPort());
+		final var udp = ((UdpEndpointAddress) src).inet();
+		return r.handleServiceType(h, data, offset, udp.getAddress(), udp.getPort());
 	}
 
 	void sendRoutingLostMessage(final int lost, final int state) throws KNXConnectionClosedException

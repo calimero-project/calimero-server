@@ -97,7 +97,7 @@ final class DataEndpointService extends ServiceLooper
 	}
 
     @Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException {
 		try {
 			return svcHandler.handleDataServiceType(src, h, data, offset);

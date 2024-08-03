@@ -156,7 +156,7 @@ final class DiscoveryService extends ServiceLooper
 	}
 
 	@Override
-	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final InetSocketAddress src)
+	boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset, final EndpointAddress src)
 			throws KNXFormatException, IOException {
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
@@ -195,9 +195,12 @@ final class DiscoveryService extends ServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
+			if (!(addr instanceof final UdpEndpointAddress udp))
+				return false;
+
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
-				sendSearchResponse(addr, ces, ext, macFilter, requestedServices, requestedDibs);
+				sendSearchResponse(udp.inet(), ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		else if (ignoreServices.contains(svc))
@@ -228,7 +231,7 @@ final class DiscoveryService extends ServiceLooper
 				final var sentOn = send(new DatagramPacket(buf, buf.length, dst));
 				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
 				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
-						sc.getName(), hostPort(dst), sentOn);
+						sc.getName(), dst, sentOn);
 			}
 		}
 	}
