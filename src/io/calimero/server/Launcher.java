@@ -748,7 +748,7 @@ public class Launcher implements Runnable, AutoCloseable
 			final var tunnelingUsers = container.tunnelingUsers();
 			if (!tunnelingUsers.isEmpty()) {
 				final var serverAddress = useServerAddress ? sc.getMediumSettings().getDeviceAddress() : null;
-				setTunnelingUsers(ios, objectInstance, tunnelingUsers, additionalAddresses, serverAddress);
+				setTunnelingUsers(objectInstance, tunnelingUsers, additionalAddresses, serverAddress);
 			}
 			else {
 				// list all additional addresses as tunneling addresses
@@ -953,7 +953,7 @@ public class Launcher implements Runnable, AutoCloseable
 	private static final int pidTunnelingAddresses = 79;
 	private static final int pidTunnelingUsers = 97;
 
-	private void setTunnelingUsers(final InterfaceObjectServer ios, final int objectInstance,
+	private void setTunnelingUsers(final int objectInstance,
 		final Map<Integer, List<IndividualAddress>> userToAddresses, final List<IndividualAddress> additionalAddresses,
 		final IndividualAddress ctrlEndpoint) {
 
@@ -961,6 +961,7 @@ public class Launcher implements Runnable, AutoCloseable
 		final var addrIndices = userToAddresses.values().stream().flatMap(List::stream)
 				.map(addr -> addressIndex(addr, additionalAddresses, ctrlEndpoint)).sorted().distinct()
 				.collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (r1, r2) -> {}).toByteArray();
+		final var ios = server.getInterfaceObjectServer();
 		setTunnelingAddresses(ios, objectInstance, addrIndices);
 
 		// tunneling user entries are sorted first by user <, then by tunneling addr idx <

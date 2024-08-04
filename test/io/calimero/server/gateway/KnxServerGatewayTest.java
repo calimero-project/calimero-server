@@ -234,7 +234,7 @@ class KnxServerGatewayTest
 		private final EventListeners<NetworkLinkListener> listeners = new EventListeners<>();
 
 		// has to be public for creation by subnet connector
-		public DummyLink(final Object[] s) {}
+		public DummyLink(@SuppressWarnings("unused") final Object[] __) {}
 
 		@Override
 		public void addLinkListener(final NetworkLinkListener l)

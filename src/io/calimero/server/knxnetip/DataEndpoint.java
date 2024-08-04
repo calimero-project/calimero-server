@@ -67,7 +67,6 @@ import io.calimero.KNXIllegalArgumentException;
 import io.calimero.KNXTimeoutException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.ReturnCode;
-import io.calimero.ServiceType;
 import io.calimero.baos.BaosService;
 import io.calimero.cemi.CEMI;
 import io.calimero.cemi.CEMIBusMon;
@@ -499,7 +498,7 @@ public final class DataEndpoint extends ConnectionBase
 		logger.log(DEBUG, "respond with {0}", res);
 
 		final var dst = etsDstHack(dataEndpt, src);
-		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dst);
+		send(PacketHelper.toPacket(new ServiceRequest<>(res.type(), channelId, getSeqSend(), res)), dst);
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
