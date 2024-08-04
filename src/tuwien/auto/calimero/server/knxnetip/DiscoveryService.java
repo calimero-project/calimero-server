@@ -81,6 +81,7 @@ final class DiscoveryService extends ServiceLooper
 		s = createSocket(joinOn);
 	}
 
+	@SuppressWarnings("resource")
 	private MulticastSocket createSocket(final NetworkInterface[] joinOn)
 	{
 		final String p = System.getProperties().getProperty("java.net.preferIPv4Stack");

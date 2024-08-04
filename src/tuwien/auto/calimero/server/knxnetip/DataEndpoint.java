@@ -465,7 +465,7 @@ public final class DataEndpoint extends ConnectionBase
 		logger.debug("respond with {}", res);
 
 		final var dst = etsDstHack(dataEndpt, src);
-		send(PacketHelper.toPacket(new ServiceRequest<ServiceType>(res.type(), channelId, getSeqSend(), res)), dst);
+		send(PacketHelper.toPacket(new ServiceRequest<>(res.type(), channelId, getSeqSend(), res)), dst);
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
