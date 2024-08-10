@@ -30,7 +30,7 @@ Supported Features
 Note that for KNX IP Secure a keyfile or an ETS keyring (*.knxkeys) is required, see [section below](#knx-ip-secure).
 
 * Discovery and self-description
-* Tunneling
+* Tunneling: UDP, TCP (& Unix domain sockets with KNX Tunneling v2)
 * Routing
 * Busmonitor (for KNX subnet interfaces that do not support a dedicated busmonitor mode, KNXnet/IP bus monitor connections are realized by converting cEMI L-Data to cEMI bus monitor messages)
 * Local device management
@@ -112,6 +112,7 @@ Description of the supported XML elements and attributes:
 * `<routing>224.0.23.12</routing>` (optional): the multicast setup used by the service container for KNX IP (Secure) routing, defaults to the IP multicast address 224.0.23.12. (If the `routing` attribute of the service container is set to `false`, this setting has no effect.)  
 Optional attributes for secure routing:
     - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
+* `<unixSocket>/path/to/unix/socket</unixSocket>` accept client connections over Unix domain sockets, server socket binds to the specified file-system path
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to the KNX subnet, one of:
       - `udp`: the KNX subnet is connected via a UDP KNXnet/IP tunneling connection
