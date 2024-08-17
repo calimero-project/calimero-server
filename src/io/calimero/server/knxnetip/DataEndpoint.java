@@ -241,7 +241,8 @@ public final class DataEndpoint extends ConnectionBase
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, hostPort(dst),
+			final var remote = dst != null ? hostPort(dst) : remoteDataEndpt;
+			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, remote,
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
