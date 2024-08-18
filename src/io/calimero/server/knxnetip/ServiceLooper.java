@@ -171,9 +171,10 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			return sender;
 		}
 
+		var clientAssigned = new UdpEndpointAddress(endpoint.endpoint());
 		if (logEndpointType == 2)
-			logger.log(TRACE, "using client-assigned {0} endpoint {1} for responses", type, hostPort(endpoint.endpoint()));
-		return new UdpEndpointAddress(endpoint.endpoint());
+			logger.log(TRACE, "using client-assigned {0} endpoint {1} for responses", type, clientAssigned);
+		return clientAssigned;
 	}
 
 	void fireResetRequest(final String endpointName, final InetSocketAddress ctrlEndpoint)

@@ -63,7 +63,7 @@ final class DataEndpointService extends ServiceLooper
 	{
 		super(server, newSocket(localCtrlEndpt.getLocalAddress(), 0), 512, MAX_RECEIVE_INTERVAL * 1000);
 		this.svcContName = svcContName;
-		logger.log(DEBUG, "created socket on " + hostPort((InetSocketAddress) s.getLocalSocketAddress()));
+		logger.log(DEBUG, "created socket " + new UdpEndpointAddress((InetSocketAddress) s.getLocalSocketAddress()));
 	}
 
 	void resetRequest(final DataEndpoint endpoint)
