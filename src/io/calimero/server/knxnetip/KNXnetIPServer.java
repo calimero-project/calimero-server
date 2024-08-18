@@ -72,7 +72,6 @@ import io.calimero.IndividualAddress;
 import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.ReturnCode;
-import io.calimero.Settings;
 import io.calimero.datapoint.Datapoint;
 import io.calimero.device.BaseKnxDevice;
 import io.calimero.device.KnxDevice;
@@ -355,9 +354,6 @@ public class KNXnetIPServer
 
 		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();
-
-		logger.log(INFO, "{0} v{1}", "Calimero KNX IP server", Settings.getLibraryVersion());
-
 		ios.addServerListener(this::onPropertyValueChanged);
 
 		// server KNX device address, since we don't know about routing at this time

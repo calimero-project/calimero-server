@@ -636,6 +636,8 @@ public class Launcher implements Runnable, AutoCloseable
 	{
 		config = XmlConfiguration.from(URI.create(configUri));
 		logger = LogService.getLogger("io.calimero.server." + config.name());
+		logger.log(INFO, "Calimero KNX IP server {0}", Manifest.buildInfo(Launcher.class));
+
 		server = new KNXnetIPServer(config);
 
 		// output the configuration we loaded
