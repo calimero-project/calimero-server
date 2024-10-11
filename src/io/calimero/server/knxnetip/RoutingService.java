@@ -219,7 +219,7 @@ final class RoutingService extends ServiceLooper
 	{
 		if (secure)
 			return true;
-		final var udp = ((UdpEndpointAddress) src).inet();
+		final var udp = ((UdpEndpointAddress) src).address();
 		return r.handleServiceType(h, data, offset, udp.getAddress(), udp.getPort());
 	}
 

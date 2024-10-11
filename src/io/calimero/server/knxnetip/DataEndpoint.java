@@ -179,14 +179,14 @@ public final class DataEndpoint extends ConnectionBase
 		socket = localDataEndpt;
 
 		if (remoteCtrlEndpt instanceof final UdpEndpointAddress udp)
-			ctrlEndpt = udp.inet();
+			ctrlEndpt = udp.address();
 		else if  (remoteCtrlEndpt instanceof final TcpEndpointAddress tcp)
 			ctrlEndpt = tcp.address();
 		else
 			ctrlEndpt = null;
 
 		if (remoteDataEndpt instanceof final UdpEndpointAddress udp)
-			dataEndpt = udp.inet();
+			dataEndpt = udp.address();
 		else if  (remoteDataEndpt instanceof final TcpEndpointAddress tcp)
 			dataEndpt = tcp.address();
 		else
@@ -739,7 +739,7 @@ public final class DataEndpoint extends ConnectionBase
 	// forwarder for udp inet socket overload
 	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final EndpointAddress actual) {
 		if (actual instanceof final UdpEndpointAddress udp)
-			return etsDstHack(correct, udp.inet());
+			return etsDstHack(correct, udp.address());
 		return correct;
 	}
 

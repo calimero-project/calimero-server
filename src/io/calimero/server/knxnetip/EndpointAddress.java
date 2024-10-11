@@ -51,8 +51,6 @@ sealed interface EndpointAddress {
 record UnixEndpointAddress(UnixDomainSocketAddress address, long id) implements EndpointAddress {
 	UnixEndpointAddress { Objects.requireNonNull(address); }
 
-	UnixDomainSocketAddress unix() { return address; }
-
 	@Override
 	public String protocol() { return "uds"; }
 
@@ -62,8 +60,6 @@ record UnixEndpointAddress(UnixDomainSocketAddress address, long id) implements 
 
 record UdpEndpointAddress(InetSocketAddress address) implements EndpointAddress {
 	UdpEndpointAddress { Objects.requireNonNull(address); }
-
-	InetSocketAddress inet() { return address; }
 
 	@Override
 	public String protocol() { return "udp"; }

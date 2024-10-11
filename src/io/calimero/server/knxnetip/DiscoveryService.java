@@ -201,7 +201,7 @@ final class DiscoveryService extends ServiceLooper
 
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
-				sendSearchResponse(udp.inet(), ces, ext, macFilter, requestedServices, requestedDibs);
+				sendSearchResponse(udp.address(), ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		else if (ignoreServices.contains(svc))

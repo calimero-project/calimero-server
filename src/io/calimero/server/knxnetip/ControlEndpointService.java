@@ -698,7 +698,7 @@ final class ControlEndpointService extends ServiceLooper
 		else if (dst instanceof UnixEndpointAddress)
 			udsEndpoint.send(buf, dst);
 		else if (dst instanceof final UdpEndpointAddress udp)
-			s.send(new DatagramPacket(buf, buf.length, udp.inet()));
+			s.send(new DatagramPacket(buf, buf.length, udp.address()));
 	}
 
 	private DatagramSocket createSocket()

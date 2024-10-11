@@ -289,7 +289,7 @@ final class SecureSessions {
 		else if (address instanceof UnixEndpointAddress)
 			ctrlEndpoint.udsEndpoint.send(data, address);
 		else if (address instanceof final UdpEndpointAddress udp)
-			socket.send(new DatagramPacket(data, data.length, udp.inet()));
+			socket.send(new DatagramPacket(data, data.length, udp.address()));
 	}
 
 	private ByteBuffer establishSession(final EndpointAddress remote, final KNXnetIPHeader h, final byte[] data,
