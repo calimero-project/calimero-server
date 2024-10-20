@@ -90,8 +90,8 @@ sealed abstract class StreamEndpoint implements Runnable, AutoCloseable
 	}
 
 	public void run() {
-		final String namePrefix = ctrlEndpoint.getServiceContainer().getName() + (baos ? " baos" : "") + " " + name + " ";
-		final String name = namePrefix + "service";
+		final String namePrefix = ctrlEndpoint.getServiceContainer().getName() + (baos ? " baos" : "") + " ";
+		final String name = namePrefix + this.name + " service";
 		Thread.currentThread().setName(name);
 
 		try (var server = open()) {
@@ -102,10 +102,10 @@ sealed abstract class StreamEndpoint implements Runnable, AutoCloseable
 			if (endpoint instanceof TcpEndpointAddress) {
 				final var isa = (InetSocketAddress) server.getLocalAddress();
 				final var netif = NetworkInterface.getByInetAddress(isa.getAddress());
-				ctrlEndpoint.logger.log(INFO, "{0} ({1} {2}) is up and running", name, netif.getName(), endpoint);
+				ctrlEndpoint.logger.log(INFO, "{0} {1}/{2} is up and running", name, netif.getName(), endpoint);
 			}
 			else
-				ctrlEndpoint.logger.log(INFO, "{0} ({1}) is up and running", name, endpoint);
+				ctrlEndpoint.logger.log(INFO, "{0} {1} is up and running", name, endpoint);
 
 			while (true) {
 				final var channel = server.accept();

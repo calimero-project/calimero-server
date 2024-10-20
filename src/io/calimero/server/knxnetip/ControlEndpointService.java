@@ -275,12 +275,12 @@ final class ControlEndpointService extends ServiceLooper
 			try {
 				final NetworkInterface netif = NetworkInterface.getByInetAddress(local.getAddress());
 				if (netif != null)
-					bound = netif.getName() + " ";
+					bound = netif.getName() + "/";
 			}
 			catch (final SocketException ignore) {}
 			bound += hostPort(local);
 		}
-		return svcCont.getName() + " control endpoint (" + bound + ")";
+		return svcCont.getName() + " control endpoint " + bound;
 	}
 
 	@Override

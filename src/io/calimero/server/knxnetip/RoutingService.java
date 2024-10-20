@@ -91,7 +91,9 @@ final class RoutingService extends ServiceLooper
 		@Override
 		public String name()
 		{
-			return "KNX IP routing service (" + networkInterface().getName() + " " + ctrlEndpt.getAddress().getHostAddress() + ")";
+			String netifName = networkInterface().getName();
+			netifName = netifName.equals("0.0.0.0") ? "" : netifName + "/";
+			return "KNX IP routing service " + netifName + ctrlEndpt.getAddress().getHostAddress();
 		}
 
 		@Override
