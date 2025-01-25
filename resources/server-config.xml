@@ -3,7 +3,8 @@
 <knxServer name="knx-server" friendlyName="Calimero KNX IP Server">
 	<!-- KNXnet/IP search & discovery -->
 	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
-
+	<!-- Traces all client/subnet messages processed by this server -->
+	<!-- <trace format="json">~/knxserver.trace</trace> -->
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
 	<serviceContainer activate="true" routing="true" networkMonitoring="true"
 		udpPort="3671" listenNetIf="any">

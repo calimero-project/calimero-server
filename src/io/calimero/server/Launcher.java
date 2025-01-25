@@ -48,6 +48,8 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.System.Logger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -119,6 +121,8 @@ import io.calimero.server.ServerConfiguration.Container;
 import io.calimero.server.gateway.KnxServerGateway;
 import io.calimero.server.gateway.SubnetConnector;
 import io.calimero.server.gateway.SubnetConnector.InterfaceType;
+import io.calimero.server.gateway.trace.CemiFrameTracer;
+import io.calimero.server.gateway.trace.CemiFrameTracer.Format;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
@@ -195,6 +199,19 @@ public class Launcher implements Runnable, AutoCloseable
 							discovery = attr(r, XmlConfiguration.attrActivate).map(Boolean::parseBoolean).orElse(true);
 							listen = attr(r, XmlConfiguration.attrListenNetIf).orElse("");
 							outgoing = attr(r, "outgoingNetIf").orElse("");
+						}
+						case "trace" -> {
+							final var format = CemiFrameTracer.Format.from(attr(r, "format").orElse("json"));
+							final String sink = r.getElementText();
+							try {
+								final var writer = format == Format.Noop ? Writer.nullWriter()
+										: sink.isEmpty() ? new OutputStreamWriter(System.out)
+												: Files.newBufferedWriter(Path.of(expandHome.apply(sink)).toAbsolutePath());
+								CemiFrameTracer.configure(format, writer);
+							}
+							catch (final IOException e) {
+								throw new KNXMLException("opening trace destination", e);
+							}
 						}
 						case XmlConfiguration.svcCont -> readServiceContainer(r);
 					}
