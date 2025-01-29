@@ -18,7 +18,7 @@ repositories {
 	maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
 }
 
-val junitJupiterVersion = "5.11.3"
+val junitJupiterVersion = "5.11.4"
 
 group = "io.calimero"
 version = "3.0-SNAPSHOT"
