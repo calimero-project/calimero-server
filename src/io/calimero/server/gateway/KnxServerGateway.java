@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1202,6 +1202,7 @@ public class KnxServerGateway implements Runnable
 				|| mc == CEMIDevMgmt.MC_RESET_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ
 				|| mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
 			logger.log(TRACE, "{0} {1}: {2}", s, fe.getSource(), frame);
+			CemiFrameTracer.instance().trace(frame, fe.getSource().toString(), null, FramePath.ClientToLocal);
 
 			final var securityControl = fe.security().orElse(SecurityControl.Plain);
 			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame, securityControl);
@@ -1922,6 +1923,7 @@ public class KnxServerGateway implements Runnable
 							f.getStartIndex(), elems);
 			try {
 				c.send(dm, WaitForAck);
+				CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
 			}
 			catch (final KNXException e) {
 				logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
@@ -1988,6 +1990,7 @@ public class KnxServerGateway implements Runnable
 			}
 			try {
 				c.send(dm, WaitForAck);
+				CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
 			}
 			catch (final KNXException e) {
 				logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
