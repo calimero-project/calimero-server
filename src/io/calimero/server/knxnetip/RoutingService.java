@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -93,7 +93,7 @@ final class RoutingService extends ServiceLooper
 		{
 			String netifName = networkInterface().getName();
 			netifName = netifName.equals("0.0.0.0") ? "" : netifName + "/";
-			return "KNX IP routing service " + netifName + ctrlEndpt.getAddress().getHostAddress();
+			return "KNX IP Routing " + netifName + ctrlEndpt.getAddress().getHostAddress();
 		}
 
 		@Override
