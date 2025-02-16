@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -77,6 +77,7 @@ import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -943,24 +944,42 @@ final class ControlEndpointService extends ServiceLooper
 		final DataEndpoint newDataEndpoint;
 		LooperTask looperTask = null;
 
-		if (svcCont.reuseControlEndpoint()) {
+		if (svcCont.reuseControlEndpoint()) { // reusing the control endpoint only makes sense for UDP
 			svcLoop = this;
 			newDataEndpoint = new DataEndpoint(this, s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
 					useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
 			try {
-				svcLoop = new DataEndpointService(server, s, svcCont.getName());
+				final boolean stream = tcpEndpoint.connections.containsKey(dataEndpt)
+						|| udsEndpoint.connections.containsKey(dataEndpt)
+						|| baosEndpoint.connections.containsKey(dataEndpt)
+						|| udsBaosEndpoint.connections.containsKey(dataEndpt);
 
-				final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-				newDataEndpoint = new DataEndpoint(this, s, svcLoop.getSocket(), ctrlEndpt, dataEndpt, channelId, device,
-						cType, useNat, sessions, sessionId, bc.andThen(this::connectionClosed),
-						((DataEndpointService) svcLoop)::resetRequest);
-				((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
+				BiConsumer<DataEndpoint, IndividualAddress> bc;
+				final DatagramSocket socket;
+				Consumer<DataEndpoint> resetRequest;
+				if (stream) {
+					svcLoop = null;
+					socket = null;
+					bc = (__, ___) -> {};
+					resetRequest = (__) -> {};
+				}
+				else {
+					svcLoop = new DataEndpointService(server, s, svcCont.getName());
+					socket = svcLoop.getSocket();
+					bc = (h, a) -> svcLoop.quit();
+					resetRequest = ((DataEndpointService) svcLoop)::resetRequest;
+				}
 
-				looperTask = new LooperTask(server,
-						svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0,
-						() -> svcLoop);
+				newDataEndpoint = new DataEndpoint(this, s, socket, ctrlEndpt, dataEndpt, channelId, device,
+						cType, useNat, sessions, sessionId, bc.andThen(this::connectionClosed), resetRequest);
+				if (svcLoop != null)
+					((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
+
+				if (!stream)
+					looperTask = new LooperTask(server,
+							svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
@@ -971,15 +990,17 @@ final class ControlEndpointService extends ServiceLooper
 		if (!acceptConnection(svcCont, newDataEndpoint, device, cType)) {
 			// don't use sh.close() here, we would initiate tunneling disconnect sequence
 			// but we have to call svcLoop.quit() to close local data socket
-			svcLoop.quit();
+			if (svcLoop != null)
+				svcLoop.quit();
 			freeDeviceAddress(device);
 			return errorResponse(ErrorCodes.KNX_CONNECTION, endpoint);
 		}
 		connections.put(channelId, newDataEndpoint);
-		if (looperTask != null)
+		if (looperTask != null) {
 			LooperTask.execute(looperTask);
-		if (!svcCont.reuseControlEndpoint())
-			looperTasks.add(looperTask);
+			if (!svcCont.reuseControlEndpoint())
+				looperTasks.add(looperTask);
+		}
 
 		// for udp, always create our own HPAI from the socket, since the service container
 		// might have opted for ephemeral port use
