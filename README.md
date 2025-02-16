@@ -46,13 +46,13 @@ Note that for KNX IP Secure a keyfile or an ETS keyring (*.knxkeys) is required,
 How-to & Examples
 -----------------
 
-Note, running gradle build (e.g., `./gradlew build`) will create _build/distributions/calimero-server-*.tar/.zip_, which contains a directly executable script and all required dependencies.
+Note, running gradle build (e.g., `./gradlew build`) will also create _build/distributions/calimero-server-*.tar/.zip_, which contains a directly executable script and all required dependencies.
 
 ### Start Server
 
 *Before trying the examples below with a configuration, make sure the configuration is appropriate for your KNX setup!*
 
-On the terminal, a running server instance can be stopped by typing "stop".
+On the terminal, a running server instance can be stopped by `Ctrl+C` or typing "stop".
 
 #### Using Gradle
 
