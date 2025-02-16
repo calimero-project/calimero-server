@@ -383,7 +383,7 @@ public class Launcher implements Runnable, AutoCloseable
 								disruptionBufferLowerPort, disruptionBufferUpperPort);
 
 						final var connector = switch (interfaceType) {
-							case Knxip   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
+							case Knxip    -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
 									subnetLatencyTolerance);
 							case Udp      -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
 									msgFormat, overrideSrcAddress, subnetArgs);
@@ -391,7 +391,7 @@ public class Launcher implements Runnable, AutoCloseable
 							case Tpuart  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
 							case Emulate -> datapoints != null ? SubnetConnector.newCustom(sc, InterfaceType.Emulate, datapoints)
 									: SubnetConnector.newCustom(sc, InterfaceType.Emulate);
-							case User -> SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
+							case User    -> SubnetConnector.newWithUserLink(sc, subnetLinkClass, overrideSrcAddress, subnetArgs);
 							case Usb, Ft12, Virtual -> SubnetConnector.newWithInterfaceType(sc, interfaceType, msgFormat,
 									overrideSrcAddress, subnetArgs);
 							case Unknown -> throw new KNXMLException("no subnet interface type specified");
