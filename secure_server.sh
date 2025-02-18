@@ -14,7 +14,7 @@ keyfile_enc="keyfile.enc"
 keyfile_dec="/dev/shm/calimero-server-keyfile"
 
 server_config_path="resources/server-config.xml"
-run_server="./build/distributions/calimero-server-2.6-rc1/bin/calimero-server"
+run_server="./build/distributions/calimero-server-2.6-rc2/bin/calimero-server"
 
 # openssl option is not recognized on some platforms
 sslOptionPbkdf2="-pbkdf2"
@@ -25,19 +25,19 @@ if [ "$1" = "-?" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ];then
 	echo Usage $0 "[-e keyfile]"
 	echo "      -e    encrypt a cleartext keyfile"
 	echo "Note: default settings assume you ran './gradlew build' and"
-	echo "      extracted './build/distributions/calimero-server-2.6-rc1.[tar|zip]'"
+	echo "      extracted './build/distributions/calimero-server-2.6-rc2.[tar|zip]'"
 	exit 0
 fi
 
 if [ "$1" = "-e" ]; then
 	cleartext="$2"
-	
+
 	openssl aes-256-cbc $sslOptionPbkdf2 -in $cleartext -out $keyfile_enc
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		exit 1
 	fi
-	
+
 	read -p "Done. Remove '$cleartext' [y/N]: " remove
 	if [ "$remove" = "y" ] || [ "$remove" = "yes" ]; then
 		shred --remove $cleartext
