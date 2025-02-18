@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1251,27 +1251,13 @@ final class ControlEndpointService extends ServiceLooper
 
 	boolean setupBaosTcpEndpoint(final InetSocketAddress remote) {
 		try {
-			final var svcLoop = new DataEndpointService(server, s, svcCont.getName());
+			final var newDataEndpoint = new DataEndpoint(s, null, remote, remote, 0, device,
+					ConnectionType.Baos, false, sessions, 0, this::connectionClosed, __ -> {});
 
-			final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-			final var newDataEndpoint = new DataEndpoint(s, svcLoop.getSocket(), remote, remote, 0, device,
-					ConnectionType.Baos, false, sessions, 0, bc.andThen(this::connectionClosed), __ -> {});
-			svcLoop.svcHandler = newDataEndpoint;
-
-			final var looperTask = new LooperTask(server,
-					svcCont.getName() + " data endpoint " + hostPort(newDataEndpoint.getRemoteAddress()), 0,
-					() -> svcLoop);
-
-			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos)) {
-				// don't use sh.close() here, we would initiate tunneling disconnect sequence
-				// but we have to call svcLoop.quit() to close local data socket
-				svcLoop.quit();
+			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos))
 				return false;
-			}
 
 			connections.put(0, newDataEndpoint);
-			LooperTask.execute(looperTask);
-			looperTasks.add(looperTask);
 			connectionEstablished(svcCont, newDataEndpoint);
 			return true;
 		}
