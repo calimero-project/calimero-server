@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2018, 2024 B. Malinowsky
+    Copyright (c) 2018, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -156,6 +156,8 @@ final class TcpLooper implements Runnable, AutoCloseable {
 		if (looper != null && !looper.ctrlEndpoint.sessions.anyMatch(remote))
 			looper.close("last active client connection timed out");
 	}
+
+	boolean baos() { return baos; }
 
 	private boolean inactive() {
 		final InetSocketAddress remote = (InetSocketAddress) socket.getRemoteSocketAddress();

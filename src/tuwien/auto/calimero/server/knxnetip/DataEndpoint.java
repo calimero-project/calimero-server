@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -193,7 +193,10 @@ public final class DataEndpoint extends ConnectionBase
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
 		checkFrameType(frame);
-		if (TcpLooper.connections.containsKey(dataEndpt)) {
+		final var looper = TcpLooper.connections.get(dataEndpt);
+		if (looper != null) {
+			if (looper.baos())
+				return;
 			super.send(frame, BlockingMode.NonBlocking);
 			setStateNotify(OK);
 		}
