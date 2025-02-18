@@ -1279,26 +1279,13 @@ final class ControlEndpointService extends ServiceLooper
 
 	boolean setupBaosStreamEndpoint(final EndpointAddress remote) {
 		try {
-			final var svcLoop = new DataEndpointService(server, s, svcCont.getName());
+			final var newDataEndpoint = new DataEndpoint(this, s, null, remote, remote, 0, device,
+					ConnectionType.Baos, false, sessions, 0, this::connectionClosed, __ -> {});
 
-			final BiConsumer<DataEndpoint, IndividualAddress> bc = (h, a) -> svcLoop.quit();
-			final var newDataEndpoint = new DataEndpoint(this, s, svcLoop.getSocket(), remote, remote, 0, device,
-					ConnectionType.Baos, false, sessions, 0, bc.andThen(this::connectionClosed), __ -> {});
-			svcLoop.svcHandler = newDataEndpoint;
-
-			final var looperTask = new LooperTask(server,
-					svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0, () -> svcLoop);
-
-			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos)) {
-				// don't use sh.close() here, we would initiate tunneling disconnect sequence
-				// but we have to call svcLoop.quit() to close local data socket
-				svcLoop.quit();
+			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos))
 				return false;
-			}
 
 			connections.put(0, newDataEndpoint);
-			LooperTask.execute(looperTask);
-			looperTasks.add(looperTask);
 			connectionEstablished(svcCont, newDataEndpoint);
 			return true;
 		}
