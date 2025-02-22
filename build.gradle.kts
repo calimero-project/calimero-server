@@ -12,13 +12,13 @@ plugins {
 }
 
 repositories {
-	mavenLocal()
 	mavenCentral()
+	mavenLocal()
 	maven("https://oss.sonatype.org/content/repositories/snapshots")
 	maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
 }
 
-val junitJupiterVersion = "5.11.4"
+val junitJupiterVersion by rootProject.extra { "5.12.0" }
 
 group = "com.github.calimero"
 version = "2.6-rc2"
@@ -89,8 +89,12 @@ tasks.withType<Javadoc>().configureEach {
 	(options as CoreJavadocOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
 
-tasks.named<Test>("test") {
-	useJUnitPlatform()
+testing {
+	suites {
+		val test by getting(JvmTestSuite::class) {
+			useJUnitJupiter("${rootProject.extra.get("junitJupiterVersion")}")
+		}
+	}
 }
 
 dependencies {
@@ -105,8 +109,6 @@ dependencies {
 	add("usbRuntimeOnly", "io.calimero:calimero-usb:$version")
 	runtimeOnly(sourceSets["serial"].runtimeClasspath)
 	runtimeOnly(sourceSets["usb"].runtimeClasspath)
-
-	testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
 }
 
 tasks.named<Jar>("jar") {
