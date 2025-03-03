@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -216,6 +216,9 @@ public final class DataEndpoint extends ConnectionBase
 	public void send(final CEMI frame, final BlockingMode mode)
 		throws KNXTimeoutException, KNXConnectionClosedException, InterruptedException
 	{
+		// don't send cEMI frame to a BAOS client
+		if (ctype == ConnectionType.Baos)
+			return;
 		checkFrameType(frame);
 		final var remote = remoteAddress();
 		// always send non-blocking over tcp and unix sockets
