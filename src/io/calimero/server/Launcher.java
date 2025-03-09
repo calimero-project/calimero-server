@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -408,9 +408,9 @@ public class Launcher implements Runnable, AutoCloseable
 							sc.unixSocketPath(unixSocketPath);
 
 						final var connector = switch (interfaceType) {
-							case Knxip    -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
+							case Knxip   -> SubnetConnector.newWithRoutingLink(sc, subnetKnxipNetif, subnetArgs,
 									subnetLatencyTolerance);
-							case Udp      -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
+							case Udp     -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
 									msgFormat, overrideSrcAddress, subnetArgs);
 							case Tcp     -> SubnetConnector.withTcp(sc, subnetArgs, tunnelingAddress, user, host);
 							case Tpuart  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);

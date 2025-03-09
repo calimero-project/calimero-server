@@ -329,8 +329,7 @@ final class ControlEndpointService extends ServiceLooper
 			// If we're shutting down, we're not here anymore. This avoids our connections list being repopulated
 			// with newly established connections which won't last and just get closed again.
 			if (inShutdown) {
-				logger.log(TRACE, "{0} is being shut down, ignore connect request from {1}",
-						svcCont.getName(), src);
+				logger.log(TRACE, "{0} is being shut down, ignore connect request from {1}", svcCont.getName(), src);
 				return true;
 			}
 

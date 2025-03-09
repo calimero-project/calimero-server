@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -60,6 +60,10 @@ import io.calimero.knxnetip.util.HPAI;
 
 abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 {
+	private static final Set<Integer> ignoreServices = Set.of(
+			KNXnetIPHeader.SEARCH_RES,
+			KNXnetIPHeader.SearchResponse);
+
 	final KNXnetIPServer server;
 	final Logger logger;
 	boolean useNat;
@@ -116,10 +120,6 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 			logger.log(WARNING, "received invalid frame", e);
 		}
 	}
-
-	private static final Set<Integer> ignoreServices = Set.of(
-			KNXnetIPHeader.SEARCH_RES,
-			KNXnetIPHeader.SearchResponse);
 
 	@Override
 	protected void onTimeout()
