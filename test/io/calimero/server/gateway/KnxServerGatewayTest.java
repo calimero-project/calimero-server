@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -270,8 +270,7 @@ class KnxServerGatewayTest
 		public void send(final CEMILData msg, final boolean waitForCon) {}
 
 		@Override
-		public void sendRequest(final KNXAddress dst, final Priority p, final byte[] nsdu)
-		{
+		public void sendRequest(final KNXAddress dst, final Priority p, final byte... nsdu) {
 			try {
 				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), false);
 			}
@@ -281,8 +280,7 @@ class KnxServerGatewayTest
 		}
 
 		@Override
-		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte[] nsdu)
-		{
+		public void sendRequestWait(final KNXAddress dst, final Priority p, final byte... nsdu) {
 			try {
 				send(new CEMILData(CEMILData.MC_LDATA_REQ, new IndividualAddress("0.0.0"), dst, nsdu, p), true);
 			}
