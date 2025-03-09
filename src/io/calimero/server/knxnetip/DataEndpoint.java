@@ -36,7 +36,7 @@
 
 package io.calimero.server.knxnetip;
 
-import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
+import static io.calimero.server.knxnetip.UdpServiceLooper.hostPort;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;

@@ -126,7 +126,7 @@ import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import io.calimero.server.knxnetip.SecureSessions.Session;
 
-final class ControlEndpointService extends ServiceLooper
+final class ControlEndpointService extends UdpServiceLooper
 {
 	// Connect response error codes
 	private static final int NoMoreUniqueConnections = 0x25;
@@ -939,7 +939,7 @@ final class ControlEndpointService extends ServiceLooper
 		else
 			return errorResponse(ErrorCodes.CONNECTION_TYPE, endpoint);
 
-		final ServiceLooper svcLoop;
+		final UdpServiceLooper svcLoop;
 		final DataEndpoint newDataEndpoint;
 		LooperTask looperTask = null;
 

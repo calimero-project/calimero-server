@@ -67,7 +67,7 @@ import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import io.calimero.log.LogService;
 import io.calimero.mgmt.PropertyAccess.PID;
 
-final class RoutingService extends ServiceLooper
+final class RoutingService extends UdpServiceLooper
 {
 	private boolean closing;
 

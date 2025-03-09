@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ import io.calimero.CloseEvent;
 import io.calimero.KNXFormatException;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
-final class DataEndpointService extends ServiceLooper
+final class DataEndpointService extends UdpServiceLooper
 {
 	// KNX receive timeout in seconds
 	private static final int MAX_RECEIVE_INTERVAL = 120;

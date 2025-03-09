@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2024, 2024 B. Malinowsky
+    Copyright (c) 2024, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 
 package io.calimero.server.knxnetip;
 
-import static io.calimero.server.knxnetip.ServiceLooper.hostPort;
+import static io.calimero.server.knxnetip.UdpServiceLooper.hostPort;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;

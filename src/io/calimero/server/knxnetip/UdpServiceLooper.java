@@ -58,7 +58,7 @@ import io.calimero.knxnetip.servicetype.ErrorCodes;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.util.HPAI;
 
-abstract class ServiceLooper extends UdpSocketLooper implements Runnable
+abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 {
 	private static final Set<Integer> ignoreServices = Set.of(
 			KNXnetIPHeader.SEARCH_RES,
@@ -68,7 +68,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 	final Logger logger;
 	boolean useNat;
 
-	ServiceLooper(final KNXnetIPServer server, final DatagramSocket socket, final int receiveBufferSize,
+	UdpServiceLooper(final KNXnetIPServer server, final DatagramSocket socket, final int receiveBufferSize,
 		final int socketTimeout)
 	{
 		super(socket, true, receiveBufferSize, socketTimeout, 0);
@@ -76,7 +76,7 @@ abstract class ServiceLooper extends UdpSocketLooper implements Runnable
 		this.logger = server.logger;
 	}
 
-	ServiceLooper(final KNXnetIPServer server, final DatagramSocket socket, final boolean closeSocket,
+	UdpServiceLooper(final KNXnetIPServer server, final DatagramSocket socket, final boolean closeSocket,
 		final int receiveBufferSize, final int socketTimeout)
 	{
 		super(socket, closeSocket, receiveBufferSize, socketTimeout, 0);

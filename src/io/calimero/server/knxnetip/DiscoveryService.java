@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -72,7 +72,7 @@ import io.calimero.knxnetip.util.Srp;
 import io.calimero.knxnetip.util.Srp.Type;
 import io.calimero.server.knxnetip.KNXnetIPServer.Endpoint;
 
-final class DiscoveryService extends ServiceLooper
+final class DiscoveryService extends UdpServiceLooper
 {
 	private static final InetAddress systemSetupMulticast = KNXnetIPRouting.DefaultMulticast;
 

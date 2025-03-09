@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -66,15 +66,15 @@ class LooperTask implements Runnable {
 	private final Logger logger;
 	private final String serviceName;
 	private final int maxRetries;
-	private final Supplier<ServiceLooper> supplier;
-	private volatile ServiceLooper looper;
+	private final Supplier<UdpServiceLooper> supplier;
+	private volatile UdpServiceLooper looper;
 	private int attempt;
 
 	private volatile Future<?> scheduledFuture;
 
 	// maxRetries: -1: always retry, 0 none, 1: at most one retry, ...
 	LooperTask(final KNXnetIPServer server, final String serviceName,
-		final int retryAttempts, final Supplier<ServiceLooper> serviceSupplier)
+		final int retryAttempts, final Supplier<UdpServiceLooper> serviceSupplier)
 	{
 		logger = server.logger;
 		this.serviceName = serviceName;
@@ -114,13 +114,13 @@ class LooperTask implements Runnable {
 		return serviceName;
 	}
 
-	Optional<ServiceLooper> looper() {
+	Optional<UdpServiceLooper> looper() {
 		return Optional.ofNullable(looper);
 	}
 
 	void quit() {
 		// only call cleanup if there is no looper, otherwise cleanup is called in run()
-		looper().ifPresentOrElse(ServiceLooper::quit, () -> cleanup(INFO, null));
+		looper().ifPresentOrElse(UdpServiceLooper::quit, () -> cleanup(INFO, null));
 		final var future = scheduledFuture;
 		if (future != null)
 			future.cancel(true);

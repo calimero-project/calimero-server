@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -393,7 +393,7 @@ public class KNXnetIPServer
 		// add new KNXnet/IP parameter object for this service container
 		final var knxipParameters = (KnxipParameterObject) findOrAddInterfaceObject(endpoints.size() + 1, knxObject);
 
-		final Supplier<ServiceLooper> builder = () -> new ControlEndpointService(this, sc);
+		final Supplier<UdpServiceLooper> builder = () -> new ControlEndpointService(this, sc);
 		final var controlEndpoint = new LooperTask(this, serverName + " control endpoint " + sc.getName(), -1, builder);
 
 		final var endpoint = new Endpoint(sc, knxipParameters, controlEndpoint);
@@ -991,7 +991,7 @@ public class KNXnetIPServer
 			if (!runDiscovery)
 				return;
 		}
-		final Supplier<ServiceLooper> builder = () -> new DiscoveryService(this, outgoing, listen);
+		final Supplier<UdpServiceLooper> builder = () -> new DiscoveryService(this, outgoing, listen);
 		discovery = new LooperTask(this, serverName + " discovery endpoint", retryAttempts, builder);
 		LooperTask.scheduleWithRetry(discovery);
 	}
