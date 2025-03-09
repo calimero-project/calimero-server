@@ -14,6 +14,9 @@
 			depends on max. end-to-end network latency (usually [500 .. 8000] ms) -->
 		<!-- <routing latencyTolerance="1000">224.0.23.12</routing> -->
 
+		<!-- Accept client connections over Unix domain sockets -->
+		<!-- <unixSocket>/tmp/calimero/.socket</unixSocket> -->
+
 		<!-- Enabling the disruption buffer will replay missed frames after reconnecting a KNXnet/IP client link
 			using the specific client UDP port range (if caused by a disrupted connection). -->
 		<!-- <disruptionBuffer expirationTimeout="30" udpPort="5555-5559" /> -->
