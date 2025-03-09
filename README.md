@@ -16,7 +16,8 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 The Calimero KNXnet/IP server requires `calimero-core` and `calimero-device`.
 _Optional_ dependencies, required for serial communication:
 
-* TP-UART / FT1.2: `serial-native` (with its JNI libraries), or `calimero-rxtx` for using any RXTX descendant/compatible library on your platform. 
+* TP-UART / FT1.2: `serial-native` (with its JNI libraries), or `calimero-rxtx` for using any RXTX descendant/compatible library on your platform.
+  If you run Java 22, you can also use `calimero-serial-ffm` to leverage the Foreign Function & Memory API.
 * KNX USB or KNX RF USB: `calimero-usb` (and its transitive closure).
 
 ### Docker image
