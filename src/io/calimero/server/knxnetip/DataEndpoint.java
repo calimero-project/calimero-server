@@ -128,7 +128,7 @@ public final class DataEndpoint extends ConnectionBase
 	private final SecureSessions sessions;
 	private final int sessionId;
 
-	private final boolean tcp;
+	private final boolean stream;
 
 	private final Instant connectedSince;
 
@@ -200,7 +200,7 @@ public final class DataEndpoint extends ConnectionBase
 
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
 
-		tcp = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
+		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
 				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
 
 		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
@@ -269,8 +269,8 @@ public final class DataEndpoint extends ConnectionBase
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
 		try {
-			final int chid = tcp ? 0 : channelId;
-			final int seq = tcp ? 0 : getSeqSend();
+			final int chid = stream ? 0 : channelId;
+			final int seq = stream ? 0 : getSeqSend();
 			final var buf = PacketHelper.toPacket(new ServiceRequest<>(serviceRequest, chid, seq, svc));
 
 			// NYI udp: we need a send method like for cEMI
@@ -293,7 +293,7 @@ public final class DataEndpoint extends ConnectionBase
 	@Override
 	public String toString()
 	{
-		final String nat = (useNat && !tcp) ? "NAT, " : "";
+		final String nat = (useNat && !stream) ? "NAT, " : "";
 		final var deviceAddress = device != null ? ", " + device : "";
 		return "%s (%schannel %d%s)".formatted(name(), nat, getChannelId(), deviceAddress);
 	}
@@ -365,6 +365,7 @@ public final class DataEndpoint extends ConnectionBase
 		final boolean configReq = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_REQ;
 		final boolean configAck = svc == KNXnetIPHeader.DEVICE_CONFIGURATION_ACK;
 
+		// XXX workaround is only relevant for UDP, so check socket != null
 		if (tunnel && (configReq || configAck)) {
 			final int recvChannelId = configReq ? ServiceRequest.from(h, data, offset).getChannelID()
 					: new ServiceAck(svc, data, offset).getChannelID();
@@ -393,7 +394,7 @@ public final class DataEndpoint extends ConnectionBase
 
 			final int seq = req.getSequenceNumber();
 			final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (tcp)
+			if (stream)
 				; // no-op
 			else if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
@@ -409,7 +410,7 @@ public final class DataEndpoint extends ConnectionBase
 				return true;
 			}
 
-			if (tcp || seq == getSeqRcv()) {
+			if (stream || seq == getSeqRcv()) {
 				incSeqRcv();
 				updateLastMsgTimestamp();
 
