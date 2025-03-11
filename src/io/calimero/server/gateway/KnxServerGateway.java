@@ -1600,7 +1600,7 @@ public class KnxServerGateway implements Runnable
 	}
 
 	private void dispatchLdataToClients(final SubnetConnector subnet, final CEMILData f, final long eventId,
-			final FrameEvent recordFrameEvent, final FramePath path) throws InterruptedException {
+			final FrameEvent recordFrameEvent, final FramePath path) {
 		logger.log(DEBUG, "dispatch {0}->{1} to all server-side connections", f.getSource(), f.getDestination());
 		final ServiceContainer sc = subnet.getServiceContainer();
 		for (final var conn : serverConnections) {

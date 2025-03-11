@@ -291,7 +291,7 @@ public class KNXnetIPServer
 							setSbcRoutingMode(objectIndex, info);
 							if (info == 1)
 								disableSbcFuture = Executor.scheduledExecutor()
-										.schedule(() -> sbcRoutingModeTimeout(objectIndex, (byte) 0), 20, TimeUnit.SECONDS);
+										.schedule(() -> sbcRoutingModeTimeout(objectIndex, 0), 20, TimeUnit.SECONDS);
 						}
 						else
 							returnCode = ReturnCode.DataVoid;
