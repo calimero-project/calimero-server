@@ -100,43 +100,6 @@ import io.calimero.server.knxnetip.SecureSessions.Session;
  */
 public final class DataEndpoint extends ConnectionBase
 {
-	// sender SHALL wait 1 second for the acknowledgment response
-	// to a tunneling request
-	private static final int TUNNELING_REQ_TIMEOUT = 1;
-	// sender SHALL wait 10 seconds for the acknowledgment response
-	// to a device configuration request
-	private static final int CONFIGURATION_REQ_TIMEOUT = 10;
-
-	private final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed;
-	private final Consumer<DataEndpoint> resetRequest;
-
-	private final ControlEndpointService ces;
-	private volatile IndividualAddress device;
-	private final ConnectionType ctype;
-
-	private final EndpointAddress remoteCtrlEndpt;
-	private final EndpointAddress remoteDataEndpt;
-
-	private volatile boolean shutdown;
-
-	// updated on every correctly received message
-	private long lastMsgTimestamp;
-
-	private final SecureSessions sessions;
-	private final int sessionId;
-
-	private final boolean stream;
-
-	private final Instant connectedSince;
-
-	// if enabled by client, notify client about changes of connection status and tunneling address
-	private boolean featureInfoServiceEnabled;
-	private boolean tunnelingAddressChanged;
-
-	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
-	// even if indicated otherwise in the HPAI or required by the spec
-	private volatile InetSocketAddress useDifferingEtsSrcPortForResponse;
-
 	public enum ConnectionType {
 		LinkLayer(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
 		Monitor(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
@@ -156,6 +119,40 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	}
 
+
+	// sender SHALL wait 1 second for the acknowledgment response to a tunneling request
+	private static final int TUNNELING_REQ_TIMEOUT = 1;
+	// sender SHALL wait 10 seconds for the acknowledgment response to a device configuration request
+	private static final int CONFIGURATION_REQ_TIMEOUT = 10;
+
+	private final ControlEndpointService ces;
+	private final ConnectionType ctype;
+	private final EndpointAddress remoteCtrlEndpt;
+	private final EndpointAddress remoteDataEndpt;
+	private final boolean stream;
+	private final Instant connectedSince;
+
+	private final SecureSessions sessions;
+	private final int sessionId;
+
+	private final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed;
+	private final Consumer<DataEndpoint> resetRequest;
+
+	private volatile IndividualAddress device;
+	private volatile boolean shutdown;
+
+	// updated on every correctly received message
+	private long lastMsgTimestamp;
+
+	// if enabled by client, notify client about changes of connection status and tunneling address
+	private boolean featureInfoServiceEnabled;
+	private boolean tunnelingAddressChanged;
+
+	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
+	// even if indicated otherwise in the HPAI or required by the spec
+	private volatile InetSocketAddress useDifferingEtsSrcPortForResponse;
+
+
 	DataEndpoint(final ControlEndpointService ces, final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
@@ -165,13 +162,20 @@ public final class DataEndpoint extends ConnectionBase
 	{
 		super(type.req, type.ack, type.maxSendAttempts, type.timeout);
 		this.ces = ces;
-		this.device = assigned;
 		this.ctype = type;
 		this.remoteCtrlEndpt = remoteCtrlEndpt;
 		this.remoteDataEndpt = remoteDataEndpt;
+		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
+				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
+		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		this.device = assigned;
+		this.sessions = sessions;
+		this.sessionId = sessionId;
+		this.connectionClosed = connectionClosed;
+		this.resetRequest = resetRequest;
 
 		this.channelId = channelId;
-
+		useNat = useNAT;
 		ctrlSocket = localCtrlEndpt;
 		socket = localDataEndpt;
 
@@ -189,22 +193,9 @@ public final class DataEndpoint extends ConnectionBase
 		else
 			dataEndpt = null;
 
-		useNat = useNAT;
-		this.sessions = sessions;
-		this.sessionId = sessionId;
-		this.connectionClosed = connectionClosed;
-		this.resetRequest = resetRequest;
-
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
-
-		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
-				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
-
-		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-
 		if (sessionId > 0)
 			sessions.addConnection(sessionId, remoteCtrlEndpt);
-
 		updateLastMsgTimestamp();
 		setState(OK);
 	}
