@@ -114,7 +114,7 @@ public final class DataEndpoint extends ConnectionBase
 	private final Consumer<DataEndpoint> resetRequest;
 
 	private final ControlEndpointService ces;
-	private final IndividualAddress device;
+	private volatile IndividualAddress device;
 	private final ConnectionType ctype;
 
 	private final EndpointAddress remoteCtrlEndpt;
@@ -556,12 +556,15 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private boolean updateTunnelingAddress(final byte[] value) {
-		final IndividualAddress ia = new IndividualAddress(value);
-		if (!device.equals(ia)) {
-			if (serverAddress().equals(ia) || additionalAddresses().contains(ia))
-				return false;
-			// NYI update tunneling address
-		}
+		final var update = new IndividualAddress(value);
+		if (update.equals(device))
+			return true;
+		if (update.equals(ces.serverAddress()) || ces.additionalAddresses().contains(update))
+			return false;
+		if (!ces.checkAndSetDeviceAddress(update, false))
+			return false;
+		ces.freeDeviceAddress(update);
+		device = update;
 		tunnelingAddressChanged = true;
 		return true;
 	}

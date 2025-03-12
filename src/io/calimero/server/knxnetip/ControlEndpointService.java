@@ -791,7 +791,7 @@ final class ControlEndpointService extends UdpServiceLooper
 		return server.objectInstance(svcCont);
 	}
 
-	private IndividualAddress serverAddress()
+	IndividualAddress serverAddress()
 	{
 		try {
 			return new IndividualAddress(knxipObject.get(PID.KNX_INDIVIDUAL_ADDRESS));
@@ -1183,7 +1183,7 @@ final class ControlEndpointService extends UdpServiceLooper
 		return false;
 	}
 
-	private boolean checkAndSetDeviceAddress(final IndividualAddress device, final boolean isServerAddress)
+	boolean checkAndSetDeviceAddress(final IndividualAddress device, final boolean isServerAddress)
 	{
 		if (!matchesSubnet(device, serverAddress()))
 			return false;
@@ -1201,7 +1201,7 @@ final class ControlEndpointService extends UdpServiceLooper
 		}
 	}
 
-	private void freeDeviceAddress(final IndividualAddress device)
+	void freeDeviceAddress(final IndividualAddress device)
 	{
 		synchronized (usedKnxAddresses) {
 			usedKnxAddresses.remove(device);
