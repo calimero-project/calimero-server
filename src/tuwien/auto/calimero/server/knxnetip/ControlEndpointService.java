@@ -765,7 +765,7 @@ final class ControlEndpointService extends ServiceLooper
 		return server.objectInstance(svcCont);
 	}
 
-	private IndividualAddress serverAddress()
+	IndividualAddress serverAddress()
 	{
 		try {
 			return new IndividualAddress(knxipObject.get(PID.KNX_INDIVIDUAL_ADDRESS));
@@ -920,7 +920,7 @@ final class ControlEndpointService extends ServiceLooper
 
 		if (svcCont.reuseControlEndpoint()) { // reusing the control endpoint only makes sense for UDP
 			svcLoop = this;
-			newDataEndpoint = new DataEndpoint(s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
+			newDataEndpoint = new DataEndpoint(this, s, getSocket(), ctrlEndpt, dataEndpt, channelId, device, cType,
 					useNat, sessions, sessionId, this::connectionClosed, this::resetRequest);
 		}
 		else {
@@ -943,7 +943,7 @@ final class ControlEndpointService extends ServiceLooper
 					resetRequest = ((DataEndpointService) svcLoop)::resetRequest;
 				}
 
-				newDataEndpoint = new DataEndpoint(s, socket, ctrlEndpt, dataEndpt, channelId, device,
+				newDataEndpoint = new DataEndpoint(this, s, socket, ctrlEndpt, dataEndpt, channelId, device,
 						cType, useNat, sessions, sessionId, bc.andThen(this::connectionClosed), resetRequest);
 				if (svcLoop != null)
 					((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
@@ -1156,7 +1156,7 @@ final class ControlEndpointService extends ServiceLooper
 		return false;
 	}
 
-	private boolean checkAndSetDeviceAddress(final IndividualAddress device, final boolean isServerAddress)
+	boolean checkAndSetDeviceAddress(final IndividualAddress device, final boolean isServerAddress)
 	{
 		if (!matchesSubnet(device, serverAddress()))
 			return false;
@@ -1174,7 +1174,7 @@ final class ControlEndpointService extends ServiceLooper
 		}
 	}
 
-	private void freeDeviceAddress(final IndividualAddress device)
+	void freeDeviceAddress(final IndividualAddress device)
 	{
 		synchronized (usedKnxAddresses) {
 			usedKnxAddresses.remove(device);
@@ -1251,7 +1251,7 @@ final class ControlEndpointService extends ServiceLooper
 
 	boolean setupBaosTcpEndpoint(final InetSocketAddress remote) {
 		try {
-			final var newDataEndpoint = new DataEndpoint(s, null, remote, remote, 0, device,
+			final var newDataEndpoint = new DataEndpoint(this, s, null, remote, remote, 0, device,
 					ConnectionType.Baos, false, sessions, 0, this::connectionClosed, __ -> {});
 
 			if (!acceptConnection(svcCont, newDataEndpoint, device, ConnectionType.Baos))

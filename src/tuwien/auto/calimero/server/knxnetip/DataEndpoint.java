@@ -69,7 +69,6 @@ import tuwien.auto.calimero.cemi.CEMIDevMgmt;
 import tuwien.auto.calimero.cemi.CEMIFactory;
 import tuwien.auto.calimero.cemi.CEMILData;
 import tuwien.auto.calimero.device.ios.DeviceObject;
-import tuwien.auto.calimero.device.ios.InterfaceObject;
 import tuwien.auto.calimero.device.ios.KnxPropertyException;
 import tuwien.auto.calimero.knxnetip.ConnectionBase;
 import tuwien.auto.calimero.knxnetip.KNXConnectionClosedException;
@@ -87,7 +86,6 @@ import tuwien.auto.calimero.knxnetip.servicetype.TunnelingFeature.InterfaceFeatu
 import tuwien.auto.calimero.knxnetip.util.HPAI;
 import tuwien.auto.calimero.log.LogService;
 import tuwien.auto.calimero.log.LogService.LogLevel;
-import tuwien.auto.calimero.mgmt.PropertyAccess.PID;
 import tuwien.auto.calimero.secure.SecurityControl;
 import tuwien.auto.calimero.secure.SecurityControl.DataSecurity;
 import tuwien.auto.calimero.server.knxnetip.SecureSessions.Session;
@@ -109,7 +107,8 @@ public final class DataEndpoint extends ConnectionBase
 	private final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed;
 	private final Consumer<DataEndpoint> resetRequest;
 
-	private final IndividualAddress device;
+	private final ControlEndpointService ces;
+	private volatile IndividualAddress device;
 	private final ConnectionType ctype;
 
 	private volatile boolean shutdown;
@@ -151,7 +150,7 @@ public final class DataEndpoint extends ConnectionBase
 		}
 	}
 
-	DataEndpoint(final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
+	DataEndpoint(final ControlEndpointService ces, final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final InetSocketAddress remoteCtrlEndpt, final InetSocketAddress remoteDataEndpt, final int channelId,
 		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
 		final SecureSessions sessions, final int sessionId,
@@ -159,6 +158,7 @@ public final class DataEndpoint extends ConnectionBase
 		final Consumer<DataEndpoint> resetRequest)
 	{
 		super(type.req, type.ack, type.maxSendAttempts, type.timeout);
+		this.ces = ces;
 		device = assigned;
 		this.ctype = type;
 		this.channelId = channelId;
@@ -520,12 +520,15 @@ public final class DataEndpoint extends ConnectionBase
 	}
 
 	private boolean updateTunnelingAddress(final byte[] value) {
-		final IndividualAddress ia = new IndividualAddress(value);
-		if (!device.equals(ia)) {
-			if (serverAddress().equals(ia) || additionalAddresses().contains(ia))
-				return false;
-			// NYI update tunneling address
-		}
+		final var update = new IndividualAddress(value);
+		if (update.equals(device))
+			return true;
+		if (update.equals(ces.serverAddress()) || ces.additionalAddresses().contains(update))
+			return false;
+		if (!ces.checkAndSetDeviceAddress(update, false))
+			return false;
+		ces.freeDeviceAddress(update);
+		device = update;
 		tunnelingAddressChanged = true;
 		return true;
 	}
@@ -553,26 +556,6 @@ public final class DataEndpoint extends ConnectionBase
 			catch (final KnxPropertyException ignore) {}
 		}
 		return 15;
-	}
-
-	private IndividualAddress serverAddress() {
-		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
-		int addr = 0;
-		if (dataEndpoint.isPresent())
-			addr = dataEndpoint.get().server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.KNX_INDIVIDUAL_ADDRESS, 1, 0);
-		return new IndividualAddress(addr);
-	}
-
-	private List<IndividualAddress> additionalAddresses() {
-		final var endpoints = ControlEndpointService.findDataEndpoint(channelId)
-				.map(ep -> ep.server.endpoints).orElse(List.of());
-		for (final var endpoint : endpoints) {
-			final Optional<ControlEndpointService> looper = endpoint.controlEndpoint();
-			if (looper.isPresent()) {
-				return looper.get().additionalAddresses();
-			}
-		}
-		return List.of();
 	}
 
 	void mediumConnectionStatusChanged(final boolean active) {
