@@ -52,7 +52,6 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -74,7 +73,6 @@ import io.calimero.cemi.CEMIDevMgmt;
 import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILData;
 import io.calimero.device.ios.DeviceObject;
-import io.calimero.device.ios.InterfaceObject;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.knxnetip.ConnectionBase;
 import io.calimero.knxnetip.KNXConnectionClosedException;
@@ -91,7 +89,6 @@ import io.calimero.knxnetip.servicetype.TunnelingFeature;
 import io.calimero.knxnetip.servicetype.TunnelingFeature.InterfaceFeature;
 import io.calimero.knxnetip.util.HPAI;
 import io.calimero.log.LogService;
-import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.SecurityControl;
 import io.calimero.secure.SecurityControl.DataSecurity;
 import io.calimero.server.knxnetip.SecureSessions.Session;
@@ -374,7 +371,7 @@ public final class DataEndpoint extends ConnectionBase
 			final int localPort = socket.getLocalPort();
 			logger.log(ERROR, "ETS 5 sends configuration requests for channel {0} to wrong UDP port {1} (channel {2}), "
 					+ "try to find correct connection", recvChannelId, localPort, channelId);
-			final Optional<DataEndpointService> dataEndpointService = ControlEndpointService.findDataEndpoint(recvChannelId);
+			final Optional<DataEndpointService> dataEndpointService = ces.findDataEndpoint(recvChannelId);
 			if (dataEndpointService.isPresent()) {
 				dataEndpointService.get().rebindSocket(localPort);
 				dataEndpointService.get().svcHandler.acceptDataService(src, h, data, offset);
@@ -474,7 +471,7 @@ public final class DataEndpoint extends ConnectionBase
 				logger.log(TRACE, "data endpoint received connection-state request (channel {0}) from {1}",
 						csr.getChannelID(), hostPort(dataEndpt));
 				updateLastMsgTimestamp();
-				status = subnetStatus();
+				status = ces.subnetStatus();
 			}
 			else
 				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
@@ -519,7 +516,7 @@ public final class DataEndpoint extends ConnectionBase
 				case IndividualAddress -> responseForFeature(feat, device.toByteArray());
 				case MaxApduLength -> responseForFeature(feat, (byte) 0, (byte) maxApduLength());
 				case DeviceDescriptorType0 -> responseForFeature(feat, DD0.TYPE_091A.toByteArray());
-				case ConnectionStatus -> responseForFeature(feat, (byte) (subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
+				case ConnectionStatus -> responseForFeature(feat, (byte) (ces.subnetStatus() == ErrorCodes.NO_ERROR ? 1 : 0));
 				case Manufacturer -> responseForFeature(feat, (byte) 0, (byte) 0);
 				case ActiveEmiType -> responseForFeature(feat, (byte) 0x03); // always cEMI (see KnxTunnelEmi.CEmi)
 				case EnableFeatureInfoService -> responseForFeature(feat, (byte) (featureInfoServiceEnabled ? 1 : 0));
@@ -569,49 +566,12 @@ public final class DataEndpoint extends ConnectionBase
 		return true;
 	}
 
-	private int subnetStatus() {
-		final var endpoints = ControlEndpointService.findDataEndpoint(channelId).map(ep -> ep.server.endpoints)
-				.orElse(List.of());
-		for (final var endpoint : endpoints) {
-			final Optional<ControlEndpointService> looper = endpoint.controlEndpoint();
-			if (looper.isPresent()) {
-				final ControlEndpointService ces = looper.get();
-				if (ces.addressInUse(device))
-					return ces.subnetStatus();
-			}
-		}
-		return ErrorCodes.KNX_CONNECTION;
-	}
-
 	private int maxApduLength() {
-		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
-		if (dataEndpoint.isPresent()) {
-			try {
-				return DeviceObject.lookup(dataEndpoint.get().server.getInterfaceObjectServer()).maxApduLength();
-			}
-			catch (final KnxPropertyException ignore) {}
+		try {
+			return DeviceObject.lookup(ces.server.getInterfaceObjectServer()).maxApduLength();
 		}
+		catch (final KnxPropertyException ignore) {}
 		return 15;
-	}
-
-	private IndividualAddress serverAddress() {
-		final Optional<DataEndpointService> dataEndpoint = ControlEndpointService.findDataEndpoint(channelId);
-		int addr = 0;
-		if (dataEndpoint.isPresent())
-			addr = dataEndpoint.get().server.getProperty(InterfaceObject.DEVICE_OBJECT, 1, PID.KNX_INDIVIDUAL_ADDRESS, 1, 0);
-		return new IndividualAddress(addr);
-	}
-
-	private List<IndividualAddress> additionalAddresses() {
-		final var endpoints = ControlEndpointService.findDataEndpoint(channelId)
-				.map(ep -> ep.server.endpoints).orElse(List.of());
-		for (final var endpoint : endpoints) {
-			final Optional<ControlEndpointService> looper = endpoint.controlEndpoint();
-			if (looper.isPresent()) {
-				return looper.get().additionalAddresses();
-			}
-		}
-		return List.of();
 	}
 
 	void mediumConnectionStatusChanged(final boolean active) {

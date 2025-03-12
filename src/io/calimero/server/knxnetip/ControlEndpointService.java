@@ -1228,10 +1228,10 @@ final class ControlEndpointService extends UdpServiceLooper
 	}
 
 	// workaround to find the correct looper/connection when ETS sends to the wrong UDP port
-	private static final Set<LooperTask> looperTasks = Collections
+	private final Set<LooperTask> looperTasks = Collections
 			.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
-	static Optional<DataEndpointService> findDataEndpoint(final int channelId) {
+	Optional<DataEndpointService> findDataEndpoint(final int channelId) {
 		synchronized (looperTasks) {
 			for (final LooperTask t : looperTasks) {
 				final Optional<DataEndpointService> looper = t.looper().map(DataEndpointService.class::cast);
