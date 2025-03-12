@@ -360,7 +360,7 @@ public final class DataEndpoint extends ConnectionBase
 			if (recvChannelId == channelId)
 				return false;
 			final int localPort = socket.getLocalPort();
-			logger.log(ERROR, "ETS 5 sends configuration requests for channel {0} to wrong UDP port {1} (channel {2}), "
+			logger.log(WARNING, "ETS 5 sends configuration requests for channel {0} to wrong UDP port {1} (channel {2}), "
 					+ "try to find correct connection", recvChannelId, localPort, channelId);
 			final Optional<DataEndpointService> dataEndpointService = ces.findDataEndpoint(recvChannelId);
 			if (dataEndpointService.isPresent()) {
