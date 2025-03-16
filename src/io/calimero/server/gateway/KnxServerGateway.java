@@ -1528,7 +1528,7 @@ public class KnxServerGateway implements Runnable
 				// 1. look for client tunneling connection with matching assigned address
 				KNXnetIPConnection c = findConnection(dst);
 				if (c != null) {
-					logger.log(DEBUG, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
+					logger.log(TRACE, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
 					send(sc, c, f, path);
 				}
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
