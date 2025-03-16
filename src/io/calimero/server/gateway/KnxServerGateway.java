@@ -1558,10 +1558,7 @@ public class KnxServerGateway implements Runnable
 					send(sc, c, f, path);
 				}
 				else {
-					logger.log(INFO, "no active KNXnet/IP connection for destination {0}, " +
-							"dispatch {1}->{2} to all server-side connections", dst, f.getSource(), dst);
-					for (final var conn : serverConnections)
-						asyncSend(sc, conn, f, path);
+					logger.log(TRACE, "drop frame {0} (no matching KNXnet/IP connection) {1}", path, f);
 				}
 			}
 			else {
