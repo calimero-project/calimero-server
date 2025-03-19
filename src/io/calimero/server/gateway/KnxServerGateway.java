@@ -1277,8 +1277,7 @@ public class KnxServerGateway implements Runnable
 					final var config = routerObj.routingLcConfig(false);
 					switch (config) {
 						case All -> {
-							for (final var conn : serverConnections)
-								asyncSend(sc, conn, send, FramePath.SubnetToClient);
+							dispatchLdataToClients(subnet, send, fe.id(), null, FramePath.SubnetToClient);
 							dispatchToOtherSubnets(send, subnet, false, FramePath.SubnetToSubnet);
 						}
 						case Block -> {
