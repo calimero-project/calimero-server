@@ -1259,10 +1259,10 @@ public class KnxServerGateway implements Runnable
 					if (ldata.getDestination().equals(containerAddr)) {
 						// with an usb interface, device is always our own address, so we always exclude it for now
 						if (subnet.interfaceType() == InterfaceType.Usb)
-							logger.log(DEBUG, "received from subnet using usb interface {0}, don't intercept frame",
+							logger.log(TRACE, "received from subnet using usb interface {0}, don''t intercept frame",
 									subnet.getName());
 						else if (subnet.interfaceAddress().isPresent())
-							logger.log(TRACE, "received from subnet interface {0}, don't intercept frame",
+							logger.log(TRACE, "received from subnet interface {0}, don''t intercept frame",
 									subnet.getName());
 						else {
 							deviceListeners.forEach(l -> l.indication(fe));
@@ -1743,7 +1743,7 @@ public class KnxServerGateway implements Runnable
 			if (usb) {
 				final var subnetAddress = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
 				if (!f.getSource().equals(subnetAddress) && SecureApplicationLayer.isSecuredService(f)) {
-					logger.log(WARNING, "{0}->{1} source address mismatch: can't forward secure service to {2}", f.getSource(),
+					logger.log(WARNING, "{0}->{1} source address mismatch: cannot forward secure service to {2}", f.getSource(),
 							f.getDestination(), subnet.getName());
 					return;
 				}

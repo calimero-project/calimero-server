@@ -709,7 +709,7 @@ public class KNXnetIPServer
 			final NetworkInterface nif = NetworkInterface.getByName(ifname);
 			if (nif != null)
 				return nif;
-			logger.log(ERROR, "option " + option + ": no network interface with name '" + ifname + "'");
+			logger.log(ERROR, "option {0}: no network interface with name ''{1}''", option, ifname);
 		}
 		catch (final SocketException e) {
 			logger.log(ERROR, "option " + option + " for interface " + ifname, e);
