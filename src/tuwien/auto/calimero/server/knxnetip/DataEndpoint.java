@@ -197,8 +197,10 @@ public final class DataEndpoint extends ConnectionBase
 		if (looper != null) {
 			if (looper.baos())
 				return;
-			super.send(frame, BlockingMode.NonBlocking);
-			setStateNotify(OK);
+			synchronized (this) {
+				super.send(frame, BlockingMode.NonBlocking);
+				setStateNotify(OK);
+			}
 		}
 		else
 			super.send(frame, mode);
