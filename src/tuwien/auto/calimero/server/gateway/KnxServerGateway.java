@@ -1156,7 +1156,8 @@ public class KnxServerGateway implements Runnable
 								return;
 							}
 
-							connector.ifPresent(subnet -> dispatchToSubnet(subnet, send, fe.systemBroadcast()));
+							connector.ifPresentOrElse(subnet -> dispatchToSubnet(subnet, send, fe.systemBroadcast()),
+									() -> logger.debug("drop frame C->S (no matching KNX subnet) {}", ldata));
 						}
 					}
 				}
