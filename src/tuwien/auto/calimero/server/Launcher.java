@@ -758,8 +758,10 @@ public class Launcher implements Runnable, AutoCloseable
 
 		routerObj.set(PID.LOAD_STATE_CONTROL, (byte) 1);
 		routerObj.set(PID.MEDIUM_STATUS, (byte) 1);
-		routerObj.set(PID.MAIN_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
-		routerObj.set(PID.SUB_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
+		if (!routerObj.contains(PID.MAIN_LCCONFIG))
+			routerObj.set(PID.MAIN_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
+		if (!routerObj.contains(PID.SUB_LCCONFIG))
+			routerObj.set(PID.SUB_LCCONFIG, (byte) ((1 << 2) | RoutingConfig.Route.ordinal()));
 		final int pidRouteTableControl = 56; // Function property
 		routerObj.set(pidRouteTableControl, (byte) 0);
 
@@ -883,6 +885,9 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private void setGroupAddressFilter(final RouterObject routerObj, final Set<GroupAddress> filter) {
+		if (routerObj.contains(PID.TABLE_REFERENCE) && filter.isEmpty())
+			return;
+
 		final int filterSize = (1 << 16) / 8;
 		final var table = new BitSet(filterSize);
 
@@ -901,7 +906,7 @@ public class Launcher implements Runnable, AutoCloseable
 		// use location of Filter Table Realisation Type 2, which shall start at memory address 0x0200
 		final int filterTableLocation = 0x200;
 		routerObj.set(PID.TABLE_REFERENCE, ByteBuffer.allocate(4).putInt(filterTableLocation).array());
-        final var memory = server.device().deviceMemory();
+		final var memory = server.device().deviceMemory();
 		// table.toByteArray is only so big to contain the index of the highest set bit in the bitset
 		// we need to clear all bits first, so we don't retain any filter loaded from disk during init of device
 		memory.set(filterTableLocation, new byte[filterSize]);
