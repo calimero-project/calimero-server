@@ -98,7 +98,7 @@ import io.calimero.server.knxnetip.SecureSessions.Session;
  *
  * @author B. Malinowsky
  */
-public final class DataEndpoint extends ConnectionBase
+public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEndpoint
 {
 	public enum ConnectionType {
 		LinkLayer(KNXnetIPHeader.TUNNELING_REQ, KNXnetIPHeader.TUNNELING_ACK, 2, TUNNELING_REQ_TIMEOUT),
@@ -152,6 +152,7 @@ public final class DataEndpoint extends ConnectionBase
 	// even if indicated otherwise in the HPAI or required by the spec
 	private volatile InetSocketAddress useDifferingEtsSrcPortForResponse;
 
+	private final FifoSequentialExecutor executor;
 
 	DataEndpoint(final ControlEndpointService ces, final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
 		final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt, final int channelId,
@@ -196,8 +197,14 @@ public final class DataEndpoint extends ConnectionBase
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
 		if (sessionId > 0)
 			sessions.addConnection(sessionId, remoteCtrlEndpt);
+		executor = new FifoSequentialExecutor(name() + " task queue", logger);
 		updateLastMsgTimestamp();
 		setState(OK);
+	}
+
+	@Override
+	public void enqueue(final Runnable task) {
+		executor.execute(task);
 	}
 
 	@Override

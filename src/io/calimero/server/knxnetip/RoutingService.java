@@ -71,13 +71,21 @@ final class RoutingService extends UdpServiceLooper
 {
 	private boolean closing;
 
-	private class RoutingServiceHandler extends KNXnetIPRouting
+	private class RoutingServiceHandler extends KNXnetIPRouting implements KnxipQueuingEndpoint
 	{
+		private final FifoSequentialExecutor executor;
+
 		RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup,
 			final boolean enableLoopback) throws KNXException {
 			super(mcGroup);
 			init(netif, enableLoopback, false);
 			logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
+			executor = new FifoSequentialExecutor(name() + " task queue", logger);
+		}
+
+		@Override
+		public void enqueue(final Runnable task) {
+			executor.execute(task);
 		}
 
 		// forwarder for RoutingService dispatch, called from handleServiceType
