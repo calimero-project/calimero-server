@@ -69,14 +69,11 @@ import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -160,6 +157,7 @@ import io.calimero.server.knxnetip.DataEndpoint;
 import io.calimero.server.knxnetip.DataEndpoint.ConnectionType;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
+import io.calimero.server.knxnetip.KnxipQueuingEndpoint;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
 import io.calimero.server.knxnetip.ServerListener;
 import io.calimero.server.knxnetip.ServiceContainer;
@@ -297,7 +295,8 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void connectionEstablished(final ServiceContainer svcContainer, final KNXnetIPConnection connection)
 		{
-			serverConnections.add(connection);
+			final var endpoint = (KnxipQueuingEndpoint) connection;
+			serverConnections.add(endpoint);
 			logger.log(DEBUG, "established connection {0}", connection);
 
 			try {
@@ -324,7 +323,7 @@ public class KnxServerGateway implements Runnable
 			if (port >= portRange[0] && port <= portRange[1]) {
 				buffer.add(connection);
 				if (buffer.isDisrupted(connection)) {
-					waitingForReplay.put(connection, svcContainer);
+					waitingForReplay.put(endpoint, svcContainer);
 					synchronized (KnxServerGateway.this) {
 						KnxServerGateway.this.notify();
 					}
@@ -343,7 +342,7 @@ public class KnxServerGateway implements Runnable
 			if (event == ServiceContainerEvent.ROUTING_SVC_STARTED) {
 				final KNXnetIPConnection conn = sce.getConnection();
 				conn.addConnectionListener(new ConnectionListener(sc, conn.name()));
-				serverConnections.add(conn);
+				serverConnections.add((KnxipQueuingEndpoint) conn);
 			}
 			else if (event == ServiceContainerEvent.REMOVED_FROM_SERVER) {
 				for (final Iterator<SubnetConnector> i = connectors.iterator(); i.hasNext();) {
@@ -460,7 +459,7 @@ public class KnxServerGateway implements Runnable
 	private final KNXnetIPServer server;
 	// connectors array is not sync'd throughout gateway
 	private final List<SubnetConnector> connectors = new ArrayList<>();
-	private final List<KNXnetIPConnection> serverConnections = new CopyOnWriteArrayList<>();
+	private final List<KnxipQueuingEndpoint> serverConnections = new CopyOnWriteArrayList<>();
 
 	record IpEvent(ServiceContainer sc, FrameEvent event) {}
 	private final int maxEventQueueSize = 250;
@@ -472,7 +471,7 @@ public class KnxServerGateway implements Runnable
 	// support replaying subnet events for disrupted tunneling connections
 	// TODO move to subnet connector?
 	private final Map<ServiceContainer, ReplayBuffer<FrameEvent>> subnetEventBuffers = new ConcurrentHashMap<>();
-	private final Map<KNXnetIPConnection, ServiceContainer> waitingForReplay = new ConcurrentHashMap<>();
+	private final Map<KnxipQueuingEndpoint, ServiceContainer> waitingForReplay = new ConcurrentHashMap<>();
 
 	private final Instant startTime;
 
@@ -552,8 +551,8 @@ public class KnxServerGateway implements Runnable
 			if (ipMsgCount < routingBusyMsgThreshold)
 				return;
 			ipMsgCount = 0;
-			serverConnections.stream().filter(c -> c instanceof KNXnetIPRouting)
-					.forEach(c -> sendRoutingBusy((KNXnetIPRouting) c));
+			serverConnections.stream().filter(KNXnetIPRouting.class::isInstance)
+					.forEach(c -> c.enqueue(() -> sendRoutingBusy((KNXnetIPRouting) c)));
 		}
 
 		private void sendRoutingBusy(final KNXnetIPRouting connection)
@@ -620,11 +619,7 @@ public class KnxServerGateway implements Runnable
 			// TODO support > 1 service containers
 			final SubnetConnector connector = connectors.get(0);
 			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
-			try {
-				dispatchToServer(connector, msg, eventId, FramePath.LocalToClient);
-			} catch (final InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
+			dispatchToServer(connector, msg, eventId, FramePath.LocalToClient);
 		}
 
 		@Override
@@ -982,27 +977,28 @@ public class KnxServerGateway implements Runnable
 
 	private void replayPendingSubnetEvents()
 	{
-		for (final Entry<KNXnetIPConnection, ServiceContainer> entry : waitingForReplay.entrySet()) {
-			final KNXnetIPConnection c = entry.getKey();
+		for (final var entry : waitingForReplay.entrySet()) {
+			final var endpoint = entry.getKey();
 			final ServiceContainer svcContainer = entry.getValue();
 			final ReplayBuffer<FrameEvent> replayBuffer = subnetEventBuffers.get(svcContainer);
-			final Collection<FrameEvent> events = replayBuffer.replay(c);
+			final Collection<FrameEvent> events = replayBuffer.replay(endpoint);
 
-			Executor.execute(() -> {
-				logger.log(WARNING, "previous connection of {0} got disrupted => replay {1} pending messages", c, events.size());
+			endpoint.enqueue(() -> {
+				logger.log(WARNING, "previous connection of {0} got disrupted => replay {1} pending messages", endpoint,
+						events.size());
 				try {
-					final String hostPort = hostPort(c.getRemoteAddress());
+					final String hostPort = hostPort(endpoint.getRemoteAddress());
 					for (final var fe : events) {
 						logger.log(TRACE, "replay {0}: {1}", hostPort, fe.getFrame());
-                        send(svcContainer, c, fe.getFrame(), FramePath.LocalToClient);
-                    }
+						send(svcContainer, endpoint, fe.getFrame(), FramePath.LocalToClient);
+					}
 				}
 				catch (final InterruptedException e) {
-					logger.log(WARNING, "interrupted replay for " + c, e);
+					logger.log(WARNING, "interrupted replay for " + endpoint, e);
 				}
-				waitingForReplay.remove(c);
-				logger.log(DEBUG, "replay completed for connection {0}", c);
-			}, c + " replay");
+				waitingForReplay.remove(endpoint);
+				logger.log(DEBUG, "replay completed for connection {0}", endpoint);
+			});
 		}
 	}
 
@@ -1055,35 +1051,39 @@ public class KnxServerGateway implements Runnable
 
 		final int mc = frame.getMessageCode();
 		if (frame instanceof final CEMILData ldata) {
-
-			logger.log(TRACE, "{0} {1}: {2}: {3}", s, fe.getSource(), frame,
-					DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
+			final var dst = ldata.getDestination();
+			logger.log(TRACE, "{0} {1}: {2}: {3}", s, fe.getSource(), frame, DataUnitBuilder.decode(ldata.getPayload(), dst));
 
 			// we get L-data.ind if client uses routing protocol
 			if (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND) {
 				if (mc == CEMILData.MC_LDATA_REQ) {
 					// send confirmation only for .req type
-					sendConfirmationFor((KNXnetIPConnection) fe.getSource(), (CEMILData) CEMIFactory.copy(ldata));
+					sendConfirmationFor((KnxipQueuingEndpoint) fe.getSource(), (CEMILData) CEMIFactory.copy(ldata));
 
 					// if routing is active, dispatch .req over routing connection
-					final var c = findRoutingConnection().orElse(null);
-					if (c != null) {
-						logger.log(DEBUG, "dispatch {0}->{1} using {2}", ldata.getSource(), ldata.getDestination(), c);
-						try {
-							final var ind = CEMIFactory.create(null, null,
-									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
-							send(server.getServiceContainers()[0], c, ind, FramePath.ClientToClient);
-						}
-						catch (KNXFormatException | RuntimeException e) {
-							e.printStackTrace();
-						}
-					}
+					findRoutingConnection().ifPresent(c ->
+						c.enqueue(() -> {
+							final var log = MessageFormat.format("dispatch {0}->{1} using {2}", ldata.getSource(), dst, c);
+							logger.log(DEBUG, log);
+							try {
+								final var ind = CEMIFactory.create(null, null,
+										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+								send(svcCont, c, ind, FramePath.ClientToClient);
+							}
+							catch (KNXFormatException | RuntimeException e) {
+								e.printStackTrace();
+							}
+							catch (final InterruptedException e) {
+								logger.log(WARNING, "interrupted " + log);
+							}
+						})
+					);
 				}
 
-				final var client = (KNXnetIPConnection) fe.getSource();
+				final var client = (KnxipQueuingEndpoint) fe.getSource();
 
-				if (ldata.getDestination() instanceof final IndividualAddress dst) {
-					final Optional<SubnetConnector> connector = connectorFor(dst);
+				if (dst instanceof final IndividualAddress ia) {
+					final Optional<SubnetConnector> connector = connectorFor(ia);
 					if (connector.isPresent()) {
 						if (localDeviceManagement(connector.get(), ldata))
 							return;
@@ -1091,7 +1091,7 @@ public class KnxServerGateway implements Runnable
 						// see if the frame is addressed to us
 						final IndividualAddress localInterface = connector.get().getServiceContainer()
 								.getMediumSettings().getDeviceAddress();
-						if (ldata.getDestination().equals(localInterface)) {
+						if (dst.equals(localInterface)) {
 							deviceListeners.forEach(l -> l.indication(fe));
 							return;
 						}
@@ -1115,7 +1115,7 @@ public class KnxServerGateway implements Runnable
 							// check if destination is a client of ours
 							final var dataConnections = server.dataConnections(svcCont);
 							for (final var dataEndpoint : dataConnections.values()) {
-								if (ldata.getDestination().equals(dataEndpoint.deviceAddress())) {
+								if (dst.equals(dataEndpoint.deviceAddress())) {
 									try {
 										final var ind = CEMIFactory.create(null, null,
 												(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
@@ -1131,14 +1131,14 @@ public class KnxServerGateway implements Runnable
 							// defend our own unused additional individual addresses when receiving a TL connect.req
 							if (DataUnitBuilder.getTPDUService(ldata.getPayload()) == 0x80) {
 								final var addresses = additionalAddresses(objinst);
-								if (addresses.contains(ldata.getDestination())) {
+								if (addresses.contains(dst)) {
 									// send disconnect
 									try {
-										final var disconnect = CEMIFactory.create(dst, ldata.getSource(), (CEMILData) CEMIFactory
+										final var disconnect = CEMIFactory.create(ia, ldata.getSource(), (CEMILData) CEMIFactory
 												.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
 										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
-												ldata.getDestination(), disconnect.getSource(), disconnect.getDestination(), client);
-										send(svcCont, client, disconnect, FramePath.LocalToClient);
+												dst, disconnect.getSource(), disconnect.getDestination(), client);
+										asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
 									}
 									catch (final KNXFormatException e) {
 										e.printStackTrace();
@@ -1153,7 +1153,7 @@ public class KnxServerGateway implements Runnable
 
 							// if destination is the default individual address 0xffff (e.g., after a device reset)
 							// we can't route, dispatch to all subnets
-							if (ldata.getDestination().getRawAddress() == 0xffff) {
+							if (dst.getRawAddress() == 0xffff) {
 								logger.log(TRACE, "destination is default individual address 15.15.255, dispatch to all subnets");
 								for (final var subnet : connectors) {
 									if (subnet.getServiceContainer().isActivated() && isNetworkLink(subnet))
@@ -1170,7 +1170,7 @@ public class KnxServerGateway implements Runnable
 				}
 				else { // GroupAddress
 					// broadcasts are of interest to us
-					if (ldata.getDestination().equals(GroupAddress.Broadcast))
+					if (dst.equals(GroupAddress.Broadcast))
 						deviceListeners.forEach(l -> l.indication(fe));
 
 					// send to all clients except sender
@@ -1206,7 +1206,7 @@ public class KnxServerGateway implements Runnable
 			CemiFrameTracer.instance().trace(frame, fe.getSource().toString(), null, FramePath.ClientToLocal);
 
 			final var securityControl = fe.security().orElse(SecurityControl.Plain);
-			doDeviceManagement((KNXnetIPConnection) fe.getSource(), (CEMIDevMgmt) frame, securityControl);
+			doDeviceManagement((KnxipQueuingEndpoint) fe.getSource(), (CEMIDevMgmt) frame, securityControl);
 			return;
 		}
 
@@ -1328,7 +1328,7 @@ public class KnxServerGateway implements Runnable
 						for (final var conn : serverConnections) {
 							if (conn instanceof final KNXnetIPRouting rc) {
 								if (sentOnNetif.add(rc.networkInterface()))
-									send(sc, rc, bcast, FramePath.SubnetToClient);
+									asyncSend(sc, conn, bcast, FramePath.SubnetToClient);
 							}
 						}
 						return;
@@ -1411,8 +1411,8 @@ public class KnxServerGateway implements Runnable
 		return true;
 	}
 
-	private void sendConfirmationFor(final KNXnetIPConnection c, final CEMILData f) {
-		CompletableFuture.runAsync(() -> {
+	private void sendConfirmationFor(final KnxipQueuingEndpoint c, final CEMILData f) {
+		c.enqueue(() -> {
 			try {
 				// TODO check for reasons to send negative L-Data.con
 				final boolean error = false;
@@ -1420,12 +1420,9 @@ public class KnxServerGateway implements Runnable
 				c.send(createCon(f.getPayload(), f, error), WaitForAck);
 			}
 			catch (final Exception e) {
-				throw new CompletionException(e);
+				logger.log(WARNING, "sending on {0} failed: {1} ({2}->{3} L_Data.con {4})", c, e.getMessage(),
+						f.getSource(), f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
 			}
-		}, Executor.executor()).exceptionally(t -> {
-			logger.log(WARNING, "sending on {0} failed: {1} ({2}->{3} L_Data.con {4})", c, t.getCause().getMessage(), f.getSource(),
-					f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
-			return null;
 		});
 	}
 
@@ -1516,8 +1513,7 @@ public class KnxServerGateway implements Runnable
 		return false;
 	}
 
-	private void dispatchToServer(final SubnetConnector subnet, final CEMILData f, final long eventId, final FramePath path)
-			throws InterruptedException {
+	private void dispatchToServer(final SubnetConnector subnet, final CEMILData f, final long eventId, final FramePath path) {
 		final ServiceContainer sc = subnet.getServiceContainer();
 		try {
 			final int objinst = objectInstance(subnet);
@@ -1526,10 +1522,10 @@ public class KnxServerGateway implements Runnable
 
 				final var connections = server.dataConnections(sc);
 				// 1. look for client tunneling connection with matching assigned address
-				KNXnetIPConnection c = findConnection(dst);
+				KnxipQueuingEndpoint c = findConnection(dst);
 				if (c != null) {
 					logger.log(TRACE, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
-					send(sc, c, f, path);
+					asyncSend(sc, c, f, path);
 				}
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
 				// addresses to client connections,
@@ -1549,13 +1545,13 @@ public class KnxServerGateway implements Runnable
 					c = findRoutingConnection().orElse(null);
 					if (c != null) {
 						logger.log(DEBUG, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
-						send(sc, c, f, path);
+						asyncSend(sc, c, f, path);
 					}
 				}
 				// 3. look for activated client-side routing
 				else if ((c = findRoutingConnection().orElse(null)) != null) {
 					logger.log(DEBUG, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
-					send(sc, c, f, path);
+					asyncSend(sc, c, f, path);
 				}
 				else {
 					logger.log(TRACE, "drop frame {0} (no matching KNXnet/IP connection) {1}", path, f);
@@ -1582,7 +1578,7 @@ public class KnxServerGateway implements Runnable
 					for (final var conn : serverConnections) {
 						if (conn instanceof final KNXnetIPRouting rc) {
 							if (sentOnNetif.add(rc.networkInterface()))
-								send(sc, rc, bcast, path);
+								asyncSend(sc, conn, bcast, path);
 						}
 					}
 					return;
@@ -1614,7 +1610,7 @@ public class KnxServerGateway implements Runnable
 		}
 	}
 
-	private KNXnetIPConnection findConnection(final IndividualAddress dst) {
+	private KnxipQueuingEndpoint findConnection(final IndividualAddress dst) {
 		for (final ServiceContainer sc : server.getServiceContainers()) {
 			if (matchesSubnet(dst, sc.getMediumSettings().getDeviceAddress())) {
 				final var connections = server.dataConnections(sc);
@@ -1662,31 +1658,31 @@ public class KnxServerGateway implements Runnable
 		return RoutingSystemBroadcast.isIpSystemBroadcast(f);
 	}
 
-	private Optional<KNXnetIPConnection> findRoutingConnection()
+	private Optional<KnxipQueuingEndpoint> findRoutingConnection()
 	{
 		return serverConnections.stream().filter(KNXnetIPRouting.class::isInstance).findAny();
 	}
 
-	private void asyncSend(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
+	private void asyncSend(final ServiceContainer svcContainer, final KnxipQueuingEndpoint endpoint, final CEMI f,
 			final FramePath path) {
-		asyncSend(svcContainer, c, f, null, path);
+		asyncSend(svcContainer, endpoint, f, null, path);
 	}
 
-	private void asyncSend(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
+	private void asyncSend(final ServiceContainer svcContainer, final KnxipQueuingEndpoint endpoint, final CEMI f,
 			final FrameEvent recordFrameEvent, final FramePath path) {
-		Executor.execute(() -> {
+		endpoint.enqueue(() -> {
 			try {
-				send(svcContainer, c, f, path);
+				send(svcContainer, endpoint, f, path);
 				if (recordFrameEvent != null) {
 					final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 					if (buffer != null)
-						buffer.completeEvent(c, recordFrameEvent);
+						buffer.completeEvent(endpoint, recordFrameEvent);
 				}
 			}
 			catch (final InterruptedException e) {
 				e.printStackTrace();
 			}
-		}, c + " sender");
+		});
 	}
 
 	private void send(final ServiceContainer svcContainer, final KNXnetIPConnection c, final CEMI f,
@@ -1874,8 +1870,8 @@ public class KnxServerGateway implements Runnable
 		return "";
 	}
 
-	private void doDeviceManagement(final KNXnetIPConnection c, final CEMIDevMgmt f,
-			final SecurityControl securityControl) throws InterruptedException {
+	private void doDeviceManagement(final KnxipQueuingEndpoint c, final CEMIDevMgmt f,
+			final SecurityControl securityControl) {
 		final int mc = f.getMessageCode();
 		if (mc == CEMIDevMgmt.MC_PROPREAD_REQ || mc == CEMIDevMgmt.MC_PROPWRITE_REQ) {
 			final boolean read = mc == CEMIDevMgmt.MC_PROPREAD_REQ;
@@ -1918,13 +1914,18 @@ public class KnxServerGateway implements Runnable
 					f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, data)
 					: new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(),
 							f.getStartIndex(), elems);
-			try {
-				c.send(dm, WaitForAck);
-				CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
-			}
-			catch (final KNXException e) {
-				logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
-			}
+			c.enqueue(() -> {
+				try {
+					c.send(dm, WaitForAck);
+					CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
+				}
+				catch (final KNXException e) {
+					logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
+				}
+				catch (final InterruptedException e) {
+					logger.log(WARNING, "sending on {0} interrupted ({1})", c, f);
+				}
+			});
 		}
 		else if (mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
 			final boolean read = mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ;
@@ -1985,13 +1986,18 @@ public class KnxServerGateway implements Runnable
 				else // function input length too short, ignore
 					return;
 			}
-			try {
-				c.send(dm, WaitForAck);
-				CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
-			}
-			catch (final KNXException e) {
-				logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
-			}
+			c.enqueue(() -> {
+				try {
+					c.send(dm, WaitForAck);
+					CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
+				}
+				catch (final KNXException e) {
+					logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
+				}
+				catch (final InterruptedException e) {
+					logger.log(WARNING, "sending on {0} interrupted ({1})", c, f);
+				}
+			});
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
 			// handle reset.req here since we have the connection name for logging

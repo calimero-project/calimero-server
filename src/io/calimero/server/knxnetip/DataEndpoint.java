@@ -492,13 +492,18 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	}
 
 	private void respondToFeature(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
-			throws KNXFormatException, IOException {
+			throws KNXFormatException {
 		final ByteBuffer buffer = ByteBuffer.wrap(data, offset, h.getTotalLength() - h.getStructLength());
 		final TunnelingFeature res = responseForFeature(h, buffer);
-		logger.log(DEBUG, "respond with {0}", res);
-
-		final var dst = etsDstHack(dataEndpt, src);
-		send(PacketHelper.toPacket(new ServiceRequest<>(res.type(), channelId, getSeqSend(), res)), dst);
+		enqueue(() -> {
+			logger.log(DEBUG, "respond with {0}", res);
+			final var dst = etsDstHack(dataEndpt, src);
+			try {
+				send(PacketHelper.toPacket(new ServiceRequest<>(res.type(), channelId, getSeqSend(), res)), dst);
+			} catch (final IOException e) {
+				logger.log(WARNING, "sending " + res, e);
+			}
+		});
 	}
 
 	private TunnelingFeature responseForFeature(final KNXnetIPHeader h, final ByteBuffer buffer) throws KNXFormatException {
@@ -578,14 +583,17 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	private void sendFeatureInfo(final InterfaceFeature id, final byte... value) {
 		if (featureInfoServiceEnabled) {
-			final TunnelingFeature info = TunnelingFeature.newInfo(id, value);
-			logger.log(DEBUG, "send {0}", info);
-			try {
-				send(PacketHelper.toPacket(new ServiceRequest<>(info.type(), channelId, getSeqSend(), info)), dataEndpt);
-			}
-			catch (final IOException e) {
-				logger.log(ERROR, "sending " + info, e);
-			}
+			final var info = TunnelingFeature.newInfo(id, value);
+			final var req = new ServiceRequest<>(info.type(), channelId, getSeqSend(), info);
+			enqueue(() -> {
+				logger.log(DEBUG, "send {0}", info);
+				try {
+					send(PacketHelper.toPacket(req), dataEndpt);
+				}
+				catch (final IOException e) {
+					logger.log(WARNING, "sending " + info, e);
+				}
+			});
 		}
 	}
 
