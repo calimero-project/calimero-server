@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2021 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -55,8 +55,6 @@ public class ServiceContainerEvent extends EventObject
 	public static final int ROUTING_SVC_STARTED = 3;
 	/** The routing service of the service container stopped. */
 	public static final int ROUTING_SVC_STOPPED = 4;
-
-	private static final long serialVersionUID = 1L;
 
 	private final int type;
 	private final ServiceContainer sc;
