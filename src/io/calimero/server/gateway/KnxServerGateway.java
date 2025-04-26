@@ -1324,13 +1324,7 @@ public class KnxServerGateway implements Runnable
 									send.getHopCount());
 						}
 
-						final var sentOnNetif = new HashSet<NetworkInterface>();
-						for (final var conn : serverConnections) {
-							if (conn instanceof final KNXnetIPRouting rc) {
-								if (sentOnNetif.add(rc.networkInterface()))
-									asyncSend(sc, conn, bcast, FramePath.SubnetToClient);
-							}
-						}
+						broadcastOnEachRoutingNetif(sc, bcast, FramePath.SubnetToClient);
 						return;
 					}
 
@@ -1574,13 +1568,7 @@ public class KnxServerGateway implements Runnable
 								f.getHopCount());
 					}
 
-					final var sentOnNetif = new HashSet<>();
-					for (final var conn : serverConnections) {
-						if (conn instanceof final KNXnetIPRouting rc) {
-							if (sentOnNetif.add(rc.networkInterface()))
-								asyncSend(sc, conn, bcast, path);
-						}
-					}
+					broadcastOnEachRoutingNetif(sc, bcast, path);
 					return;
 				}
 
@@ -1589,6 +1577,16 @@ public class KnxServerGateway implements Runnable
 		}
 		catch (final KnxPropertyException e) {
 			logger.log(ERROR, "send to server-side failed for " + f, e);
+		}
+	}
+
+	private void broadcastOnEachRoutingNetif(final ServiceContainer sc, final CEMILData bcast, final FramePath path) {
+		final var sentOnNetif = new HashSet<>();
+		for (final var conn : serverConnections) {
+			if (conn instanceof final KNXnetIPRouting rc) {
+				if (sentOnNetif.add(rc.networkInterface()))
+					asyncSend(sc, conn, bcast, path);
+			}
 		}
 	}
 
