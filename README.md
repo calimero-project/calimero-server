@@ -95,8 +95,8 @@ Description of the supported XML elements and attributes:
 	- `activate`: enable/disable the service container, to load/ignore that container during server startup
 	- `routing`: if `true` activate KNX IP routing, if `false` routing is disabled
 	- `networkMonitoring`: serve tunneling connection on KNX busmonitor layer (set `true`) or deny such connection requests (set `false`)
-	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is deployed.
-	- `listenNetIf` (optional): network adapter to listen for connection requests, e.g., `"any"` or `"eth1"`, defaults to host default network adapter. `any` - the first available (non-loopback) network adapter is chosen depending on your OS network setup (or localhost setting). 
+	- `udpPort` (optional): UDP port of the control endpoint to listen for incoming connection requests of that service container, defaults to KNXnet/IP standard port "3671". Use different ports if more than one service container is configured.
+	- `netif` (optional): network adapter for client communication, e.g., `"eth1"`; defaults to host default network adapter. Use `"any"` for the first available (non-loopback) network adapter depending on your OS network setup (or localhost setting). 
     - `reuseCtrlEP` (optional): use the KNXnet/IP control endpoint (UDP/IP) for tunneling connections, `false` by default. If reuse is enabled (set `true`), no list of additional KNX individual addresses is required (see below). Per the KNX standard, reuse is only possible if the control endpoint's individual address is not yet assigned to a connection, and if KNXnet/IP routing is not activated. This implies that by reusing the control endpoint, at most 1 connection can be established at a time to a service container.
     - `keyfile="~/.knx/keyfile"` (required for KNX IP Secure): path to a keyfile containing the KNX IP Secure keys, alternatively specify a `keyring`. See [below](#knx-ip-secure) for the keyfile layout.
     - `keyring="/path/to/keyring.knxkeys"` (required for KNX IP Secure): path to a keyring exported from ETS containing the KNX IP Secure keys. The _keyfile_ typically contains the password to decrypt the keyring, otherwise the server will try to query the keyring password from the system console during startup.
@@ -131,9 +131,8 @@ Optional attributes for secure routing:
       - `rf`: Wireless connection via 868 MHz
     - `format` (optional): useful for knx interfaces which support different exchange formats; recognized values are "" (default), "baos", or "cemi"
     - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
-    - `netif` (tunneling only, optional): server network interface for tunneling to KNX subnet
+    - `netif` (tunneling & KNX IP only, optional): network interface for tunneling or KNX IP communication with the KNX subnet
     - `useNat` (UDP tunneling only, optional): use network address translation (NAT)
-    - `listenNetIf` (KNX IP only): network interface for KNX IP communication with the KNX subnet
     - `domainAddress` (open media only): domain address for power-line or RF transmission medium
     - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
 
@@ -160,7 +159,7 @@ Optional attributes for secure routing:
 
 * Use the KNXnet/IP server to communicate with a KNX IP network
 
-	`<knxSubnet type="knxip" listenNetIf="eth4">224.0.23.12</knxSubnet>`
+	`<knxSubnet type="knxip" netif="eth4">224.0.23.12</knxSubnet>`
 
 * Load a user-supplied KNXNetworkLink class to communicate with the KNX subnet (the element text is parsed into constructor arguments of type String, using separators ',' and '|')
 

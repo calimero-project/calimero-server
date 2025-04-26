@@ -5,8 +5,7 @@
 	<discovery listenNetIf="all" outgoingNetIf="all" activate="true" />
 
 	<!-- Provides the KNXnet/IP-side configuration for access to one KNX subnet -->
-	<serviceContainer activate="true" routing="true" networkMonitoring="true"
-		udpPort="3671" listenNetIf="any">
+	<serviceContainer activate="true" routing="true" networkMonitoring="true" udpPort="3671" netif="any">
 		<knxAddress type="individual">7.1.0</knxAddress>
 		<routing/>
 		<!-- latencyTolerance specifies the time window for accepting secure multicasts,
@@ -28,7 +27,7 @@
 			* useNat="true"|"false": use network address translation (NAT) -->
 		<!-- <knxSubnet type="udp" netif="eth0" useNat="true">192.168.10.10:3671</knxSubnet> -->
 
-		<!-- <knxSubnet type="knxip" listenNetIf="en0">224.0.23.12</knxSubnet> -->
+		<!-- <knxSubnet type="knxip" netif="en0">224.0.23.12</knxSubnet> -->
 
 		<!-- <knxSubnet type="tcp">192.168.10.80:3671</knxSubnet> -->
 		<!-- <knxSubnet type="tcp" host="1.2.0" user="4">192.168.10.80:3671</knxSubnet> -->
