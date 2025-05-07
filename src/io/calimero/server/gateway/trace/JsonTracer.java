@@ -64,9 +64,10 @@ import io.calimero.link.medium.RawFrame;
 import io.calimero.link.medium.RawFrameBase;
 import io.calimero.link.medium.RawFrameFactory;
 import io.calimero.link.medium.TP1Ack;
+import io.calimero.log.LogService;
 
 final class JsonTracer implements CemiFrameTracer {
-	private static final Logger logger = System.getLogger(MethodHandles.lookup().lookupClass().getName());
+	private static final Logger logger = LogService.getLogger(MethodHandles.lookup().lookupClass().getName());
 
 	private final Writer writer;
 
