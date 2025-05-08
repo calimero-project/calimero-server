@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -419,7 +419,7 @@ public final class SubnetConnector
 	private InetSocketAddress parseRemoteEndpoint() {
 		final String[] args = linkArgs.split(":", -1);
 		final String ip = args[0];
-		final int port = args.length > 1 ? Integer.parseInt(args[1]) : 3671;
+		final int port = args.length > 1 ? Integer.parseUnsignedInt(args[1]) : 3671;
 		return new InetSocketAddress(ip, port);
 	}
 
