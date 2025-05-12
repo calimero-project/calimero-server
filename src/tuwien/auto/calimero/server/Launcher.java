@@ -284,7 +284,7 @@ public class Launcher implements Runnable, AutoCloseable
 							// KNX subnet domain address for power-line and RF, as hexadecimal value string
 							final String doa = r.getAttributeValue(null, "domainAddress");
 							if (doa != null) {
-								long l = Long.parseLong(doa, 16);
+								long l = Long.parseUnsignedLong(doa, 16);
 								final int bytes = subnetMedium == KNXMediumSettings.MEDIUM_RF ? 6 : 2;
 								subnetDoA = new byte[bytes];
 								for (int i = subnetDoA.length; i-- > 0; l >>>= 8)
