@@ -613,11 +613,8 @@ public class Launcher implements Runnable, AutoCloseable
 	 */
 	public static void main(final String[] args)
 	{
-		if (args.length == 0) {
-			System.out.println("Calimero server " + Manifest.buildInfo(Launcher.class));
-			System.out.println("Supply file name/URI for the KNX server configuration");
+		if (idxOutOfRange(args, 0))
 			return;
-		}
 
 		if ("--version".equals(args[0]) || args.length == 1 && "-v".equals(args[0])) {
 			System.out.println(Manifest.buildInfo(Launcher.class));
@@ -635,6 +632,9 @@ public class Launcher implements Runnable, AutoCloseable
 			optIdx++;
 		}
 
+		if (idxOutOfRange(args, optIdx))
+			return;
+
 		final String configUri = args[args.length - 1];
 		final boolean detached = "--no-stdin".equals(args[optIdx]);
 		try (var launcher = new Launcher(configUri)) {
@@ -642,6 +642,16 @@ public class Launcher implements Runnable, AutoCloseable
 			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
 			launcher.run();
 		}
+	}
+
+	private static boolean idxOutOfRange(final String[] args, final int idx) {
+		if (idx < args.length)
+			return false;
+		System.out.format("""
+				Calimero server %s
+				Supply file name/URI for the KNX server configuration
+				""", Manifest.buildInfo(Launcher.class));
+		return true;
 	}
 
 	/**
