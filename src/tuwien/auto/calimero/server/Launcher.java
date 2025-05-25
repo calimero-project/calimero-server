@@ -1,6 +1,6 @@
 /*
     Calimero 2 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -588,10 +588,8 @@ public class Launcher implements Runnable, AutoCloseable
 	 */
 	public static void main(final String[] args)
 	{
-		if (args.length == 0) {
-			System.out.println("supply file name/URI for the KNX server configuration");
+		if (idxOutOfRange(args, 0))
 			return;
-		}
 
 		if ("--version".equals(args[0]) || args.length == 1 && "-v".equals(args[0])) {
 			System.out.println("Calimero server " + Settings.getLibraryVersion());
@@ -607,6 +605,9 @@ public class Launcher implements Runnable, AutoCloseable
 			optIdx++;
 		}
 
+		if (idxOutOfRange(args, optIdx))
+			return;
+
 		final String configUri = args[args.length - 1];
 		final boolean detached = "--no-stdin".equals(args[optIdx]);
 		try (var launcher = new Launcher(configUri)) {
@@ -614,6 +615,13 @@ public class Launcher implements Runnable, AutoCloseable
 			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
 			launcher.run();
 		}
+	}
+
+	private static boolean idxOutOfRange(final String[] args, final int idx) {
+		if (idx < args.length)
+			return false;
+		System.out.println("Supply file name/URI for the KNX server configuration");
+		return true;
 	}
 
 	/**
