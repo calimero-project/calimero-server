@@ -36,6 +36,7 @@
 
 package io.calimero.server.gateway;
 
+import static io.calimero.cemi.CEMIFactory.create;
 import static io.calimero.device.ios.InterfaceObject.DEVICE_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.KNXNETIP_PARAMETER_OBJECT;
 import static io.calimero.device.ios.InterfaceObject.ROUTER_OBJECT;
@@ -72,6 +73,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1058,26 +1060,16 @@ public class KnxServerGateway implements Runnable
 			if (mc == CEMILData.MC_LDATA_REQ || mc == CEMILData.MC_LDATA_IND) {
 				if (mc == CEMILData.MC_LDATA_REQ) {
 					// send confirmation only for .req type
-					sendConfirmationFor((KnxipQueuingEndpoint) fe.getSource(), (CEMILData) CEMIFactory.copy(ldata));
+					sendConfirmationFor((KnxipQueuingEndpoint) fe.getSource(), ldata);
 
-					// if routing is active, dispatch .req over routing connection
-					findRoutingConnection().ifPresent(c ->
-						c.enqueue(() -> {
-							final var log = MessageFormat.format("dispatch {0}->{1} using {2}", ldata.getSource(), dst, c);
-							logger.log(DEBUG, log);
-							try {
-								final var ind = CEMIFactory.create(null, null,
-										(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+					// if routing is active, convert .req to .ind and dispatch over routing connection
+					findRoutingConnection().ifPresent(c -> dispatch(c,
+							() -> create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false),
+							ind -> {
+								logger.log(DEBUG, "dispatch {0}->{1} using {2}", ldata.getSource(), dst, c);
 								send(svcCont, c, ind, FramePath.ClientToClient);
 							}
-							catch (KNXFormatException | RuntimeException e) {
-								e.printStackTrace();
-							}
-							catch (final InterruptedException e) {
-								logger.log(WARNING, "interrupted " + log);
-							}
-						})
-					);
+					));
 				}
 
 				final var client = (KnxipQueuingEndpoint) fe.getSource();
@@ -1117,8 +1109,8 @@ public class KnxServerGateway implements Runnable
 							for (final var dataEndpoint : dataConnections.values()) {
 								if (dst.equals(dataEndpoint.deviceAddress())) {
 									try {
-										final var ind = CEMIFactory.create(null, null,
-												(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+										final var ind = create(null, null,
+												(CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 										asyncSend(svcCont, dataEndpoint, ind, FramePath.ClientToClient);
 									}
 									catch (KNXFormatException | RuntimeException e) {
@@ -1134,8 +1126,7 @@ public class KnxServerGateway implements Runnable
 								if (addresses.contains(dst)) {
 									// send disconnect
 									try {
-										final var disconnect = CEMIFactory.create(ia, ldata.getSource(), (CEMILData) CEMIFactory
-												.create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
+										final var disconnect = create(ia, ldata.getSource(), (CEMILData) create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
 										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
 												dst, disconnect.getSource(), disconnect.getDestination(), client);
 										asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
@@ -1181,8 +1172,7 @@ public class KnxServerGateway implements Runnable
 								continue;
 
 						try {
-							final var ind = CEMIFactory.create(null, null,
-									(CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+							final var ind = create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 							asyncSend(svcCont, conn, ind, FramePath.ClientToClient);
 						}
 						catch (KNXFormatException | RuntimeException e) {
@@ -1405,18 +1395,44 @@ public class KnxServerGateway implements Runnable
 		return true;
 	}
 
-	private void sendConfirmationFor(final KnxipQueuingEndpoint c, final CEMILData f) {
-		c.enqueue(() -> {
+	@FunctionalInterface
+	private interface FrameSupplier {
+		CEMI get() throws KNXException;
+	}
+
+	@FunctionalInterface
+	private interface SendIt {
+		void send(CEMI frame) throws KNXException, InterruptedException;
+	}
+
+	private void dispatch(final KnxipQueuingEndpoint endpoint, final FrameSupplier frameSupplier, final SendIt sender) {
+		endpoint.enqueue(() -> {
+			CEMI cemi = null;
 			try {
-				// TODO check for reasons to send negative L-Data.con
-				final boolean error = false;
-				logger.log(TRACE, "send positive cEMI L_Data.con");
-				c.send(createCon(f.getPayload(), f, error), WaitForAck);
+				cemi = frameSupplier.get();
+				sender.send(cemi);
 			}
-			catch (final Exception e) {
-				logger.log(WARNING, "sending on {0} failed: {1} ({2}->{3} L_Data.con {4})", c, e.getMessage(),
-						f.getSource(), f.getDestination(), DataUnitBuilder.decode(f.getPayload(), f.getDestination()));
+			catch (final KNXException e) {
+				var detail = new StringJoiner(" ", " (", ")").setEmptyValue("");
+				if (cemi != null) {
+					detail.add(cemi.toString());
+					if (cemi instanceof final CEMILData ldata)
+						detail.add(DataUnitBuilder.decode(ldata.getPayload(), ldata.getDestination()));
+				}
+				logger.log(WARNING, "send failed on {0}: {1}{2}", endpoint, e.getMessage(), detail);
 			}
+			catch (final InterruptedException e) {
+				logger.log(WARNING, "send interrupted on {0} ({1})", endpoint, cemi);
+			}
+		});
+	}
+
+	private void sendConfirmationFor(final KnxipQueuingEndpoint c, final CEMILData f) {
+		// TODO check for reasons to send negative L-Data.con
+		final boolean error = false;
+		dispatch(c, () -> createCon(f.getPayload(), f, error), con -> {
+			logger.log(TRACE, "send positive cEMI L_Data.con");
+			c.send(con, WaitForAck);
 		});
 	}
 
@@ -1425,7 +1441,7 @@ public class KnxServerGateway implements Runnable
 	{
 		if (original instanceof CEMILDataEx) {
 			// since we don't use the error flag, simply always create positive .con using the cemi factory
-			return CEMIFactory.create(CEMILData.MC_LDATA_CON, null, original);
+			return create(CEMILData.MC_LDATA_CON, null, original);
 
 //			final CEMILDataEx con = new CEMILDataEx(CEMILData.MC_LDATA_CON, original.getSource(),
 //					original.getDestination(), data, original.getPriority(), error);
@@ -1532,7 +1548,7 @@ public class KnxServerGateway implements Runnable
 						if (assignedAddress != null) {
 							logger.log(DEBUG, "dispatch {0}->{1} ({2}) using {3}", f.getSource(), assignedAddress,
 									dst, connection);
-							asyncSend(sc, connection, CEMIFactory.create(null, assignedAddress, f, false), path);
+							asyncSend(sc, connection, create(null, assignedAddress, f, false), path);
 						}
 					}
 					// also dispatch via routing as-is
@@ -1668,17 +1684,12 @@ public class KnxServerGateway implements Runnable
 
 	private void asyncSend(final ServiceContainer svcContainer, final KnxipQueuingEndpoint endpoint, final CEMI f,
 			final FrameEvent recordFrameEvent, final FramePath path) {
-		endpoint.enqueue(() -> {
-			try {
-				send(svcContainer, endpoint, f, path);
-				if (recordFrameEvent != null) {
-					final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
-					if (buffer != null)
-						buffer.completeEvent(endpoint, recordFrameEvent);
-				}
-			}
-			catch (final InterruptedException e) {
-				e.printStackTrace();
+		dispatch(endpoint, () -> f, frame -> {
+			send(svcContainer, endpoint, frame, path);
+			if (recordFrameEvent != null) {
+				final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
+				if (buffer != null)
+					buffer.completeEvent(endpoint, recordFrameEvent);
 			}
 		});
 	}
@@ -1745,12 +1756,12 @@ public class KnxServerGateway implements Runnable
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
-				ldata = CEMIFactory.create(source, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_REQ, null, f), false, true);
+				ldata = create(source, null, (CEMILData) create(CEMILData.MC_LDATA_REQ, null, f), false, true);
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
-				ldata = CEMIFactory.create(null, null, (CEMILData) CEMIFactory.create(CEMILData.MC_LDATA_IND, null, f), false, false);
+				ldata = create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, f), false, false);
 			else if (usb || overrideSrcAddress)
-				ldata = CEMIFactory.create(source, null, f, false);
+				ldata = create(source, null, f, false);
 			else
 				ldata = f;
 
@@ -1771,7 +1782,7 @@ public class KnxServerGateway implements Runnable
 				case DomainAddressSerialNumberWrite:
 					if (!send.isSystemBroadcast()) {
 						if (!(send instanceof CEMILDataEx))
-							send = CEMIFactory.create(null, null, send, true);
+							send = create(null, null, send, true);
 						((CEMILDataEx) send).setBroadcast(false);
 						logger.log(DEBUG, "{0} changed to system broadcast", DataUnitBuilder.decodeAPCI(svc));
 					}
@@ -1908,21 +1919,12 @@ public class KnxServerGateway implements Runnable
 			}
 
 			final int con = read ? CEMIDevMgmt.MC_PROPREAD_CON : CEMIDevMgmt.MC_PROPWRITE_CON;
-			final CEMIDevMgmt dm = read || data != null ? new CEMIDevMgmt(con, f.getObjectType(),
-					f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, data)
-					: new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(),
-							f.getStartIndex(), elems);
-			c.enqueue(() -> {
-				try {
-					c.send(dm, WaitForAck);
-					CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
-				}
-				catch (final KNXException e) {
-					logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
-				}
-				catch (final InterruptedException e) {
-					logger.log(WARNING, "sending on {0} interrupted ({1})", c, f);
-				}
+			final CEMIDevMgmt dm = read || data != null
+					? new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems, data)
+					: new CEMIDevMgmt(con, f.getObjectType(), f.getObjectInstance(), f.getPID(), f.getStartIndex(), elems);
+			dispatch(c, () -> dm, frame -> {
+				c.send(frame, WaitForAck);
+				CemiFrameTracer.instance().trace(frame, c.toString(), null, FramePath.LocalToClient);
 			});
 		}
 		else if (mc == CEMIDevMgmt.MC_FUNCPROP_CMD_REQ || mc == CEMIDevMgmt.MC_FUNCPROP_READ_REQ) {
@@ -1984,17 +1986,9 @@ public class KnxServerGateway implements Runnable
 				else // function input length too short, ignore
 					return;
 			}
-			c.enqueue(() -> {
-				try {
-					c.send(dm, WaitForAck);
-					CemiFrameTracer.instance().trace(dm, c.toString(), null, FramePath.LocalToClient);
-				}
-				catch (final KNXException e) {
-					logger.log(WARNING, "sending on {0} failed: {1} ({2})", c, e.getMessage(), f);
-				}
-				catch (final InterruptedException e) {
-					logger.log(WARNING, "sending on {0} interrupted ({1})", c, f);
-				}
+			dispatch(c, () -> dm, frame -> {
+				c.send(frame, WaitForAck);
+				CemiFrameTracer.instance().trace(frame, c.toString(), null, FramePath.LocalToClient);
 			});
 		}
 		else if (mc == CEMIDevMgmt.MC_RESET_REQ) {
