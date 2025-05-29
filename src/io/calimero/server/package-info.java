@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2022, 2025 B. Malinowsky
+    Copyright (c) 2025, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,15 +35,6 @@
 */
 
 /**
- * Defines the Calimero KNXnet/IP server API.
+ * Contains the server launcher and configuration.
  */
-module io.calimero.server {
-	requires transitive io.calimero.core;
-	requires transitive io.calimero.device;
-
-	exports io.calimero.server;
-	exports io.calimero.server.gateway;
-	exports io.calimero.server.knxnetip;
-
-	opens io.calimero.server.gateway to io.calimero.core; // @LinkEvent
-}
+package io.calimero.server;
