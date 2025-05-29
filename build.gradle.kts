@@ -163,6 +163,8 @@ tasks.named<Jar>("jar") {
 			"Class-Path" to configurations.runtimeClasspath.get().files.joinToString(" ") { it.name }
 		)
 	}
+
+	exclude("server-config.xml")
 }
 
 publishing {
