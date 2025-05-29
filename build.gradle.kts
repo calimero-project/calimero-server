@@ -53,6 +53,10 @@ java {
 	}
 }
 
+// we don't need the serial/usb feature jars when publishing
+tasks.named("serialJar") { enabled = false }
+tasks.named("usbJar") { enabled = false }
+
 tasks.withType<Jar>().configureEach {
 	from(projectDir) {
 		include("LICENSE.txt")
