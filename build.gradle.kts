@@ -105,8 +105,8 @@ dependencies {
 	api("com.github.calimero:calimero-core:$version")
 	api("com.github.calimero:calimero-device:$version")
 
-	implementation("org.slf4j:slf4j-api:2.0.16")
-	runtimeOnly("org.slf4j:slf4j-simple:2.0.16")
+	implementation("org.slf4j:slf4j-api:2.0.17")
+	runtimeOnly("org.slf4j:slf4j-simple:2.0.17")
 
 	add("serialRuntimeOnly", "com.github.calimero:calimero-rxtx:$version")
 	add("serialRuntimeOnly", "io.calimero:serial-native:$version")
