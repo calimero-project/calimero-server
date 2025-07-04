@@ -502,7 +502,7 @@ final class ControlEndpointService extends UdpServiceLooper
 				status = subnetStatus();
 			else {
 				final var ctrlEp = csr.getControlEndpoint().endpoint();
-				final var addr = endpoint != null ? endpoint.getRemoteAddress()
+				final var addr = endpoint != null ? endpoint.remoteAddress()
 						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
 				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
 						csr.getChannelID(), addr, ErrorCodes.getErrorMessage(status));
