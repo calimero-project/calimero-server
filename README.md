@@ -1,4 +1,4 @@
-Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml/badge.svg)](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml)
+Calimero KNXnet/IP Server [![CI with Gradle](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml/badge.svg)](https://github.com/calimero-project/calimero-server/actions/workflows/gradle.yml) [![](https://jitpack.io/v/calimero-project/calimero-server.svg)](https://jitpack.io/#calimero-project/calimero-server) [![](https://img.shields.io/badge/jitpack-master-brightgreen?label=JitPack)](https://jitpack.io/#calimero-project/calimero-server/master)
 =========================
 
 A KNXnet/IP server for running your own KNXnet/IP server in software. The minimum required runtime environment is [JDK 17](https://www.oracle.com/java/technologies/downloads/) (_java.base_).
