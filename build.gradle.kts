@@ -20,7 +20,7 @@ repositories {
 val junitJupiterVersion by rootProject.extra { "5.13.2" }
 
 group = "io.calimero"
-version = "3.0-SNAPSHOT"
+version = "3.0-M1"
 
 sourceSets {
 	main {

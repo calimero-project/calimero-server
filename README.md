@@ -74,7 +74,7 @@ Make sure all required `jar` packages are available, and any referenced files in
 java -cp "./*" io.calimero.server.Launcher server-config.xml
 
 # Or, a minimal working example with explicit references to jars (adjust as required)
-java -cp "calimero-server-3.0-SNAPSHOT.jar:calimero-core-3.0-SNAPSHOT.jar:calimero-device-3.0-SNAPSHOT.jar" io.calimero.server.Launcher server-config.xml
+java -cp "calimero-server-3.0-M1.jar:calimero-core-3.0-M1.jar:calimero-device-3.0-M1.jar" io.calimero.server.Launcher server-config.xml
 ~~~
 
 
