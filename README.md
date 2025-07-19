@@ -59,12 +59,6 @@ On the terminal, a running server instance can be stopped by `Ctrl+C` or typing 
 
     ./gradlew run --args resources/server-config.xml
 
-#### Using Maven
-
-~~~ sh
-mvn exec:java -Dexec.args=resources/server-config.xml
-~~~
-
 #### Using Java
 
 Make sure all required `jar` packages are available, and any referenced files in the folder `resources` are found (e.g., copy them into the current working directory)
