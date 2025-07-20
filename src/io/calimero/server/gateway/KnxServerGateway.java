@@ -2035,10 +2035,18 @@ public class KnxServerGateway implements Runnable
 		LocalDeviceManagementUsb adapter = ldmAdapter;
 		if (adapter != null && adapter.isOpen())
 			return adapter;
-		@SuppressWarnings("unchecked")
-		KNXNetworkLink link = (KNXNetworkLink) ((Link<KNXNetworkLink>) connector.getSubnetLink()).target();
-		if (link == null)
+
+		// make sure we don't have a virtual link
+		if (!(connector.getSubnetLink() instanceof Link<?> l))
+			throw new KNXException("no USB subnet link for " + connector.getName());
+
+		final var target = l.target();
+		if (target == null)
 			throw new KNXException("no open subnet link for " + connector.getName());
+		// make sure we don't have a monitor link
+		if (!(target instanceof KNXNetworkLink link))
+			throw new KNXException("subnet link is in busmonitor-layer");
+
 		if (!link.isOpen()) {
 			@SuppressWarnings("unchecked")
 			final var cast = ((Link<KNXNetworkLink>) connector.openNetworkLink());
