@@ -7,7 +7,7 @@ A KNXnet/IP server for running your own KNXnet/IP server in software. The minimu
 * Turn a KNX interface into a KNXnet/IP server, e.g., KNX USB or KNX RF USB interfaces, EMI1/2 serial couplers 
 * Use KNX IP Secure to secure your client-side KNX IP network traffic
 * Intercept or proxy a KNXnet/IP connection, e.g., for monitoring/debugging purposes
-* Setup a (secure) time server for your KNX network
+* Set up a (secure) time-server for your KNX network
 * Emulate/virtualize a KNX network
 
 
