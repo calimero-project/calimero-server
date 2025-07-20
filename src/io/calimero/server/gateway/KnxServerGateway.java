@@ -628,9 +628,6 @@ public class KnxServerGateway implements Runnable
 		public String getName() { return name; }
 
 		@Override
-		public void setKNXMedium(final KNXMediumSettings settings) {}
-
-		@Override
 		public KNXMediumSettings getKNXMedium() { return new KnxIPSettings(server.device().getAddress()); }
 
 		@Override

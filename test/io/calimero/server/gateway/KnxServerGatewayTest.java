@@ -258,9 +258,6 @@ class KnxServerGatewayTest
 		}
 
 		@Override
-		public void setKNXMedium(final KNXMediumSettings settings) {}
-
-		@Override
 		public KNXMediumSettings getKNXMedium()
 		{
 			return null;
