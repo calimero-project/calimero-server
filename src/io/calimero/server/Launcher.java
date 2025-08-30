@@ -639,7 +639,7 @@ public class Launcher implements Runnable, AutoCloseable
 		final boolean detached = "--no-stdin".equals(args[optIdx]);
 		try (var launcher = new Launcher(configUri)) {
 			launcher.terminal = !detached;
-			Runtime.getRuntime().addShutdownHook(new Thread(launcher::quit, launcher.server.getName() + " shutdown"));
+			Runtime.getRuntime().addShutdownHook(shutdownHook(launcher));
 			launcher.run();
 		}
 	}
@@ -652,6 +652,11 @@ public class Launcher implements Runnable, AutoCloseable
 				Supply file name/URI for the KNX server configuration
 				""", Manifest.buildInfo(Launcher.class));
 		return true;
+	}
+
+	private static Thread shutdownHook(final Launcher launcher) {
+		return Thread.ofVirtual().inheritInheritableThreadLocals(false)
+				.name(launcher.server.getName() + " shutdown").unstarted(launcher::quit);
 	}
 
 	/**
