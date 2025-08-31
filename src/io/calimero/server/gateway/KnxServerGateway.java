@@ -429,7 +429,7 @@ public class KnxServerGateway implements Runnable
 			final byte[] data = bytesFromWord(sc.getMediumSettings().maxApduLength());
 			final int pidMaxRoutingApduLength = 58;
 			setProperty(ROUTER_OBJECT, objectInstance(subnet), pidMaxRoutingApduLength, data);
-			if (subnet == connectors.get(0)) {
+			if (subnet == connectors.getFirst()) {
 				setProperty(DEVICE_OBJECT, 1, PID.MAX_APDULENGTH, data);
 				final int pidMaxInterfaceApduLength = 68;
 				setProperty(InterfaceObject.CEMI_SERVER_OBJECT, 1, pidMaxInterfaceApduLength, data);
@@ -527,7 +527,7 @@ public class KnxServerGateway implements Runnable
 
 		private void checkRoutingBusy()
 		{
-			final var subnet = connectors.get(0);
+			final var subnet = connectors.getFirst();
 			final var settings = subnet.getServiceContainer().getMediumSettings();
 			final int medium = settings.getMedium();
 
@@ -602,7 +602,7 @@ public class KnxServerGateway implements Runnable
 				}
 			}
 			else {
-				final var self = connectors.get(0).getServiceContainer().getMediumSettings().getDeviceAddress();
+				final var self = connectors.getFirst().getServiceContainer().getMediumSettings().getDeviceAddress();
 				final boolean sysBcast = dst == null;
 				final CEMILData msg;
 				if (sysBcast) {
@@ -619,7 +619,7 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void send(final CEMILData msg, final boolean waitForCon) {
 			// TODO support > 1 service containers
-			final SubnetConnector connector = connectors.get(0);
+			final SubnetConnector connector = connectors.getFirst();
 			final long eventId = connector.lastEventId + 1; // required for fake busmonitor sequence number
 			dispatchToServer(connector, msg, eventId, FramePath.LocalToClient);
 		}
@@ -662,7 +662,7 @@ public class KnxServerGateway implements Runnable
 
 			// setting the device link also sets the medium of our link proxy (KNX IP), so restore the correct
 			// value of the first service container
-			final var serviceContainer = config.containers().get(0).subnetConnector().getServiceContainer();
+			final var serviceContainer = config.containers().getFirst().subnetConnector().getServiceContainer();
 			final int medium = serviceContainer.getMediumSettings().getMedium();
 			server.getInterfaceObjectServer().setProperty(InterfaceObject.CEMI_SERVER_OBJECT, objectInstance,
 					PID.MEDIUM_TYPE, 1, 1, (byte) 0, (byte) medium);

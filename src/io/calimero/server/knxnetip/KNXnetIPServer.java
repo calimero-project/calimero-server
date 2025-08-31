@@ -556,23 +556,18 @@ public class KNXnetIPServer
 	 */
 	public synchronized void setOption(final String optionKey, final String value)
 	{
-		if (OPTION_DISCOVERY_DESCRIPTION.equals(optionKey)) {
-			runDiscovery = Boolean.parseBoolean(value);
-			stopDiscoveryService();
-			if (runDiscovery && running)
-				startDiscoveryService(outgoingIf, discoveryIfs, -1);
+		switch (optionKey) {
+			case OPTION_DISCOVERY_DESCRIPTION -> {
+				runDiscovery = Boolean.parseBoolean(value);
+				stopDiscoveryService();
+				if (runDiscovery && running)
+					startDiscoveryService(outgoingIf, discoveryIfs, -1);
+			}
+			case OPTION_ROUTING_LOOPBACK     -> multicastLoopback = Boolean.parseBoolean(value);
+			case OPTION_DISCOVERY_INTERFACES -> discoveryIfs = parseNetworkInterfaces(optionKey, value);
+			case OPTION_OUTGOING_INTERFACE   -> outgoingIf = parseNetworkInterfaces(optionKey, value);
+			default -> logger.log(WARNING, "option \"" + optionKey + "\" not supported or unknown");
 		}
-		else if (OPTION_ROUTING_LOOPBACK.equals(optionKey)) {
-			multicastLoopback = Boolean.parseBoolean(value);
-		}
-		else if (OPTION_DISCOVERY_INTERFACES.equals(optionKey)) {
-			discoveryIfs = parseNetworkInterfaces(optionKey, value);
-		}
-		else if (OPTION_OUTGOING_INTERFACE.equals(optionKey)) {
-			outgoingIf = parseNetworkInterfaces(optionKey, value);
-		}
-		else
-			logger.log(WARNING, "option \"" + optionKey + "\" not supported or unknown");
 	}
 
 	public void configureSecurity(final ServiceContainer sc, final Map<String, byte[]> keys,
@@ -597,7 +592,7 @@ public class KNXnetIPServer
 				|| securedServices.contains(ServiceFamily.Tunneling);
 		final boolean configureSecureUnicast = configureDefault || useSecureDevMgmtTunneling;
 
-		// if we setup secure unicast services, we need at least device authentication
+		// if we set up secure unicast services, we need at least device authentication
 		if (configureSecureUnicast && keys.containsKey("device.key")) {
 			if (configureDefault || securedServices.contains(ServiceFamily.DeviceManagement))
 				secure.add(ServiceFamily.DeviceManagement);

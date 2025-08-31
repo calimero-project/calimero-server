@@ -99,59 +99,64 @@ final class JsonTracer implements CemiFrameTracer {
 	private static String toJson(final CEMI frame, final String client, final Object subnet, final FramePath path) {
 		record JsonTraceEvent(Instant time, Object client, Object subnet, FramePath path, Json frame) implements Json {}
 
-		Json jsonFrame;
-		if (frame instanceof final CEMILData ldata) {
-			final boolean extended = ldata instanceof CEMILDataEx;
-			final var payload = frame.getPayload();
-			String tpci = "";
-			String apci = "";
-			byte[] asdu = null;
-			if (payload.length > 1) {
-				tpci = DataUnitBuilder.decodeTPCI(DataUnitBuilder.getTPDUService(payload), ldata.getDestination());
-				apci = DataUnitBuilder.decodeAPCI(DataUnitBuilder.getAPDUService(payload));
-				asdu = DataUnitBuilder.extractASDU(payload);
+		final var jsonFrame = switch (frame) {
+			case final CEMILData ldata -> {
+				final boolean extended = ldata instanceof CEMILDataEx;
+				final var payload = frame.getPayload();
+				String tpci = "";
+				String apci = "";
+				byte[] asdu = null;
+				if (payload.length > 1) {
+					tpci = DataUnitBuilder.decodeTPCI(DataUnitBuilder.getTPDUService(payload), ldata.getDestination());
+					apci = DataUnitBuilder.decodeAPCI(DataUnitBuilder.getAPDUService(payload));
+					asdu = DataUnitBuilder.extractASDU(payload);
+				}
+
+				// ??? add boolean lengthOptimizedApdu, String decodedAsdu
+				record JsonCemiFrame(String svc, boolean extended, IndividualAddress src, KNXAddress dst,
+						boolean repetition, int hopCount, Priority priority, boolean ack, boolean sysBcast, boolean con,
+						String tpci, String apci, byte[] asdu) implements Json {}
+
+				yield new JsonCemiFrame(svcPrimitive(ldata.getMessageCode()), extended, ldata.getSource(),
+						ldata.getDestination(), ldata.isRepetition(), ldata.getHopCount(), ldata.getPriority(),
+						ldata.isAckRequested(), ldata.isSystemBroadcast(), ldata.isPositiveConfirmation(), tpci, apci,
+						asdu);
 			}
+			case final CEMIDevMgmt devMgmt -> {
+				record JsonCemiFrame(String svc, int objectType, int objectInstance, int pid, int start, int elements,
+						String error, byte[] payload) implements Json {}
 
-			// ??? add boolean lengthOptimizedApdu, String decodedAsdu
-			record JsonCemiFrame(String svc, boolean extended, IndividualAddress src, KNXAddress dst,
-					boolean repetition, int hopCount, Priority priority, boolean ack, boolean sysBcast, boolean con,
-					String tpci, String apci, byte[] asdu) implements Json {}
-
-			jsonFrame = new JsonCemiFrame(svcPrimitive(ldata.getMessageCode()), extended, ldata.getSource(),
-					ldata.getDestination(), ldata.isRepetition(), ldata.getHopCount(), ldata.getPriority(),
-					ldata.isAckRequested(), ldata.isSystemBroadcast(), ldata.isPositiveConfirmation(), tpci, apci, asdu);
-		}
-		else if (frame instanceof final CEMIDevMgmt devMgmt) {
-			record JsonCemiFrame(String svc, int objectType, int objectInstance, int pid, int start, int elements,
-				String error, byte[] payload) implements Json {}
-
-			jsonFrame = new JsonCemiFrame(svcPrimitiveDevMgmt(devMgmt.getMessageCode()), devMgmt.getObjectType(),
-					devMgmt.getObjectInstance(), devMgmt.getPID(), devMgmt.getStartIndex(), devMgmt.getElementCount(),
-					devMgmt.getErrorMessage(), devMgmt.getPayload());
-		}
-		else if (frame instanceof final CEMIBusMon mon) {
-			record JsonMonitorIndication(String svc, long relativeTimestamp, int seqNumber, boolean frameError,
-				boolean bitError, boolean parityError, boolean lost, byte[] data, Json rawFrame) implements Json {}
-
-			final var medium = KNXMediumSettings.MEDIUM_TP1; // TODO
-			final var extBusmon = false; // TODO PL110 only
-			Json jsonRawFrame = null;
-			try {
-				jsonRawFrame = toJson(RawFrameFactory.create(medium, mon.getPayload(), 0, extBusmon));
+				yield new JsonCemiFrame(svcPrimitiveDevMgmt(devMgmt.getMessageCode()), devMgmt.getObjectType(),
+						devMgmt.getObjectInstance(), devMgmt.getPID(), devMgmt.getStartIndex(),
+						devMgmt.getElementCount(), devMgmt.getErrorMessage(), devMgmt.getPayload());
 			}
-			catch (final KNXFormatException e) {
-				logger.log(DEBUG, "error creating monitor raw frame from " + HexFormat.of().formatHex(mon.getPayload()), e);
-			}
+			case final CEMIBusMon mon -> {
+				record JsonMonitorIndication(String svc, long relativeTimestamp, int seqNumber, boolean frameError,
+						boolean bitError, boolean parityError, boolean lost, byte[] data, Json rawFrame) implements
+						io.calimero.server.gateway.trace.Json {}
 
-			jsonFrame = new JsonMonitorIndication(svcPrimitive(mon.getMessageCode()), mon.getTimestamp(),
-					mon.getSequenceNumber(), mon.getFrameError(), mon.getBitError(), mon.getParityError(),
-					mon.getLost(), mon.getPayload(), jsonRawFrame);
-		}
-		else {
-			logger.log(DEBUG, "tracer does not support cEMI frame format " + frame.getClass().getSimpleName());
+				final var medium = KNXMediumSettings.MEDIUM_TP1; // TODO
+				final var extBusmon = false; // TODO PL110 only
+				Json jsonRawFrame = null;
+				try {
+					jsonRawFrame = toJson(RawFrameFactory.create(medium, mon.getPayload(), 0, extBusmon));
+				}
+				catch (final KNXFormatException e) {
+					logger.log(DEBUG, "error creating monitor raw frame from " + HexFormat.of().formatHex(mon.getPayload()), e);
+				}
+
+				yield new JsonMonitorIndication(svcPrimitive(mon.getMessageCode()), mon.getTimestamp(),
+						mon.getSequenceNumber(), mon.getFrameError(), mon.getBitError(), mon.getParityError(),
+						mon.getLost(), mon.getPayload(), jsonRawFrame);
+			}
+			default -> {
+				logger.log(DEBUG, "tracer does not support cEMI frame format " + frame.getClass().getSimpleName());
+				yield null;
+			}
+		};
+
+		if (jsonFrame == null)
 			return null;
-		}
-
 		final var jsonTraffic = new JsonTraceEvent(Instant.now(), client, subnet, path, jsonFrame);
 		return jsonTraffic.toJson();
 	}

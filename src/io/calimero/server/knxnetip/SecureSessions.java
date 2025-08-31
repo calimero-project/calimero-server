@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2018, 2024 B. Malinowsky
+    Copyright (c) 2018, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -284,12 +284,11 @@ final class SecureSessions {
 	}
 
 	private void send(final byte[] data, final EndpointAddress address) throws IOException {
-		if (address instanceof TcpEndpointAddress)
-			ctrlEndpoint.tcpEndpoint.send(data, address);
-		else if (address instanceof UnixEndpointAddress)
-			ctrlEndpoint.udsEndpoint.send(data, address);
-		else if (address instanceof final UdpEndpointAddress udp)
-			socket.send(new DatagramPacket(data, data.length, udp.address()));
+		switch (address) {
+			case TcpEndpointAddress __        -> ctrlEndpoint.tcpEndpoint.send(data, address);
+			case UnixEndpointAddress __       -> ctrlEndpoint.udsEndpoint.send(data, address);
+			case final UdpEndpointAddress udp -> socket.send(new DatagramPacket(data, data.length, udp.address()));
+		}
 	}
 
 	private ByteBuffer establishSession(final EndpointAddress remote, final KNXnetIPHeader h, final byte[] data,

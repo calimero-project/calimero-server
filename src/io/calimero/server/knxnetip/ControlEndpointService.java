@@ -693,12 +693,11 @@ final class ControlEndpointService extends UdpServiceLooper
 			logger.log(DEBUG, "send session {0} seq {1} tag {2} to {3}", sessionId, seq, msgTag, dst);
 		}
 
-		if (dst instanceof TcpEndpointAddress)
-			tcpEndpoint.send(buf, dst);
-		else if (dst instanceof UnixEndpointAddress)
-			udsEndpoint.send(buf, dst);
-		else if (dst instanceof final UdpEndpointAddress udp)
-			s.send(new DatagramPacket(buf, buf.length, udp.address()));
+		switch (dst) {
+			case TcpEndpointAddress __  -> tcpEndpoint.send(buf, dst);
+			case UnixEndpointAddress __ -> udsEndpoint.send(buf, dst);
+			case UdpEndpointAddress udp -> s.send(new DatagramPacket(buf, buf.length, udp.address()));
+		}
 	}
 
 	private DatagramSocket createSocket()

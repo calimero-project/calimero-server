@@ -180,19 +180,17 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		ctrlSocket = localCtrlEndpt;
 		socket = localDataEndpt;
 
-		if (remoteCtrlEndpt instanceof final UdpEndpointAddress udp)
-			ctrlEndpt = udp.address();
-		else if  (remoteCtrlEndpt instanceof final TcpEndpointAddress tcp)
-			ctrlEndpt = tcp.address();
-		else
-			ctrlEndpt = null;
+		ctrlEndpt = switch (remoteCtrlEndpt) {
+			case final UdpEndpointAddress udp -> udp.address();
+			case final TcpEndpointAddress tcp -> tcp.address();
+			default -> null;
+		};
 
-		if (remoteDataEndpt instanceof final UdpEndpointAddress udp)
-			dataEndpt = udp.address();
-		else if  (remoteDataEndpt instanceof final TcpEndpointAddress tcp)
-			dataEndpt = tcp.address();
-		else
-			dataEndpt = null;
+		dataEndpt = switch (remoteDataEndpt) {
+			case final UdpEndpointAddress udp -> udp.address();
+			case final TcpEndpointAddress tcp -> tcp.address();
+			case null, default -> null;
+		};
 
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
 		if (sessionId > 0)

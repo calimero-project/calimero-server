@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2016, 2024 B. Malinowsky
+    Copyright (c) 2016, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -155,7 +155,7 @@ final class ReplayBuffer<T extends FrameEvent>
 	{
 		synchronized (buffer) {
 			while (buffer.size() >= maxBufferSize)
-				buffer.remove(0);
+				buffer.removeFirst();
 			buffer.add(e);
 		}
 		logger.log(TRACE, "record {0} as event ''{1}''", e, e.id());
@@ -186,7 +186,7 @@ final class ReplayBuffer<T extends FrameEvent>
 			final int events = buffer.size() - fromIndex;
 			if (fromIndex == 0) {
 				logger.log(WARNING, "{0} has ≥ {1} events pending with a buffer size of {2}, up to {3} events "
-						+ "will be missing", conn, events, buffer.size(), buffer.get(0).id() - last);
+						+ "will be missing", conn, events, buffer.size(), buffer.getFirst().id() - last);
 			}
 
 			logger.log(INFO, "{0} has {1} pending events for replay: ({2}..{3}]", conn, events, last, latestEventCount());
@@ -218,7 +218,7 @@ final class ReplayBuffer<T extends FrameEvent>
 	private long latestEventCount()
 	{
 		synchronized (buffer) {
-			return buffer.get(buffer.size() - 1).id();
+			return buffer.getLast().id();
 		}
 	}
 
