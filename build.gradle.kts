@@ -130,7 +130,7 @@ tasks.named<CreateStartScripts>("startScripts") {
 		val commonsLang3 = rtClasspath.filter { it.name.startsWith("commons-lang3") }
 		val libName = commonsLang3.first().name
 
-		unixScriptFile.replace("\n\nMODULE_PATH=", ":${'$'}APP_HOME/lib/$libName\n\nMODULE_PATH=")
+		unixScriptFile.replace("\n\nMODULE_PATH=", $$":$APP_HOME/lib/$$libName\n\nMODULE_PATH=")
 		winScriptFile.replace("\r\nset MODULE_PATH=", ";%APP_HOME%\\lib\\$libName\r\nset MODULE_PATH=")
 	}
 }
