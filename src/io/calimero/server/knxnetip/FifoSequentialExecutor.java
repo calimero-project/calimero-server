@@ -65,11 +65,10 @@ final class FifoSequentialExecutor implements java.util.concurrent.Executor {
 		if (tasks.isEmpty())
 			return;
 		if (running.compareAndSet(false, true))
-			Executor.execute(this::runTasks);
+			Executor.execute(this::runTasks, name);
 	}
 
 	private void runTasks() {
-		Thread.currentThread().setName(name);
 		for (var task = tasks.poll(); task != null; task = tasks.poll()) {
 			try {
 				task.run();
