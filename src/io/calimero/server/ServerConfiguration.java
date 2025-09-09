@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2020, 2024 B. Malinowsky
+    Copyright (c) 2020, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -162,12 +162,15 @@ public class ServerConfiguration {
 					? secureSymbol + " " : "";
 			final String unicast = "" + sc.getControlEndpoint().endpoint().getPort();
 			final String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
+			final String baos = ((DefaultServiceContainer) sc).baosSupport() ? ", BAOS support (UDP/TCP port 12004)" : "";
 			final String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
-			return String.format("""
+			return """
 					%s%s:
-						server: listen on %s (%sport %s%s%s), KNX IP %srouting %s%s
-						%s connection: %s%s""", sc.getName(), activated, sc.networkInterface(), unicastSecure, unicast,
-					udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, type, sc.getMediumSettings(), filter);
+						server: listen on %s (UDP/TCP %sport %s%s%s), KNX IP %srouting %s%s%s
+						%s connection: %s%s""".formatted(
+					sc.getName(), activated,
+					sc.networkInterface(), unicastSecure, unicast, udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, baos,
+					type, sc.getMediumSettings(), filter);
 		}
 	}
 
@@ -250,11 +253,11 @@ public class ServerConfiguration {
 
 	@Override
 	public String toString() {
-		// @formatter:off
-		return String.format("'%s' with %s service container%s, discovery%s",
-				friendly,
-				containers.size(), containers.size() > 1 ? "s" : "",
-				discovery ? ": listen on " + discoveryNetifs() + " send on " + outgoingNetifs() + " interfaces": " disabled");
-		// @formatter:on
+		return """
+				'%s'
+				discovery: %s"""
+				.formatted(friendly, discovery
+						? "listen on " + discoveryNetifs() + ", send on " + outgoingNetifs() + " interfaces"
+						: "disabled");
 	}
 }
