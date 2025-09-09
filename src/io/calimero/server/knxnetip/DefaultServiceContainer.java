@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2024 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -190,5 +190,5 @@ public class DefaultServiceContainer implements ServiceContainer
 	/**
 	 * {@return <code>true</code> iff service container should serve BAOS connections, <code>false</code> otherwise}
 	 */
-	boolean baosSupport() { return baosSupport; }
+	public final boolean baosSupport() { return baosSupport; }
 }
