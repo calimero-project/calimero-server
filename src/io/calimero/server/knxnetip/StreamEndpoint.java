@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2018, 2024 B. Malinowsky
+    Copyright (c) 2018, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,13 +46,15 @@ import java.net.NetworkInterface;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.Executor;
 
-sealed abstract class StreamEndpoint implements Runnable, AutoCloseable
+sealed abstract class StreamEndpoint implements AutoCloseable
 		permits TcpEndpoint, UnixDomainSocketEndpoint {
 
 	final ConcurrentHashMap<EndpointAddress, StreamLooper> connections = new ConcurrentHashMap<>();
@@ -60,65 +62,64 @@ sealed abstract class StreamEndpoint implements Runnable, AutoCloseable
 	final EndpointAddress endpoint;
 	final boolean baos;
 
+	private final String namePrefix;
 	private final String name;
-	private Thread thread;
-
+	private volatile Thread thread;
 
 	StreamEndpoint(final ControlEndpointService ces, final EndpointAddress endpoint, final String name, final boolean baos) {
 		ctrlEndpoint = ces;
 		this.endpoint = endpoint;
-		this.name = name;
 		this.baos = baos;
+
+		namePrefix = ctrlEndpoint.getServiceContainer().getName() + (baos ? " baos" : "") + " ";
+		this.name = namePrefix + name + " service";
 	}
 
 	void start() throws InterruptedException {
-		final Future<?> task = Executor.executor().submit(this);
-		try {
-			while (!task.isDone()) {
-				synchronized (this) {
-					if (thread != null)
-						return;
-					wait();
+		final var init = new CompletableFuture<Void>();
+
+		final Runnable loop = () -> {
+			try (var server = open()) {
+				init.complete(null);
+
+				if (endpoint instanceof TcpEndpointAddress) {
+					final var isa = (InetSocketAddress) server.getLocalAddress();
+					final var netif = NetworkInterface.getByInetAddress(isa.getAddress());
+					ctrlEndpoint.logger.log(INFO, "{0} {1}/{2} is up and running", name, netif.getName(), endpoint);
+				}
+				else
+					ctrlEndpoint.logger.log(INFO, "{0} {1} is up and running", name, endpoint);
+
+				while (true) {
+					final var channel = server.accept();
+					final var looper = newLooper(channel);
+					connections.put(looper.endpoint, looper);
+					Executor.execute(looper, namePrefix + "connection " + looper.endpoint);
 				}
 			}
+			catch (final Throwable t) {
+				init.completeExceptionally(t);
+				if (t instanceof final ClosedByInterruptException e)
+					ctrlEndpoint.logger.log(Level.DEBUG, "{0} {1} closed", name, endpoint);
+				else if (t instanceof final IOException e)
+					ctrlEndpoint.logger.log(ERROR, "socket error in " + name + " " + endpoint, e);
+			}
+			finally {
+				cleanup();
+			}
+		};
+
+		try {
+			thread = Executor.execute(loop, name);
+			init.get(5, TimeUnit.SECONDS);
 		}
-		catch (final InterruptedException e) {
+		catch (final Throwable t) {
 			close();
-			throw e;
-		}
-		throw new KnxRuntimeException("couldn't start " + name + " service for " + ctrlEndpoint.getServiceContainer().getName());
-	}
-
-	public void run() {
-		final String namePrefix = ctrlEndpoint.getServiceContainer().getName() + (baos ? " baos" : "") + " ";
-		final String name = namePrefix + this.name + " service";
-		Thread.currentThread().setName(name);
-
-		try (var server = open()) {
-			synchronized (this) {
-				thread = Thread.currentThread();
-				notifyAll();
+			switch (t) {
+				case InterruptedException e -> throw e;
+				case ExecutionException __  -> throw new KnxRuntimeException("couldn't start " + name, t.getCause());
+				default -> throw new KnxRuntimeException("couldn't start " + name, t);
 			}
-			if (endpoint instanceof TcpEndpointAddress) {
-				final var isa = (InetSocketAddress) server.getLocalAddress();
-				final var netif = NetworkInterface.getByInetAddress(isa.getAddress());
-				ctrlEndpoint.logger.log(INFO, "{0} {1}/{2} is up and running", name, netif.getName(), endpoint);
-			}
-			else
-				ctrlEndpoint.logger.log(INFO, "{0} {1} is up and running", name, endpoint);
-
-			while (true) {
-				final var channel = server.accept();
-				final var looper = newLooper(channel);
-				connections.put(looper.endpoint, looper);
-				Executor.execute(looper, namePrefix + "connection " + looper.endpoint);
-			}
-		}
-		catch (final ClosedByInterruptException e) {
-			ctrlEndpoint.logger.log(Level.DEBUG, name + " {0} closed", endpoint);
-		}
-		catch (final IOException e) {
-			ctrlEndpoint.logger.log(ERROR, "socket error in " + name + " " + endpoint, e);
 		}
 	}
 
@@ -132,12 +133,14 @@ sealed abstract class StreamEndpoint implements Runnable, AutoCloseable
 			looper.send(buf);
 	}
 
+	void cleanup() {}
+
 	@Override
 	public void close() {
 		connections.values().forEach(StreamLooper::close);
-		synchronized (this) {
-			if (thread != null) thread.interrupt();
-		}
+		final Thread t = thread;
+		if (t != null)
+			t.interrupt();
 	}
 
 	void lastSessionTimedOut(final EndpointAddress remote) {

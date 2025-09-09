@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2024, 2024 B. Malinowsky
+    Copyright (c) 2024, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,20 +52,6 @@ final class UnixDomainSocketEndpoint extends StreamEndpoint {
 	}
 
 	@Override
-	public void run() {
-		try {
-			super.run();
-		} finally {
-			final var path = ((UnixDomainSocketAddress) endpoint.address()).getPath();
-			if (!path.toString().isEmpty()) try {
-				Files.deleteIfExists(path);
-			} catch (final IOException e) {
-				ctrlEndpoint.logger.log(INFO, "error deleting unix socket path " + path, e);
-			}
-		}
-	}
-
-	@Override
 	ServerSocketChannel open() throws IOException {
 		final var ssc = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
 		final var path = ((UnixDomainSocketAddress) endpoint.address()).getPath();
@@ -84,6 +70,15 @@ final class UnixDomainSocketEndpoint extends StreamEndpoint {
 		return new Looper(ctrlEndpoint, channel);
 	}
 
+	@Override
+	void cleanup()  {
+		final var path = ((UnixDomainSocketAddress) endpoint.address()).getPath();
+		if (!path.toString().isEmpty()) try {
+			Files.deleteIfExists(path);
+		} catch (final IOException e) {
+			ctrlEndpoint.logger.log(INFO, "error deleting unix socket path " + path, e);
+		}
+	}
 
 
 	final class Looper extends StreamLooper {
