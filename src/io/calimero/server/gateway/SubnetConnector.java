@@ -44,6 +44,7 @@ import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -460,8 +461,16 @@ public final class SubnetConnector
 
 	@Override
 	public String toString() {
-		final Object linkDesc = subnetLink != null ? subnetLink : (linkArgs + " " + msgFormat);
-		return (interfaceType + " " + linkDesc).trim(); // trim because linkDesc might be empty
+		final var joiner = new StringJoiner(" ");
+		joiner.add(interfaceType.toString());
+		if (subnetLink != null)
+			return joiner.add(subnetLink.toString()).toString();
+
+		if (!linkArgs.isBlank())
+			joiner.add(linkArgs);
+		if (!msgFormat.isBlank())
+			joiner.add(msgFormat);
+		return joiner.toString();
 	}
 
 	void setSubnetListener(final SubnetListener subnetListener)
