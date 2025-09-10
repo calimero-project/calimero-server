@@ -391,11 +391,11 @@ public final class SubnetConnector
 
 		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
-			case Udp ->
-				() -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
+			case Udp -> () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
 			case Tcp -> () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), settings);
 			case Usb -> () -> new KNXNetworkMonitorUsb(linkArgs, settings);
-			case Ft12 -> () -> "cemi".equals(msgFormat) ? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
+			case Ft12 -> () -> "cemi".equals(msgFormat)
+					? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
 					: new KNXNetworkMonitorFT12(linkArgs, settings);
 			case Tpuart -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
 			case User -> () -> newLinkUsing(className, linkArgs.split("[,|]"));
@@ -477,10 +477,10 @@ public final class SubnetConnector
 	{
 		listener = subnetListener;
 		final AutoCloseable link = getSubnetLink();
-		if (link instanceof KNXNetworkLink)
-			((KNXNetworkLink) link).addLinkListener(listener);
-		if (link instanceof KNXNetworkMonitor)
-			((KNXNetworkMonitor) link).addMonitorListener(listener);
+		if (link instanceof final KNXNetworkLink networkLink)
+			networkLink.addLinkListener(listener);
+		if (link instanceof final KNXNetworkMonitor monitor)
+			monitor.addMonitorListener(listener);
 	}
 
 	void requestBaos(final boolean baos) {

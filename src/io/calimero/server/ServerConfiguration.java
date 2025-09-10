@@ -145,8 +145,8 @@ public class ServerConfiguration {
 			final var optSec = securedServices.contains(ServiceFamily.Security) ? ", KNX secure: optional" : "";
 			final var keyfile = keyfile();
 
-			if ((sc instanceof RoutingServiceContainer)) {
-				mcast = "multicast group " + ((RoutingServiceContainer) sc).routingMulticastAddress().getHostAddress();
+			if (sc instanceof final RoutingServiceContainer rsc) {
+				mcast = "multicast group " + rsc.routingMulticastAddress().getHostAddress();
 
 				final boolean secureRoutingRequired = securedServices.contains(ServiceFamily.Routing);
 				if (secureRoutingRequired && keyfile.getOrDefault("group.key", new byte[0]).length == 16)
