@@ -90,9 +90,13 @@ import io.calimero.device.ios.DeviceObject;
 import io.calimero.device.ios.InterfaceObject;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXnetIPConnection;
 import io.calimero.knxnetip.KNXnetIPTunnel;
 import io.calimero.knxnetip.KNXnetIPTunnel.TunnelingLayer;
+import io.calimero.knxnetip.TcpEndpointAddress;
+import io.calimero.knxnetip.UdpEndpointAddress;
+import io.calimero.knxnetip.UdsEndpointAddress;
 import io.calimero.knxnetip.servicetype.ConnectRequest;
 import io.calimero.knxnetip.servicetype.ConnectResponse;
 import io.calimero.knxnetip.servicetype.ConnectionstateRequest;
@@ -695,7 +699,7 @@ final class ControlEndpointService extends UdpServiceLooper
 
 		switch (dst) {
 			case TcpEndpointAddress __  -> tcpEndpoint.send(buf, dst);
-			case UnixEndpointAddress __ -> udsEndpoint.send(buf, dst);
+			case UdsEndpointAddress __  -> udsEndpoint.send(buf, dst);
 			case UdpEndpointAddress udp -> s.send(new DatagramPacket(buf, buf.length, udp.address()));
 		}
 	}

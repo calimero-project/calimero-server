@@ -85,8 +85,12 @@ import io.calimero.device.ios.InterfaceObject;
 import io.calimero.device.ios.InterfaceObjectServer;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXnetIPDevMgmt;
 import io.calimero.knxnetip.SecureConnection;
+import io.calimero.knxnetip.TcpEndpointAddress;
+import io.calimero.knxnetip.UdpEndpointAddress;
+import io.calimero.knxnetip.UdsEndpointAddress;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.log.LogService;
 import io.calimero.secure.KnxSecureException;
@@ -286,7 +290,7 @@ final class SecureSessions {
 	private void send(final byte[] data, final EndpointAddress address) throws IOException {
 		switch (address) {
 			case TcpEndpointAddress __        -> ctrlEndpoint.tcpEndpoint.send(data, address);
-			case UnixEndpointAddress __       -> ctrlEndpoint.udsEndpoint.send(data, address);
+			case UdsEndpointAddress __        -> ctrlEndpoint.udsEndpoint.send(data, address);
 			case final UdpEndpointAddress udp -> socket.send(new DatagramPacket(data, data.length, udp.address()));
 		}
 	}

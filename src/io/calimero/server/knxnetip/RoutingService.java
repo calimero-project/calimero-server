@@ -57,6 +57,7 @@ import io.calimero.cemi.CEMI;
 import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILDataEx;
 import io.calimero.device.ios.KnxipParameterObject;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXConnectionClosedException;
 import io.calimero.knxnetip.KNXnetIPRouting;
 import io.calimero.knxnetip.SecureConnection;
@@ -92,7 +93,7 @@ final class RoutingService extends UdpServiceLooper
 		// forwarder for RoutingService dispatch, called from handleServiceType
 		@Override
 		protected boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
-				final io.calimero.knxnetip.EndpointAddress src) throws KNXFormatException, IOException {
+				final EndpointAddress src) throws KNXFormatException, IOException {
 			return super.handleServiceType(h, data, offset, src);
 		}
 

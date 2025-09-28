@@ -45,6 +45,8 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.time.Duration;
 
+import io.calimero.knxnetip.TcpEndpointAddress;
+
 final class TcpEndpoint extends StreamEndpoint {
 	TcpEndpoint(final ControlEndpointService ces, final InetSocketAddress endpoint, final boolean baos) {
 		super(ces, new TcpEndpointAddress(endpoint), "tcp", baos);

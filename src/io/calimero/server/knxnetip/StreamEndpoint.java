@@ -53,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.Executor;
+import io.calimero.knxnetip.EndpointAddress;
+import io.calimero.knxnetip.TcpEndpointAddress;
 
 sealed abstract class StreamEndpoint implements AutoCloseable
 		permits TcpEndpoint, UnixDomainSocketEndpoint {

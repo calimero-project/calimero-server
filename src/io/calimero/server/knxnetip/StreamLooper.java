@@ -52,6 +52,7 @@ import java.time.Duration;
 import io.calimero.CloseEvent;
 import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 
 abstract sealed class StreamLooper implements Runnable, AutoCloseable

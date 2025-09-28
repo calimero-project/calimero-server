@@ -46,9 +46,11 @@ import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import io.calimero.knxnetip.UdsEndpointAddress;
+
 final class UnixDomainSocketEndpoint extends StreamEndpoint {
 	UnixDomainSocketEndpoint(final ControlEndpointService ctrlEndpoint, final Path path, final boolean baos) {
-		super(ctrlEndpoint, new UnixEndpointAddress(UnixDomainSocketAddress.of(path), 0), "unix socket", baos);
+		super(ctrlEndpoint, new UdsEndpointAddress(UnixDomainSocketAddress.of(path), 0), "unix socket", baos);
 	}
 
 	@Override
@@ -83,7 +85,7 @@ final class UnixDomainSocketEndpoint extends StreamEndpoint {
 
 	final class Looper extends StreamLooper {
 		Looper(final ControlEndpointService ces, final SocketChannel channel) throws IOException {
-			super(ces, new UnixEndpointAddress(remote(channel), channel.hashCode()), channel, baos);
+			super(ces, new UdsEndpointAddress(remote(channel), channel.hashCode()), channel, baos);
 		}
 
 		@Override

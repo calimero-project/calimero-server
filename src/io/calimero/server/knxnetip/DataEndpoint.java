@@ -75,8 +75,12 @@ import io.calimero.cemi.CEMILData;
 import io.calimero.device.ios.DeviceObject;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.knxnetip.ConnectionBase;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXConnectionClosedException;
 import io.calimero.knxnetip.KNXnetIPConnection;
+import io.calimero.knxnetip.TcpEndpointAddress;
+import io.calimero.knxnetip.UdpEndpointAddress;
+import io.calimero.knxnetip.UdsEndpointAddress;
 import io.calimero.knxnetip.servicetype.ConnectionstateRequest;
 import io.calimero.knxnetip.servicetype.ConnectionstateResponse;
 import io.calimero.knxnetip.servicetype.DisconnectResponse;
@@ -150,7 +154,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
 	// even if indicated otherwise in the HPAI or required by the spec
-	private volatile io.calimero.knxnetip.EndpointAddress useDifferingEtsSrcPortForResponse;
+	private volatile EndpointAddress useDifferingEtsSrcPortForResponse;
 
 	private final FifoSequentialExecutor executor;
 
@@ -166,12 +170,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		this.ctype = type;
 		this.remoteCtrlEndpt = remoteCtrlEndpt;
 		this.remoteDataEndpt = remoteDataEndpt;
-		var ep = switch (remoteDataEndpt) {
-			case UdpEndpointAddress(var addr) -> new io.calimero.knxnetip.UdpEndpointAddress(addr);
-			case TcpEndpointAddress(var addr) -> new io.calimero.knxnetip.TcpEndpointAddress(addr);
-			case UnixEndpointAddress(var addr, var id) -> new io.calimero.knxnetip.UdsEndpointAddress(addr, id);
-		};
-		dataEp(ep);
+		dataEp(remoteDataEndpt);
 		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
 				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
 		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
@@ -221,7 +220,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		checkFrameType(frame);
 		final var remote = remoteAddress();
 		// always send non-blocking over tcp and unix sockets
-		if (remote instanceof TcpEndpointAddress || remote instanceof UnixEndpointAddress) {
+		if (remote instanceof TcpEndpointAddress || remote instanceof UdsEndpointAddress) {
 			synchronized (this) {
 				super.send(frame, BlockingMode.NonBlocking);
 				setStateNotify(OK);
@@ -232,7 +231,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	}
 
 	@Override
-	protected void send(final byte[] packet, final io.calimero.knxnetip.EndpointAddress dst) throws IOException {
+	protected void send(final byte[] packet, final EndpointAddress dst) throws IOException {
 		byte[] buf = packet;
 		if (sessionId > 0) {
 			final Session session = sessions.sessions.get(sessionId);
@@ -250,7 +249,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 		if (remoteDataEndpt instanceof TcpEndpointAddress)
 			ces.tcpEndpoint.send(buf, remoteDataEndpt);
-		else if (remoteDataEndpt instanceof UnixEndpointAddress)
+		else if (remoteDataEndpt instanceof UdsEndpointAddress)
 			ces.udsEndpoint.send(buf, remoteDataEndpt);
 		else {
 			final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
@@ -487,9 +486,9 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			// TODO etsDstHack is only necessary for UDP
 			var ep = csr.getControlEndpoint().endpoint();
 			var correct = switch (src) {
-				case UdpEndpointAddress __ -> new io.calimero.knxnetip.UdpEndpointAddress(ep);
-				case TcpEndpointAddress __ -> new io.calimero.knxnetip.TcpEndpointAddress(ep);
-				case UnixEndpointAddress __ -> new io.calimero.knxnetip.UdsEndpointAddress(UnixDomainSocketAddress.of(""), 0);
+				case UdpEndpointAddress __ -> new UdpEndpointAddress(ep);
+				case TcpEndpointAddress __ -> new TcpEndpointAddress(ep);
+				case UdsEndpointAddress __ -> new UdsEndpointAddress(UnixDomainSocketAddress.of(""), 0);
 			};
 			final var dst = etsDstHack(correct, src);
 			send(buf, dst);
@@ -725,9 +724,9 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	}
 
 	// forwarder for udp inet socket overload
-	private io.calimero.knxnetip.EndpointAddress etsDstHack(final io.calimero.knxnetip.EndpointAddress correct, final EndpointAddress actual) {
+	private EndpointAddress etsDstHack(final EndpointAddress correct, final EndpointAddress actual) {
 		if (actual instanceof final UdpEndpointAddress udp)
-			return new io.calimero.knxnetip.UdpEndpointAddress(etsDstHack((InetSocketAddress) correct.address(), udp.address()));
+			return new UdpEndpointAddress(etsDstHack((InetSocketAddress) correct.address(), udp.address()));
 		return correct;
 	}
 
@@ -740,7 +739,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		if (actual.getPort() == correct.getPort())
 			return correct;
 		logger.log(DEBUG, "[ETS] respond to different port {0} (data endpoint was setup for {1})", actual.getPort(), correct.getPort());
-		useDifferingEtsSrcPortForResponse = new io.calimero.knxnetip.UdpEndpointAddress(actual);
+		useDifferingEtsSrcPortForResponse = new UdpEndpointAddress(actual);
 		return actual;
 	}
 }
