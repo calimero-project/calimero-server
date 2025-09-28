@@ -36,7 +36,6 @@
 
 package io.calimero.server.knxnetip;
 
-import static io.calimero.server.knxnetip.UdpServiceLooper.hostPort;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -48,6 +47,7 @@ import java.lang.System.Logger.Level;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -150,7 +150,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	// ETS bug: ETS 6 wants the response sent to its src port the request got sent from,
 	// even if indicated otherwise in the HPAI or required by the spec
-	private volatile InetSocketAddress useDifferingEtsSrcPortForResponse;
+	private volatile io.calimero.knxnetip.EndpointAddress useDifferingEtsSrcPortForResponse;
 
 	private final FifoSequentialExecutor executor;
 
@@ -166,6 +166,12 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		this.ctype = type;
 		this.remoteCtrlEndpt = remoteCtrlEndpt;
 		this.remoteDataEndpt = remoteDataEndpt;
+		var ep = switch (remoteDataEndpt) {
+			case UdpEndpointAddress(var addr) -> new io.calimero.knxnetip.UdpEndpointAddress(addr);
+			case TcpEndpointAddress(var addr) -> new io.calimero.knxnetip.TcpEndpointAddress(addr);
+			case UnixEndpointAddress(var addr, var id) -> new io.calimero.knxnetip.UdsEndpointAddress(addr, id);
+		};
+		dataEp(ep);
 		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
 				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
 		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
@@ -226,7 +232,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	}
 
 	@Override
-	protected void send(final byte[] packet, final InetSocketAddress dst) throws IOException {
+	protected void send(final byte[] packet, final io.calimero.knxnetip.EndpointAddress dst) throws IOException {
 		byte[] buf = packet;
 		if (sessionId > 0) {
 			final Session session = sessions.sessions.get(sessionId);
@@ -237,7 +243,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			final var remote = dst != null ? hostPort(dst) : remoteDataEndpt;
+			final var remote = dst != null ? dst : remoteDataEndpt;
 			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, remote,
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
@@ -248,12 +254,15 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			ces.udsEndpoint.send(buf, remoteDataEndpt);
 		else {
 			final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
-			final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst);
-			final var src = useNat || actualDst.equals(ctrlEndpt) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
-			logger.log(TRACE, "send {0}->{1} {2}", hostPort((InetSocketAddress) src),
-					hostPort(actualDst), HexFormat.ofDelimiter(" ").formatHex(buf));
+			final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst.address());
+			final var src = useNat || actualDst.equals(ctrlEp()) ? ctrlSocket.getLocalSocketAddress() : socket.getLocalSocketAddress();
+			if (src == null) { // don't bother, socket got closed
+				return;
+			}
+			logger.log(TRACE, "send {0}->{1} {2}", new UdpEndpointAddress((InetSocketAddress) src),
+					actualDst, HexFormat.ofDelimiter(" ").formatHex(buf));
 
-			if (useNat || actualDst.equals(ctrlEndpt))
+			if (useNat || actualDst.equals(ctrlEp()))
 				ctrlSocket.send(p);
 			else
 				socket.send(p);
@@ -267,7 +276,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			final var buf = PacketHelper.toPacket(new ServiceRequest<>(serviceRequest, chid, seq, svc));
 
 			// NYI udp: we need a send method like for cEMI
-			send(buf, dataEndpt);
+			send(buf, dataEp());
 		}
 		catch (final IOException e) {
 			close(CloseEvent.INTERNAL, "communication failure", ERROR, e);
@@ -391,7 +400,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 				; // no-op
 			else if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
 				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
-				send(buf, etsDstHack(dataEndpt, src));
+				send(buf, etsDstHack(dataEp(), src));
 			}
 			else {
 				logger.log(WARNING, type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
@@ -447,7 +456,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 				// update state and notify our lock
 				setStateNotify(res.getStatus() == ErrorCodes.NO_ERROR ? OK : ACK_ERROR);
 				logger.log(TRACE, "received service ack {0} from {1} (channel {2})", res.getSequenceNumber(),
-						hostPort(ctrlEndpt), channelId);
+						ctrlEp(), channelId);
 				if (internalState == ACK_ERROR)
 					logger.log(WARNING, "received service acknowledgment status " + res.getStatusString());
 			}
@@ -465,16 +474,24 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 			if (status == ErrorCodes.NO_ERROR) {
 				logger.log(TRACE, "data endpoint received connection-state request (channel {0}) from {1}",
-						csr.getChannelID(), hostPort(dataEndpt));
+						csr.getChannelID(), dataEp());
 				updateLastMsgTimestamp();
 				status = ces.subnetStatus();
 			}
 			else
 				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
-						csr.getChannelID(), hostPort(dataEndpt), ErrorCodes.getErrorMessage(status));
+						csr.getChannelID(), dataEp(), ErrorCodes.getErrorMessage(status));
 
 			final byte[] buf = PacketHelper.toPacket(new ConnectionstateResponse(csr.getChannelID(), status));
-			final var dst = etsDstHack(csr.getControlEndpoint().endpoint(), src);
+
+			// TODO etsDstHack is only necessary for UDP
+			var ep = csr.getControlEndpoint().endpoint();
+			var correct = switch (src) {
+				case UdpEndpointAddress __ -> new io.calimero.knxnetip.UdpEndpointAddress(ep);
+				case TcpEndpointAddress __ -> new io.calimero.knxnetip.TcpEndpointAddress(ep);
+				case UnixEndpointAddress __ -> new io.calimero.knxnetip.UdsEndpointAddress(UnixDomainSocketAddress.of(""), 0);
+			};
+			final var dst = etsDstHack(correct, src);
 			send(buf, dst);
 		}
 		else
@@ -495,7 +512,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		final TunnelingFeature res = responseForFeature(h, buffer);
 		enqueue(() -> {
 			logger.log(DEBUG, "respond with {0}", res);
-			final var dst = etsDstHack(dataEndpt, src);
+			final var dst = etsDstHack(dataEp(), src);
 			try {
 				send(PacketHelper.toPacket(new ServiceRequest<>(res.type(), channelId, getSeqSend(), res)), dst);
 			} catch (final IOException e) {
@@ -586,7 +603,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			enqueue(() -> {
 				logger.log(DEBUG, "send {0}", info);
 				try {
-					send(PacketHelper.toPacket(req), dataEndpt);
+					send(PacketHelper.toPacket(req), dataEp());
 				}
 				catch (final IOException e) {
 					logger.log(WARNING, "sending " + info, e);
@@ -708,9 +725,9 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	}
 
 	// forwarder for udp inet socket overload
-	private InetSocketAddress etsDstHack(final InetSocketAddress correct, final EndpointAddress actual) {
+	private io.calimero.knxnetip.EndpointAddress etsDstHack(final io.calimero.knxnetip.EndpointAddress correct, final EndpointAddress actual) {
 		if (actual instanceof final UdpEndpointAddress udp)
-			return etsDstHack(correct, udp.address());
+			return new io.calimero.knxnetip.UdpEndpointAddress(etsDstHack((InetSocketAddress) correct.address(), udp.address()));
 		return correct;
 	}
 
@@ -723,7 +740,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		if (actual.getPort() == correct.getPort())
 			return correct;
 		logger.log(DEBUG, "[ETS] respond to different port {0} (data endpoint was setup for {1})", actual.getPort(), correct.getPort());
-		useDifferingEtsSrcPortForResponse = actual;
+		useDifferingEtsSrcPortForResponse = new io.calimero.knxnetip.UdpEndpointAddress(actual);
 		return actual;
 	}
 }

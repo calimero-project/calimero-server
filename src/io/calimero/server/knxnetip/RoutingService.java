@@ -60,6 +60,7 @@ import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.knxnetip.KNXConnectionClosedException;
 import io.calimero.knxnetip.KNXnetIPRouting;
 import io.calimero.knxnetip.SecureConnection;
+import io.calimero.knxnetip.UdpEndpointAddress;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.servicetype.PacketHelper;
 import io.calimero.knxnetip.servicetype.RoutingLostMessage;
@@ -91,9 +92,8 @@ final class RoutingService extends UdpServiceLooper
 		// forwarder for RoutingService dispatch, called from handleServiceType
 		@Override
 		protected boolean handleServiceType(final KNXnetIPHeader h, final byte[] data, final int offset,
-			final InetAddress src, final int port) throws KNXFormatException, IOException
-		{
-			return super.handleServiceType(h, data, offset, src, port);
+				final io.calimero.knxnetip.EndpointAddress src) throws KNXFormatException, IOException {
+			return super.handleServiceType(h, data, offset, src);
 		}
 
 		@Override
@@ -229,8 +229,8 @@ final class RoutingService extends UdpServiceLooper
 	{
 		if (secure)
 			return true;
-		final var udp = ((UdpEndpointAddress) src).address();
-		return r.handleServiceType(h, data, offset, udp.getAddress(), udp.getPort());
+		var tmp = new UdpEndpointAddress((InetSocketAddress) src.address());
+		return r.handleServiceType(h, data, offset, tmp);
 	}
 
 	void sendRoutingLostMessage(final int lost, final int state) throws KNXConnectionClosedException
