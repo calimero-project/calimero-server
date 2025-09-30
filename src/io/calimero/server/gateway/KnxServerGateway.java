@@ -239,7 +239,7 @@ public class KnxServerGateway implements Runnable
 
 			if (!(conn instanceof KNXnetIPDevMgmt)) {
 				final AutoCloseable subnetLink = connector.getSubnetLink();
-				AutoCloseable rawLink = subnetLink instanceof Link ? ((Link<?>) subnetLink).target() : subnetLink;
+				AutoCloseable rawLink = subnetLink instanceof final Link<?> link ? link.target() : subnetLink;
 				try {
 					if (type == ConnectionType.Baos) {
 						final String format = connector.format();
@@ -595,7 +595,7 @@ public class KnxServerGateway implements Runnable
 			if (ldm) {
 				for (final var c : serverConnections) {
 					// device mgmt endpoints don't have a device address assigned
-					if (c instanceof DataEndpoint && ((DataEndpoint) c).deviceAddress() == null) {
+					if (c instanceof final DataEndpoint dataEp && dataEp.deviceAddress() == null) {
 //						final var deviceMgmtEndpoint = (DataEndpoint) c;
 						// NYI send cEMI T-Data
 					}
@@ -1202,7 +1202,7 @@ public class KnxServerGateway implements Runnable
 
 	private void checkBaosService(final FrameEvent fe) {
 		final var source = fe.getSource();
-		if (!(source instanceof DataEndpoint && ((DataEndpoint) source).type() == ConnectionType.Baos))
+		if (!(source instanceof final DataEndpoint dataEp && dataEp.type() == ConnectionType.Baos))
 			return;
 
 		for (final var connector : connectors) {
@@ -1499,8 +1499,8 @@ public class KnxServerGateway implements Runnable
 	private boolean isNetworkLink(final SubnetConnector subnet)
 	{
 		AutoCloseable link = subnet.getSubnetLink();
-		if (link instanceof Link)
-			link = ((Link<?>) link).target();
+		if (link instanceof final Link<?> l)
+			link = l.target();
 		if (!(link instanceof KNXNetworkLink)) {
 			final IndividualAddress addr = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
 			logger.log(WARNING, "cannot dispatch to KNX subnet {0}: {1}", addr, link == null ? "no subnet connection" : link);
@@ -1571,8 +1571,8 @@ public class KnxServerGateway implements Runnable
 				if (routing != null && isSubnetBroadcast(objinst, f)) {
 					logger.log(INFO, "forward as IP system broadcast {0}", f);
 					final CEMILData bcast;
-					if (f instanceof CEMILDataEx) {
-						((CEMILDataEx) f).setBroadcast(false);
+					if (f instanceof final CEMILDataEx ldataEx) {
+						ldataEx.setBroadcast(false);
 						bcast = f;
 					}
 					else {
@@ -1732,8 +1732,8 @@ public class KnxServerGateway implements Runnable
 			// or vice versa a .req to .ind if we use KNXnet/IP routing on the KNX subnet
 			// ??? HACK: do we use routing on the KNX subnet
 			AutoCloseable subnetLink = link;
-			if (subnetLink instanceof Link)
-				subnetLink = ((Link<?>) subnetLink).target();
+			if (subnetLink instanceof final Link<?> l)
+				subnetLink = l.target();
 			final boolean routing = subnetLink instanceof KNXNetworkLinkIP && subnetLink.toString().contains("routing");
 			final boolean usb = subnetLink instanceof KNXNetworkLinkUsb;
 			IndividualAddress source = usb ? new IndividualAddress(0) : null;
@@ -2251,8 +2251,8 @@ public class KnxServerGateway implements Runnable
 		}
 		// otherwise, decrement and forward
 		--count;
-		if (msg instanceof CEMILDataEx) {
-			((CEMILDataEx) msg).setHopCount(count);
+		if (msg instanceof final CEMILDataEx ldataEx) {
+			ldataEx.setHopCount(count);
 			return msg;
 		}
 		return new CEMILData(msg.getMessageCode(), msg.getSource(), msg.getDestination(),

@@ -111,7 +111,7 @@ final class RoutingService extends UdpServiceLooper
 		@Override
 		public void send(final CEMI frame, final BlockingMode mode) throws KNXConnectionClosedException {
 			var send = frame;
-			if (frame instanceof CEMILDataEx && !((CEMILDataEx) frame).additionalInfo().isEmpty()) {
+			if (frame instanceof final CEMILDataEx ldataEx && !ldataEx.additionalInfo().isEmpty()) {
 				send = CEMIFactory.copy(frame);
 				((CEMILDataEx) send).additionalInfo().clear();
 			}

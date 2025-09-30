@@ -635,7 +635,7 @@ public class KNXnetIPServer
 		final boolean useSecureRouting = securedServices.contains(ServiceFamily.Routing);
 		final boolean configureSecureRouting = configureDefault || useSecureRouting;
 		final byte[] groupKey = keys.get("group.key");
-		if (configureSecureRouting && sc instanceof RoutingServiceContainer && groupKey != null) {
+		if (configureSecureRouting && sc instanceof final RoutingServiceContainer rsc && groupKey != null) {
 			secure.add(ServiceFamily.Routing);
 
 			try {
@@ -645,7 +645,7 @@ public class KNXnetIPServer
 
 				// DPT 7.002
 				final DPTXlator2ByteUnsigned t = new DPTXlator2ByteUnsigned(DPTXlator2ByteUnsigned.DPT_TIMEPERIOD);
-				t.setTimePeriod(((RoutingServiceContainer) sc).latencyTolerance().toMillis());
+				t.setTimePeriod(rsc.latencyTolerance().toMillis());
 				ios.setDescription(new Description(objIndex, knxObject, KnxipParameterObject.Pid.LatencyTolerance, 0,
 						PropertyTypes.PDT_UNSIGNED_INT, false, 1, 1, 3, 0), true);
 				setProperty(knxObject, objectInstance, KnxipParameterObject.Pid.LatencyTolerance, t.getData());
@@ -834,8 +834,8 @@ public class KNXnetIPServer
 		setProperty(knxObject, objectInstance, PID.MAC_ADDRESS, new byte[6]);
 
 		// routing stuff
-		if (endpoint instanceof RoutingServiceContainer)
-			setRoutingConfiguration((RoutingServiceContainer) endpoint, objectInstance);
+		if (endpoint instanceof final RoutingServiceContainer rsc)
+			setRoutingConfiguration(rsc, objectInstance);
 		else
 			resetRoutingConfiguration(objectInstance);
 		// 100 ms is the default busy wait time

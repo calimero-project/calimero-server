@@ -198,12 +198,12 @@ final class DiscoveryService extends UdpServiceLooper
 			// for discovery, we do not remember previous NAT decisions
 			useNat = false;
 			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
-			if (!(addr instanceof final UdpEndpointAddress udp))
+			if (!(addr instanceof UdpEndpointAddress(InetSocketAddress udp)))
 				return false;
 
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
-				sendSearchResponse(udp.address(), ces, ext, macFilter, requestedServices, requestedDibs);
+				sendSearchResponse(udp, ces, ext, macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		else if (ignoreServices.contains(svc))

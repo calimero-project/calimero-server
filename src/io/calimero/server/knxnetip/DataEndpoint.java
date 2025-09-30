@@ -725,8 +725,8 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	// forwarder for udp inet socket overload
 	private EndpointAddress etsDstHack(final EndpointAddress correct, final EndpointAddress actual) {
-		if (actual instanceof final UdpEndpointAddress udp)
-			return new UdpEndpointAddress(etsDstHack((InetSocketAddress) correct.address(), udp.address()));
+		if (actual instanceof UdpEndpointAddress(InetSocketAddress udp))
+			return new UdpEndpointAddress(etsDstHack((InetSocketAddress) correct.address(), udp));
 		return correct;
 	}
 

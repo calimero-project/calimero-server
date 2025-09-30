@@ -187,8 +187,8 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 
 	static RuntimeException wrappedException(final Exception e)
 	{
-		if (e instanceof RuntimeException)
-			return (RuntimeException) e;
+		if (e instanceof final RuntimeException rte)
+			return rte;
 		final var rte = new KnxRuntimeException(e.getMessage(), e);
 		rte.setStackTrace(e.getStackTrace());
 		return rte;
