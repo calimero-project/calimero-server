@@ -374,7 +374,8 @@ public final class SubnetConnector
 				}
 				yield config::getBufferedLink;
 			}
-			default -> throw new KNXException("network link: unknown KNX subnet specifier '" + interfaceType + "'");
+			case Virtual, Unknown ->
+					throw new KNXException("network link: unsupported KNX subnet interface type '" + interfaceType + "'");
 		};
 
 		final KNXNetworkLink link = new Connector().reconnectOn(true, true, true)
@@ -398,7 +399,8 @@ public final class SubnetConnector
 					: new KNXNetworkMonitorFT12(linkArgs, settings);
 			case Tpuart -> () -> new KNXNetworkMonitorTpuart(linkArgs, false);
 			case User -> () -> newLinkUsing(className, linkArgs.split("[,|]"));
-			default -> throw new KNXException("monitor link: unknown KNX subnet specifier " + interfaceType);
+			case Knxip, Emulate, Virtual, Unknown ->
+					throw new KNXException("monitor link: unsupported KNX subnet interface type '" + interfaceType + "'");
 		};
 
 		final Connector c = new Connector().reconnectOn(true, true, true)
