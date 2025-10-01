@@ -283,7 +283,7 @@ final class ControlEndpointService extends UdpServiceLooper
 					bound = netif.getName() + "/";
 			}
 			catch (final SocketException ignore) {}
-			bound += hostPort(local);
+			bound += new UdpEndpointAddress(local);
 		}
 		return svcCont.getName() + " control endpoint " + bound;
 	}
@@ -567,8 +567,8 @@ final class ControlEndpointService extends UdpServiceLooper
 		if (res.isPresent()) {
 			send(sessionId, 0, res.get(), dst);
 			final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
-			logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
-					svcCont.getName(), dst, svcCont.networkInterface());
+			logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2}", deviceDib.getName(),
+					svcCont.getName(), dst);
 		}
 	}
 
@@ -716,8 +716,8 @@ final class ControlEndpointService extends UdpServiceLooper
 				s.setReuseAddress(true);
 			ip = usableIpAddresses().findFirst().orElse(null);
 			s.bind(new InetSocketAddress(ip, port));
-			final InetSocketAddress boundTo = (InetSocketAddress) s.getLocalSocketAddress();
-			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), hostPort(boundTo));
+			final var boundTo = new UdpEndpointAddress((InetSocketAddress) s.getLocalSocketAddress());
+			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), boundTo);
 			return s;
 		}
 		catch (final SocketException e) {

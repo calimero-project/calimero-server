@@ -278,12 +278,9 @@ public class KnxServerGateway implements Runnable
 					}
 				}
 				catch (KNXException | InterruptedException e) {
-					final var interfaceType = connector.interfaceType();
-					final String subnetArgs = connector.linkArguments();
-					final ServiceContainer serviceContainer = connector.getServiceContainer();
-					final KNXMediumSettings settings = serviceContainer.getMediumSettings();
-					logger.log(ERROR, MessageFormat.format("open subnet link using {0} interface {1} for {2}", interfaceType,
-							subnetArgs, settings), e);
+					logger.log(ERROR, MessageFormat.format("open subnet link using {0} interface {1} for {2}",
+							connector.interfaceType(), connector.linkArguments(),
+							connector.getServiceContainer().getMediumSettings()), e);
 					if (e instanceof InterruptedException)
 						Thread.currentThread().interrupt();
 					return false;

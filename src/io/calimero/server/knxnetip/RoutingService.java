@@ -102,7 +102,7 @@ final class RoutingService extends UdpServiceLooper
 		{
 			String netifName = networkInterface().getName();
 			netifName = netifName.equals("0.0.0.0") ? "" : netifName + "/";
-			return "KNX IP Routing " + netifName + ctrlEndpt.getAddress().getHostAddress();
+			return "KNX IP Routing " + netifName + ctrlEp();
 		}
 
 		@Override

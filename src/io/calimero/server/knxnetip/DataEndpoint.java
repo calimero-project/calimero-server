@@ -131,8 +131,6 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	private final ControlEndpointService ces;
 	private final ConnectionType ctype;
-	private final EndpointAddress remoteCtrlEndpt;
-	private final EndpointAddress remoteDataEndpt;
 	private final boolean stream;
 	private final Instant connectedSince;
 
@@ -158,18 +156,16 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	private final FifoSequentialExecutor executor;
 
-	DataEndpoint(final ControlEndpointService ces, final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
-		final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt, final int channelId,
-		final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
-		final SecureSessions sessions, final int sessionId,
-		final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed,
-		final Consumer<DataEndpoint> resetRequest)
-	{
+	DataEndpoint(final ControlEndpointService ces,
+			final DatagramSocket localCtrlEndpt, final DatagramSocket localDataEndpt,
+			final EndpointAddress remoteCtrlEndpt, final EndpointAddress remoteDataEndpt,
+			final int channelId, final IndividualAddress assigned, final ConnectionType type, final boolean useNAT,
+			final SecureSessions sessions, final int sessionId,
+			final BiConsumer<DataEndpoint, IndividualAddress> connectionClosed, final Consumer<DataEndpoint> resetRequest) {
 		super(type.req, type.ack, type.maxSendAttempts, type.timeout);
 		this.ces = ces;
 		this.ctype = type;
-		this.remoteCtrlEndpt = remoteCtrlEndpt;
-		this.remoteDataEndpt = remoteDataEndpt;
+		ctrlEp(remoteCtrlEndpt);
 		dataEp(remoteDataEndpt);
 		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
 				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
@@ -184,18 +180,6 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		useNat = useNAT;
 		ctrlSocket = localCtrlEndpt;
 		socket = localDataEndpt;
-
-		ctrlEndpt = switch (remoteCtrlEndpt) {
-			case final UdpEndpointAddress udp -> udp.address();
-			case final TcpEndpointAddress tcp -> tcp.address();
-			default -> null;
-		};
-
-		dataEndpt = switch (remoteDataEndpt) {
-			case final UdpEndpointAddress udp -> udp.address();
-			case final TcpEndpointAddress tcp -> tcp.address();
-			case null, default -> null;
-		};
 
 		logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
 		if (sessionId > 0)
@@ -218,7 +202,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		if (ctype == ConnectionType.Baos)
 			return;
 		checkFrameType(frame);
-		final var remote = remoteAddress();
+		final var remote = dataEp();
 		// always send non-blocking over tcp and unix sockets
 		if (remote instanceof TcpEndpointAddress || remote instanceof UdsEndpointAddress) {
 			synchronized (this) {
@@ -242,15 +226,15 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			final long seq = session.sendSeq.get(); // don't increment send seq, this is just for logging
 			buf = sessions.newSecurePacket(sessionId, packet);
 			final int msgTag = 0;
-			final var remote = dst != null ? dst : remoteDataEndpt;
+			final var remote = dst != null ? dst : dataEp();
 			logger.log(TRACE, "send session {0} seq {1} tag {2} to {3} {4}", sessionId, seq, msgTag, remote,
 					HexFormat.ofDelimiter(" ").formatHex(buf));
 		}
 
-		if (remoteDataEndpt instanceof TcpEndpointAddress)
-			ces.tcpEndpoint.send(buf, remoteDataEndpt);
-		else if (remoteDataEndpt instanceof UdsEndpointAddress)
-			ces.udsEndpoint.send(buf, remoteDataEndpt);
+		if (dataEp() instanceof TcpEndpointAddress)
+			ces.tcpEndpoint.send(buf, dataEp());
+		else if (dataEp() instanceof UdsEndpointAddress)
+			ces.udsEndpoint.send(buf, dataEp());
 		else {
 			final var actualDst = useDifferingEtsSrcPortForResponse != null ? useDifferingEtsSrcPortForResponse : dst;
 			final DatagramPacket p = new DatagramPacket(buf, buf.length, actualDst.address());
@@ -288,7 +272,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	{
 		final String lock = new String(Character.toChars(0x1F512));
 		final String prefix = "KNX IP " + (sessionId > 0 ? lock + " " : "");
-		return prefix + ctype + " " + remoteCtrlEndpt;
+		return prefix + ctype + " " + ctrlEp();
 	}
 
 	@Override
@@ -301,7 +285,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	public IndividualAddress deviceAddress() { return device; }
 
-	EndpointAddress remoteAddress() { return remoteDataEndpt; }
+	EndpointAddress remoteAddress() { return dataEp(); }
 
 	public Instant connectedSince() { return connectedSince; }
 
@@ -337,16 +321,16 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		if (sessionId == 0)
 			return acceptDataService(src, h, data, offset);
 
-		if (ces.tcpEndpoint.connections.containsKey(remoteAddress()))
+		if (ces.tcpEndpoint.connections.containsKey(dataEp()))
 			return acceptDataService(src, h, data, offset);
-		if (ces.udsEndpoint.connections.containsKey(remoteAddress()))
+		if (ces.udsEndpoint.connections.containsKey(dataEp()))
 			return acceptDataService(src, h, data, offset);
 
 		if (!h.isSecure()) {
 			logger.log(WARNING, "received non-secure packet {0} - discard {1}", h, HexFormat.ofDelimiter(" ").formatHex(data));
 			return true;
 		}
-		return sessions.acceptService(h, data, offset, remoteAddress(), this);
+		return sessions.acceptService(h, data, offset, dataEp(), this);
 	}
 
 	private static final Function<ByteBuffer, BaosService> baosServiceParser = buf -> {
@@ -442,8 +426,8 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 				return true;
 
 			if (res.getSequenceNumber() != getSeqSend())
-				logger.log(WARNING, "received " + type + " acknowledgment with wrong send-sequence " + res.getSequenceNumber() + ", expected "
-						+ getSeqSend() + " - ignored");
+				logger.log(WARNING, "received {0} acknowledgment with wrong send-sequence {1}, expected {2} - ignored",
+						type, res.getSequenceNumber(), getSeqSend());
 			else {
 				if (!checkVersion(h)) {
 					close(CloseEvent.INTERNAL, "protocol version changed", ERROR, null);
@@ -469,7 +453,8 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			// gets delayed by the connection-state.res timeout.
 			final ConnectionstateRequest csr = new ConnectionstateRequest(data, offset);
 			int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().hostProtocol() != HPAI.IPV4_UDP) status = ErrorCodes.HOST_PROTOCOL_TYPE;
+			if (status == ErrorCodes.NO_ERROR && csr.getControlEndpoint().hostProtocol() != HPAI.IPV4_UDP)
+				status = ErrorCodes.HOST_PROTOCOL_TYPE;
 
 			if (status == ErrorCodes.NO_ERROR) {
 				logger.log(TRACE, "data endpoint received connection-state request (channel {0}) from {1}",
