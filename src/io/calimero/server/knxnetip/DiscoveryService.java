@@ -232,15 +232,20 @@ final class DiscoveryService extends UdpServiceLooper
 			if (res.isPresent()) {
 				final var buf = res.get();
 				final var sentOn = send(new DatagramPacket(buf, buf.length, dst.address()));
+				var printInterfaces = sentOn.isEmpty() ? "" : " on " + sentOn;
 				final DeviceDIB deviceDib = server.createDeviceDIB(sc);
-				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2} on {3}", deviceDib.getName(),
-						sc.getName(), dst, sentOn);
+				logger.log(DEBUG, "KNXnet/IP discovery: identify as ''{0}'' for container {1} to {2}{3}", deviceDib.getName(),
+						sc.getName(), dst, printInterfaces);
 			}
 		}
 	}
 
 	private List<String> send(final DatagramPacket p) throws IOException {
-		if (!p.getAddress().isMulticastAddress() || outgoing == null) {
+		if (!p.getAddress().isMulticastAddress()) {
+			s.send(p);
+			return List.of();
+		}
+		if (outgoing == null) {
 			s.send(p);
 			return List.of("any");
 		}
