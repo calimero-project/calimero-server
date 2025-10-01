@@ -1058,7 +1058,7 @@ public class KnxServerGateway implements Runnable
 
 					// if routing is active, convert .req to .ind and dispatch over routing connection
 					findRoutingConnection().ifPresent(c -> dispatch(c,
-							() -> create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false),
+							() -> create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false),
 							ind -> {
 								logger.log(DEBUG, "dispatch {0}->{1} using {2}", ldata.getSource(), dst, c);
 								send(svcCont, c, ind, FramePath.ClientToClient);
@@ -1103,8 +1103,7 @@ public class KnxServerGateway implements Runnable
 							for (final var dataEndpoint : dataConnections.values()) {
 								if (dst.equals(dataEndpoint.deviceAddress())) {
 									try {
-										final var ind = create(null, null,
-												(CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+										final var ind = create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 										asyncSend(svcCont, dataEndpoint, ind, FramePath.ClientToClient);
 									}
 									catch (KNXFormatException | RuntimeException e) {
@@ -1120,7 +1119,8 @@ public class KnxServerGateway implements Runnable
 								if (addresses.contains(dst)) {
 									// send disconnect
 									try {
-										final var disconnect = create(ia, ldata.getSource(), (CEMILData) create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
+										final var disconnect = create(ia, ldata.getSource(),
+												create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
 										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
 												dst, disconnect.getSource(), disconnect.getDestination(), client);
 										asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
@@ -1166,7 +1166,7 @@ public class KnxServerGateway implements Runnable
 								continue;
 
 						try {
-							final var ind = create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
+							final var ind = create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 							asyncSend(svcCont, conn, ind, FramePath.ClientToClient);
 						}
 						catch (KNXFormatException | RuntimeException e) {
@@ -1750,10 +1750,10 @@ public class KnxServerGateway implements Runnable
 			// adjust .ind: on every KNX subnet link (except routing links) we require an L-Data.req
 			// also ensure repeat flag is set/cleared according to medium
 			if (mc == CEMILData.MC_LDATA_IND && !routing)
-				ldata = create(source, null, (CEMILData) create(CEMILData.MC_LDATA_REQ, null, f), false, true);
+				ldata = create(source, null, create(CEMILData.MC_LDATA_REQ, null, f), false, true);
 			// adjust .req: on KNX subnets with KNXnet/IP routing, we require an L-Data.ind
 			else if (mc == CEMILData.MC_LDATA_REQ && routing)
-				ldata = create(null, null, (CEMILData) create(CEMILData.MC_LDATA_IND, null, f), false, false);
+				ldata = create(null, null, create(CEMILData.MC_LDATA_IND, null, f), false, false);
 			else if (usb || overrideSrcAddress)
 				ldata = create(source, null, f, false);
 			else
