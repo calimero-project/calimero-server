@@ -276,14 +276,6 @@ public final class SubnetConnector
 	public KNXNetworkLink openNetworkLink() throws KNXException, InterruptedException
 	{
 		final KNXMediumSettings settings = mediumSettings();
-
-		// special-case virtual: if we use connector below, we cannot cast link to VirtualLink for creating device links
-		if (interfaceType == InterfaceType.Virtual) {
-			final KNXNetworkLink link = new VirtualLink(linkArgs, settings);
-			setSubnetLink(link);
-			return link;
-		}
-
 		final TSupplier<KNXNetworkLink> ts = switch (interfaceType) {
 			case Udp -> {
 				// find IPv4 address for local socket address
@@ -375,8 +367,9 @@ public final class SubnetConnector
 				}
 				yield config::getBufferedLink;
 			}
-			case Virtual, Unknown ->
-					throw new KNXException("network link: unsupported KNX subnet interface type '" + interfaceType + "'");
+			case Virtual -> () -> new VirtualLink(linkArgs, settings);
+			case Unknown -> throw new KNXException(
+					"network link: unsupported KNX subnet interface type '" + interfaceType + "'");
 		};
 
 		final KNXNetworkLink link = new Connector().reconnectOn(true, true, true)
