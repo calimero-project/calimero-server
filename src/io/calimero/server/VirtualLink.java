@@ -37,9 +37,7 @@
 package io.calimero.server;
 
 import static java.lang.System.Logger.Level.DEBUG;
-import static java.lang.System.Logger.Level.ERROR;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,7 +45,6 @@ import io.calimero.FrameEvent;
 import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
-import io.calimero.KNXFormatException;
 import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILData;
 import io.calimero.internal.EventListeners;
@@ -117,27 +114,22 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 		if (!accept(uplink, msg))
 			return;
 
-		try {
-			// send a .con for a .req
-			if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
-				final CEMILData f = CEMIFactory.create(CEMILData.MC_LDATA_CON, msg.getPayload(), msg);
-				final FrameEvent e = new FrameEvent(this, f);
-				confirmation.fire(l -> l.confirmation(e));
-			}
-			// forward .ind as is, but convert req. to .ind and also remove repeat flag
-			final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg : CEMIFactory.create(null, null,
-					CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg), false, false);
+		// send a .con for a .req
+		if (msg.getMessageCode() == CEMILData.MC_LDATA_REQ) {
+			final CEMILData f = CEMIFactory.create(CEMILData.MC_LDATA_CON, msg.getPayload(), msg);
 			final FrameEvent e = new FrameEvent(this, f);
-			// if we are a device link sending to the uplink, send the .ind to all other device links of that uplink
-			if (isDeviceLink)
-				uplink.deviceLinks.stream().filter(l -> accept(l, msg))
-						.forEach(link -> link.notifier.getListeners().fire(l -> l.indication(e)));
-			// send the .ind to our uplink
-			uplink.notifier.getListeners().fire(l -> l.indication(e));
+			confirmation.fire(l -> l.confirmation(e));
 		}
-		catch (final KNXFormatException e) {
-			logger.log(ERROR, MessageFormat.format("create cEMI for link {0} using: {1}", uplink.getName(), msg), e);
-		}
+		// forward .ind as is, but convert req. to .ind and also remove repeat flag
+		final CEMILData f = msg.getMessageCode() == CEMILData.MC_LDATA_IND ? msg : CEMIFactory.create(null, null,
+				CEMIFactory.create(CEMILData.MC_LDATA_IND, msg.getPayload(), msg), false, false);
+		final FrameEvent e = new FrameEvent(this, f);
+		// if we are a device link sending to the uplink, send the .ind to all other device links of that uplink
+		if (isDeviceLink)
+			uplink.deviceLinks.stream().filter(l -> accept(l, msg))
+					.forEach(link -> link.notifier.getListeners().fire(l -> l.indication(e)));
+		// send the .ind to our uplink
+		uplink.notifier.getListeners().fire(l -> l.indication(e));
 	}
 
 	// if the uplink is a device link:

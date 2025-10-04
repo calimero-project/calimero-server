@@ -1106,7 +1106,7 @@ public class KnxServerGateway implements Runnable
 										final var ind = create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 										asyncSend(svcCont, dataEndpoint, ind, FramePath.ClientToClient);
 									}
-									catch (KNXFormatException | RuntimeException e) {
+									catch (final RuntimeException e) {
 										e.printStackTrace();
 									}
 									return;
@@ -1118,16 +1118,11 @@ public class KnxServerGateway implements Runnable
 								final var addresses = additionalAddresses(objinst);
 								if (addresses.contains(dst)) {
 									// send disconnect
-									try {
-										final var disconnect = create(ia, ldata.getSource(),
-												create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
-										logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
-												dst, disconnect.getSource(), disconnect.getDestination(), client);
-										asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
-									}
-									catch (final KNXFormatException e) {
-										e.printStackTrace();
-									}
+									final var disconnect = create(ia, ldata.getSource(),
+											create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
+									logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
+											dst, disconnect.getSource(), disconnect.getDestination(), client);
+									asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
 									return;
 								}
 							}
@@ -1169,7 +1164,7 @@ public class KnxServerGateway implements Runnable
 							final var ind = create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false);
 							asyncSend(svcCont, conn, ind, FramePath.ClientToClient);
 						}
-						catch (KNXFormatException | RuntimeException e) {
+						catch (final RuntimeException e) {
 							e.printStackTrace();
 						}
 					}
@@ -1793,7 +1788,7 @@ public class KnxServerGateway implements Runnable
 			setNetworkState(oi, true, true);
 			logger.log(WARNING, "timeout sending to {0}: {1}", f.getDestination(), e.getMessage());
 		}
-		catch (final KNXFormatException | KNXLinkClosedException e) {
+		catch (final KNXLinkClosedException e) {
 			logger.log(ERROR, "error sending to {0} on subnet {1}: {2}", f.getDestination(), link.getName(), e.getMessage());
 			if (e.getCause() != null)
 				logger.log(DEBUG, e + ", caused by:", e.getCause());
