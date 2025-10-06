@@ -36,6 +36,7 @@
 
 package io.calimero.server;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
@@ -55,7 +56,6 @@ import io.calimero.server.gateway.SubnetConnector;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
-import io.calimero.server.knxnetip.ServiceContainer;
 
 /**
  * Configuration for a KNXnet/IP server.
@@ -136,7 +136,7 @@ public class ServerConfiguration {
 
 		@Override
 		public String toString() {
-			final ServiceContainer sc = subnetConnector().getServiceContainer();
+			final var sc = (DefaultServiceContainer) subnetConnector().getServiceContainer();
 
 			final String activated = sc.isActivated() ? "" : " [not activated]";
 			String mcast = "disabled";
@@ -160,16 +160,18 @@ public class ServerConfiguration {
 			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
 					? secureSymbol + " " : "";
-			final String unicast = "" + sc.getControlEndpoint().endpoint().getPort();
-			final String udpOnly = ((DefaultServiceContainer) sc).udpOnly() ? ", announce UDP only": "";
-			final String baos = ((DefaultServiceContainer) sc).baosSupport() ? ", BAOS support (UDP/TCP port 12004)" : "";
+			final int unicast = sc.getControlEndpoint().endpoint().getPort();
+			final String udpOnly = sc.udpOnly() ? ", announce UDP only": "";
+			final String baos = sc.baosSupport() ? "\n\t        BAOS support (UDP/TCP port 12004)" : "";
+			final String uds = sc.unixSocketPath().map(path -> "\n\t        UDS path " + path).orElse("");
 			final String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
 			return """
 					%s%s:
-						server: listen on %s (UDP/TCP %sport %s%s%s), KNX IP %srouting %s%s%s
+						server: listen on %s (UDP/TCP %sport %s%s%s)
+						        KNX IP %srouting %s%s%s%s
 						%s connection: %s%s""".formatted(
 					sc.getName(), activated,
-					sc.networkInterface(), unicastSecure, unicast, udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, baos,
+					sc.networkInterface(), unicastSecure, unicast, udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, baos, uds,
 					type, sc.getMediumSettings(), filter);
 		}
 	}
