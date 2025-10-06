@@ -92,7 +92,6 @@ import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXnetIPConnection;
-import io.calimero.knxnetip.KNXnetIPTunnel;
 import io.calimero.knxnetip.KNXnetIPTunnel.TunnelingLayer;
 import io.calimero.knxnetip.TcpEndpointAddress;
 import io.calimero.knxnetip.UdpEndpointAddress;
@@ -372,15 +371,15 @@ final class ControlEndpointService extends UdpServiceLooper
 			byte[] requestedDibs = {};
 			for (final Srp srp : sr.searchParameters()) {
 				final Type type = srp.type();
-				if (type == Srp.Type.SelectByProgrammingMode) {
+				if (type == Type.SelectByProgrammingMode) {
 					if (!DeviceObject.lookup(server.getInterfaceObjectServer()).programmingMode())
 						return true;
 				}
-				else if (type == Srp.Type.SelectByMacAddress)
+				else if (type == Type.SelectByMacAddress)
 					macFilter = srp.data();
-				else if (type == Srp.Type.SelectByService)
+				else if (type == Type.SelectByService)
 					requestedServices = srp.data();
-				else if (type == Srp.Type.RequestDibs)
+				else if (type == Type.RequestDibs)
 					requestedDibs = srp.data();
 				else  if (srp.isMandatory())
 					return true;
@@ -670,7 +669,7 @@ final class ControlEndpointService extends UdpServiceLooper
 				if (session != null && addressAuthorizedForUser(session.userId, addr))
 					status.add(SlotStatus.Authorized);
 			}
-			else if (!isSecuredService(ServiceFamily.Tunneling))
+			else if (!isSecuredService(Tunneling))
 				status.add(SlotStatus.Authorized);
 
 			if (subnetOk)
@@ -829,7 +828,7 @@ final class ControlEndpointService extends UdpServiceLooper
 			}
 		}
 
-		if (connType == KNXnetIPTunnel.TUNNEL_CONNECTION) {
+		if (connType == TUNNEL_CONNECTION) {
 			final TunnelingLayer knxLayer;
 			final TunnelCRI cri = (TunnelCRI) req.getCRI();
 			try {

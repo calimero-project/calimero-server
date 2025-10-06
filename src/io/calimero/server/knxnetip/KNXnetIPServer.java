@@ -98,7 +98,6 @@ import io.calimero.link.medium.PLSettings;
 import io.calimero.log.LogService;
 import io.calimero.mgmt.Description;
 import io.calimero.mgmt.Destination;
-import io.calimero.mgmt.PropertyAccess;
 import io.calimero.mgmt.PropertyAccess.PID;
 import io.calimero.secure.KnxSecureException;
 import io.calimero.server.ServerConfiguration;
@@ -210,7 +209,7 @@ public class KNXnetIPServer
 				return;
 			LooperTask.scheduleWithRetry(controlEndpoint);
 			if (serviceContainer instanceof final RoutingServiceContainer routingContainer) {
-				final var mcast = knxipParameters.inetAddress(PropertyAccess.PID.ROUTING_MULTICAST_ADDRESS);
+				final var mcast = knxipParameters.inetAddress(PID.ROUTING_MULTICAST_ADDRESS);
 				routingEndpoint = new LooperTask(KNXnetIPServer.this,
 						// TODO mcast address might change
 						serverName + " routing service " + mcast.getHostAddress(), -1,
@@ -883,7 +882,7 @@ public class KNXnetIPServer
 
 	private void resetRoutingConfiguration(final int objectInstance)
 	{
-		setProperty(InterfaceObject.KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, new byte[4]);
+		setProperty(KNXNETIP_PARAMETER_OBJECT, objectInstance, PID.ROUTING_MULTICAST_ADDRESS, new byte[4]);
 	}
 
 	int objectInstance(final ServiceContainer sc)

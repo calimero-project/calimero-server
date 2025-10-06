@@ -176,7 +176,7 @@ import io.calimero.server.knxnetip.ShutdownEvent;
  * Besides, the gateway handles KNXnet/IP local device management by processing and answering
  * received client messages.<br>
  * The gateway implements a group address filter using a memory-mapped table with its location stored in the KNX property
- * {@link io.calimero.mgmt.PropertyAccess.PID#TABLE_REFERENCE} in the interface object
+ * {@link PID#TABLE_REFERENCE} in the interface object
  * {@link InterfaceObject#ROUTER_OBJECT}.
  * <p>
  * Starting a gateway by invoking {@link #run()} is a blocking operation. Therefore, this class
@@ -822,7 +822,7 @@ public class KnxServerGateway implements Runnable
 					? DataSecurity.AuthConf : DataSecurity.None;
 			((BaseKnxDevice) server.device()).addGroupObject(datapoint, security, false);
 			if (security != DataSecurity.None)
-				server.getInterfaceObjectServer().setProperty(InterfaceObject.SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);
+				server.getInterfaceObjectServer().setProperty(SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);
 
 			final var dpt = datapoint.getDPT();
 			final var dst = datapoint.getMainAddress();
@@ -1640,7 +1640,7 @@ public class KnxServerGateway implements Runnable
 		if (f.getDestination().getRawAddress() != 0)
 			return false;
 
-		final int sbc = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
+		final int sbc = getPropertyOrDefault(ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
 		if (sbc == 0)
 			return false;
 
@@ -1649,7 +1649,7 @@ public class KnxServerGateway implements Runnable
 
 	// checks if received server-side frame qualifies as subnet broadcast
 	private boolean isIpSystemBroadcast(final int objInstance, final CEMILData f) {
-		final int sbc = getPropertyOrDefault(InterfaceObject.ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
+		final int sbc = getPropertyOrDefault(ROUTER_OBJECT, objInstance, pidIpSbcControl, 0);
 		// NYI if disabled, still check if sysbcast, and handle like IP device
 		if (sbc == 0)
 			return false;
@@ -1938,7 +1938,7 @@ public class KnxServerGateway implements Runnable
 						if (read) {
 							final var ios = server.getInterfaceObjectServer();
 
-							if (objectType == InterfaceObject.KNXNETIP_PARAMETER_OBJECT) {
+							if (objectType == KNXNETIP_PARAMETER_OBJECT) {
 								if (propertyId == KnxipParameterObject.Pid.SecuredServiceFamilies) {
 									if (serviceId == 0) {
 										if (functionInput.length == 3) {
