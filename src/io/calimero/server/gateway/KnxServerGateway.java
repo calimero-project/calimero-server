@@ -126,6 +126,7 @@ import io.calimero.knxnetip.KNXnetIPRouting;
 import io.calimero.knxnetip.LostMessageEvent;
 import io.calimero.knxnetip.RoutingBusyEvent;
 import io.calimero.knxnetip.RoutingListener;
+import io.calimero.knxnetip.UdsEndpointAddress;
 import io.calimero.knxnetip.servicetype.RoutingBusy;
 import io.calimero.knxnetip.servicetype.RoutingSystemBroadcast;
 import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
@@ -314,11 +315,11 @@ public class KnxServerGateway implements Runnable
 			if (buffer == null)
 				return;
 			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
-			final InetSocketAddress remote = connection.getRemoteAddress();
+			final var remote = connection.remoteAddress();
 			// unix domain sockets are not applicable for our replay buffer
-			if (remote == null)
+			if (remote instanceof UdsEndpointAddress)
 				return;
-			final int port = remote.getPort();
+			final int port = ((InetSocketAddress) remote.address()).getPort();
 			if (port >= portRange[0] && port <= portRange[1]) {
 				buffer.add(connection);
 				if (buffer.isDisrupted(connection)) {
@@ -983,9 +984,8 @@ public class KnxServerGateway implements Runnable
 				logger.log(WARNING, "previous connection of {0} got disrupted => replay {1} pending messages", endpoint,
 						events.size());
 				try {
-					final String hostPort = hostPort(endpoint.getRemoteAddress());
 					for (final var fe : events) {
-						logger.log(TRACE, "replay {0}: {1}", hostPort, fe.getFrame());
+						logger.log(TRACE, "replay {0}: {1}", endpoint.remoteAddress(), fe.getFrame());
 						send(svcContainer, endpoint, fe.getFrame(), FramePath.LocalToClient);
 					}
 				}
@@ -996,10 +996,6 @@ public class KnxServerGateway implements Runnable
 				logger.log(DEBUG, "replay completed for connection {0}", endpoint);
 			});
 		}
-	}
-
-	static String hostPort(final InetSocketAddress addr) {
-		return addr.getAddress().getHostAddress() + ":" + addr.getPort();
 	}
 
 	private void launchServer()

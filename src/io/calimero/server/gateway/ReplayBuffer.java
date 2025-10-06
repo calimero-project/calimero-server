@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import io.calimero.FrameEvent;
+import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXnetIPConnection;
 import io.calimero.log.LogService;
 
@@ -62,6 +63,10 @@ final class ReplayBuffer<T extends FrameEvent>
 	private static final Logger logger = LogService.getLogger(MethodHandles.lookup().lookupClass());
 
 	private record Key(String hostAddress, int port, long timestamp) {
+		Key(final EndpointAddress remote) {
+			this((InetSocketAddress) remote.address());
+		}
+
 		Key(final InetSocketAddress remote) {
 			this(remote.getAddress().getHostAddress(), remote.getPort(), System.currentTimeMillis());
 		}
@@ -87,7 +92,7 @@ final class ReplayBuffer<T extends FrameEvent>
 
 	private List<KNXnetIPConnection> disruptedCandidates(final KNXnetIPConnection c)
 	{
-		final Key key = new Key(c.getRemoteAddress());
+		final Key key = new Key(c.remoteAddress());
 		synchronized (connectionToKey) {
 			final List<KNXnetIPConnection> exactMatch = find(c, key, 2);
 			if (!exactMatch.isEmpty()) {
@@ -148,7 +153,7 @@ final class ReplayBuffer<T extends FrameEvent>
 	public void add(final KNXnetIPConnection c)
 	{
 		logger.log(DEBUG, "activate replay buffer for {0}", c);
-		connectionToKey.put(c, new Key(c.getRemoteAddress()));
+		connectionToKey.put(c, new Key(c.remoteAddress()));
 	}
 
 	public void recordEvent(final T e)
