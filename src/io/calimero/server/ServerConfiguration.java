@@ -36,7 +36,6 @@
 
 package io.calimero.server;
 
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
@@ -160,7 +159,7 @@ public class ServerConfiguration {
 			final boolean secureUnicastRequired = securedServices.contains(ServiceFamily.Tunneling);
 			final String unicastSecure = secureUnicastRequired && keyfile.get("user.1") != null
 					? secureSymbol + " " : "";
-			final int unicast = sc.getControlEndpoint().endpoint().getPort();
+			final int unicast = sc.port();
 			final String udpOnly = sc.udpOnly() ? ", announce UDP only": "";
 			final String baos = sc.baosSupport() ? "\n\t        BAOS support (UDP/TCP port 12004)" : "";
 			final String uds = sc.unixSocketPath().map(path -> "\n\t        UDS path " + path).orElse("");

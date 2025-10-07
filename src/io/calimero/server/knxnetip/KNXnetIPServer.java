@@ -840,9 +840,8 @@ public class KNXnetIPServer
 		// 100 ms is the default busy wait time
 		setPropertyIfAbsent(knxObject, objectInstance, PID.ROUTING_BUSY_WAIT_TIME, bytesFromWord(100));
 
-		// ip and setup multicast
-		final byte[] ip = endpoint.getControlEndpoint().endpoint().getAddress().getAddress();
-		setProperty(knxObject, objectInstance, PID.CURRENT_IP_ADDRESS, ip);
+		// IP address is initialized later by control endpoint
+		setProperty(knxObject, objectInstance, PID.CURRENT_IP_ADDRESS, new byte[4]);
 		setProperty(knxObject, objectInstance, PID.SYSTEM_SETUP_MULTICAST_ADDRESS, DefaultMulticast.getAddress());
 
 		//

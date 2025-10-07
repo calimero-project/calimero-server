@@ -55,7 +55,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private volatile boolean activated = true;
 	private final String id;
 	private final String netif;
-	private final HPAI ctrlEndpt;
+	private final int port;
 	private final KNXMediumSettings settings;
 	private final boolean reuseEndpt;
 	private final boolean networkMonitor;
@@ -74,10 +74,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	 *        service containers, and provide a descriptive name of the container. Therefore, a
 	 *        unique, but yet descriptive name should be chosen. See also {@link #getName()}
 	 * @param netif network interface name for the control endpoint to listen on, might be <code>"any"</code>
-	 * @param controlEndpoint control endpoint address information which uniquely identifies this
-	 *        service container to KNXnet/IP clients, UDP host protocol only, the HPAI has to
-	 *        contain an IP address not 0; if parameter is <code>null</code>, a control endpoint is
-	 *        created using the local host address and ephemeral port assignment
+	 * @param port UDP/TCP port of the control endpoint for KNXnet/IP clients
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param reuseCtrlEndpt <code>true</code> to reuse control endpoint, <code>false</code>
 	 *        otherwise, see {@link #reuseControlEndpoint()}
@@ -86,31 +83,29 @@ public class DefaultServiceContainer implements ServiceContainer
 	 *        this service container, <code>false</code> otherwise
 	 * @param baosSupport serve BAOS connections
 	 */
-	public DefaultServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
-		final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
-		final boolean udpOnly, final boolean baosSupport)
-	{
+	public DefaultServiceContainer(final String name, final String netif, final int port,
+			final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+			final boolean udpOnly, final boolean baosSupport) {
 		if (name == null)
 			throw new NullPointerException("container identifier must not be null");
 		id = name;
 		this.netif = netif;
-		if (controlEndpoint == null)
-			// create with local host address and ephemeral port
-			ctrlEndpt = new HPAI(null, 0);
-		else {
-			if (controlEndpoint.hostProtocol() != HPAI.IPV4_UDP)
-				throw new KNXIllegalArgumentException("only support for UDP communication");
-			ctrlEndpt = controlEndpoint;
-		}
-		// IP is mandatory, port might be 0 indicating the use of an ephemeral port
-		if (ctrlEndpt.endpoint().getAddress().isAnyLocalAddress())
-			throw new KNXIllegalArgumentException("no local host address specified");
+		this.port = port;
 		settings = subnet;
 		reuseEndpt = reuseCtrlEndpt;
 		networkMonitor = allowNetworkMonitoring;
 		this.udpOnly = udpOnly;
 		disruptionBufferTimeout = Duration.of(0, ChronoUnit.SECONDS);
 		this.baosSupport = baosSupport;
+	}
+
+	@Deprecated
+	public DefaultServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+			final KNXMediumSettings subnet, final boolean reuseCtrlEndpt, final boolean allowNetworkMonitoring,
+			final boolean udpOnly, final boolean baosSupport)
+	{
+		this(name, netif, controlEndpoint.endpoint().getPort(), subnet, reuseCtrlEndpt, allowNetworkMonitoring,
+				udpOnly, baosSupport);
 	}
 
 	@Override
@@ -126,10 +121,14 @@ public class DefaultServiceContainer implements ServiceContainer
 	}
 
 	@Override
+	public final int port() { return port; }
+
+	@Override
+	@Deprecated
 	public HPAI getControlEndpoint()
 	{
 		// be careful using HPAI::getAddress, because the IP of the control endpoint can change over time
-		return ctrlEndpt;
+		return new HPAI(null, port);
 	}
 
 	@Override

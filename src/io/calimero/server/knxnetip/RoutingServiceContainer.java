@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 * @param name see {@link DefaultServiceContainer}
 	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
 	 *        <code>"any"</code> to use system default
-	 * @param controlEndpoint see {@link DefaultServiceContainer}
+	 * @param port see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
@@ -73,23 +73,23 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 *        use {@link KNXnetIPRouting#DefaultMulticast} for the default KNX multicast group
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
-	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+	public RoutingServiceContainer(final String name, final String netif, final int port,
 		final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
 		final InetAddress routingMulticast, final boolean baosSupport)
 	{
-		this(name, netif, controlEndpoint, subnet, allowNetworkMonitoring, udpOnly, routingMulticast,
+		this(name, netif, port, subnet, allowNetworkMonitoring, udpOnly, routingMulticast,
 				Duration.ofMillis(0), baosSupport);
 	}
 
 	/**
 	 * Creates a new service container configuration equal to
-	 * {@link #RoutingServiceContainer(String, String, HPAI, KNXMediumSettings, boolean, boolean, InetAddress, boolean)} with
-	 * options for knx secure routing.
+	 * {@link #RoutingServiceContainer(String, String, int, KNXMediumSettings, boolean, boolean, InetAddress, boolean)}
+	 * with options for knx secure routing.
 	 *
 	 * @param name see {@link DefaultServiceContainer}
 	 * @param netif network interface name this service container should use for KNXnet/IP routing, might be
 	 *        <code>"any"</code> to use system default
-	 * @param controlEndpoint see {@link DefaultServiceContainer}
+	 * @param port see {@link DefaultServiceContainer}
 	 * @param subnet KNX medium settings of the KNX subnet this service container is connected to
 	 * @param allowNetworkMonitoring see {@link DefaultServiceContainer}
 	 * @param udpOnly <code>true</code> to allow only UDP client connections (no TCP), <code>false</code> to allow both
@@ -99,10 +99,10 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 	 *        (typically 500 ms to 5000 ms), <code>0 &lt; latencyTolerance.toMillis() &le; 8000</code>
 	 * @param baosSupport serve BAOS connections (routing won't be forwarding object server messages)
 	 */
-	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+	public RoutingServiceContainer(final String name, final String netif, final int port,
 			final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
 			final InetAddress routingMulticast, final Duration latencyTolerance, final boolean baosSupport) {
-		super(name, netif, controlEndpoint, subnet, false, allowNetworkMonitoring, udpOnly, baosSupport);
+		super(name, netif, port, subnet, false, allowNetworkMonitoring, udpOnly, baosSupport);
 		final IndividualAddress addr = subnet.getDeviceAddress();
 		if (addr.getDevice() != 0)
 			throw new KNXIllegalArgumentException(
@@ -111,6 +111,14 @@ public class RoutingServiceContainer extends DefaultServiceContainer
 			throw new KNXIllegalArgumentException(routingMulticast + " is not a valid KNX routing multicast address");
 		mcast = routingMulticast;
 		this.latency = latencyTolerance;
+	}
+
+	@Deprecated
+	public RoutingServiceContainer(final String name, final String netif, final HPAI controlEndpoint,
+			final KNXMediumSettings subnet, final boolean allowNetworkMonitoring, final boolean udpOnly,
+			final InetAddress routingMulticast, final Duration latencyTolerance, final boolean baosSupport) {
+		this(name, netif, controlEndpoint.endpoint().getPort(), subnet, allowNetworkMonitoring, udpOnly,
+				routingMulticast, latencyTolerance, baosSupport);
 	}
 
 	public final InetAddress routingMulticastAddress()

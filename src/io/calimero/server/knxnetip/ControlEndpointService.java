@@ -705,16 +705,14 @@ final class ControlEndpointService extends UdpServiceLooper
 
 	private DatagramSocket createSocket()
 	{
-		final HPAI ep = svcCont.getControlEndpoint();
 		InetAddress ip;
 		try {
 			final DatagramSocket s = new DatagramSocket(null);
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
-			final int port = ep.endpoint().getPort();
-			if (port == KNXnetIPConnection.DEFAULT_PORT)
+			if (svcCont.port() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
 			ip = usableIpAddresses().findFirst().orElse(null);
-			s.bind(new InetSocketAddress(ip, port));
+			s.bind(new InetSocketAddress(ip, svcCont.port()));
 			final var boundTo = new UdpEndpointAddress((InetSocketAddress) s.getLocalSocketAddress());
 			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), boundTo);
 			return s;

@@ -51,7 +51,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.System.Logger;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -105,7 +104,6 @@ import io.calimero.dptxlator.PropertyTypes;
 import io.calimero.internal.Executor;
 import io.calimero.internal.Manifest;
 import io.calimero.knxnetip.SecureConnection;
-import io.calimero.knxnetip.util.HPAI;
 import io.calimero.knxnetip.util.ServiceFamiliesDIB.ServiceFamily;
 import io.calimero.link.KNXNetworkLinkIP;
 import io.calimero.link.medium.KNXMediumSettings;
@@ -386,20 +384,14 @@ public class Launcher implements Runnable, AutoCloseable
 						else if (s.getMedium() == KNXMediumSettings.MEDIUM_RF)
 							((RFSettings) s).setDomainAddress(subnetDoA);
 
-						// try to get an IPv4 address from the optional netif
-						InetAddress ia = null;
-						if (netif != null)
-							ia = Collections.list(netif.getInetAddresses()).stream()
-									.filter(a -> a instanceof Inet4Address).findFirst().orElse(null);
-						final HPAI hpai = new HPAI(ia, port);
 						final String netifName = netif != null ? netif.getName() : "any";
 						final String svcContName = subnetArgs.isEmpty() ? interfaceType + "-" + subnet : subnetArgs;
 						final boolean baosSupport = "baos".equals(msgFormat);
 						if (routing)
-							sc = new RoutingServiceContainer(svcContName, netifName, hpai, s, monitor, udpOnly,
+							sc = new RoutingServiceContainer(svcContName, netifName, port, s, monitor, udpOnly,
 									routingMcast, latencyTolerance, baosSupport);
 						else
-							sc = new DefaultServiceContainer(svcContName, netifName, hpai, s, reuse, monitor, udpOnly,
+							sc = new DefaultServiceContainer(svcContName, netifName, port, s, reuse, monitor, udpOnly,
 									baosSupport);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),

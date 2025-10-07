@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2023 B. Malinowsky
+    Copyright (c) 2010, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -76,12 +76,14 @@ public interface ServiceContainer
 	String networkInterface();
 
 	/**
-	 * Returns the control endpoint which uniquely identifies the service container to a client.
-	 * <p>
-	 *
-	 * @return the host protocol address information containing the control endpoint
-	 * @see HPAI
+	 * {@return the UDP/TCP port used for this service container's control endpoint}
 	 */
+	int port();
+
+	/**
+	 * @deprecated Use {@link #networkInterface()} and {@link #port()}.
+	 */
+	@Deprecated
 	HPAI getControlEndpoint();
 
 	/**

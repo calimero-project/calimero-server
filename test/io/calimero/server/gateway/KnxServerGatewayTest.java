@@ -62,7 +62,6 @@ import io.calimero.device.ios.InterfaceObjectServer;
 import io.calimero.internal.EventListeners;
 import io.calimero.internal.Executor;
 import io.calimero.knxnetip.util.DeviceDIB;
-import io.calimero.knxnetip.util.HPAI;
 import io.calimero.link.KNXNetworkLink;
 import io.calimero.link.NetworkLinkListener;
 import io.calimero.link.medium.KNXMediumSettings;
@@ -84,8 +83,7 @@ class KnxServerGatewayTest
 	void init() throws Exception
 	{
 		server = setupServer("test");
-		final ServiceContainer sc = new DefaultServiceContainer("test container", "any",
-				new HPAI(null, 5647),
+		final ServiceContainer sc = new DefaultServiceContainer("test container", "any", 5647,
 				KNXMediumSettings.create(DeviceDIB.MEDIUM_TP1, new IndividualAddress(1, 1, 1)), false, true, false, false);
 		server.addServiceContainer(sc);
 		final SubnetConnector connector = SubnetConnector.newWithUserLink(sc, DummyLink.class.getName(), null, "");
@@ -122,7 +120,7 @@ class KnxServerGatewayTest
 	{
 		final KNXnetIPServer s = setupServer("test 2");
 		final var lo = InetAddress.getLoopbackAddress();
-		final var sc = new DefaultServiceContainer("test container 2", "any", new HPAI(lo, 0), new TPSettings(),
+		final var sc = new DefaultServiceContainer("test container 2", "any", 0, new TPSettings(),
 				false, false, false, false);
 		s.addServiceContainer(sc);
 		final var connector = SubnetConnector.newCustom(sc, InterfaceType.Emulate);
