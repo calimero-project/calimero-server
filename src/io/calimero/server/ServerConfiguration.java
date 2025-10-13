@@ -166,11 +166,12 @@ public class ServerConfiguration {
 			final String reuseCtrlEndpoint = sc.reuseControlEndpoint() ? ", reuse ctrl endpoint" : "";
 			return """
 					%s%s:
-						server: listen on %s (UDP/TCP %sport %s%s%s)
-						        KNX IP %srouting %s%s%s%s
+						server: listen on %s (UDP/TCP %sport %s%s%s)%s
+						        KNX IP %srouting %s%s%s
 						%s connection: %s%s""".formatted(
 					sc.getName(), activated,
-					sc.networkInterface(), unicastSecure, unicast, udpOnly, reuseCtrlEndpoint, secureRouting, mcast, optSec, baos, uds,
+					sc.networkInterface(), unicastSecure, unicast, udpOnly, reuseCtrlEndpoint, optSec,
+					secureRouting, mcast, baos, uds,
 					type, sc.getMediumSettings(), filter);
 		}
 	}

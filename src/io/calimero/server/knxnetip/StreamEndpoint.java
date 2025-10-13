@@ -118,10 +118,11 @@ sealed abstract class StreamEndpoint implements AutoCloseable
 		}
 		catch (final Throwable t) {
 			close();
+			final String msg = "couldn't start %s %s".formatted(name, endpoint);
 			switch (t) {
 				case InterruptedException e -> throw e;
-				case ExecutionException __  -> throw new KnxRuntimeException("couldn't start " + name, t.getCause());
-				default -> throw new KnxRuntimeException("couldn't start " + name, t);
+				case ExecutionException __  -> throw new KnxRuntimeException(msg, t.getCause());
+				default                     -> throw new KnxRuntimeException(msg, t);
 			}
 		}
 	}
