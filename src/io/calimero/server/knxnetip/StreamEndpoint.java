@@ -100,7 +100,8 @@ sealed abstract class StreamEndpoint implements AutoCloseable
 				}
 			}
 			catch (final Throwable t) {
-				init.completeExceptionally(t);
+				if (init.completeExceptionally(t))
+					return;
 				if (t instanceof ClosedByInterruptException)
 					ctrlEndpoint.logger.log(Level.DEBUG, "{0} {1} closed", name, endpoint);
 				else if (t instanceof final IOException e)
