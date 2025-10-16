@@ -38,8 +38,8 @@ package io.calimero.server;
 
 import static java.lang.System.Logger.Level.DEBUG;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import io.calimero.FrameEvent;
 import io.calimero.GroupAddress;
@@ -64,7 +64,7 @@ import io.calimero.link.medium.RFSettings;
  */
 public class VirtualLink extends AbstractLink<AutoCloseable>
 {
-	private final List<VirtualLink> deviceLinks = new ArrayList<>();
+	private final List<VirtualLink> deviceLinks = new CopyOnWriteArrayList<>();
 	private final boolean isDeviceLink;
 
 	public VirtualLink(final String name, final KNXMediumSettings settings)
