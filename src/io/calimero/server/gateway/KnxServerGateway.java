@@ -2035,7 +2035,7 @@ public class KnxServerGateway implements Runnable
 		if (!link.isOpen()) {
 			@SuppressWarnings("unchecked")
 			final var cast = ((Link<KNXNetworkLink>) connector.openNetworkLink());
-			link = (KNXNetworkLink) cast.target();
+			link = cast.target();
 		}
 
 		try {
