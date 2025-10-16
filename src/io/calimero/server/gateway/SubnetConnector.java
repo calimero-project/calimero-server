@@ -278,14 +278,11 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = mediumSettings();
 		final TSupplier<KNXNetworkLink> ts = switch (interfaceType) {
 			case Udp -> {
-				// find IPv4 address for local socket address
-				final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
-						.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
-				final InetSocketAddress local = new InetSocketAddress(ia, 0);
-				final boolean useNat = (Boolean) this.args[0];
+				final var local = new InetSocketAddress(anyInet4Address(), 0);
 				final var server = parseRemoteEndpoint();
 				if (requestBaos)
 					yield () -> BaosLinkIp.newUdpLink(local, server);
+				final boolean useNat = (Boolean) this.args[0];
 				yield () -> KNXNetworkLinkIP.newTunnelingLink(local, server, useNat, settings);
 			}
 			case Tcp -> {
@@ -405,11 +402,15 @@ public final class SubnetConnector
 	}
 
 	private TcpConnection newTcpConnection() {
-		final InetAddress ia = Optional.ofNullable(netif).map(ni -> ni.inetAddresses()).orElse(Stream.empty())
-				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
-		final InetSocketAddress local = new InetSocketAddress(ia, 0);
+		final var local = new InetSocketAddress(anyInet4Address(), 0);
 		final var server = parseRemoteEndpoint();
 		return TcpConnection.newTcpConnection(local, server);
+	}
+
+	// find any IPv4 address of netif for local socket address
+	private InetAddress anyInet4Address() {
+		return Optional.ofNullable(netif).map(NetworkInterface::inetAddresses).orElse(Stream.empty())
+				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
 	}
 
 	private InetSocketAddress parseRemoteEndpoint() {

@@ -525,7 +525,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			};
 		}
 		else if (svc == KNXnetIPHeader.TunnelingFeatureSet) {
-			final byte[] value = feat.featureValue().get();
+			final byte[] value = feat.featureValue().orElseThrow();
 			// write access to IA is only permitted if connection is not secured
 			if (feat.featureId() == InterfaceFeature.IndividualAddress && sessionId == 0) {
 				final ReturnCode result = updateTunnelingAddress(value) ? ReturnCode.Success : ReturnCode.DataVoid;

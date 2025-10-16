@@ -573,7 +573,7 @@ public class KNXnetIPServer
 			final EnumSet<ServiceFamily> securedServices) {
 		final int objectInstance = objectInstance(sc);
 		final var endpoint = endpointFor(sc);
-		final int objIndex = endpoint.get().knxipParameters.getIndex();
+		final int objIndex = endpoint.orElseThrow().knxipParameters.getIndex();
 
 		// option to not require secured services only, but also allow plain (mainly for testing)
 		boolean setSecuredServices = true;

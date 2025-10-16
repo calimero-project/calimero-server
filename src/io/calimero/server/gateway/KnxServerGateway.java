@@ -220,7 +220,7 @@ public class KnxServerGateway implements Runnable
 		@Override
 		public void connectionClosed(final CloseEvent e)
 		{
-			serverConnections.remove(e.getSource());
+			serverConnections.remove((KnxipQueuingEndpoint) e.getSource());
 			logger.log(DEBUG, "removed connection {0} ({1})", name, e.getReason());
 			if (e.getInitiator() == CloseEvent.CLIENT_REQUEST) {
 				final KNXnetIPConnection c = (KNXnetIPConnection) e.getSource();

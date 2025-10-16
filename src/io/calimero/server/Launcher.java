@@ -834,11 +834,11 @@ public class Launcher implements Runnable, AutoCloseable
 		final var host = sc.getMediumSettings().getDeviceAddress();
 		final var device = keyring.devices().get(host);
 		if (device != null) {
-			final var authKey = SecureConnection
-					.hashDeviceAuthenticationPassword(keyring.decryptPassword(device.authentication().get(), pwd));
+			final var authKey = SecureConnection.hashDeviceAuthenticationPassword(
+					keyring.decryptPassword(device.authentication().orElseThrow(), pwd));
 			decrypted.put("device.key", authKey);
-			final var mgmtKey = SecureConnection
-					.hashUserPassword(keyring.decryptPassword(device.password().get(), pwd));
+			final var mgmtKey = SecureConnection.hashUserPassword(
+					keyring.decryptPassword(device.password().orElseThrow(), pwd));
 			decrypted.put("user[1].key", mgmtKey);
 		}
 
