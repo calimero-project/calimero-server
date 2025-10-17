@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2024, 2024 B. Malinowsky
+    Copyright (c) 2024, 2025 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,11 +47,7 @@ final class TaskScope implements AutoCloseable {
 	private final Duration timeout;
 
 	public TaskScope(final String name, final Duration terminationTimeout) {
-		es = Executors.newCachedThreadPool(r -> {
-			final Thread t = new Thread(r, name);
-			t.setDaemon(true);
-			return t;
-		});
+		es = Executors.newThreadPerTaskExecutor(r -> Thread.ofVirtual().name(name).unstarted(r));
 		timeout = terminationTimeout;
 	}
 
