@@ -313,9 +313,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			sessions.removeConnection(sessionId);
 	}
 
-	void setSocket(final DatagramSocket socket) {
-		this.socket = socket;
-	}
+	void setSocket(final DatagramSocket socket) { this.socket = socket; }
 
 	boolean handleDataServiceType(final EndpointAddress src, final KNXnetIPHeader h, final byte[] data, final int offset)
 			throws KNXFormatException, IOException {

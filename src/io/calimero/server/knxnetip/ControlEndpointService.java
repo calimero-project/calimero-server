@@ -501,19 +501,18 @@ final class ControlEndpointService extends UdpServiceLooper
 				}
 			}
 
+			HPAI ctrlEp = csr.getControlEndpoint();
 			if (status == ErrorCodes.NO_ERROR)
 				status = subnetStatus();
 			else {
-				final var ctrlEp = csr.getControlEndpoint().endpoint();
-				final var addr = endpoint != null ? endpoint.remoteAddress()
-						: ctrlEp.getAddress().isAnyLocalAddress() || ctrlEp.getPort() == 0 ? src : ctrlEp;
+				final var addr = endpoint != null ? endpoint.remoteAddress() : ctrlEp.nat() ? src : ctrlEp.endpoint();
 				logger.log(WARNING, "received invalid connection-state request (channel {0}) from {1}: {2}",
 						csr.getChannelID(), addr, ErrorCodes.getErrorMessage(status));
 			}
 
 			final byte[] buf = PacketHelper.toPacket(protocolVersion,
 					new ConnectionstateResponse(csr.getChannelID(), status));
-			send(sessionId, csr.getChannelID(), buf, createResponseAddress(csr.getControlEndpoint(), src, 0));
+			send(sessionId, csr.getChannelID(), buf, createResponseAddress(ctrlEp, src, 0));
 		}
 		else if (svc == KNXnetIPHeader.CONNECTIONSTATE_RES)
 			logger.log(DEBUG, "received connection-state response - ignored");

@@ -314,11 +314,12 @@ public class KnxServerGateway implements Runnable
 			final ReplayBuffer<FrameEvent> buffer = subnetEventBuffers.get(svcContainer);
 			if (buffer == null)
 				return;
-			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
+			// client ctrl endpoint is used for deciding whether we use replay buffer or not
 			final var remote = connection.remoteAddress();
 			// unix domain sockets are not applicable for our replay buffer
 			if (remote instanceof UdsEndpointAddress)
 				return;
+			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
 			final int port = ((InetSocketAddress) remote.address()).getPort();
 			if (port >= portRange[0] && port <= portRange[1]) {
 				buffer.add(connection);
@@ -981,7 +982,7 @@ public class KnxServerGateway implements Runnable
 			final Collection<FrameEvent> events = replayBuffer.replay(endpoint);
 
 			endpoint.enqueue(() -> {
-				logger.log(WARNING, "previous connection of {0} got disrupted => replay {1} pending messages", endpoint,
+				logger.log(WARNING, "previous connection {0} got disrupted => replay {1} pending messages", endpoint,
 						events.size());
 				try {
 					for (final var fe : events) {
