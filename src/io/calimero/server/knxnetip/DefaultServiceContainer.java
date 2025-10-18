@@ -61,8 +61,7 @@ public class DefaultServiceContainer implements ServiceContainer
 	private final boolean networkMonitor;
 	private final boolean udpOnly;
 	private volatile Duration disruptionBufferTimeout;
-	private volatile int disruptionBufferLowerPort;
-	private volatile int disruptionBufferUpperPort;
+	private volatile PortRange disruptionBufferPortRange = new PortRange(0, 65_535);
 	private final boolean baosSupport;
 	private volatile Path unixSocketPath;
 
@@ -163,13 +162,12 @@ public class DefaultServiceContainer implements ServiceContainer
 
 	public boolean udpOnly() { return udpOnly; }
 
-	public void setDisruptionBuffer(final Duration expirationTimeout, final int lowerPort, final int upperPort)
+	public void setDisruptionBuffer(final Duration expirationTimeout, final PortRange range)
 	{
 		if (expirationTimeout.isNegative())
 			throw new KNXIllegalArgumentException("disruption buffer timeout " + expirationTimeout + " < 0");
 		disruptionBufferTimeout = expirationTimeout;
-		disruptionBufferLowerPort = lowerPort;
-		disruptionBufferUpperPort = upperPort;
+		disruptionBufferPortRange = range;
 	}
 
 	public final Duration disruptionBufferTimeout()
@@ -177,10 +175,21 @@ public class DefaultServiceContainer implements ServiceContainer
 		return disruptionBufferTimeout;
 	}
 
-	public final int[] disruptionBufferPortRange()
-	{
-		return new int[] { disruptionBufferLowerPort, disruptionBufferUpperPort };
+	public record PortRange(int lowerPort, int upperPort) {
+		public PortRange {
+			if (lowerPort < 0 || lowerPort > upperPort || upperPort > 65_535)
+				throw new KNXIllegalArgumentException("range [%d-%d] not in [0-65535]".formatted(lowerPort, upperPort));
+		}
+
+		public static PortRange from(final String range) {
+			final String[] split = range.split("-", -1);
+			final var lower = Integer.parseUnsignedInt(split[0]);
+			final var upper = Integer.parseUnsignedInt(split.length > 1 ? split[1] : split[0]);
+			return new PortRange(lower, upper);
+		}
 	}
+
+	public final PortRange disruptionBufferPortRange() { return disruptionBufferPortRange; }
 
 	public final void unixSocketPath(final Path path) { unixSocketPath = path; }
 

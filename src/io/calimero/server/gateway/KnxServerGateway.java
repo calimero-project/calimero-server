@@ -319,9 +319,9 @@ public class KnxServerGateway implements Runnable
 			// unix domain sockets are not applicable for our replay buffer
 			if (remote instanceof UdsEndpointAddress)
 				return;
-			final int[] portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
+			final var portRange = ((DefaultServiceContainer) svcContainer).disruptionBufferPortRange();
 			final int port = ((InetSocketAddress) remote.address()).getPort();
-			if (port >= portRange[0] && port <= portRange[1]) {
+			if (port >= portRange.lowerPort() && port <= portRange.upperPort()) {
 				buffer.add(connection);
 				if (buffer.isDisrupted(connection)) {
 					waitingForReplay.put(endpoint, svcContainer);
@@ -694,9 +694,9 @@ public class KnxServerGateway implements Runnable
 			final ServiceContainer sc = connector.getServiceContainer();
 			final Duration timeout = ((DefaultServiceContainer) sc).disruptionBufferTimeout();
 			if (!timeout.isZero()) {
-				final int[] portRange = ((DefaultServiceContainer) sc).disruptionBufferPortRange();
-				logger.log(INFO, "activate ''{0}'' disruption buffer on ports [{1}-{2}], disruption timeout {3} s", sc.getName(),
-						portRange[0], portRange[1], timeout.getSeconds());
+				final var portRange = ((DefaultServiceContainer) sc).disruptionBufferPortRange();
+				logger.log(INFO, "activate ''{0}'' disruption buffer on ports [{1}-{2}], disruption timeout {3} s",
+						sc.getName(), portRange.lowerPort(), portRange.upperPort(), timeout.getSeconds());
 				subnetEventBuffers.put(sc, new ReplayBuffer<>(timeout));
 			}
 

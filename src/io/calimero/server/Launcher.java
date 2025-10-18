@@ -122,6 +122,7 @@ import io.calimero.server.gateway.SubnetConnector.InterfaceType;
 import io.calimero.server.gateway.trace.CemiFrameTracer;
 import io.calimero.server.gateway.trace.CemiFrameTracer.Format;
 import io.calimero.server.knxnetip.DefaultServiceContainer;
+import io.calimero.server.knxnetip.DefaultServiceContainer.PortRange;
 import io.calimero.server.knxnetip.KNXnetIPServer;
 import io.calimero.server.knxnetip.RoutingServiceContainer;
 import io.calimero.server.knxnetip.ServiceContainer;
@@ -273,8 +274,7 @@ public class Launcher implements Runnable, AutoCloseable
 			Set<GroupAddress> filter = Collections.emptySet();
 			List<IndividualAddress> indAddressPool = new ArrayList<>();
 			String expirationTimeout = "0";
-			int disruptionBufferLowerPort = 0;
-			int disruptionBufferUpperPort = 0;
+			var disruptionBufferPortRange = new PortRange(0, 0);
 			final var tunnelingUserToAddresses = new HashMap<Integer, List<IndividualAddress>>();
 
 			Path unixSocketPath = null;
@@ -357,9 +357,7 @@ public class Launcher implements Runnable, AutoCloseable
 						case "unixSocket" -> unixSocketPath = Path.of(r.getElementText());
 						case "disruptionBuffer" -> {
 							expirationTimeout = r.getAttributeValue(null, "expirationTimeout");
-							final String[] range = attr(r, attrUdpPort).orElse("0-65535").split("-", -1);
-							disruptionBufferLowerPort = Integer.parseUnsignedInt(range[0]);
-							disruptionBufferUpperPort = Integer.parseUnsignedInt(range.length > 1 ? range[1] : range[0]);
+							disruptionBufferPortRange = PortRange.from(attr(r, attrUdpPort).orElse("0-65535"));
 						}
 						case "timeServer" -> {
 							final var formats = List.of(DPTXlatorDate.DPT_DATE.getID(),
@@ -395,7 +393,7 @@ public class Launcher implements Runnable, AutoCloseable
 									baosSupport);
 						sc.setActivationState(activate);
 						sc.setDisruptionBuffer(Duration.ofSeconds(Integer.parseUnsignedInt(expirationTimeout)),
-								disruptionBufferLowerPort, disruptionBufferUpperPort);
+								disruptionBufferPortRange);
 						if (unixSocketPath != null)
 							sc.unixSocketPath(unixSocketPath);
 
