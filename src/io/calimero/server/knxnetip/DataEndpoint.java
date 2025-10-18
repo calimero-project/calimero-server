@@ -285,7 +285,8 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	public IndividualAddress deviceAddress() { return device; }
 
-	EndpointAddress remoteAddress() { return dataEp(); }
+	@Override
+	protected EndpointAddress dataEp() { return super.dataEp(); }
 
 	public Instant connectedSince() { return connectedSince; }
 

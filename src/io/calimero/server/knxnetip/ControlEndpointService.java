@@ -242,7 +242,7 @@ final class ControlEndpointService extends UdpServiceLooper
 
 		final long now = System.currentTimeMillis();
 		final boolean timeout = (now - endpoint.getLastMsgTimestamp()) >= 120_000;
-		final var remote = endpoint.remoteAddress();
+		final var remote = endpoint.dataEp();
 		if (timeout && !anyMatchDataConnection(remote)) {
 			tcpEndpoint.lastConnectionTimedOut(remote);
 			udsEndpoint.lastConnectionTimedOut(remote);
@@ -978,7 +978,7 @@ final class ControlEndpointService extends UdpServiceLooper
 
 				if (!stream)
 					looperTask = new LooperTask(server,
-							svcCont.getName() + " data endpoint " + newDataEndpoint.remoteAddress(), 0, () -> svcLoop);
+							svcCont.getName() + " data endpoint " + newDataEndpoint.dataEp(), 0, () -> svcLoop);
 			}
 			catch (final RuntimeException e) {
 				// we don't have any better error than NO_MORE_CONNECTIONS for this
@@ -1243,7 +1243,7 @@ final class ControlEndpointService extends UdpServiceLooper
 	}
 
 	boolean anyMatchDataConnection(final EndpointAddress remoteEndpoint) {
-		return connections.values().stream().anyMatch(c -> c.remoteAddress().equals(remoteEndpoint));
+		return connections.values().stream().anyMatch(c -> c.dataEp().equals(remoteEndpoint));
 	}
 
 	// we do not assign channel id 0
