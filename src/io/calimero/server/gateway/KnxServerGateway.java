@@ -945,25 +945,25 @@ public class KnxServerGateway implements Runnable
 						NetworkInterface.getByInetAddress(ip).getName()));
 
 				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
-					info.append(format("     IP mcast: %s netif %s%n",
+					info.append(format("    IP mcast : %s netif %s%n",
 							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
 				}
 
-				info.append(format("       subnet: %s%n", c.getSubnetLink()));
+				info.append(format("    subnet   : %s%n", c.getSubnetLink()));
 
 				final long toKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_KNX).orElse(0L);
 				final long overflowKnx = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_KNX).orElse(0L);
 				final int rateToKnx = telegramsToKnx.get(objInst - 1).average();
-				info.append(format("    IP => KNX: sent %d, overflow %d [msgs], %d [msgs/min]%n", toKnx, overflowKnx, rateToKnx));
+				info.append(format("    IP => KNX: sent %d, overflow %d msgs, %d msg/min%n", toKnx, overflowKnx, rateToKnx));
 				final long toIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.MSG_TRANSMIT_TO_IP).orElse(0L);
 				final long overflowIP = property(KNXNETIP_PARAMETER_OBJECT, objInst, PID.QUEUE_OVERFLOW_TO_IP).orElse(0L);
 				final int rateToIP = telegramsFromKnx.get(objInst - 1).average();
-				info.append(format("    KNX => IP: sent %d, overflow %d [msgs], %d [msgs/min]%n", toIP, overflowIP, rateToIP));
+				info.append(format("    KNX => IP: sent %d, overflow %d msgs, %d msg/min%n", toIP, overflowIP, rateToIP));
 
 				final var connections = server.dataConnections(c.getServiceContainer());
 				if (!connections.isEmpty())
-					info.append("  active client connections:\n");
-				connections.forEach((addr, client) -> info.append(format("    %s, connected since %s%n",
+					info.append("    active client connections:\n");
+				connections.forEach((addr, client) -> info.append(format("        %s, connected since %s%n",
 						client, dtFormatter.format(client.connectedSince()))));
 			}
 			catch (final Exception e) {
