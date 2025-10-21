@@ -949,25 +949,22 @@ final class ControlEndpointService extends UdpServiceLooper
 		}
 		else {
 			try {
-				final boolean stream = tcpEndpoint.connections.containsKey(dataEndpt)
-						|| udsEndpoint.connections.containsKey(dataEndpt)
-						|| baosEndpoint.connections.containsKey(dataEndpt)
-						|| udsBaosEndpoint.connections.containsKey(dataEndpt);
+				final boolean udp = dataEndpt instanceof UdpEndpointAddress;
 
 				BiConsumer<DataEndpoint, IndividualAddress> bc;
 				final DatagramSocket socket;
 				Consumer<DataEndpoint> resetRequest;
-				if (stream) {
-					svcLoop = null;
-					socket = null;
-					bc = (__, ___) -> {};
-					resetRequest = (__) -> {};
-				}
-				else {
+				if (udp) {
 					svcLoop = new DataEndpointService(server, s, svcCont.getName());
 					socket = svcLoop.getSocket();
 					bc = (h, a) -> svcLoop.quit();
 					resetRequest = ((DataEndpointService) svcLoop)::resetRequest;
+				}
+				else {
+					svcLoop = null;
+					socket = null;
+					bc = (__, ___) -> {};
+					resetRequest = (__) -> {};
 				}
 
 				newDataEndpoint = new DataEndpoint(this, s, socket, ctrlEndpt, dataEndpt, channelId, device,
@@ -975,7 +972,7 @@ final class ControlEndpointService extends UdpServiceLooper
 				if (svcLoop != null)
 					((DataEndpointService) svcLoop).svcHandler = newDataEndpoint;
 
-				if (!stream)
+				if (udp)
 					looperTask = new LooperTask(server,
 							svcCont.getName() + " data endpoint " + newDataEndpoint.dataEp(), 0, () -> svcLoop);
 			}

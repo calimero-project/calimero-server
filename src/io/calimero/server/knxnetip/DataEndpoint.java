@@ -131,7 +131,6 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	private final ControlEndpointService ces;
 	private final ConnectionType ctype;
-	private final boolean stream;
 	private final Instant connectedSince;
 
 	private final SecureSessions sessions;
@@ -167,8 +166,6 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 		this.ctype = type;
 		ctrlEp(remoteCtrlEndpt);
 		dataEp(remoteDataEndpt);
-		stream = ces.tcpEndpoint.connections.containsKey(remoteDataEndpt) ||
-				ces.udsEndpoint.connections.containsKey(remoteDataEndpt);
 		connectedSince = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 		this.device = assigned;
 		this.sessions = sessions;
@@ -254,8 +251,9 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 	public void send(final BaosService svc) throws KNXConnectionClosedException {
 		try {
-			final int chid = stream ? 0 : channelId;
-			final int seq = stream ? 0 : getSeqSend();
+			final boolean udp = ctrlEp() instanceof UdpEndpointAddress;
+			final int chid = udp ? channelId : 0;
+			final int seq = udp ? getSeqSend() : 0;
 			final var buf = PacketHelper.toPacket(new ServiceRequest<>(serviceRequest, chid, seq, svc));
 
 			// NYI udp: we need a send method like for cEMI
@@ -278,7 +276,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 	@Override
 	public String toString()
 	{
-		final String nat = (useNat && !stream) ? "NAT, " : "";
+		final String nat = (useNat && ctrlEp() instanceof UdpEndpointAddress) ? "NAT, " : "";
 		final var deviceAddress = device != null ? ", " + device : "";
 		return "%s (%schannel %d%s)".formatted(name(), nat, getChannelId(), deviceAddress);
 	}
@@ -368,7 +366,6 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 		final String type = tunnel ? "tunneling" : "device configuration";
 		if (svc == serviceRequest || svc == KNXnetIPHeader.TunnelingFeatureGet || svc == KNXnetIPHeader.TunnelingFeatureSet) {
-
 			final var req = svc == KNXnetIPHeader.ObjectServerRequest
 					? ServiceRequest.from(h, data, offset, baosServiceParser)
 					: ServiceRequest.from(h, data, offset);
@@ -378,15 +375,17 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 
 			final int seq = req.getSequenceNumber();
 			final int status = checkVersion(h) ? ErrorCodes.NO_ERROR : ErrorCodes.VERSION_NOT_SUPPORTED;
-			if (stream)
-				; // no-op
-			else if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
-				final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
-				send(buf, etsDstHack(dataEp(), src));
-			}
-			else {
-				logger.log(WARNING, type + " request with invalid receive sequence " + seq + ", expected " + getSeqRcv() + " - ignored");
-				return true;
+			final boolean udp = src instanceof UdpEndpointAddress;
+			if (udp) {
+				if (seq == getSeqRcv() || (tunnel && ((seq + 1) & 0xFF) == getSeqRcv())) {
+					final byte[] buf = PacketHelper.toPacket(new ServiceAck(serviceAck, channelId, seq, status));
+					send(buf, etsDstHack(dataEp(), src));
+				}
+				else {
+					logger.log(WARNING, "{0} request with invalid receive sequence {1}, expected {2} - ignored", type,
+							seq, getSeqRcv());
+					return true;
+				}
 			}
 
 			if (status == ErrorCodes.VERSION_NOT_SUPPORTED) {
@@ -394,7 +393,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 				return true;
 			}
 
-			if (stream || seq == getSeqRcv()) {
+			if (!udp || seq == getSeqRcv()) {
 				incSeqRcv();
 				updateLastMsgTimestamp();
 
