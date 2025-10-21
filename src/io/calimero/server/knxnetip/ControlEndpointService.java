@@ -425,7 +425,7 @@ final class ControlEndpointService extends UdpServiceLooper
 				if (channelId == 0)
 					status = ErrorCodes.NO_MORE_CONNECTIONS;
 				else {
-					logger.log(INFO, "{0}: setup data endpoint (channel {1}) for connection request from {2}",
+					logger.log(DEBUG, "{0}: setup data endpoint (channel {1}) for connection request from {2}",
 							svcCont.getName(), channelId, ctrlEndpt);
 					final var dataEndpt = createResponseAddress(req.getDataEndpoint(), src, 2);
 					final ConnectResponse res = initNewConnection(req, ctrlEndpt, dataEndpt, channelId);
@@ -897,12 +897,12 @@ final class ControlEndpointService extends UdpServiceLooper
 
 			device = this.device;
 			final boolean isServerAddress = device.equals(serverAddress());
-			logger.log(INFO, "assign {0} address {1} to channel {2}",
+			logger.log(TRACE, "assign {0} address {1} to channel {2}",
 					isServerAddress ? "server device" : "additional individual", device, channelId);
 			crd = new TunnelCRD(device);
 		}
 		else if (connType == DEVICE_MGMT_CONNECTION) {
-			logger.log(INFO, "setup device management connection with channel ID {0}", channelId);
+			logger.log(DEBUG, "setup device management connection with channel ID {0}", channelId);
 			// At first, check if we are allowed to open mgmt connection at all; if
 			// server assigned its own device address, we have to reject the request
 			synchronized (usedKnxAddresses) {
