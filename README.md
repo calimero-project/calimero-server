@@ -111,8 +111,8 @@ Description of the supported XML elements and attributes:
     - `udpPort="5555-5559"`: The disruption buffer is only available for clients which connect via the specified (client-side) UDP port range. All other clients are ignored.
 
 * `<routing>224.0.23.12</routing>` (optional): the multicast setup used by the service container for KNX IP (Secure) routing, defaults to the IP multicast address 224.0.23.12. (If the `routing` attribute of the service container is set to `false`, this setting has no effect.)  
-Optional attributes for secure routing:
-    - `latencyTolerance="1000"`: time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
+Attributes for secure routing:
+    - `latencyTolerance="1000"`: time window (in milliseconds) for accepting secure multicasts, depends on the max. end-to-end network latency
 * `<unixSocket>/path/to/unix/socket</unixSocket>` accept client connections over Unix domain sockets, server socket binds to the specified file-system path
 * `<knxSubnet>` settings of the KNX subnet the service container shall communicate with. The `knxSubnet` element text contains identifiers specific to the KNX subnet interface type, i.e., IP address[:port] for IP-based interfaces, or USB interface name/ID for KNX USB interfaces, constructor arguments for user-supplied network links, .... Attributes:
     - `type`: interface type to the KNX subnet, one of:
@@ -127,13 +127,14 @@ Optional attributes for secure routing:
                    If no datapoint file is configured, the emulation behavior is as follows: once a datapoint value is written to the subnet, it is added to the list of known datapoints, available for subsequent process communication. 
       - `user`: own programmed connections may be added here
     - `medium` (optional): KNX transmission medium, one of "tp1" (default), "pl110", "knxip", "rf"
-	   - `tp1`: Twisted pair (transmission with 9600 Baud as specified in the KNX standard)
+      - `tp1`: Twisted pair (transmission with 9600 Baud as specified in the KNX standard)
       - `pl110`: use power-line to connect
       - `knxip`: access via Ethernet
       - `rf`: Wireless connection via 868 MHz
     - `format` (optional): useful for knx interfaces which support different exchange formats; recognized values are "" (default), "baos", or "cemi"
     - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
     - `netif` (tunneling & KNX IP only, optional): network interface for tunneling or KNX IP communication with the KNX subnet
+    - `latencyTolerance` (KNX IP Secure only): time window (in milliseconds) for accepting secure multicasts, depends on the max. end-to-end network latency
     - `useNat` (UDP tunneling only, optional): use network address translation (NAT)
     - `domainAddress` (open media only): domain address for power-line or RF transmission medium
     - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
