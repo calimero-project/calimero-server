@@ -40,12 +40,16 @@ import static java.lang.System.Logger.Level.WARNING;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.util.function.Consumer;
 
 import io.calimero.CloseEvent;
 import io.calimero.FrameEvent;
@@ -57,9 +61,14 @@ import io.calimero.cemi.CEMI;
 import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILDataEx;
 import io.calimero.device.ios.KnxipParameterObject;
+import io.calimero.internal.EventListeners;
 import io.calimero.knxnetip.EndpointAddress;
 import io.calimero.knxnetip.KNXConnectionClosedException;
 import io.calimero.knxnetip.KNXnetIPRouting;
+import io.calimero.knxnetip.LostMessageEvent;
+import io.calimero.knxnetip.RateLimitEvent;
+import io.calimero.knxnetip.RoutingBusyEvent;
+import io.calimero.knxnetip.RoutingListener;
 import io.calimero.knxnetip.SecureConnection;
 import io.calimero.knxnetip.UdpEndpointAddress;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
@@ -77,8 +86,16 @@ final class RoutingService extends UdpServiceLooper
 	{
 		private final FifoSequentialExecutor executor;
 
-		RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup,
-			final boolean enableLoopback) throws KNXException {
+		RoutingServiceHandler(final InetAddress mcGroup, final String name) {
+			super(mcGroup);
+			ctrlEndpt = new InetSocketAddress(mcGroup, DEFAULT_PORT);
+			dataEndpt = ctrlEndpt;
+			logger = LogService.getLogger("io.calimero.server.knxnetip." + name);
+			executor = new FifoSequentialExecutor(name + " task queue", logger);
+		}
+
+		RoutingServiceHandler(final NetworkInterface netif, final InetAddress mcGroup, final boolean enableLoopback)
+				throws KNXException {
 			super(mcGroup);
 			init(netif, enableLoopback, false);
 			logger = LogService.getLogger("io.calimero.server.knxnetip." + name());
@@ -86,7 +103,7 @@ final class RoutingService extends UdpServiceLooper
 		}
 
 		@Override
-		public void enqueue(final Runnable task) {
+		public final void enqueue(final Runnable task) {
 			executor.execute(task);
 		}
 
@@ -124,7 +141,7 @@ final class RoutingService extends UdpServiceLooper
 		}
 
 		@Override
-		public String toString()
+		public final String toString()
 		{
 			return name();
 		}
@@ -138,6 +155,60 @@ final class RoutingService extends UdpServiceLooper
 			RoutingService.this.quit();
 			super.close(initiator, reason, level, t);
 		}
+	}
+
+	private final class SecureRoutingServiceHandler extends RoutingServiceHandler {
+		private final KNXnetIPRouting impl;
+		private final DatagramChannel dc;
+
+		private static final MethodHandle MH_channel;
+		static {
+			try {
+				MH_channel = MethodHandles.privateLookupIn(KNXnetIPRouting.class, MethodHandles.lookup())
+						.findVirtual(KNXnetIPRouting.class, "channel", MethodType.methodType(DatagramChannel.class));
+			}
+			catch (NoSuchMethodException | IllegalAccessException e) {
+				throw new AssertionError(e);
+			}
+		}
+
+
+		SecureRoutingServiceHandler(final KNXnetIPRouting impl) {
+			super(impl.getRemoteAddress().getAddress(), impl.name());
+			this.impl = impl;
+			try {
+				dc = (DatagramChannel) MH_channel.invoke(impl);
+			}
+			catch (final Throwable e) {
+				throw new AssertionError(e);
+			}
+		}
+
+		@Override
+		public void send(final CEMI frame, final BlockingMode blockingMode) throws KNXConnectionClosedException {
+			impl.send(frame, blockingMode);
+		}
+
+		@Override
+		public void send(final RoutingLostMessage lost) {
+			// NYI sending routing lost message
+			logger.log(WARNING, "sending routing lost message not implemented");
+		}
+
+		@Override
+		public String name() { return impl.name(); }
+
+		@Override
+		protected DatagramChannel channel() { return dc; }
+
+		@Override
+		protected void close(final int initiator, final String reason, final Level level, final Throwable t) {
+			closing = true;
+			impl.close();
+			super.close(initiator, reason, level, t);
+		}
+
+		EventListeners<KNXListener> listeners() { return listeners; }
 	}
 
 	final RoutingServiceHandler r;
@@ -157,33 +228,44 @@ final class RoutingService extends UdpServiceLooper
 
 		final var mcGroup = knxipObject.inetAddress(PID.ROUTING_MULTICAST_ADDRESS);
 
-		final KNXnetIPRouting inst;
 		try {
 			final NetworkInterface netif = networkInterface();
 			if (secure) {
-				inst = SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
-				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback) {
+				final var impl = SecureConnection.newRouting(netif, mcGroup, groupKey, sc.latencyTolerance());
+				final var srsh = new SecureRoutingServiceHandler(impl);
+				r = srsh;
+				// our routing listener has to insert our own handler as source for each event
+				impl.addConnectionListener(new RoutingListener() {
 					@Override
-					public void send(final RoutingLostMessage lost) {
-						// NYI sending routing lost message
-						logger.log(WARNING, "NYI sending routing lost message");
+					public void frameReceived(final FrameEvent e) {
+						final var adapted = new FrameEvent(srsh, e.getFrame(), e.systemBroadcast());
+						srsh.listeners().fire(l -> l.frameReceived(adapted));
 					}
 
 					@Override
-					public String name() { return inst.name(); }
+					public void lostMessage(final LostMessageEvent e) {
+						final var adapted = new LostMessageEvent(srsh, e.getSender(), e.getDeviceState(), e.getLostMessages());
+						fireRoutingEvent(rl -> rl.lostMessage(adapted));
+					}
 
 					@Override
-					protected void close(final int initiator, final String reason, final Level level,
-							final Throwable t) {
-						closing = true;
-						inst.close();
-						super.close(initiator, reason, level, t);
+					public void routingBusy(final RoutingBusyEvent e) {
+						final var adapted = new RoutingBusyEvent(srsh, e.sender(), e.get());
+						fireRoutingEvent(rl -> rl.routingBusy(adapted));
 					}
-				};
-				// add listener to inst after r got initialized
-				inst.addConnectionListener(new KNXListener() {
+
 					@Override
-					public void frameReceived(final FrameEvent e) {}
+					public void rateLimit(final RateLimitEvent e) {
+						final var adapted = new RateLimitEvent(srsh);
+						fireRoutingEvent(rl -> rl.rateLimit(adapted));
+					}
+
+					private void fireRoutingEvent(final Consumer<RoutingListener> c) {
+						srsh.listeners().fire(l -> {
+							if (l instanceof final RoutingListener rl)
+								c.accept(rl);
+						});
+					}
 
 					@Override
 					public void connectionClosed(final CloseEvent e) { r.close(); }
@@ -191,7 +273,6 @@ final class RoutingService extends UdpServiceLooper
 			}
 			else {
 				r = new RoutingServiceHandler(netif, mcGroup, enableLoopback);
-				inst = r;
 			}
 		}
 		catch (SocketException | KNXException e) {
@@ -203,11 +284,21 @@ final class RoutingService extends UdpServiceLooper
 		}
 
 		s = r.channel().socket();
-		fireRoutingServiceStarted(svcCont, inst);
+		fireRoutingServiceStarted(svcCont, r);
 	}
 
 	@Override
 	protected void receive(final byte[] buf) throws IOException {
+		if (secure) {
+			// do nothing, secure routing impl runs the receiver
+			try {
+				Thread.sleep(100);
+			}
+			catch (final InterruptedException e) {
+				quit();
+			}
+			return;
+		}
 		final ByteBuffer buffer = ByteBuffer.wrap(buf);
 		final var source = r.channel().receive(buffer);
 		buffer.flip();
