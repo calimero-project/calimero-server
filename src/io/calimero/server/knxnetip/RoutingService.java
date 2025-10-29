@@ -210,11 +210,11 @@ final class RoutingService extends UdpServiceLooper
 		EventListeners<KNXListener> listeners() { return listeners; }
 	}
 
-	final RoutingServiceHandler r;
+	private final RoutingServiceHandler r;
 	private final RoutingServiceContainer svcCont;
 	private final boolean secure;
 
-	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final boolean enableLoopback)	{
+	RoutingService(final KNXnetIPServer server, final RoutingServiceContainer sc, final boolean enableLoopback) {
 		super(server, null, false, 512, 0);
 		svcCont = sc;
 
