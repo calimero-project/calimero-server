@@ -403,9 +403,11 @@ public final class SubnetConnector
 	}
 
 	private TcpConnection newTcpConnection() {
-		final var local = new InetSocketAddress(anyInet4Address(), 0);
+		final var local = anyInet4Address();
 		final var server = parseRemoteEndpoint();
-		return TcpConnection.newTcpConnection(local, server);
+		if (local == null)
+			return TcpConnection.newTcpConnection(server);
+		return TcpConnection.newTcpConnection(new InetSocketAddress(local, 0), server);
 	}
 
 	// find any IPv4 address of netif for local socket address
