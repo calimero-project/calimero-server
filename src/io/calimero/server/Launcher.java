@@ -317,6 +317,7 @@ public class Launcher implements Runnable, AutoCloseable
 									useNat = Boolean.parseBoolean(r.getAttributeValue(null, "useNat"));
 								}
 								case Tcp -> {
+									subnetKnxipNetif = getNetIf(r);
 									tunnelingAddress = indAddress(r, "tunnelingAddress");
 									host = indAddress(r, "host");
 									user = attr(r, "user", 0);
@@ -402,7 +403,7 @@ public class Launcher implements Runnable, AutoCloseable
 									subnetLatencyTolerance);
 							case Udp     -> SubnetConnector.newWithTunnelingLink(sc, subnetKnxipNetif, useNat,
 									msgFormat, overrideSrcAddress, subnetArgs);
-							case Tcp     -> SubnetConnector.withTcp(sc, subnetArgs, tunnelingAddress, user, host);
+							case Tcp     -> SubnetConnector.withTcp(sc, subnetKnxipNetif, subnetArgs, tunnelingAddress, user, host);
 							case Tpuart  -> SubnetConnector.newWithTpuartLink(sc, overrideSrcAddress, subnetArgs);
 							case Emulate -> datapoints != null ? SubnetConnector.newCustom(sc, InterfaceType.Emulate, datapoints)
 									: SubnetConnector.newCustom(sc, InterfaceType.Emulate);

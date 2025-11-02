@@ -176,9 +176,9 @@ public final class SubnetConnector
 		return new SubnetConnector(container, InterfaceType.User, "", overrideSrcAddress, null, className, subnetArgs);
 	}
 
-	public static SubnetConnector withTcp(final ServiceContainer container, final String subnetArgs,
-			final IndividualAddress tunnelingAddress, final int user, final IndividualAddress host) {
-		return new SubnetConnector(container, InterfaceType.Tcp, "", new IndividualAddress(0), null, null, subnetArgs,
+	public static SubnetConnector withTcp(final ServiceContainer container, final NetworkInterface netif,
+			final String subnetArgs, final IndividualAddress tunnelingAddress, final int user, final IndividualAddress host) {
+		return new SubnetConnector(container, InterfaceType.Tcp, "", new IndividualAddress(0), netif, null, subnetArgs,
 				tunnelingAddress, user, host);
 	}
 
@@ -228,13 +228,13 @@ public final class SubnetConnector
 
 	private SubnetConnector(final ServiceContainer container, final InterfaceType interfaceType, final String msgFormat,
 		final IndividualAddress overrideSrcAddress,
-		final NetworkInterface routingNetif, final String className, final String subnetArgs, final Object... args)
+		final NetworkInterface netif, final String className, final String subnetArgs, final Object... args)
 	{
 		sc = container;
 		this.interfaceType = interfaceType;
 		this.msgFormat = msgFormat;
 		this.overrideInterfaceAddress = overrideSrcAddress;
-		netif = routingNetif;
+		this.netif = netif;
 		this.className = className;
 		linkArgs = subnetArgs;
 		this.args = args;
