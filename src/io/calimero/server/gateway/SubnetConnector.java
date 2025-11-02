@@ -53,6 +53,7 @@ import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
 import io.calimero.KNXException;
 import io.calimero.KNXIllegalArgumentException;
+import io.calimero.KnxRuntimeException;
 import io.calimero.Priority;
 import io.calimero.baos.BaosLinkAdapter;
 import io.calimero.baos.ip.BaosLinkIp;
@@ -409,8 +410,11 @@ public final class SubnetConnector
 
 	// find any IPv4 address of netif for local socket address
 	private InetAddress anyInet4Address() {
-		return Optional.ofNullable(netif).map(NetworkInterface::inetAddresses).orElse(Stream.empty())
-				.filter(Inet4Address.class::isInstance).findFirst().orElse(null);
+		if (netif == null)
+			return null;
+		return netif.inetAddresses().filter(Inet4Address.class::isInstance).findFirst()
+				.orElseThrow(() -> new KnxRuntimeException(
+						"KNX subnet interface '%s' has no bound IPv4 address".formatted(netif.getName())));
 	}
 
 	private InetSocketAddress parseRemoteEndpoint() {
