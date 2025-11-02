@@ -465,7 +465,8 @@ public final class SubnetConnector
 	public String toString() {
 		final var joiner = new StringJoiner(" ");
 		joiner.add(interfaceType.toString());
-		if (subnetLink != null)
+		final var link = getSubnetLink();
+		if (link != null)
 			return joiner.add(subnetLink.toString()).toString();
 
 		if (!linkArgs.isBlank())
