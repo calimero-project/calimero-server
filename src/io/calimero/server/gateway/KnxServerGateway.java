@@ -726,56 +726,57 @@ public class KnxServerGateway implements Runnable
 	{
 		launchServer();
 
-		for (final var connector : connectors) {
-			if (connector.getServiceContainer().isActivated())
-				try {
-					connector.openNetworkLink();
-					// we immediately set a virtual network to connected, so that there is no
-					// initial state "knx bus not connected" in a server discovery
-					if (connector.interfaceType() == InterfaceType.Virtual)
-						setNetworkState(1, true, false);
-				}
-				catch (KNXException | RuntimeException e) {
-					logger.log(ERROR, "error opening network link for " + connector.getName(), e);
-					server.shutdown();
-					return;
-				}
-				catch (final InterruptedException e) {
-					server.shutdown();
-					Thread.currentThread().interrupt();
-					return;
-				}
-		}
-
+		Thread dispatcherThread = null;
 		trucking = true;
-		final var dispatcherThread = Executor.execute(dispatcher, name + " subnet dispatcher");
-		while (trucking) {
-			try {
-				// although we possibly run in a dedicated thread so to not delay any
-				// other user tasks, be aware that subnet frame dispatching to IP
-				// front-end is done in this thread
-				final FrameEvent event = subnetEvents.take();
-				// If we received a reset.req message in the message handler, the resetEvent marker gets added
-				if (event == ResetEvent) {
-					// Check trucking, since someone might have called quit during server shutdown
-					if (trucking)
-						launchServer();
-				}
-				else {
-					replayPendingSubnetEvents();
-					onSubnetFrameReceived(event);
+		try {
+			for (final var connector : connectors) {
+				if (connector.getServiceContainer().isActivated()) {
+					try {
+						connector.openNetworkLink();
+						// we immediately set a virtual network to connected, so that there is no
+						// initial state "knx bus not connected" in a server discovery
+						if (connector.interfaceType() == InterfaceType.Virtual)
+							setNetworkState(1, true, false);
+					}
+					catch (KNXException | RuntimeException e) {
+						logger.log(ERROR, "error opening network link for " + connector.getName(), e);
+						server.shutdown();
+						return;
+					}
 				}
 			}
-			catch (final RuntimeException e) {
-				logger.log(ERROR, "on dispatching KNX message", e);
-			}
-			catch (final InterruptedException e) {
-				quit();
-				Thread.currentThread().interrupt();
+
+			dispatcherThread = Executor.execute(dispatcher, name + " subnet dispatcher");
+			while (trucking) {
+				try {
+					// although we possibly run in a dedicated thread so to not delay any
+					// other user tasks, be aware that subnet frame dispatching to IP
+					// front-end is done in this thread
+					final FrameEvent event = subnetEvents.take();
+					// If we received a reset.req message in the message handler, the resetEvent marker gets added
+					if (event == ResetEvent) {
+						// Check trucking, since someone might have called quit during server shutdown
+						if (trucking)
+							launchServer();
+					}
+					else {
+						replayPendingSubnetEvents();
+						onSubnetFrameReceived(event);
+					}
+				}
+				catch (final RuntimeException e) {
+					logger.log(ERROR, "on dispatching KNX message", e);
+				}
 			}
 		}
-
-		dispatcherThread.interrupt();
+		catch (final InterruptedException e) {
+			quit();
+			Thread.currentThread().interrupt();
+		}
+		finally {
+			if (dispatcherThread != null)
+				dispatcherThread.interrupt();
+		}
 	}
 
 	/**
