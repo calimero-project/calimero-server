@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 import io.calimero.DataUnitBuilder;
 import io.calimero.IndividualAddress;

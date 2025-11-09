@@ -88,7 +88,6 @@ import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
 import io.calimero.KNXAddress;
 import io.calimero.KNXException;
-import io.calimero.KNXFormatException;
 import io.calimero.KNXRemoteException;
 import io.calimero.KNXTimeoutException;
 import io.calimero.KnxRuntimeException;
@@ -1423,9 +1422,7 @@ public class KnxServerGateway implements Runnable
 		});
 	}
 
-	private static CEMI createCon(final byte[] data, final CEMILData original, final boolean error)
-		throws KNXFormatException
-	{
+	private static CEMI createCon(final byte[] data, final CEMILData original, final boolean error) {
 		if (original instanceof CEMILDataEx) {
 			// since we don't use the error flag, simply always create positive .con using the cemi factory
 			return create(CEMILData.MC_LDATA_CON, null, original);
@@ -2023,7 +2020,6 @@ public class KnxServerGateway implements Runnable
 		if (adapter != null && adapter.isOpen())
 			return adapter;
 
-		// make sure we don't have a virtual link
 		if (!(connector.getSubnetLink() instanceof Link<?> l))
 			throw new KNXException("no USB subnet link for " + connector.getName());
 

@@ -873,10 +873,12 @@ public class Launcher implements Runnable, AutoCloseable
 			final var subnetHost = connector.host().orElse(host);
 			final var iface = Optional.ofNullable(keyring.interfaces().get(subnetHost)).orElse(List.of()).stream()
 					.filter(intf -> intf.user() == user).findFirst().orElseThrow(() -> new KnxSecureException(
-							connector.getName() + ": no keyring interface found for host " + subnetHost + " user " + user));
+							"KNX subnet %s: no keyring interface found for host %s user %d"
+									.formatted(connector.getName(), subnetHost, user)));
 			if (iface.password().isEmpty())
-				throw new KnxSecureException(connector.getName() + ": keyring interface for host " + subnetHost + " user "
-						+ user + " does not have a password configured");
+				throw new KnxSecureException(
+						"KNX subnet %s: keyring interface for host %s user %d does not have a password configured"
+								.formatted(connector.getName(), subnetHost, user));
 			final var key = SecureConnection.hashUserPassword(keyring.decryptPassword(iface.password().get(), pwd));
 			decrypted.put("subnet.tunneling.key", key);
 
@@ -889,6 +891,7 @@ public class Launcher implements Runnable, AutoCloseable
 			else
 				decrypted.put("subnet.device.key", new byte[0]);
 		}
+		// routing
 		if (connector.knxipSecure()) {
 			final var backbone = keyring.backbone().filter(bb -> bb.multicastGroup().getHostAddress().equals(connector.linkArguments()));
 			if (backbone.isPresent() && backbone.get().groupKey().isPresent()) {
