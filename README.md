@@ -129,6 +129,11 @@ Optional attributes for secure routing:
     - `knxAddress` (optional): override the knx source address used in a frame dispatched to the knx subnet, used for knx interfaces which expect a specific address (e.g., "0.0.0")
     - `netif` (tunneling & KNX IP only, optional): network interface for tunneling or KNX IP communication with the KNX subnet
     - `useNat` (UDP tunneling only, optional): use network address translation (NAT)
+    - `tunnelingAddress` (TCP only, optional): request a specific individual address for tunneling
+    - `user` (KNX IP Secure tunneling, required): the user ID for tunneling
+    - `host` (KNX IP Secure tunneling, optional): the host address (IA) in the supplied keyring for the secure 
+      subnet connection; defaults to the service container's individual address
+    - `latencyTolerance` (KNX IP Secure routing, optional): time window for accepting secure multicasts (in milliseconds), depends on the max. end-to-end network latency
     - `domainAddress` (open media only): domain address for power-line or RF transmission medium
     - `class` (user-supplied KNX subnet type only): class name of a user-supplied KNXNetworkLink to use for subnet communication
 
