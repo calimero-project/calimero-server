@@ -290,13 +290,7 @@ public final class SubnetConnector
 				if (requestBaos)
 					yield () -> BaosLinkIp.newTcpLink(newTcpConnection());
 
-				// check if we have a tunneling address specified
-				KNXMediumSettings tunnelingSettings;
-				if (args.length > 0 && args[0] instanceof final IndividualAddress ia)
-					tunnelingSettings = new ReplaceInterfaceAddressProxy(settings, ia);
-				else
-					tunnelingSettings = settings;
-
+				final var tunnelingSettings = tunnelingAddress(settings);
 				if (args.length > 0 && args[1] instanceof final Integer user && userKey != null) {
 					yield () -> KNXNetworkLinkIP.newSecureTunnelingLink(
 							newTcpConnection().newSecureSession(user, userKey.clone(), deviceAuthCode.clone()),
@@ -400,6 +394,13 @@ public final class SubnetConnector
 		final KNXNetworkMonitor link = c.newMonitor(ts);
 		setSubnetLink(link);
 		return link;
+	}
+
+	// adjust medium settings if we have a tunneling address specified
+	private KNXMediumSettings tunnelingAddress(final KNXMediumSettings settings) {
+		if (args.length > 0 && args[0] instanceof final IndividualAddress ia)
+			return new ReplaceInterfaceAddressProxy(settings, ia);
+		return settings;
 	}
 
 	private TcpConnection newTcpConnection() {
