@@ -375,7 +375,7 @@ public final class SubnetConnector
 		if (interfaceType == InterfaceType.Virtual || interfaceType == InterfaceType.Emulate)
 			return null;
 
-		final KNXMediumSettings settings = sc.getMediumSettings();
+		final KNXMediumSettings settings = mediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
 			case Udp -> () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
 			case Tcp -> {
