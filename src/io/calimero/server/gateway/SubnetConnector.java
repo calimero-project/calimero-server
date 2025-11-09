@@ -378,7 +378,15 @@ public final class SubnetConnector
 		final KNXMediumSettings settings = sc.getMediumSettings();
 		final TSupplier<KNXNetworkMonitor> ts = switch (interfaceType) {
 			case Udp -> () -> new KNXNetworkMonitorIP(new InetSocketAddress(0), parseRemoteEndpoint(), false, settings);
-			case Tcp -> () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), settings);
+			case Tcp -> {
+				final var tunnelingSettings = tunnelingAddress(settings);
+				if (args.length > 0 && args[1] instanceof final Integer user && userKey != null) {
+					yield () -> KNXNetworkMonitorIP.newSecureMonitorLink(
+							newTcpConnection().newSecureSession(user, userKey.clone(), deviceAuthCode.clone()),
+							tunnelingSettings);
+				}
+				yield () -> KNXNetworkMonitorIP.newMonitorLink(newTcpConnection(), tunnelingSettings);
+			}
 			case Usb -> () -> new KNXNetworkMonitorUsb(linkArgs, settings);
 			case Ft12 -> () -> "cemi".equals(msgFormat)
 					? KNXNetworkMonitorFT12.newCemiMonitor(linkArgs, settings)
