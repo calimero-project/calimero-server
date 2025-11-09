@@ -739,7 +739,9 @@ public class Launcher implements Runnable, AutoCloseable
 				case Tcp -> {
 					if (connector.user().isPresent()) {
 						final var userKey = keyfile.get("subnet.tunneling.key");
-						final var deviceAuthCode = keyfile.get("subnet.device.key");
+						if (userKey == null)
+							throw new KnxSecureException("KNX subnet " + connector.getName() + ": missing tunneling key");
+						final var deviceAuthCode = keyfile.getOrDefault("subnet.device.key", new byte[0]);
 						connector.setIpSecure(userKey, deviceAuthCode);
 					}
 				}
