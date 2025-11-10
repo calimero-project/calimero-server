@@ -858,14 +858,11 @@ public class KnxServerGateway implements Runnable
 					if (conn instanceof final DataEndpoint de) {
 						if (de.type() == ConnectionType.DevMgmt)
 							continue;
-						// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
-						// we serve that connection by converting cEMI L-Data -> cEMI BusMon
+						// if we have a bus monitoring connection, convert cEMI L-Data -> cEMI BusMon
 						monitor = de.type() == ConnectionType.Monitor;
 					}
 
 					final var f = new CEMILDataEx(CEMILData.MC_LDATA_IND, src, dst, apdu, p);
-					// if we have a bus monitoring connection, but a subnet connector does not support busmonitor mode,
-					// we serve that connection by converting cEMI L-Data -> cEMI BusMon
 					final CEMI send = monitor ? convertToBusmon(f, eventId, connector) : f;
 					asyncSend(sc, conn, send, FramePath.LocalToClient);
 				}
@@ -1690,9 +1687,7 @@ public class KnxServerGateway implements Runnable
 		final AutoCloseable ac = getSubnetConnector(svcContainer.getName()).getSubnetLink();
 		if (ac instanceof final Link<?> link)
 			return link.getName();
-		if (ac instanceof final VirtualLink vLink)
-			return vLink.getName();
-		return ac.toString();
+		return "";
 	}
 
 	private void send(final SubnetConnector subnet, final CEMILData f, final FramePath path)
