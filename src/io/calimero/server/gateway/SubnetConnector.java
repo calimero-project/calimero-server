@@ -273,6 +273,40 @@ public final class SubnetConnector
 		return subnetLink;
 	}
 
+	enum LinkType { NetworkLink, MonitorLink }
+
+	synchronized AutoCloseable link(final LinkType linkType) throws KNXException, InterruptedException {
+		final var link = getSubnetLink();
+		if (link != null) {
+			final var rawLink = link instanceof final Connector.Link<?> l ? l.target() : link;
+			if (rawLink instanceof VirtualLink)
+				return link;
+			boolean open = false;
+			// explicitly check both link types, as raw link might be null
+			if (rawLink instanceof final KNXNetworkLink nwLink) {
+				open = nwLink.isOpen();
+				if (linkType == LinkType.NetworkLink)
+					return link;
+			}
+			if (rawLink instanceof final KNXNetworkMonitor monLink) {
+				open = monLink.isOpen();
+				if (linkType == LinkType.MonitorLink)
+					return link;
+			}
+			try {
+				link.close();
+			}
+			catch (Exception ignore) {}
+			// give slow interfaces some time to settle down after closing
+			if (open)
+				Thread.sleep(700);
+		}
+		return switch (linkType) {
+			case NetworkLink -> openNetworkLink();
+			case MonitorLink -> openMonitorLink();
+		};
+	}
+
 	public KNXNetworkLink openNetworkLink() throws KNXException, InterruptedException
 	{
 		final KNXMediumSettings settings = mediumSettings();
