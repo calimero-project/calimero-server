@@ -41,6 +41,7 @@ import static java.lang.System.Logger.Level.DEBUG;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import io.calimero.CloseEvent;
 import io.calimero.FrameEvent;
 import io.calimero.GroupAddress;
 import io.calimero.IndividualAddress;
@@ -106,6 +107,11 @@ public class VirtualLink extends AbstractLink<AutoCloseable>
 		logger.log(DEBUG, "send {0}{1}", (waitForCon ? "(wait for confirmation) " : ""), msg);
 		for (final VirtualLink l : deviceLinks)
 			send(msg, notifier.getListeners(), l);
+	}
+
+	@Override
+	protected void onClose() {
+		notifier.getListeners().fire(l -> l.linkClosed(new CloseEvent(this, CloseEvent.USER_REQUEST, "user request")));
 	}
 
 	private void send(final CEMILData msg, final EventListeners<NetworkLinkListener> confirmation,
