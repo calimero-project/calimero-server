@@ -927,7 +927,7 @@ public class KnxServerGateway implements Runnable
 				final InetAddress ip = knxipObject.inetAddress(PID.CURRENT_IP_ADDRESS);
 				final InetAddress mask = knxipObject.inetAddress(PID.CURRENT_SUBNET_MASK);
 				info.append(format("    server IP: %s (subnet %s) netif %s%n", ip.getHostAddress(), mask.getHostAddress(),
-						NetworkInterface.getByInetAddress(ip).getName()));
+						Optional.ofNullable(NetworkInterface.getByInetAddress(ip)).map(NetworkInterface::getName).orElse("n/a")));
 
 				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
 					info.append(format("    IP mcast : %s netif %s%n",
