@@ -930,8 +930,8 @@ public class KnxServerGateway implements Runnable
 						Optional.ofNullable(NetworkInterface.getByInetAddress(ip)).map(NetworkInterface::getName).orElse("n/a")));
 
 				if (c.getServiceContainer() instanceof final RoutingServiceContainer rsc) {
-					info.append(format("    IP mcast : %s netif %s%n",
-							rsc.routingMulticastAddress().getHostAddress(), rsc.networkInterface()));
+					final var mcast = knxipObject.inetAddress(PID.ROUTING_MULTICAST_ADDRESS).getHostAddress();
+					info.append(format("    IP mcast : %s netif %s%n", mcast, rsc.networkInterface()));
 				}
 
 				info.append(format("    subnet   : %s%n", c.getSubnetLink()));
