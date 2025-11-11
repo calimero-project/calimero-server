@@ -150,7 +150,6 @@ import io.calimero.secure.SecurityControl.DataSecurity;
 import io.calimero.serial.ConnectionStatus;
 import io.calimero.serial.usb.UsbConnection;
 import io.calimero.server.ServerConfiguration;
-import io.calimero.server.VirtualLink;
 import io.calimero.server.gateway.SubnetConnector.InterfaceType;
 import io.calimero.server.gateway.trace.CemiFrameTracer;
 import io.calimero.server.gateway.trace.CemiFrameTracer.FramePath;
@@ -239,37 +238,28 @@ public class KnxServerGateway implements Runnable
 			if (!(conn instanceof KNXnetIPDevMgmt)) {
 				final AutoCloseable subnetLink = connector.getSubnetLink();
 				AutoCloseable rawLink = subnetLink instanceof final Link<?> link ? link.target() : subnetLink;
-				try {
-					if (type == ConnectionType.Baos) {
-						final String format = connector.format();
-						if (!"baos".equals(format))
-							return false;
-						connector.requestBaos(true);
+				if (type == ConnectionType.Baos) {
+					final String format = connector.format();
+					if (!"baos".equals(format))
+						return false;
+					connector.requestBaos(true);
 
-						if (!(rawLink instanceof BaosLink)) {
-							// TODO closeLink has a delay, which we hit twice now (here and below)
-							closeLink(subnetLink);
-						}
+					if (!(rawLink instanceof BaosLink)) {
+						// TODO closeLink has a delay, which we hit twice now (here and below)
+						closeLink(subnetLink);
 					}
-					else {
-						connector.requestBaos(false);
-						if (rawLink instanceof BaosLink) {
-							closeLink(subnetLink);
-						}
-					}
-
-					setupLink(connector, type == ConnectionType.Monitor
-									? SubnetConnector.LinkType.MonitorLink
-									: SubnetConnector.LinkType.NetworkLink);
 				}
-				catch (KNXException | InterruptedException e) {
-					logger.log(ERROR, MessageFormat.format("open subnet link using {0} interface {1} for {2}",
-							connector.interfaceType(), connector.linkArguments(),
-							connector.getServiceContainer().getMediumSettings()), e);
-					if (e instanceof InterruptedException)
-						Thread.currentThread().interrupt();
+				else {
+					connector.requestBaos(false);
+					if (rawLink instanceof BaosLink) {
+						closeLink(subnetLink);
+					}
+				}
+
+				if (!setupLink(connector, type == ConnectionType.Monitor
+						? SubnetConnector.LinkType.MonitorLink
+						: SubnetConnector.LinkType.NetworkLink))
 					return false;
-				}
 			}
 
 			conn.addConnectionListener(new ConnectionListener(svcContainer, conn.name()));
@@ -714,16 +704,9 @@ public class KnxServerGateway implements Runnable
 		trucking = true;
 		try {
 			for (final var connector : connectors) {
-				if (connector.getServiceContainer().isActivated()) {
-					try {
-						setupLink(connector, SubnetConnector.LinkType.NetworkLink);
-					}
-					catch (KNXException | RuntimeException e) {
-						logger.log(ERROR, "error opening network link for " + connector.getName(), e);
-						server.shutdown();
+				if (connector.getServiceContainer().isActivated())
+					if (!setupLink(connector, SubnetConnector.LinkType.NetworkLink))
 						return;
-					}
-				}
 			}
 
 			while (trucking) {
@@ -749,10 +732,10 @@ public class KnxServerGateway implements Runnable
 			}
 		}
 		catch (final InterruptedException e) {
-			quit();
 			Thread.currentThread().interrupt();
 		}
 		finally {
+			quit();
 			dispatcherThread.interrupt();
 		}
 	}
@@ -796,13 +779,24 @@ public class KnxServerGateway implements Runnable
 		return List.copyOf(connectors);
 	}
 
-	private void setupLink(final SubnetConnector connector, final SubnetConnector.LinkType linkType)
-			throws KNXException, InterruptedException {
-		connector.link(linkType);
-		// we immediately set a virtual network to connected, so that there is no
-		// initial state "knx bus not connected" in a server discovery
-		if (connector.interfaceType() == InterfaceType.Virtual)
-			setNetworkState(1, true, false);
+	private boolean setupLink(final SubnetConnector connector, final SubnetConnector.LinkType linkType) {
+		try {
+			connector.link(linkType);
+			// we immediately set a virtual network to connected, so that there is no
+			// initial state "knx bus not connected" in a server discovery
+			if (connector.interfaceType() == InterfaceType.Virtual)
+				setNetworkState(1, true, false);
+			return true;
+		}
+		catch (KNXException | RuntimeException e) {
+			logger.log(ERROR, MessageFormat.format("error opening subnet link for {0} using {1} interface {2}",
+					connector.getServiceContainer().getMediumSettings().getDeviceAddress(),
+					connector.interfaceType(), connector.linkArguments()), e);
+		}
+		catch (final InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		return false;
 	}
 
 	private void setupTimeServer(final SubnetConnector connector, final List<StateDP> datapoints) {
