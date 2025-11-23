@@ -112,6 +112,7 @@ import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.device.ios.PropertyEvent;
 import io.calimero.device.ios.RouterObject;
+import io.calimero.device.ios.SecurityObject;
 import io.calimero.dptxlator.DPTXlator;
 import io.calimero.dptxlator.DPTXlatorDate;
 import io.calimero.dptxlator.DPTXlatorDateTime;
@@ -1860,7 +1861,7 @@ public class KnxServerGateway implements Runnable
 		final var ios = server.getInterfaceObjectServer();
 		boolean securityMode = false;
 		try {
-			securityMode = ios.getProperty(SECURITY_OBJECT, objectInstance, pid, 1, 1)[0] == 1;
+			securityMode = ios.getProperty(SECURITY_OBJECT, 1, SecurityObject.Pid.SecurityMode, 1, 1)[0] == 1;
 		}
 		catch (final KnxPropertyException noSecurityObject) {}
 		final boolean allowed = AccessPolicies.checkPropertyAccess(objectType, pid, read, securityMode, securityCtrl);
