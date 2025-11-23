@@ -910,7 +910,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 	private void waitForTermination()
 	{
-		System.out.println("type 'stop' to stop the gateway and shutdown the server");
+		System.out.println("Use Ctrl+C or 'stop' to shutdown the server and exit");
 		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in, Charset.defaultCharset()));
 		try {
 			String line;
