@@ -8,6 +8,7 @@ plugins {
 	application
 	`maven-publish`
 	signing
+	id("org.graalvm.buildtools.native") version "0.11.3"
 	id("com.github.ben-manes.versions") version "0.53.0"
 }
 
@@ -168,6 +169,35 @@ tasks.named<Jar>("jar") {
 	}
 
 	exclude("server-config.xml")
+}
+
+graalvmNative {
+//	toolchainDetection = true // only works reliably if a single JDK is installed, which is GraalVM
+	agent {
+//		enabled = true
+		defaultMode = "standard"
+	}
+	binaries {
+		named("main") {
+//			verbose = true
+			sharedLibrary = false
+			mainClass.set("io.calimero.server.Launcher")
+			buildArgs.addAll(
+				listOf(
+					"--enable-sbom=export",
+					"--future-defaults=all",
+					"--emit build-report",
+					"--initialize-at-build-time",
+					"-march=native",
+					"-Os",
+					"--no-fallback",
+					"--exact-reachability-metadata",
+					"-H:+ReportExceptionStackTraces",
+				)
+			)
+			jvmArgs.add("--enable-native-access=ALL-UNNAMED")
+		}
+	}
 }
 
 publishing {

@@ -1,0 +1,56 @@
+{
+  "reflection": [
+    {
+      "type": "io.calimero.server.Launcher"
+    },
+    {
+      "type": "io.calimero.server.knxnetip.KNXnetIPServer$IOSL"
+    },
+    {
+      "type": "io.calimero.server.knxnetip.ServerListener"
+    },
+    {
+      "type": "io.calimero.server.gateway.KnxServerGateway$ConnectionListener"
+    },
+    {
+      "type": "io.calimero.server.gateway.KnxServerGateway$KNXnetIPServerListener"
+    },
+    {
+      "type": "io.calimero.server.gateway.KnxServerGateway$SubnetListener"
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonTraceEvent",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonCemiFrame",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$2JsonCemiFrame",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonMonitorIndication",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonRawFrame",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonRawAck",
+      "allPublicMethods": true
+    },
+    {
+      "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonRfLData",
+      "allPublicMethods": true
+    }
+  ],
+  "resources": [
+    {
+      "module:": "io.calimero.server",
+      "glob": "META-INF/MANIFEST.MF"
+    }
+  ]
+}
