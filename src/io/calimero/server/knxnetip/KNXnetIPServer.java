@@ -80,6 +80,7 @@ import io.calimero.device.ServiceResult;
 import io.calimero.device.ios.DeviceObject;
 import io.calimero.device.ios.InterfaceObject;
 import io.calimero.device.ios.InterfaceObjectServer;
+import io.calimero.device.ios.InterfaceObjectServerListener;
 import io.calimero.device.ios.KnxPropertyException;
 import io.calimero.device.ios.KnxipParameterObject;
 import io.calimero.device.ios.PropertyEvent;
@@ -337,6 +338,14 @@ public class KNXnetIPServer
 		}
 	};
 
+	// GraalVM native image doesn't like lambdas
+	private final class IOSL implements InterfaceObjectServerListener {
+		@Override
+		public void onPropertyValueChanged(final PropertyEvent pe) {
+			KNXnetIPServer.this.onPropertyValueChanged(pe);
+		}
+	}
+
 	/**
 	 * Creates a new KNXnet/IP server instance using the supplied configuration.
 	 * <p>
@@ -353,7 +362,7 @@ public class KNXnetIPServer
 
 		device = new KnxServerDevice(config, logic);
 		ios = device.getInterfaceObjectServer();
-		ios.addServerListener(this::onPropertyValueChanged);
+		ios.addServerListener(new IOSL());
 
 		// server KNX device address, since we don't know about routing at this time
 		// address is always 15.15.0; might be updated later or by routing configuration
