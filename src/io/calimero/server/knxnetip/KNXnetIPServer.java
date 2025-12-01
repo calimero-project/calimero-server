@@ -169,8 +169,9 @@ public class KNXnetIPServer
 
 	final Logger logger;
 
-	private boolean running;
-	private boolean inShutdown;
+	public enum State { New, Starting, Running, Stopping, Stopped }
+
+	private State state = State.New;
 
 	// Discovery and description
 
@@ -427,7 +428,7 @@ public class KNXnetIPServer
 					((PLSettings) settings).getDomainAddress());
 
 		initKNXnetIpParameterObject(size, sc);
-		if (running)
+		if (state == State.Running)
 			endpoint.start();
 		fireServiceContainerAdded(sc);
 		return true;
@@ -458,7 +459,7 @@ public class KNXnetIPServer
 		endpointFor(sc).ifPresent(endpoint -> {
 			// stop service if we are already launched
 			synchronized (this) {
-				if (running)
+				if (state == State.Running)
 					endpoint.stop();
 			}
 			endpoints.remove(endpoint);
@@ -568,7 +569,7 @@ public class KNXnetIPServer
 			case OPTION_DISCOVERY_DESCRIPTION -> {
 				runDiscovery = Boolean.parseBoolean(value);
 				stopDiscoveryService();
-				if (runDiscovery && running)
+				if (runDiscovery && state == State.Running)
 					startDiscoveryService(outgoingIf, discoveryIfs, -1);
 			}
 			case OPTION_ROUTING_LOOPBACK     -> multicastLoopback = Boolean.parseBoolean(value);
@@ -730,12 +731,12 @@ public class KNXnetIPServer
 	 */
 	public synchronized void launch()
 	{
-		if (running)
+		if (state == State.Starting || state == State.Running)
 			return;
+		state = State.Starting;
 
 		startDiscoveryService(outgoingIf, discoveryIfs, -1);
 		endpoints.forEach(Endpoint::start);
-		running = true;
 	}
 
 	/**
@@ -748,11 +749,11 @@ public class KNXnetIPServer
 	 */
 	public synchronized void shutdown()
 	{
-		if (!running || inShutdown)
+		if (state == State.New || state == State.Stopping || state == State.Stopped)
 			return;
-		inShutdown = true;
-		fireShutdown();
+		state = State.Stopping;
 
+		fireShutdown();
 		stopDiscoveryService();
 
 		try (var scope = new TaskScope("service container shutdown", Duration.ofSeconds(12))) {
@@ -760,9 +761,10 @@ public class KNXnetIPServer
 		}
 
 		device.close();
-		inShutdown = false;
-		running = false;
+		state = State.Stopped;
 	}
+
+	public synchronized State state() { return state; }
 
 	public final KnxDevice device() { return device; }
 
@@ -1032,6 +1034,20 @@ public class KNXnetIPServer
 	final EventListeners<ServerListener> listeners()
 	{
 		return listeners;
+	}
+
+	final synchronized void notifyEndpointRunning() {
+		if (state != State.Starting)
+			return;
+		for (final Endpoint ep : endpoints) {
+			if (ep.serviceContainer.isActivated()) {
+				if (ep.controlEndpoint().isEmpty())
+					return;
+				if (ep.serviceContainer instanceof RoutingServiceContainer && ep.routingEndpoint().isEmpty())
+					return;
+			}
+		}
+		state = State.Running;
 	}
 
 	private void fireServiceContainerAdded(final ServiceContainer sc)

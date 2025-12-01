@@ -63,6 +63,7 @@ class LooperTask implements Runnable {
 		task.scheduledFuture = Executor.scheduledExecutor().scheduleWithFixedDelay(task, 0, retryDelay, TimeUnit.SECONDS);
 	}
 
+	private final KNXnetIPServer server;
 	private final Logger logger;
 	private final String serviceName;
 	private final int maxRetries;
@@ -76,6 +77,7 @@ class LooperTask implements Runnable {
 	LooperTask(final KNXnetIPServer server, final String serviceName,
 		final int retryAttempts, final Supplier<UdpServiceLooper> serviceSupplier)
 	{
+		this.server = server;
 		logger = server.logger;
 		this.serviceName = serviceName;
 		maxRetries = retryAttempts >= -1 ? retryAttempts : 0;
@@ -95,6 +97,7 @@ class LooperTask implements Runnable {
 			// reset for the next reconnection attempt
 			attempt = 0;
 			logger.log(INFO, looper + " is up and running");
+			server.notifyEndpointRunning();
 			looper.run();
 			cleanup(INFO, null);
 		}
