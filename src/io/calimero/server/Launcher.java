@@ -647,7 +647,7 @@ public class Launcher implements Runnable, AutoCloseable
 
 	private static Thread shutdownHook(final Launcher launcher) {
 		return Thread.ofVirtual().inheritInheritableThreadLocals(false)
-				.name(launcher.server.getName() + " shutdown").unstarted(launcher::quit);
+				.name(launcher.server.getName() + " shutdown").unstarted(launcher::close);
 	}
 
 	/**
@@ -697,13 +697,6 @@ public class Launcher implements Runnable, AutoCloseable
 	 * @return the gateway
 	 */
 	public final KnxServerGateway getGateway() { return gw; }
-
-	/**
-	 * Quits a running server gateway launched by this launcher, and shuts down the KNX server.
-	 */
-	public void quit() {
-		close();
-	}
 
 	/**
 	 * Shuts down a running KNX server and gateway launched by this launcher.
