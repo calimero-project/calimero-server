@@ -671,23 +671,23 @@ public class Launcher implements Runnable, AutoCloseable
 	@Override
 	public void run()
 	{
+		Thread gwThread = null;
 		try {
 			setupContainers(config.containers());
 			gw = new KnxServerGateway(server, config);
+			gwThread = Executor.execute(gw, server.getName());
 
-			final String name = server.getName();
-			if (terminal) {
-				Executor.execute(gw, name);
+			if (terminal)
 				waitForTermination();
-				quit();
-			}
-			else {
-				Thread.currentThread().setName(name);
-				gw.run();
-			}
+			else
+				gwThread.join();
 		}
 		catch (final RuntimeException e) {
 			logger.log(ERROR, "initialization of KNX server failed", e);
+		}
+		catch (final InterruptedException e) {
+			gwThread.interrupt();
+			Thread.currentThread().interrupt();
 		}
 	}
 
@@ -908,21 +908,27 @@ public class Launcher implements Runnable, AutoCloseable
 		return allKeys;
 	}
 
-	private void waitForTermination()
-	{
+	private void waitForTermination() throws InterruptedException {
 		System.out.println("Use Ctrl+C or 'stop' to shutdown the server and exit");
 		final BufferedReader r = new BufferedReader(new InputStreamReader(System.in, Charset.defaultCharset()));
 		try {
-			String line;
-			while ((line = r.readLine()) != null) {
-				if (line.equals("stop"))
-					break;
-				if (line.equals("stat"))
-					System.out.println(gw);
+			while (server.state() != KNXnetIPServer.State.Stopped) {
+				if (!r.ready()) {
+					Thread.sleep(100);
+					continue;
+				}
+				switch (r.readLine()) {
+					case null -> { return; }
+					case "stop" -> { return; }
+					case "stat" -> System.out.println(getGateway());
+					default -> {}
+				}
 			}
+		}
+		catch (final IOException ignore) {}
+		finally {
 			System.out.println("request to stop server");
 		}
-		catch (final IOException e) {}
 	}
 
 	private void setGroupAddressFilter(final RouterObject routerObj, final Set<GroupAddress> filter) {
