@@ -133,7 +133,7 @@ import io.calimero.xml.XmlReader;
 /**
  * Contains the startup and execution logic for the KNX server gateway. The server configuration is
  * read from an XML resource. Either use method {@link #main(String[])}, or
- * {@link #Launcher(String)} together with {@link #run()}.
+ * {@link #Launcher(String)} together with {@link #run()} and {@link #close()}.
  *
  * @author B. Malinowsky
  */
@@ -200,7 +200,7 @@ public class Launcher implements Runnable, AutoCloseable
 							outgoing = attr(r, "outgoingNetIf").orElse("");
 						}
 						case "trace" -> {
-							final var format = CemiFrameTracer.Format.from(attr(r, "format").orElse("json"));
+							final var format = Format.from(attr(r, "format").orElse("json"));
 							final String sink = r.getElementText();
 							try {
 								final var writer = format == Format.Noop ? Writer.nullWriter()

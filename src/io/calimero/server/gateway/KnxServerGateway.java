@@ -2008,6 +2008,7 @@ public class KnxServerGateway implements Runnable
 		if (!(target instanceof KNXNetworkLink))
 			throw new KNXException("subnet link is in busmonitor-layer");
 
+		@SuppressWarnings("unchecked")
 		final var link = ((Link<KNXNetworkLink>) connector.link(SubnetConnector.LinkType.NetworkLink)).target();
 
 		try {
