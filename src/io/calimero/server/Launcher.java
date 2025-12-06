@@ -686,9 +686,7 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	/**
-	 * Returns the KNX server gateway.
-	 *
-	 * @return the gateway
+	 * {@return the KNX server gateway}
 	 */
 	public final KnxServerGateway getGateway() { return gw; }
 
