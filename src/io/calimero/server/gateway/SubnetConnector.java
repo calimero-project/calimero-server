@@ -63,6 +63,7 @@ import io.calimero.cemi.CEMILData;
 import io.calimero.datapoint.Datapoint;
 import io.calimero.datapoint.DatapointMap;
 import io.calimero.datapoint.DatapointModel;
+import io.calimero.datapoint.StateDP;
 import io.calimero.dptxlator.DPTXlator;
 import io.calimero.dptxlator.TranslatorTypes;
 import io.calimero.knxnetip.TcpConnection;
@@ -118,6 +119,10 @@ public final class SubnetConnector
 	private byte[] groupKey;
 	private byte[] userKey;
 	private byte[] deviceAuthCode;
+
+	record TimeServerConfig(StateDP datapoint, DPTXlator xlator) {}
+
+	private volatile List<TimeServerConfig> timeServerConfig = List.of();
 
 	/**
 	 * Creates a new subnet connector using a KNXnet/IP Routing or KNX IP subnet link.
@@ -532,6 +537,10 @@ public final class SubnetConnector
 		if ("baos".equals(msgFormat))
 			requestBaos = baos;
 	}
+
+	void timeServerConfig(List<TimeServerConfig> config) { timeServerConfig = List.copyOf(config); }
+
+	List<TimeServerConfig> timeServerConfig() { return timeServerConfig; }
 
 	private void connectionStatusChanged(final boolean connected) {
 		if (listener != null)

@@ -102,7 +102,6 @@ import io.calimero.cemi.CEMIDevMgmt;
 import io.calimero.cemi.CEMIFactory;
 import io.calimero.cemi.CEMILData;
 import io.calimero.cemi.CEMILDataEx;
-import io.calimero.datapoint.StateDP;
 import io.calimero.device.AccessPolicies;
 import io.calimero.device.BaseKnxDevice;
 import io.calimero.device.ios.InterfaceObject;
@@ -627,9 +626,7 @@ public class KnxServerGateway implements Runnable
 	 */
 	public KnxServerGateway(final KNXnetIPServer s, final ServerConfiguration config) {
 		this(config.name(), s, config.containers().stream().map(c -> c.subnetConnector()).toList());
-		for (final var c : config.containers()) {
-			setupTimeServer(c.subnetConnector(), c.timeServerDatapoints());
-		}
+		config.containers().forEach(this::configureTimeServer);
 
 		try {
 			server.device().setDeviceLink(new LinkAdapter());
@@ -705,9 +702,11 @@ public class KnxServerGateway implements Runnable
 		trucking = true;
 		try {
 			for (final var connector : connectors) {
-				if (connector.getServiceContainer().isActivated())
+				if (connector.getServiceContainer().isActivated()) {
 					if (!setupLink(connector, SubnetConnector.LinkType.NetworkLink))
 						return;
+					scheduleTimeServer(connector);
+				}
 			}
 
 			while (trucking) {
@@ -800,29 +799,37 @@ public class KnxServerGateway implements Runnable
 		return false;
 	}
 
-	private void setupTimeServer(final SubnetConnector connector, final List<StateDP> datapoints) {
-		for (final var datapoint : datapoints) {
-			final var security = Security.defaultInstallation().groupKeys().containsKey(datapoint.getMainAddress())
+	private void configureTimeServer(final ServerConfiguration.Container cont) {
+		final var config = new ArrayList<SubnetConnector.TimeServerConfig>();
+		for (final var dp : cont.timeServerDatapoints()) {
+			final var security = Security.defaultInstallation().groupKeys().containsKey(dp.getMainAddress())
 					? DataSecurity.AuthConf : DataSecurity.None;
-			((BaseKnxDevice) server.device()).addGroupObject(datapoint, security, false);
+			((BaseKnxDevice) server.device()).addGroupObject(dp, security, false);
 			if (security != DataSecurity.None)
-				server.getInterfaceObjectServer().setProperty(SECURITY_OBJECT, 1, 51, 1, 1, (byte) 1);
+				SecurityObject.lookup(server.getInterfaceObjectServer()).set(51, (byte) 1);
 
-			final var dpt = datapoint.getDPT();
-			final var dst = datapoint.getMainAddress();
-			final int sendInterval = datapoint.getExpirationTimeout();
-			logger.log(DEBUG, "setup time server for {0}: publish ''{1}'' ({2}) to {3} every {4} seconds", connector.getName(),
-					datapoint.getName(), dpt, dst, sendInterval);
 			try {
-				final var xlator = TranslatorTypes.createTranslator(dpt);
-
-				Executor.scheduledExecutor().scheduleWithFixedDelay(
-						() -> transmitCurrentTime(connector, xlator, dst, datapoint.getPriority()),
-						5, sendInterval, TimeUnit.SECONDS);
+				final var xlator = TranslatorTypes.createTranslator(dp.dptId());
+				config.add(new SubnetConnector.TimeServerConfig(dp, xlator));
 			}
 			catch (final KNXException e) {
-				throw new KnxRuntimeException("time server DPT setup", e);
+				throw new KnxRuntimeException(
+						"error configuring time server for " + dp.getMainAddress() + ": " + e.getMessage());
 			}
+		}
+		cont.subnetConnector().timeServerConfig(config);
+	}
+
+	private void scheduleTimeServer(final SubnetConnector connector) {
+		for (final var config : connector.timeServerConfig()) {
+			final var dp = config.datapoint();
+			final var dst = dp.getMainAddress();
+			final int sendInterval = dp.getExpirationTimeout();
+			logger.log(DEBUG, "schedule time server for {0}: publish ''{1}'' ({2}) to {3} every {4} seconds",
+					connector.getName(), dp.getName(), dp.dptId(), dst, sendInterval);
+			Executor.scheduledExecutor().scheduleWithFixedDelay(
+					() -> transmitCurrentTime(connector, config.xlator(), dst, dp.getPriority()),
+					5, sendInterval, TimeUnit.SECONDS);
 		}
 	}
 
