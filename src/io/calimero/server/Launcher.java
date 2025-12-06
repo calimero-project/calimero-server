@@ -587,7 +587,7 @@ public class Launcher implements Runnable, AutoCloseable
 	private final ServerConfiguration config;
 
 	private final KNXnetIPServer server;
-	private KnxServerGateway gw;
+	private final KnxServerGateway gw;
 
 	// are we directly started from main, and allow terminal-based termination
 	private boolean terminal;
@@ -666,24 +666,18 @@ public class Launcher implements Runnable, AutoCloseable
 		// output the configuration we loaded
 		final String s = config.containers().stream().map(c -> "service container " + c).collect(Collectors.joining("\n"));
 		logger.log(INFO, "use configuration {0}\n{1}", config, s);
+		setupContainers(config.containers());
+		gw = new KnxServerGateway(server, config);
 	}
 
 	@Override
-	public void run()
-	{
-		Thread gwThread = null;
+	public void run() {
+		final var gwThread = Executor.execute(gw, server.getName());
 		try {
-			setupContainers(config.containers());
-			gw = new KnxServerGateway(server, config);
-			gwThread = Executor.execute(gw, server.getName());
-
 			if (terminal)
 				waitForTermination();
 			else
 				gwThread.join();
-		}
-		catch (final RuntimeException e) {
-			logger.log(ERROR, "initialization of KNX server failed", e);
 		}
 		catch (final InterruptedException e) {
 			gwThread.interrupt();
