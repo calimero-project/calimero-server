@@ -361,12 +361,12 @@ public class Launcher implements Runnable, AutoCloseable
 							disruptionBufferPortRange = PortRange.from(attr(r, attrUdpPort).orElse("0-65535"));
 						}
 						case "timeServer" -> {
-							final var formats = List.of(DPTXlatorDate.DPT_DATE.getID(),
-									DPTXlatorTime.DPT_TIMEOFDAY.getID(), DPTXlatorDateTime.DPT_DATE_TIME.getID());
+							final var formats = List.of(DPTXlatorDate.DPT_DATE.dptId(),
+									DPTXlatorTime.DPT_TIMEOFDAY.dptId(), DPTXlatorDateTime.DPT_DATE_TIME.dptId());
 							while (r.nextTag() == XmlReader.START_ELEMENT) {
 								final var datapoint = new StateDP(r);
-								if (!formats.contains(datapoint.getDPT()))
-									throw new KNXMLException("invalid time server datapoint type '" + datapoint.getDPT()
+								if (!formats.contains(datapoint.dptId()))
+									throw new KNXMLException("invalid time server datapoint type '" + datapoint.dptId()
 											+ "', supported are " + formats);
 								timeServerDatapoints.add(datapoint);
 							}
