@@ -386,7 +386,7 @@ public final class SubnetConnector
 				if (config.getDatapointModel() instanceof DatapointMap<?>) {
 					// init all emulated datapoints with their default value
 					for (final Datapoint dp : ((DatapointMap<?>) config.getDatapointModel()).getDatapoints()) {
-						final DPTXlator t = TranslatorTypes.createTranslator(dp.getDPT());
+						final DPTXlator t = TranslatorTypes.createTranslator(dp.dptId());
 						final byte[] tpdu = t.getTypeSize() == 0
 								? DataUnitBuilder.createLengthOptimizedAPDU(0x80, t.getData())
 								: DataUnitBuilder.createAPDU(0x80, t.getData());
