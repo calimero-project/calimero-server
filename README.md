@@ -206,4 +206,4 @@ To run the KNXnet/IP server and gateway directly in Java code, see the implement
 Logging
 -------
 
-Calimero KNXnet/IP server uses the [System.Logger](https://docs.oracle.com/en/java/javase/19/docs/api/java.base/java/lang/System.Logger.html). Bind any desired logging frameworks of your choice.
+Calimero KNXnet/IP server uses the [System.Logger](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/System.Logger.html). Bind any desired logging frameworks of your choice.
