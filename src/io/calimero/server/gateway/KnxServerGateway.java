@@ -208,7 +208,8 @@ public class KnxServerGateway implements Runnable
 		public void lostMessage(final LostMessageEvent e)
 		{
 			final String unit = e.getLostMessages() > 1 ? "messages" : "message";
-			logger.log(WARNING, "KNXnet/IP router {0} lost {1} {2}",  e.getSender(), e.getLostMessages(), unit);
+			logger.log(WARNING, "KNXnet/IP router {0} lost {1} {2}",
+					e.getSender().getAddress().getHostAddress(), e.getLostMessages(), unit);
 		}
 
 		@Override
