@@ -137,6 +137,16 @@ final class ControlEndpointService extends UdpServiceLooper
 	private static final int NoTunnelingAddress = 0x2d; // address requested in the extended CRI is not a tunneling address
 	private static final int ConnectionInUse = 0x2e; // requested individual address for this connection is in use
 
+	private static final InetAddress anyLocalIPv4Address;
+	static {
+		try {
+			anyLocalIPv4Address = InetAddress.getByAddress(new byte[4]);
+		}
+		catch (UnknownHostException e) {
+			throw new InternalError(e);
+		}
+	}
+
 
 	private final ServiceContainer svcCont;
 	private final KnxipParameterObject knxipObject;
@@ -176,7 +186,9 @@ final class ControlEndpointService extends UdpServiceLooper
 		s = createSocket();
 		sessions = new SecureSessions(this);
 
-		final InetAddress addr = s.getLocalAddress();
+		InetAddress addr = s.getLocalAddress();
+		if (Arrays.equals(addr.getAddress(), new byte[16]))
+			addr = anyLocalIPv4Address;
 
 		final byte[] empty = new byte[4];
 		byte[] data = knxipObject.getOrDefault(PID.IP_ADDRESS, empty);
@@ -197,9 +209,9 @@ final class ControlEndpointService extends UdpServiceLooper
 		final String tunneling = secureTunneling ? "required" : "optional";
 		logger.log(INFO, "{0} secure mgmt/tunneling connections: {1}/{2}", sc.getName(), mgmt, tunneling);
 
-		final var ctrlEndpointAddress = (InetSocketAddress) s.getLocalSocketAddress();
+		final var ctrlEndpointAddress = new InetSocketAddress(addr, s.getLocalPort());
 		tcpEndpoint = new TcpEndpoint(this, ctrlEndpointAddress, false);
-		final var baosEndpointAddress = new InetSocketAddress(ctrlEndpointAddress.getAddress(), 12004);
+		final var baosEndpointAddress = new InetSocketAddress(addr, 12004);
 		baosEndpoint = new TcpEndpoint(this, baosEndpointAddress, true);
 
 		final Optional<Path> unixSocketPath = ((DefaultServiceContainer) sc).unixSocketPath();
@@ -710,7 +722,7 @@ final class ControlEndpointService extends UdpServiceLooper
 			// if we use the KNXnet/IP default port, we have to enable address reuse for a successful bind
 			if (svcCont.port() == KNXnetIPConnection.DEFAULT_PORT)
 				s.setReuseAddress(true);
-			ip = usableIpAddresses().findFirst().orElse(null);
+			ip = usableIpAddresses().findFirst().orElse(anyLocalIPv4Address);
 			s.bind(new InetSocketAddress(ip, svcCont.port()));
 			final var boundTo = new UdpEndpointAddress((InetSocketAddress) s.getLocalSocketAddress());
 			logger.log(TRACE, "{0} control endpoint bound to {1}", svcCont.getName(), boundTo);
