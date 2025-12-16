@@ -36,8 +36,6 @@
 
 package io.calimero.server.knxnetip;
 
-import java.util.EventObject;
-
 import io.calimero.knxnetip.KNXnetIPConnection;
 
 /**
@@ -45,7 +43,7 @@ import io.calimero.knxnetip.KNXnetIPConnection;
  *
  * @author B. Malinowsky
  */
-public class ServiceContainerEvent extends EventObject
+public class ServiceContainerEvent
 {
 	/** The service container is added to a KNXnet/IP server. */
 	public static final int ADDED_TO_SERVER = 1;
@@ -70,7 +68,6 @@ public class ServiceContainerEvent extends EventObject
 	public ServiceContainerEvent(final KNXnetIPServer source, final int reason,
 		final ServiceContainer svcCont)
 	{
-		super(source);
 		sc = svcCont;
 		type = reason;
 		conn = null;
@@ -87,7 +84,6 @@ public class ServiceContainerEvent extends EventObject
 	public ServiceContainerEvent(final KNXnetIPServer source, final int reason,
 		final ServiceContainer svcCont, final KNXnetIPConnection connection)
 	{
-		super(source);
 		sc = svcCont;
 		type = reason;
 		conn = connection;
