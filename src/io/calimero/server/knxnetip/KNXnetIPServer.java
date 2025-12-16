@@ -374,7 +374,8 @@ public class KNXnetIPServer
 
 		for (final var containerConfig : config.containers()) {
 			final var svcContainer = containerConfig.subnetConnector().getServiceContainer();
-			addServiceContainer(svcContainer);
+			if (!addServiceContainer(svcContainer))
+				throw new KnxRuntimeException("server configuration contains duplicate service container '" + svcContainer.getName() + "'");
 		}
 		setOption(KNXnetIPServer.OPTION_DISCOVERY_INTERFACES, config.discoveryNetifs().toString().replaceAll("\\[|]", ""));
 		setOption(KNXnetIPServer.OPTION_OUTGOING_INTERFACE, config.outgoingNetifs().toString().replaceAll("\\[|]", ""));
