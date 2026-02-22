@@ -112,14 +112,20 @@ val addReads = listOf(
 	"--add-reads", "io.calimero.usb.provider.javax=ALL-UNNAMED"
 )
 
+val nativeAccess = listOf(
+	"--enable-native-access=io.calimero.serial.provider.jni,serial.ffm",
+	"--enable-native-access=ALL-UNNAMED", // libs used by rxtx & usb provider
+)
+
 tasks.withType<JavaExec>().configureEach {
 	jvmArgs(addReads)
+	jvmArgs(nativeAccess)
 	// add as root module because it is required by non-modularized usb4java
 	jvmArgs("--add-modules", "org.apache.commons.lang3")
 }
 
 tasks.named<CreateStartScripts>("startScripts") {
-	defaultJvmOpts = addReads
+	defaultJvmOpts = addReads + nativeAccess
 
 	val rtClasspath = configurations.runtimeClasspath.get().files
 	val unixScriptFile = unixScript
