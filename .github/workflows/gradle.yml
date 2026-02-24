@@ -37,7 +37,7 @@ jobs:
       with:
         path: calimero-server
     - name: setup
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: ${{ matrix.java }}
