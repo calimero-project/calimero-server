@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2024, 2024 B. Malinowsky
+    Copyright (c) 2024, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,7 +41,6 @@ import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.net.SocketTimeoutException;
@@ -128,9 +127,6 @@ abstract sealed class StreamLooper implements Runnable, AutoCloseable
 					}
 				}
 			}
-		}
-		catch (final InterruptedIOException e) {
-			Thread.currentThread().interrupt();
 		}
 		catch (final KnxRuntimeException e) {
 			logger.log(WARNING, name + " error", e);
