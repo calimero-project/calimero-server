@@ -120,26 +120,10 @@ val nativeAccess = listOf(
 tasks.withType<JavaExec>().configureEach {
 	jvmArgs(addReads)
 	jvmArgs(nativeAccess)
-	// add as root module because it is required by non-modularized usb4java
-	jvmArgs("--add-modules", "org.apache.commons.lang3")
 }
 
 tasks.named<CreateStartScripts>("startScripts") {
 	defaultJvmOpts = addReads + nativeAccess
-
-	val rtClasspath = configurations.runtimeClasspath.get().files
-	val unixScriptFile = unixScript
-	val winScriptFile = windowsScript
-	doLast {
-		fun File.replace(replace: String, with: String) = writeText(readText().replace(replace, with))
-
-		// put commons-lang jar also on the classpath, used by libusb4java (which is in UNNAMED module)
-		val commonsLang3 = rtClasspath.filter { it.name.startsWith("commons-lang3") }
-		val libName = commonsLang3.first().name
-
-		unixScriptFile.replace("\n\nMODULE_PATH=", $$":$APP_HOME/lib/$$libName\n\nMODULE_PATH=")
-		winScriptFile.replace("\r\nset MODULE_PATH=", ";%APP_HOME%\\lib\\$libName\r\nset MODULE_PATH=")
-	}
 }
 
 dependencies {
