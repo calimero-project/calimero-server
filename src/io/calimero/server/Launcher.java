@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2025 B. Malinowsky
+    Copyright (c) 2010, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -612,6 +612,11 @@ public class Launcher implements Runnable, AutoCloseable
 			return;
 		}
 
+		if ("--help".equals(args[0]) || "-h".equals(args[0])) {
+			usage();
+			return;
+		}
+
 		// we have to set the command-line option for log format and level before first logger lookup
 		System.setProperty("jdk.system.logger.format", "%1$tT.%1$tL [%4$-7s] %3$s: %5$s%6$s%n");
 		int optIdx = 0;
@@ -643,6 +648,17 @@ public class Launcher implements Runnable, AutoCloseable
 				Supply file name/URI for the KNX server configuration
 				""", Manifest.buildInfo(Launcher.class));
 		return true;
+	}
+
+	private static void usage() {
+		System.out.println("""
+				Usage: Launcher [options] <config path/URI>
+				Options:
+				  --help -h       show this help message and exit
+				  --version -v    show version and exit
+				  -v[v[v]]        set log-level to info (-v, default), debug (-vv), or trace (-vvv)
+				  --no-stdin      do not use stdin (useful for running in detached mode)
+				""");
 	}
 
 	private static Thread shutdownHook(final Launcher launcher) {
