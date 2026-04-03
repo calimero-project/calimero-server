@@ -173,7 +173,7 @@ final class RoutingService extends UdpServiceLooper
 
 
 		SecureRoutingServiceHandler(final KNXnetIPRouting impl) {
-			super(impl.getRemoteAddress().getAddress(), impl.name());
+			super(impl.remoteAddress().address().getAddress(), impl.name());
 			this.impl = impl;
 			try {
 				dc = (DatagramChannel) MH_channel.invoke(impl);
