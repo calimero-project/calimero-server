@@ -641,6 +641,8 @@ public class Launcher implements Runnable, AutoCloseable
 	}
 
 	private static boolean idxOutOfRange(final String[] args, final int idx) {
+		if (idx < 0)
+			return true;
 		if (idx < args.length)
 			return false;
 		System.out.format("""
