@@ -646,7 +646,7 @@ public class Launcher implements Runnable, AutoCloseable
 		if (idx < args.length)
 			return false;
 		System.out.format("""
-				Calimero server %s
+				Calimero KNXnet/IP server %s
 				Supply file name/URI for the KNX server configuration
 				""", Manifest.buildInfo(Launcher.class));
 		return true;
