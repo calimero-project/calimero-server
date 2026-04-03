@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2016, 2025 B. Malinowsky
+    Copyright (c) 2016, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -89,7 +89,6 @@ final class RoutingService extends UdpServiceLooper
 		RoutingServiceHandler(final InetAddress mcGroup, final String name) {
 			super(mcGroup);
 			ctrlEndpt = new InetSocketAddress(mcGroup, DEFAULT_PORT);
-			dataEndpt = ctrlEndpt;
 			logger = LogService.getLogger("io.calimero.server.knxnetip." + name);
 			executor = new FifoSequentialExecutor(name + " task queue", logger);
 		}
