@@ -2,6 +2,8 @@ import org.gradle.kotlin.dsl.runtimeClasspath
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.jar.JarFile
+import kotlin.collections.plus
 
 plugins {
 	`java-library`
@@ -168,6 +170,12 @@ tasks.named<JavaExec>("run") {
 	outputs.upToDateWhen { false }
 }
 
+// graalvm native image uses jdk 25, so we can include serial-ffm which requires java 23
+val nativeImageSerialFfm by configurations.creating
+dependencies {
+	nativeImageSerialFfm("io.calimero:calimero-serial-ffm:$version")
+}
+
 graalvmNative {
 //	toolchainDetection = true // only works reliably if a single JDK is installed, which is GraalVM
 	agent {
@@ -178,9 +186,21 @@ graalvmNative {
 		named("main") {
 //			verbose = true
 			sharedLibrary = false
-			mainClass.set("io.calimero.server.Launcher")
+			mainClass.set(project.name) // yes, this sets the output name for some reason
+
+			val modulePathJars = (classpath.files + nativeImageSerialFfm.files).filter { file ->
+				file.exists() && file.name.endsWith(".jar") &&
+						JarFile(file, true, JarFile.OPEN_READ, Runtime.version()).use { jar ->
+							jar.getEntry("module-info.class") != null ||
+							jar.manifest?.mainAttributes?.getValue("Automatic-Module-Name") != null ||
+							jar.versionedStream().anyMatch { entry -> entry.name.endsWith("/module-info.class") }
+						}
+			}
+
 			buildArgs.addAll(
 				listOf(
+					"--module-path", modulePathJars.joinToString(File.pathSeparator),
+					"--module", "io.calimero.server/io.calimero.server.Launcher",
 					"--enable-sbom=export",
 //					"--future-defaults=all",
 					"--emit build-report",
@@ -192,7 +212,8 @@ graalvmNative {
 					"-H:+ReportExceptionStackTraces",
 				)
 			)
-			jvmArgs.add("--enable-native-access=ALL-UNNAMED")
+			buildArgs.addAll(addReads)
+			buildArgs.addAll(enableNativeAccess)
 		}
 	}
 }

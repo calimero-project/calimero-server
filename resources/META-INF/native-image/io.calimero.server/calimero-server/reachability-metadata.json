@@ -49,8 +49,12 @@
   ],
   "resources": [
     {
-      "module:": "io.calimero.server",
+      "module": "io.calimero.server",
       "glob": "META-INF/MANIFEST.MF"
+    },
+    {
+      "module": "io.calimero.server",
+      "glob": "simplelogger.properties"
     }
   ]
 }
