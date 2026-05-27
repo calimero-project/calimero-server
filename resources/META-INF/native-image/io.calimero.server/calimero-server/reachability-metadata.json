@@ -16,7 +16,15 @@
       "type": "io.calimero.server.gateway.KnxServerGateway$KNXnetIPServerListener"
     },
     {
-      "type": "io.calimero.server.gateway.KnxServerGateway$SubnetListener"
+      "type": "io.calimero.server.gateway.KnxServerGateway$SubnetListener",
+      "methods": [
+        {
+          "name": "connectionStatus",
+          "parameterTypes": [
+            "io.calimero.serial.ConnectionStatus"
+          ]
+        }
+      ]
     },
     {
       "type": "io.calimero.server.gateway.trace.JsonTracer$1JsonTraceEvent",
