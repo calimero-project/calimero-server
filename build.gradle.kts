@@ -209,7 +209,9 @@ graalvmNative {
 					"-Os",
 					"--no-fallback",
 					"--exact-reachability-metadata",
-					"-H:+ReportExceptionStackTraces",
+					"-H:-ReportExceptionStackTraces",
+					"-H:+UnlockExperimentalVMOptions",
+					"-H:-EnableLoggingFeature",
 				)
 			)
 			buildArgs.addAll(addReads)
