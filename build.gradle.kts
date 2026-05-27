@@ -1,8 +1,10 @@
 import org.gradle.kotlin.dsl.runtimeClasspath
+import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.jar.JarFile
+import kotlin.collections.flatMap
 import kotlin.collections.plus
 
 plugins {
@@ -108,6 +110,7 @@ testing {
 	}
 }
 
+// note, task 'package' --add-reads options need to be kept in sync with this
 val addReads = listOf(
 	"--add-reads", "io.calimero.core=io.calimero.server", // @LinkEvent
 	"--add-reads", "io.calimero.serial.provider.rxtx=ALL-UNNAMED",
@@ -218,6 +221,185 @@ graalvmNative {
 			buildArgs.addAll(enableNativeAccess)
 		}
 	}
+}
+
+val appName = project.name
+val packageDir = layout.buildDirectory.dir("package")
+val runtimeDir = packageDir.map { it.dir("runtime") }
+val appDir = packageDir.map { it.dir("app") }
+val jarTask = tasks.named<Jar>("jar")
+
+val os = org.gradle.internal.os.OperatingSystem.current()!!
+val arch = System.getProperty("os.arch")!!
+
+abstract class JdepsTask : DefaultTask() {
+	@get:Input
+	abstract val version: Property<String>
+	@get:InputFiles
+	abstract val modules: ConfigurableFileCollection
+	@get:OutputFile
+	abstract val outputFile: RegularFileProperty
+	@get:Inject
+	abstract val execOperations: ExecOperations
+
+	@TaskAction
+	fun jdeps() {
+		val result = ByteArrayOutputStream()
+		execOperations.exec {
+			val jdeps = listOf("jdeps",
+				"--print-module-deps", "--ignore-missing-deps", "--multi-release", version.get(),
+				"--recursive", "-quiet", "--module-path", modules.asPath
+			) + modules.files.map { it.path }
+			commandLine(jdeps)
+			standardOutput = result
+		}
+		outputFile.get().asFile.writeText(result.toString().trim())
+	}
+}
+
+val jdepsTask = tasks.register<JdepsTask>("jdeps") {
+	group = "other"
+	description = "Finds the module dependencies for the main binary"
+	dependsOn("jar")
+
+	version.set(java.toolchain.languageVersion.map { it.toString() })
+	modules.from(configurations.runtimeClasspath.get().filter { it.exists() }, jarTask)
+	outputFile.set(packageDir.get().file("jdeps.out"))
+}
+
+tasks.register<Delete>("cleanRuntime") {
+	delete(runtimeDir)
+}
+
+tasks.register<Exec>("runtime") {
+	group = "build"
+	description = "Creates a Java runtime for the main binary"
+	dependsOn("cleanRuntime")
+	val jdepsOutput = jdepsTask.flatMap { it.outputFile }
+	inputs.file(jdepsOutput)
+
+	val output = runtimeDir.get().asFile.path
+	doFirst {
+		val jdkModules = jdepsOutput.get().asFile.readText().replace(",java.xml", "")
+		val jlink = listOf("jlink",
+			"--no-header-files", "--no-man-pages", "--strip-debug", "--strip-native-commands",
+			"--compress", "zip-9",
+			"--output", output,
+			"--add-modules", jdkModules,
+			"--limit-modules", jdkModules,
+		)
+		commandLine(jlink)
+	}
+}
+
+tasks.register<Copy>("preparePackageJars") {
+	dependsOn("jar")
+	from(configurations.runtimeClasspath, jarTask)
+	into(packageDir.get().dir("libs"))
+	exclude(
+		when {
+			os.isLinux   -> listOf("darwin", "win")
+			os.isMacOsX  -> listOf("linux", "win")
+			os.isWindows -> listOf("darwin", "linux")
+			else         -> error("unsupported OS $os")
+		}.map { "libusb4java-*-$it*.jar" }
+	)
+	exclude(
+		when (arch) {
+			"aarch64"         -> listOf("x86*", "arm*")
+			"amd64", "x86_64" -> listOf("aarch64*", "arm*", "x86") // no asterisk on x86 to not match x86_64
+			else              -> listOf("aarch64*", "arm*", "x86_64*")
+		}.map { "libusb4java-*$it.jar" }
+	)
+}
+
+tasks.register<Copy>("copySerialNativeLib") {
+	val serialNativeDir = file("../serial-native/bin/")
+	from(serialNativeDir) {
+		val libArch = if (arch == "aarch64") "aarch64" else "x86_64"
+		include(when {
+			os.isLinux   -> "linux-$libArch/libserialcom.so"
+			os.isMacOsX  -> "darwin-$libArch/libserialcom.dylib"
+			os.isWindows -> "win-$libArch/serialcom.dll"
+			else         -> error("unsupported OS $os")
+		})
+		eachFile { path = name }
+		includeEmptyDirs = false
+	}
+	into(packageDir.get().dir(
+		when {
+			os.isMacOsX -> "native/Frameworks"
+			else        -> "native"
+		})
+	)
+}
+
+tasks.register<Delete>("cleanPackageApp") {
+	delete(appDir)
+}
+
+tasks.register<Exec>("package") {
+	group = "build"
+	description = "Packages a self-contained Java application for the main binary"
+	dependsOn("runtime", "cleanPackageApp", "preparePackageJars", "copySerialNativeLib")
+	finalizedBy(if (os.isWindows) "zipAppImage" else "tarAppImage") // for Linux/Win, where jpackage creates an app folder
+
+	val baseArgs = listOf("jpackage",
+		"--type", "app-image",
+		"--name", appName,
+		"--description", "KNX/IP server",
+		"--runtime-image", runtimeDir.get().asFile.path,
+		"--module", application.mainModule.get(),
+		"--module-path", packageDir.get().dir("libs").asFile.absolutePath,
+		"--app-version", version.toString().substringBefore("-"),
+		"--dest", appDir.get().asFile,
+	)
+
+	val javaOptionArgs = (
+			enableNativeAccess +
+					listOf(
+						"--enable-native-access=nrjavaserial",
+						"--add-reads=io.calimero.core=io.calimero.server", // @LinkEvent
+						"--add-reads=io.calimero.serial.provider.rxtx=nrjavaserial",
+						"--add-reads=io.calimero.usb.provider.javax=usb.api"
+					)
+			).flatMap { listOf("--java-options", it) }
+
+	val nativeDir = provider { packageDir.get().dir("native") }
+	val os = os
+	doFirst {
+		val nativeArgs =
+			if (!nativeDir.get().asFile.exists()) emptyList()
+			else {
+				val libDir = if (os.isMacOsX) "Frameworks" else "."
+				val libPath = if (os.isMacOsX) "\$APPDIR/../Frameworks" else "\$APPDIR/../native"
+				listOf(
+					"--app-content", nativeDir.get().dir(libDir).asFile.path,
+					"--java-options", "-Djava.library.path=$libPath"
+				)
+			}
+
+		commandLine(baseArgs + javaOptionArgs + nativeArgs)
+	}
+}
+
+tasks.register<Zip>("zipAppImage") {
+	dependsOn("package")
+	from(appDir.get().dir(appName))
+	archiveFileName.set("$appName.zip")
+	destinationDirectory.set(file(appDir))
+}
+
+tasks.register<Tar>("tarAppImage") {
+	dependsOn("package")
+	from(appDir.get().dir(appName)) {
+		filesMatching("**/$appName") { // preserve executable bit
+			permissions { unix("rwxr-xr-x") }
+		}
+	}
+	archiveFileName.set("$appName.tar.gz")
+	destinationDirectory.set(appDir)
+	compression = Compression.GZIP
 }
 
 publishing {
