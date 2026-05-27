@@ -112,18 +112,18 @@ val addReads = listOf(
 	"--add-reads", "io.calimero.usb.provider.javax=ALL-UNNAMED" // javax.usb:usb-api
 )
 
-val nativeAccess = listOf(
+val enableNativeAccess = listOf(
 	"--enable-native-access=io.calimero.serial.provider.jni,serial.ffm,org.usb4java",
 	"--enable-native-access=ALL-UNNAMED", // libs used by rxtx
 )
 
 tasks.withType<JavaExec>().configureEach {
 	jvmArgs(addReads)
-	jvmArgs(nativeAccess)
+	jvmArgs(enableNativeAccess)
 }
 
 tasks.named<CreateStartScripts>("startScripts") {
-	defaultJvmOpts = addReads + nativeAccess
+	defaultJvmOpts = addReads + enableNativeAccess
 }
 
 dependencies {
