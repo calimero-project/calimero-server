@@ -343,7 +343,7 @@ tasks.register<Exec>("package") {
 	group = "build"
 	description = "Packages a self-contained Java application for the main binary"
 	dependsOn("runtime", "cleanPackageApp", "preparePackageJars", "copySerialNativeLib")
-	finalizedBy(if (os.isWindows) "zipAppImage" else "tarAppImage") // for Linux/Win, where jpackage creates an app folder
+	finalizedBy(if (os.isLinux) "tarAppImage" else "zipAppImage")
 
 	val baseArgs = listOf("jpackage",
 		"--type", "app-image",
@@ -394,6 +394,12 @@ val osName = when {
 tasks.register<Zip>("zipAppImage") {
 	dependsOn("package")
 	from(appDir.get().dir(appName))
+	from(appDir) {
+		include("$appName.app/**")
+		filesMatching("**/$appName") { // preserve executable bit
+			permissions { unix("rwxr-xr-x") }
+		}
+	}
 	archiveFileName.set("${project.name}-${osName}-$arch-pkg.zip")
 	destinationDirectory.set(file(appDir))
 }
