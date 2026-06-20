@@ -22,7 +22,7 @@ repositories {
 	maven("https://central.sonatype.com/repository/maven-snapshots/")
 }
 
-val junitJupiterVersion by rootProject.extra { "6.1.0" }
+rootProject.extra.set("junitJupiterVersion", "6.1.0")
 
 group = "io.calimero"
 version = "3.0-SNAPSHOT"
@@ -104,7 +104,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
 	suites {
-		val test by getting(JvmTestSuite::class) {
+		val test = named<JvmTestSuite>("test") {
 			useJUnitJupiter("${rootProject.extra.get("junitJupiterVersion")}")
 		}
 	}
@@ -174,7 +174,7 @@ tasks.named<JavaExec>("run") {
 }
 
 // graalvm native image uses jdk 25, so we can include serial-ffm which requires java 23
-val nativeImageSerialFfm by configurations.creating
+val nativeImageSerialFfm = configurations.create("nativeImageSerialFfm")
 dependencies {
 	nativeImageSerialFfm("io.calimero:calimero-serial-ffm:$version")
 }
