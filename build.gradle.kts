@@ -13,7 +13,7 @@ plugins {
 	`maven-publish`
 	signing
 	id("org.graalvm.buildtools.native") version "1.1.2"
-	id("com.github.ben-manes.versions") version "0.54.0"
+	id("com.github.ben-manes.versions") version "0.62.0"
 }
 
 repositories {
