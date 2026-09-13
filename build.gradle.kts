@@ -22,7 +22,7 @@ repositories {
 	maven("https://central.sonatype.com/repository/maven-snapshots/")
 }
 
-rootProject.extra.set("junitJupiterVersion", "6.1.0")
+rootProject.extra.set("junitJupiterVersion", "6.1.3")
 
 group = "io.calimero"
 version = "3.0-SNAPSHOT"
