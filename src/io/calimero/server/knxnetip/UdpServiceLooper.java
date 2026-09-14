@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2016, 2025 B. Malinowsky
+    Copyright (c) 2016, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -118,7 +118,7 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 							Integer.toHexString(svc));
 			}
 		}
-		catch (final KNXFormatException e) {
+		catch (KNXFormatException | RuntimeException e) {
 			logger.log(WARNING, "received invalid frame", e);
 		}
 	}
