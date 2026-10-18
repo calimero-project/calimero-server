@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2025 B. Malinowsky
+    Copyright (c) 2010, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -2090,12 +2090,13 @@ public class KnxServerGateway implements Runnable
 					if (svc == PropertyDescRead) {
 						final int propIndex = asdu[2] & 0xff;
 						try {
-							response = ldm.getDescription(objIndex, pid, propIndex);
-							final int descPid = response[1] & 0xff;
+							final var desc = ldm.getDescription(objIndex, pid, propIndex);
 							final int objectType = ldm.interfaceObjects().get(objIndex);
+							final int descPid = desc.pid();
 							final var key = descPid <= 50 ? new PropertyKey(descPid) : new PropertyKey(objectType, descPid);
 							final var definitions = server.getInterfaceObjectServer().propertyDefinitions();
 							final var property = definitions.get(key);
+							response = desc.toByteArray();
 							if (property != null)
 								response[3] |= (byte) property.pdt();
 							response[response.length - 2] = 1;
