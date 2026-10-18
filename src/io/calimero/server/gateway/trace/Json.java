@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2023, 2023 B. Malinowsky
+    Copyright (c) 2023, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -80,12 +80,12 @@ interface Json {
 		sb.append(opener);
 		String delim = "";
 		for (final T e : elems) {
-			sb.append(delim).append(EndOfElement).append(" ".repeat(indent + Indent)).append(elemOpener);
+			sb.append(delim).append(EndOfElement).repeat(" ", indent + Indent).append(elemOpener);
 			addKeyValue(key.apply(e), value.apply(e), sb, indent + Indent);
 			sb.append(elemCloser);
 			delim = ",";
 		}
-		return sb.append(EndOfElement).append(" ".repeat(indent)).append(closer);
+		return sb.append(EndOfElement).repeat(" ", indent).append(closer);
 	}
 
 	private static void addKeyValue(final String key, final Object value, final StringBuilder sb, final int indent) {
