@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2016, 2025 B. Malinowsky
+    Copyright (c) 2016, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -203,7 +203,7 @@ final class DiscoveryService extends UdpServiceLooper
 
 			final var list = server.endpoints.stream().map(Endpoint::controlEndpoint).flatMap(Optional::stream).toList();
 			for (final ControlEndpointService ces : list)
-				sendSearchResponse(udp, ces, ext, macFilter, requestedServices, requestedDibs);
+				sendSearchResponse(udp, ces, ext, sr.getEndpoint().nat(), macFilter, requestedServices, requestedDibs);
 			return true;
 		}
 		else if (ignoreServices.contains(svc))
@@ -225,10 +225,11 @@ final class DiscoveryService extends UdpServiceLooper
 			KNXnetIPHeader.CONNECTIONSTATE_REQ);
 
 	private void sendSearchResponse(final UdpEndpointAddress dst, final ControlEndpointService ces, final boolean ext,
-			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+			final boolean nat, final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs)
+			throws IOException {
 		final ServiceContainer sc = ces.getServiceContainer();
 		if (sc.isActivated()) {
-			final var res = ces.createSearchResponse(ext, macFilter, requestedServices, requestedDibs, 0);
+			final var res = ces.createSearchResponse(ext, nat, macFilter, requestedServices, requestedDibs, 0);
 			if (res.isPresent()) {
 				final var buf = res.get();
 				final var sentOn = send(new DatagramPacket(buf, buf.length, dst.address()));

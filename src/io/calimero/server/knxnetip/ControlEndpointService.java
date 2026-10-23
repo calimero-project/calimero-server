@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2016, 2025 B. Malinowsky
+    Copyright (c) 2016, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -398,7 +398,7 @@ final class ControlEndpointService extends UdpServiceLooper
 			}
 
 			final var addr = createResponseAddress(sr.getEndpoint(), src, 1);
-			sendSearchResponse(sessionId, addr, macFilter, requestedServices, requestedDibs);
+			sendSearchResponse(sessionId, addr, sr.getEndpoint().nat(), macFilter, requestedServices, requestedDibs);
 		}
 		else if (svc == KNXnetIPHeader.DESCRIPTION_REQ) {
 			if (!checkVersion(h))
@@ -571,9 +571,9 @@ final class ControlEndpointService extends UdpServiceLooper
 		}
 	}
 
-	private void sendSearchResponse(final int sessionId, final EndpointAddress dst, final byte[] macFilter,
-			final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
-		final var res = createSearchResponse(true, macFilter, requestedServices, requestedDibs, sessionId);
+	private void sendSearchResponse(final int sessionId, final EndpointAddress dst, final boolean nat,
+			final byte[] macFilter, final byte[] requestedServices, final byte[] requestedDibs) throws IOException {
+		final var res = createSearchResponse(true, nat, macFilter, requestedServices, requestedDibs, sessionId);
 		if (res.isPresent()) {
 			send(sessionId, 0, res.get(), dst);
 			final DeviceDIB deviceDib = server.createDeviceDIB(svcCont);
@@ -582,7 +582,7 @@ final class ControlEndpointService extends UdpServiceLooper
 		}
 	}
 
-	Optional<byte[]> createSearchResponse(final boolean ext, final byte[] macFilter,
+	Optional<byte[]> createSearchResponse(final boolean ext, final boolean nat, final byte[] macFilter,
 			final byte[] requestedServices, final byte[] requestedDibs, final int sessionId) {
 
 		// we create our own HPAI from the actual socket, since
@@ -627,7 +627,7 @@ final class ControlEndpointService extends UdpServiceLooper
 		final List<DIB> dibs = new ArrayList<>();
 		set.forEach(dibType -> createDib(dibType, dibs, ext, sessionId));
 
-		final HPAI hpai = new HPAI(HPAI.IPV4_UDP, local);
+		final HPAI hpai = nat ? HPAI.Nat : new HPAI(HPAI.IPV4_UDP, local);
 		final byte[] buf = PacketHelper.toPacket(new SearchResponse(ext, hpai, dibs));
 		return Optional.of(buf);
 	}
