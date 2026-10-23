@@ -55,6 +55,7 @@ import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.UdpSocketLooper;
 import io.calimero.knxnetip.EndpointAddress;
+import io.calimero.knxnetip.TcpEndpointAddress;
 import io.calimero.knxnetip.UdpEndpointAddress;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.util.HPAI;
@@ -160,9 +161,10 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 			final int logEndpointType) {
 		final String type = logEndpointType == 1 ? "control" : logEndpointType == 2 ? "data" : "";
 
-		// if we once decided on NAT aware communication, we will stick to it,
+		// UDP NAT: if we once decided on NAT aware communication, we will stick to it,
 		// regardless whether subsequent HPAIs contain useful information
-		if (useNat) {
+		// TCP: always uses route-back HPAI
+		if (useNat || sender instanceof TcpEndpointAddress) {
 			if (logEndpointType != 0)
 				logger.log(DEBUG, "responses use route-back {0} endpoint {1}", type, sender);
 			return sender;
