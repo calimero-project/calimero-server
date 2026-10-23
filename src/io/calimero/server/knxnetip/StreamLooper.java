@@ -36,6 +36,7 @@
 
 package io.calimero.server.knxnetip;
 
+import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
@@ -109,7 +110,7 @@ abstract sealed class StreamLooper implements Runnable, AutoCloseable
 						}
 					}
 					catch (final KNXFormatException e) {
-						logger.log(WARNING, "received invalid frame", e);
+						logger.log(INFO, "received invalid frame", e);
 						break;
 					}
 				}
@@ -169,7 +170,7 @@ abstract sealed class StreamLooper implements Runnable, AutoCloseable
 			for (final var ep : ces.connections().values()) {
 				if (ep.remoteAddress().equals(endpoint))
 					scope.execute(() -> ep.close(CloseEvent.SERVER_REQUEST,
-							reason.isEmpty() ? "connection closing" : reason, Level.DEBUG, null));
+							reason.isEmpty() ? "connection closing" : reason, DEBUG, null));
 			}
 		}
 
@@ -201,11 +202,11 @@ abstract sealed class StreamLooper implements Runnable, AutoCloseable
 
 	private boolean sanitize(final KNXnetIPHeader h, final int length) {
 		if (h.getTotalLength() > length)
-			logger.log(WARNING, "received frame with expected length {0} does not match actual length {1} - ignored",
+			logger.log(INFO, "received frame with expected length {0} does not match actual length {1} - ignored",
 					h.getTotalLength(), length);
 		else if (h.getServiceType() == 0)
 			// check service type for 0 (invalid type), so unused service types of us can stay 0 by default
-			logger.log(WARNING, "received frame with service type 0 - ignored");
+			logger.log(DEBUG, "received frame with service type 0 - ignored");
 		else
 			return true;
 		return false;

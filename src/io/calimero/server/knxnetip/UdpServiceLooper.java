@@ -118,7 +118,10 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 							Integer.toHexString(svc));
 			}
 		}
-		catch (KNXFormatException | RuntimeException e) {
+		catch (final KNXFormatException e) {
+			logger.log(INFO, "received invalid frame", e);
+		}
+		catch (final RuntimeException e) {
 			logger.log(WARNING, "received invalid frame", e);
 		}
 	}
@@ -133,7 +136,7 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 	{
 		final boolean ok = h.getVersion() == KNXnetIPConnection.KNXNETIP_VERSION_10;
 		if (!ok)
-			logger.log(WARNING, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
+			logger.log(INFO, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
 					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
 		return ok;
 	}
@@ -197,11 +200,11 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 	private boolean sanitize(final KNXnetIPHeader h, final int length)
 	{
 		if (h.getTotalLength() > length)
-			logger.log(WARNING, "received frame with expected length {0} does not match actual length {1} - ignored",
+			logger.log(INFO, "received frame with expected length {0} does not match actual length {1} - ignored",
 					h.getTotalLength(), length);
 		else if (h.getServiceType() == 0)
 			// check service type for 0 (invalid type), so unused service types of us can stay 0 by default
-			logger.log(WARNING, "received frame with service type 0 - ignored");
+			logger.log(DEBUG, "received frame with service type 0 - ignored");
 		else
 			return true;
 		return false;

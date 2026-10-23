@@ -170,7 +170,7 @@ final class DiscoveryService extends UdpServiceLooper
 				return true;
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			if (sr.getEndpoint().hostProtocol() != HPAI.IPV4_UDP) {
-				logger.log(WARNING, "search requests to a discovery endpoint are only supported for UDP/IP");
+				logger.log(INFO, "search requests to a discovery endpoint are only supported for UDP/IP");
 				return true;
 			}
 
