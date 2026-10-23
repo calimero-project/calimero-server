@@ -36,6 +36,7 @@
 
 package io.calimero.server.knxnetip;
 
+import static io.calimero.knxnetip.KNXnetIPConnection.KNXNETIP_VERSION_10;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -54,9 +55,7 @@ import io.calimero.KNXFormatException;
 import io.calimero.KnxRuntimeException;
 import io.calimero.internal.UdpSocketLooper;
 import io.calimero.knxnetip.EndpointAddress;
-import io.calimero.knxnetip.KNXnetIPConnection;
 import io.calimero.knxnetip.UdpEndpointAddress;
-import io.calimero.knxnetip.servicetype.ErrorCodes;
 import io.calimero.knxnetip.servicetype.KNXnetIPHeader;
 import io.calimero.knxnetip.util.HPAI;
 
@@ -111,10 +110,11 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 			final KNXnetIPHeader h = KNXnetIPHeader.from(data, offset);
 			if (!sanitize(h, length))
 				return;
-			if (!handleServiceType(h, data, offset + h.getStructLength(), new UdpEndpointAddress(source))) {
+			final var remote = new UdpEndpointAddress(source);
+			if (!handleServiceType(h, data, offset + h.getStructLength(), remote)) {
 				final int svc = h.getServiceType();
 				if (!ignoreServices.contains(svc))
-					logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", source,
+					logger.log(INFO, "received packet from {0} with unknown service type 0x{1} - ignored", remote,
 							Integer.toHexString(svc));
 			}
 		}
@@ -134,10 +134,11 @@ abstract class UdpServiceLooper extends UdpSocketLooper implements Runnable
 
 	boolean checkVersion(final KNXnetIPHeader h)
 	{
-		final boolean ok = h.getVersion() == KNXnetIPConnection.KNXNETIP_VERSION_10;
+		final int version = h.getVersion();
+		final boolean ok = version == KNXNETIP_VERSION_10;
 		if (!ok)
-			logger.log(INFO, "KNXnet/IP " + (h.getVersion() >> 4) + "." + (h.getVersion() & 0xf) + " "
-					+ ErrorCodes.getErrorMessage(ErrorCodes.VERSION_NOT_SUPPORTED));
+			logger.log(INFO, "unsupported KNXnet/IP protocol version {0}.{1} (expected {0}.{1})",
+					version >> 4, version & 0xf, KNXNETIP_VERSION_10 >> 4, KNXNETIP_VERSION_10 & 0xf);
 		return ok;
 	}
 

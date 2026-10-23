@@ -164,13 +164,13 @@ final class DiscoveryService extends UdpServiceLooper
 		final int svc = h.getServiceType();
 		if (svc == KNXnetIPHeader.SEARCH_REQ || svc == KNXnetIPHeader.SearchRequest) {
 			// A request for TCP communication or a request using an unsupported
-			// protocol version should result in a host protocol type error.
-			// But since there is no status field in the search response, we log and ignore such requests.
+			// protocol version shall be discarded.
 			if (!checkVersion(h))
 				return true;
 			final SearchRequest sr = SearchRequest.from(h, data, offset);
 			if (sr.getEndpoint().hostProtocol() != HPAI.IPV4_UDP) {
-				logger.log(INFO, "search requests to a discovery endpoint are only supported for UDP/IP");
+				logger.log(INFO, "ignoring search request to the discovery endpoint from {0}: unexpected host protocol code {1}",
+						src, "0x%02x".formatted(sr.getEndpoint().hostProtocol()));
 				return true;
 			}
 
