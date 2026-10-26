@@ -852,7 +852,7 @@ public class KnxServerGateway implements Runnable
 
 			// dispatch to server-side clients
 			try {
-				logger.log(DEBUG, "dispatch {0}->{1} to all server-side connections", src, dst);
+				logger.log(DEBUG, "dispatch {0}→{1} to all server-side connections", src, dst);
 				final long eventId = new FrameEvent(this, (CEMI) null).id();
 				final var apdu = prepareTimestamp(xlator, src, dst);
 
@@ -1045,7 +1045,7 @@ public class KnxServerGateway implements Runnable
 					findRoutingConnection().ifPresent(c -> dispatch(c,
 							() -> create(null, null, create(CEMILData.MC_LDATA_IND, null, ldata), false, false),
 							ind -> {
-								logger.log(DEBUG, "dispatch {0}->{1} using {2}", ldata.getSource(), dst, c);
+								logger.log(DEBUG, "dispatch {0}→{1} using {2}", ldata.getSource(), dst, c);
 								send(svcCont, c, ind, FramePath.ClientToClient);
 							}
 					));
@@ -1105,7 +1105,7 @@ public class KnxServerGateway implements Runnable
 									// send disconnect
 									final var disconnect = create(ia, ldata.getSource(),
 											create(CEMILData.MC_LDATA_IND, new byte[] { (byte) 0x81 }, ldata), false);
-									logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}->{2} using {3}",
+									logger.log(DEBUG, "defend own additional individual address {0}, dispatch {1}→{2} using {3}",
 											dst, disconnect.getSource(), disconnect.getDestination(), client);
 									asyncSend(svcCont, client, disconnect, FramePath.LocalToClient);
 									return;
@@ -1260,7 +1260,7 @@ public class KnxServerGateway implements Runnable
 									dispatchToSubnet(os, send, fe.systemBroadcast(), FramePath.SubnetToSubnet);
 							}
 							else
-								logger.log(TRACE, "no subnet for {0}->{1} (received {2})",
+								logger.log(TRACE, "no subnet for {0}→{1} (received {2})",
 										send.getSource(), send.getDestination(),
 										DataUnitBuilder.decode(send.getPayload(), send.getDestination()));
 						}
@@ -1506,7 +1506,7 @@ public class KnxServerGateway implements Runnable
 				// 1. look for client tunneling connection with matching assigned address
 				KnxipQueuingEndpoint c = findConnection(dst);
 				if (c != null) {
-					logger.log(TRACE, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
+					logger.log(TRACE, "dispatch {0}→{1} using {2}", f.getSource(), dst, c);
 					asyncSend(sc, c, f, path);
 				}
 				// 2. workaround for usb interfaces and interfaces with address override: allow assigning additional
@@ -1518,7 +1518,7 @@ public class KnxServerGateway implements Runnable
 						final IndividualAddress assignedAddress = connection.deviceAddress();
 						// skip devmgmt connections
 						if (assignedAddress != null) {
-							logger.log(DEBUG, "dispatch {0}->{1} ({2}) using {3}", f.getSource(), assignedAddress,
+							logger.log(DEBUG, "dispatch {0}→{1} ({2}) using {3}", f.getSource(), assignedAddress,
 									dst, connection);
 							asyncSend(sc, connection, create(null, assignedAddress, f, false), path);
 						}
@@ -1526,13 +1526,13 @@ public class KnxServerGateway implements Runnable
 					// also dispatch via routing as-is
 					c = findRoutingConnection().orElse(null);
 					if (c != null) {
-						logger.log(DEBUG, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
+						logger.log(DEBUG, "dispatch {0}→{1} using {2}", f.getSource(), dst, c);
 						asyncSend(sc, c, f, path);
 					}
 				}
 				// 3. look for activated client-side routing
 				else if ((c = findRoutingConnection().orElse(null)) != null) {
-					logger.log(DEBUG, "dispatch {0}->{1} using {2}", f.getSource(), dst, c);
+					logger.log(DEBUG, "dispatch {0}→{1} using {2}", f.getSource(), dst, c);
 					asyncSend(sc, c, f, path);
 				}
 				else {
@@ -1580,7 +1580,7 @@ public class KnxServerGateway implements Runnable
 
 	private void dispatchLdataToClients(final SubnetConnector subnet, final CEMILData f, final long eventId,
 			final FrameEvent recordFrameEvent, final FramePath path) {
-		logger.log(DEBUG, "dispatch {0}->{1} to all server-side connections", f.getSource(), f.getDestination());
+		logger.log(DEBUG, "dispatch {0}→{1} to all server-side connections", f.getSource(), f.getDestination());
 		final ServiceContainer sc = subnet.getServiceContainer();
 		for (final var conn : serverConnections) {
 			CEMI send = f;
@@ -1717,7 +1717,7 @@ public class KnxServerGateway implements Runnable
 			if (usb) {
 				final var subnetAddress = subnet.getServiceContainer().getMediumSettings().getDeviceAddress();
 				if (!f.getSource().equals(subnetAddress) && SecureApplicationLayer.isSecuredService(f)) {
-					logger.log(WARNING, "{0}->{1} source address mismatch: cannot forward secure service to {2}", f.getSource(),
+					logger.log(WARNING, "{0}→{1} source address mismatch: cannot forward secure service to {2}", f.getSource(),
 							f.getDestination(), subnet.getName());
 					return;
 				}
@@ -2159,7 +2159,7 @@ public class KnxServerGateway implements Runnable
 		final byte[] device = ldm.getProperty(deviceObject, objectInstance, PID.DEVICE_ADDRESS, 1, 1);
 		final IndividualAddress current = new IndividualAddress(new byte[] { subnet[0], device[0] });
 		if (!current.equals(configured)) {
-			logger.log(WARNING, "KNX address mismatch with USB interface: currently {0}, configured {1} -> assigning {2}", current,
+			logger.log(WARNING, "KNX address mismatch with USB interface: currently {0}, configured {1} → assigning {2}", current,
 					configured, configured);
 			final byte[] addr = configured.toByteArray();
 			ldm.setProperty(deviceObject, objectInstance, PID.SUBNET_ADDRESS, 1, 1, addr[0]);
@@ -2216,7 +2216,7 @@ public class KnxServerGateway implements Runnable
 		int count = msg.getHopCount();
 		// if counter == 0, discard frame
 		if (count == 0) {
-			logger.log(WARNING, "hop count 0, discard frame {0}->{1}", msg.getSource(), msg.getDestination());
+			logger.log(WARNING, "hop count 0, discard frame {0}→{1}", msg.getSource(), msg.getDestination());
 			return null;
 		}
 		// otherwise, decrement and forward

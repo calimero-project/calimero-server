@@ -1,6 +1,6 @@
 /*
     Calimero 3 - A library for KNX network access
-    Copyright (c) 2010, 2025 B. Malinowsky
+    Copyright (c) 2010, 2026 B. Malinowsky
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -239,7 +239,7 @@ public final class DataEndpoint extends ConnectionBase implements KnxipQueuingEn
 			if (src == null) { // don't bother, socket got closed
 				return;
 			}
-			logger.log(TRACE, "send {0}->{1} {2}", new UdpEndpointAddress((InetSocketAddress) src),
+			logger.log(TRACE, "send {0}→{1} {2}", new UdpEndpointAddress((InetSocketAddress) src),
 					actualDst, HexFormat.ofDelimiter(" ").formatHex(buf));
 
 			if (useNat || actualDst.equals(ctrlEp()))
