@@ -2222,8 +2222,9 @@ public class KnxServerGateway implements Runnable
 		// otherwise, decrement and forward
 		--count;
 		if (msg instanceof final CEMILDataEx ldataEx) {
-			ldataEx.setHopCount(count);
-			return msg;
+			final CEMILDataEx copy = ldataEx.clone();
+			copy.setHopCount(count);
+			return copy;
 		}
 		return new CEMILData(msg.getMessageCode(), msg.getSource(), msg.getDestination(),
 				msg.getPayload(), msg.getPriority(), msg.isRepetition(), count);
